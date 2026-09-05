@@ -122,3 +122,59 @@ command layer at all). direflail asked to hold off deciding and talk it through 
 **Next step, when picked up:** a conversation (or a fresh `superpowers:brainstorming` pass, if it
 turns out to be Architectural-sized) specifically about where enforcement fits relative to #1 and
 to v1's existing skills — before any hook or lint script gets designed.
+
+## #4: Real per-language/per-domain default stacks for /orc-code — mostly undecided, one confirmed
+
+Raised by direflail (2026-09-05) while designing `/orc-code`'s defaults table (part of #1's work).
+When asked for real personal stack preferences to bake in (replacing the original idea's
+illustrative placeholder), only one came back genuinely settled; everything else surfaced is real
+signal about direction but not yet a decision:
+
+- **Confirmed**: Java desktop → Java + Spring + JavaFX.
+- **Unsettled, named as real interests or open questions, not decisions**: Python desktop (unsure
+  of the modern stack, guessed "close to what Orcshot uses" but not confirmed), .NET 8 + C# for
+  possible Windows desktop work, Unity for game development (wants to explore), mobile (wants
+  Android native, iOS native, AND something cross-platform, but hasn't picked any of the three),
+  web (HTML5/CSS/JS/React/Python confirmed as the toolset, but not yet mapped into specific
+  default combos), database strategy across all of the above ("we'll need to discuss what to use
+  in which case" — explicitly not resolved), containerization (Docker — wants to explore),
+  observability (Grafana/Prometheus/Loki — wants to explore).
+
+**Why this matters:** `/orc-code`'s defaults table is meant to reflect direflail's real, settled
+preferences so the tool proposes something genuinely useful — baking in a guess for a stack
+that isn't actually decided would give false-confidence suggestions, working against the whole
+"built for me" premise of this project.
+
+**Scope boundary, decided for now:** `/orc-code` v1's defaults table contains only the one
+confirmed entry (Java desktop). Every other case falls through to asking directly — which was
+already the design's fallback behavior when no default exists, so this isn't a workaround, just
+an accurate reflection of what's actually settled today.
+
+**Next step, when picked up:** likely several separate conversations/research passes, not one —
+these domains (desktop-per-language, mobile strategy, web-stack-to-default mapping, database
+strategy, containerization, observability) are different enough from each other that treating them
+as one research question would repeat the same "too much at once" problem this entry itself was
+split out to avoid.
+
+## #5: `/orc-data` — a command for tracking legacy-system info during refactor work
+
+Raised by direflail (2026-09-05) alongside `/orc-code`'s design, describing the real motivation
+behind the whole Orclab project: direflail's day job involves bringing 20-year-old Java/C# systems
+up to modern standards, and wants a dedicated way to store and organize information about the
+system being refactored, to support actually moving it to the new one.
+
+**Real overlap worth checking before designing anything new:** `code-modernization` (the same
+plugin `/orc-code refactor` already wraps, per #1's design) ships `modernize-map` and
+`modernize-extract-rules` commands — real, existing steps in its workflow that sound like they
+may already cover exactly this need (mapping a legacy system's structure, extracting its rules).
+Worth reading what those two commands actually do, concretely, before assuming `/orc-data` needs
+to be built from scratch — the same "wrap, don't reinvent" instinct already applied to
+`/orc-code refactor` itself.
+
+**Scope boundary:** nothing decided yet — no data shape, no fields, no relationship to
+`modernize-map`/`modernize-extract-rules` has been evaluated. Not part of #1's `/orc-code` work.
+
+**Next step, when picked up:** read `code-modernization`'s `modernize-map.md` and
+`modernize-extract-rules.md` in full first — if they already solve this, `/orc-data` might end up
+being a thin wrapper (same shape as `/orc-code refactor`) rather than new logic. Then a fresh
+`superpowers:brainstorming` pass for whatever gap remains.
