@@ -11,5 +11,6 @@ All notable changes to this project are documented here, newest first.
 - `/orc-help` (and `/orc` as an alias) — reports Orclab's own running version and a synopsis of
   its available commands, aware of whether it's running in Orclab's own repo or a project that
   has it installed.
-- The `.orclab/` directory convention — reserved, gitignored, per-project home for Orclab's own
-  future private bookkeeping (not yet populated by anything in this release).
+- The `.orclab/` directory convention — reserved as a future, per-project home for Orclab's own
+  private bookkeeping. Not yet created, populated, or gitignored by anything in this release —
+  decided as a convention for later use, not built yet.

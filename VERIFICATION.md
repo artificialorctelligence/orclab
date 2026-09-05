@@ -115,6 +115,11 @@ situations (empty scratch dir, existing project, etc.).
 
 ## Scenario 11: /orc-version release
 
+**Caution:** if Scenario 9's probe bump wasn't kept (i.e. you already ran `git reset --hard
+v0.3.0` to revert it), don't run this scenario against that reverted state — only run it against
+a real bump you actually intend to publish. This is the only scenario in this script that makes
+something public and irreversible.
+
 1. After running Scenario 9 (or any real bump) and deciding to keep it, run
    `/orc-version release`.
 2. **Expected:** the commit and tag get pushed to `origin`, and a real GitHub Release is created

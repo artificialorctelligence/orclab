@@ -20,6 +20,10 @@ inside any other project, it's that project.
    Strip the leading `v` — that's the current version.
 3. If neither exists, there is no current version yet — treat this as the very first version
    being established.
+4. **If both exist and disagree**: the most recent `v*` git tag is always authoritative — report
+   both values plainly and use the tag's version as the current version, not `plugin.json`'s. A
+   `plugin.json` that drifted out of sync (a hand-edit, a bad merge) should never silently become
+   the new source of truth for computing the next version.
 
 ## Step 1: Parse $ARGUMENTS and route
 

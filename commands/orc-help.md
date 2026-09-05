@@ -17,13 +17,17 @@ Orclab's installed plugin files happen to live — those can be different places
 Run the same discovery approach `/orc-code` uses for finding other plugins, applied to find
 Orclab itself: search for every `.claude-plugin/plugin.json` file under
 `~/.claude/plugins/marketplaces/` and `~/.claude/plugins/cache/`, and find the one whose `"name"`
-field is exactly `orclab`. Its containing directory is Orclab's own installed root. Read that
-file's `"version"` field.
+field is exactly `orclab`. Its containing directory is Orclab's own installed root.
 
-If you're in core context (Step 1), this discovered location IS the current working directory —
-report its version directly. If you're in project context, this discovered location is wherever
-Orclab actually got installed from (which may differ from the current directory) — report its
-version the same way.
+- **If a match is found**: read that file's `"version"` field and report it as Orclab's running
+  version.
+- **If no match is found**: Orclab isn't currently registered as a marketplace or installed as a
+  plugin anywhere on this machine. In core context (Step 1), fall back to the current working
+  directory's own `.claude-plugin/plugin.json` (the same file Step 1 already read to determine
+  context) and report its version as the working copy's version — note plainly that this is the
+  working copy, not an installed one, since no installed copy was found. In project context with
+  no match, say plainly that Orclab isn't installed as a plugin here and its version can't be
+  determined.
 
 ## Step 3: List available commands
 
