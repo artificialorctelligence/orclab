@@ -45,3 +45,53 @@ stored/overridden per project.
 **Next step, when picked up:** a fresh `superpowers:brainstorming` pass (Architectural path,
 given it's a new subsystem with its own command surface and inference logic), separate from v1's
 spec and plan.
+
+## #2: A base visual/design-system layer for apps Orclab helps build — a future sub-project, not v1
+
+Raised by direflail (2026-09-04), separately from #1 and from v1's process-core scope: right now
+Orclab has no opinion at all about how the apps it helps build actually *look* — how desktop apps,
+mobile apps, and web apps are styled, scaled, and made to behave visually, across platforms. The
+concrete comparison direflail gave: Caterpillar (their employer) has an internal framework called
+"Blocks," built on React, that fills exactly this role there — but it's employer-owned and can't
+be used outside work, so a real gap exists for personal/other-project work.
+
+**What this is NOT**: not another web framework (React/Vue/Angular/Svelte) — those were already
+ruled out as beside the point in this same conversation; direflail was explicit that the ask is
+about the visual/design layer that sits *on top of* those, not the framework itself. Also not
+CSS-utility libraries (Bootstrap, Semantic UI) or admin-panel generators (Refine, react-admin) —
+those came up in initial research but don't match the "controls look/scale/behavior across
+desktop and web platforms" framing once direflail clarified the actual ask.
+
+**Real candidates surfaced by research (not yet evaluated hands-on, not yet decided)**, roughly in
+three layers that would likely need to be picked in combination, not as a single choice:
+
+- **Full design systems** (closest analogs to Caterpillar's Blocks — token-driven theming plus a
+  complete component set plus cross-platform scaling rules): Material Design 3 (Google), Fluent UI
+  (Microsoft — adaptive layouts scaling across Windows desktop/web/mobile), Carbon (IBM —
+  framework-agnostic: React/Angular/Vue/Svelte/web components), Ant Design (strong for data-dense,
+  desktop-style apps), GitHub Primer (developer-tool focused).
+- **UI component libraries** (the practical implementation layer): shadcn/ui (copy-paste model on
+  Radix primitives + Tailwind — you own the source directly, no vendored dependency to work
+  around), Chakra UI, MUI (works for web and Electron desktop), Radix UI (unstyled, accessible
+  primitives only — maximum control, bring your own visual design).
+- **Design tokens** (the actual cross-platform-scaling mechanism underneath either of the above):
+  Style Dictionary (Amazon — transforms tokens into CSS/iOS/Android/etc. — the current industry
+  standard), Diez (compose tokens in TypeScript, compile to native iOS/Android/Web libraries), the
+  W3C Design Tokens spec (stable v1 as of October 2025 — vendor-neutral token format).
+
+No hands-on evaluation of any of these has happened yet — this is raw research, not a decision.
+An initial framing (not a recommendation to commit to) leaned toward Fluent UI or Carbon as the
+closest single-framework analogs to Blocks, versus shadcn/ui + Radix + Tailwind + a token system
+as the more modern, full-code-ownership alternative — but this needs real comparison against
+Orclab's actual target platforms (desktop apps, mobile apps, web apps specifically) before
+choosing, not just a feature-list comparison.
+
+**Why this matters:** without this, every app Orclab helps scaffold or build would need its visual
+styling decided from scratch each time, with no consistent base — the same kind of repeated,
+undistilled decision-making this whole framework project exists to avoid.
+
+**Next step, when picked up:** a fresh `superpowers:brainstorming` pass (Architectural path — this
+is a new subsystem, and the choice of base framework has wide-reaching downstream consequences for
+anything built on it), separate from v1's spec/plan and from #1's command-layer work. Likely needs
+its own research spike comparing 2-3 real candidates against Orclab's actual target platforms
+before a design gets proposed, not a decision made from the comparison table alone.
