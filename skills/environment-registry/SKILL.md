@@ -60,6 +60,13 @@ is still accurate (the live listing command, not the memory file's cached descri
 relying on it. A memory file doesn't update itself if an environment was added or removed since it
 was last written.
 
+## Relationship to superpowers
+
+This skill covers environment-registry discipline only — what a good entry contains and when to
+write one. It doesn't replace `superpowers`' generic process skills (`superpowers:brainstorming`,
+`superpowers:subagent-driven-development`, etc.), which remain available for everything outside
+registering and reading back real test environments.
+
 ## What NOT to do
 
 - Don't write speculative entries for environments that might exist someday — only real, actually-

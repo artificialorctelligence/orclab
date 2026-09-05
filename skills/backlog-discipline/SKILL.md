@@ -35,8 +35,13 @@ Then add the first entry below it, numbered `#1`.
 ## Numbering
 
 Scan the file for every `## #N:` heading and take the highest `N` seen. The new entry is `N + 1`.
-Numbers are never reused (see Deletion below), so scanning the current file is always sufficient
-— there's no need to consult git history for numbers that no longer appear.
+
+**Exception — the highest-numbered entry itself was deleted:** scanning the file alone then finds
+a lower maximum than history actually reached, which would silently reuse a number that's
+supposed to be permanent (see Deletion below). Before numbering a new entry, check whether a
+higher number ever existed — `git log -S'## #' -- BACKLOG.md` (or equivalent) — and take the true
+historical maximum, not just the current file's. Every other deletion (anywhere but the current
+maximum) leaves the file's own maximum unaffected, so scanning the file alone is sufficient there.
 
 ## Writing a new entry
 
@@ -77,6 +82,14 @@ When deleting: remove the entire `## #N: ...` section. **Do not renumber any oth
 not reuse `N` for a future entry.** A gap in the numbering (e.g. #187, #189, with no #188) is
 expected and correct — it's a real signal that something was found and explicitly judged not
 worth tracking, not a bug in the file.
+
+## Relationship to superpowers
+
+This skill covers backlog discipline only — tracking real findings in a single file. It doesn't
+replace the surrounding brainstorm → spec → plan → build → verify → merge cycle; that's
+`superpowers`' job (`superpowers:brainstorming`, `superpowers:writing-plans`,
+`superpowers:subagent-driven-development`). This skill assumes that cycle is available for
+everything outside backlog entries themselves, rather than reimplementing it.
 
 ## What NOT to do
 

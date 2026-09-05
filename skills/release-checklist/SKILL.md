@@ -65,6 +65,13 @@ correct dependency order, renumbering subsequent steps, and note briefly why it 
 release, what gap) the same way this skill's own security-check example above does — so a future
 reader understands why the step exists, not just that it does.
 
+## Relationship to superpowers
+
+This skill covers the release-checklist discipline only. Deciding whether a new checklist step
+needs its own design pass first, or executing the work a step requires, is `superpowers`' job
+(`superpowers:brainstorming`, `superpowers:subagent-driven-development`) — this skill doesn't
+reimplement that cycle, it assumes it's available.
+
 ## What NOT to do
 
 - Don't write a step you haven't actually verified works — a checklist step that silently fails

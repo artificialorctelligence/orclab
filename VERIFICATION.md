@@ -1,9 +1,9 @@
 # Orclab v1 verification script
 
-Run these three scenarios in a **fresh Claude Code session, in the Orcshot project directory**
+Run these scenarios in a **fresh Claude Code session, in the Orcshot project directory**
 (`~/projects/orcshot`), after installing Orclab per `README.md`. Orcshot already has a real
-`BACKLOG.md` and (once the second scenario is run) a real `RELEASING.md` in exactly the shape
-these skills model from, making it a better verification target than a throwaway project.
+`BACKLOG.md` and a real `RELEASING.md` in exactly the shape these skills model from, making it a
+better verification target than a throwaway project.
 
 ## Scenario 1: backlog-discipline
 
@@ -42,6 +42,14 @@ these skills model from, making it a better verification target than a throwaway
    file in the Orcshot repo — confirm with `git status` in Orcshot that nothing changed there.
 4. **Expected throughout:** at no point does Claude ask for, display, or type an actual password
    — if any step would require one, it should stop and describe the prompt instead.
+
+## Scenario 4: scaffolding on first use
+
+1. In a throwaway empty scratch directory (not Orcshot — this specifically tests the no-file-yet
+   path), ask Claude to log a real finding to the backlog.
+2. **Expected:** `BACKLOG.md` is created first, with the exact standard header from
+   `skills/backlog-discipline/SKILL.md`'s "If `BACKLOG.md` doesn't exist yet" section, and then
+   the new entry is added below it as `#1`.
 
 ## Recording the result
 

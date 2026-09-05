@@ -103,7 +103,8 @@ a deferred decision, an open question with a real (not hypothetical) consequence
 - One `## #N: title` entry per finding. `N` is monotonically increasing across the file's history
   and is **never reused**, even for a deleted entry — Orcshot's own #188 was deleted outright and
   no later entry has claimed #188 again. The skill determines the next `N` by scanning existing
-  entries for the current maximum, not by counting remaining entries.
+  entries for the current maximum — except when the deleted entry *was* that maximum, in which
+  case the file alone understates history and the true max must come from git history instead.
 - An entry keeps its original diagnostic context — what was found and why it matters, with real
   consequences spelled out, not just a one-line task description.
 - Resolving an entry **appends** a resolution note (e.g. a `(RESOLVED YYYY-MM-DD)` suffix on the

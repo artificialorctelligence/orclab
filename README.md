@@ -23,4 +23,5 @@ Register this directory as a local plugin marketplace, then install the plugin:
 ## Status
 
 v1 — process core. See `docs/superpowers/specs/` for the design history and `BACKLOG.md` for
-what's deliberately deferred (a `/orc-*` command layer is tracked as #1).
+what's deliberately deferred (a `/orc-*` command layer is tracked as #1). See `VERIFICATION.md`
+for the dogfood script that confirms these skills actually work once installed in a real project.
