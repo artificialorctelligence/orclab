@@ -25,13 +25,17 @@ field is exactly `orclab`. Its containing directory is Orclab's own installed ro
   plugin anywhere on this machine. In core context (Step 1), fall back to the current working
   directory's own `.claude-plugin/plugin.json` (the same file Step 1 already read to determine
   context) and report its version as the working copy's version — note plainly that this is the
-  working copy, not an installed one, since no installed copy was found. In project context with
-  no match, say plainly that Orclab isn't installed as a plugin here and its version can't be
-  determined.
+  working copy, not an installed one, since no installed copy was found. The current working
+  directory is the plugin root for Step 3 in this case. In project context with no match, say
+  plainly that Orclab isn't installed as a plugin here and its version can't be determined, and
+  **stop — do not proceed to Step 3**, since there is no discovered root to list commands from.
 
 ## Step 3: List available commands
 
-In the discovered plugin root from Step 2, list every file under `commands/*.md`. For each one,
+(Skip this step entirely if Step 2 ended in the project-context/no-match case — it already told
+you to stop.) In the plugin root established by Step 2 — the discovered installed root, or the
+current working directory fallback in core context — list every file under `commands/*.md`. For
+each one,
 read its `description` frontmatter field. Present a one-line synopsis per command, in this shape:
 
 ```
