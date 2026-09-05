@@ -18,6 +18,11 @@ other projects (starting with Orcshot).
 - **/orc-code** — start a new project, add to an existing one, or refactor/migrate existing code.
   Routes deterministically to one of three flows, wrapping the `feature-dev` and
   `code-modernization` plugins where applicable rather than reimplementing their work.
+- **/orc-version** — set or increment the current project's version, draft a changelog entry from
+  real git history, tag the commit, and optionally cut a real GitHub Release
+  (`/orc-version release`).
+- **/orc-help** (alias: **/orc**) — reports Orclab's own running version and a synopsis of its
+  available commands.
 
 ## Installing
 
@@ -28,7 +33,9 @@ Register this directory as a local plugin marketplace, then install the plugin:
 
 ## Status
 
-v1 (process core) + v2 (`/orc-code`) shipped. See `docs/superpowers/specs/` for the design history
-and `BACKLOG.md` for what's deliberately deferred (real per-stack defaults research is #4,
-`/orc-data` is #5, hook-based enforcement is #3). See `VERIFICATION.md` for the dogfood script
-that confirms everything actually works once installed in a real project.
+v1 (process core) + v2 (`/orc-code`) + v3 (`/orc-version`, `/orc-help`/`/orc`) shipped. See
+`docs/superpowers/specs/` for the design history, `CHANGELOG.md` for what actually changed release
+to release, and `BACKLOG.md` for what's deliberately deferred (real per-stack defaults research is
+#4, `/orc-data` is #5, hook-based enforcement is #3, per-language manifest version-sync is #6). See
+`VERIFICATION.md` for the dogfood script that confirms everything actually works once installed in
+a real project.
