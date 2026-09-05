@@ -191,3 +191,26 @@ to be built from scratch — the same "wrap, don't reinvent" instinct already ap
 `modernize-extract-rules.md` in full first — if they already solve this, `/orc-data` might end up
 being a thin wrapper (same shape as `/orc-code refactor`) rather than new logic. Then a fresh
 `superpowers:brainstorming` pass for whatever gap remains.
+
+## #6: Per-language manifest version detection/sync for /orc-version — deferred, same reasoning as #4
+
+Raised by direflail (2026-09-05) while designing `/orc-version` (see
+`docs/superpowers/specs/2026-09-05-orclab-v3-orc-version-orc-help-design.md`): when Orclab is
+pointed at a project that already has an established version-holding file — Maven's `pom.xml`,
+npm's `package.json`, Cargo's `Cargo.toml`, and others — `/orc-version` could detect it at
+first-touch and suggest a starting version from what's already there, and/or keep that file's own
+version field in sync on every future bump (or at minimum ask each time whether to).
+
+**Why this is deferred, not built now:** real and valuable, but each format has its own real
+syntax and its own real risk of a sloppy write breaking a build — this is genuinely a per-format
+feature, not one generic mechanism. The same shape of problem as BACKLOG #4's stack-defaults
+research: broad enough that folding it into `/orc-version`'s own v1 design would have let it
+swallow everything else being decided there.
+
+**Scope boundary, decided for now:** v1 of `/orc-version` only touches `.claude-plugin/plugin.json`
+/ `marketplace.json` (when present) and falls back to `CHANGELOG.md` + a git tag otherwise. It does
+not detect or write to any other language's version-holding file.
+
+**Next step, when picked up:** likely one format at a time (Maven first, or whatever direflail
+actually needs first for real work), each with its own real syntax handled correctly — not a
+generic "detect any manifest" abstraction built speculatively ahead of a second real case.
