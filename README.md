@@ -13,6 +13,12 @@ projects (starting with Orcshot).
 - **environment-registry** — register real, live test environments (VMs, containers, staging
   servers, devices) as Claude memory, never as a git-tracked file, never storing credentials.
 
+## Commands
+
+- **/orc-code** — start a new project, add to an existing one, or refactor/migrate existing code.
+  Routes deterministically to one of three flows, wrapping the `feature-dev` and
+  `code-modernization` plugins where applicable rather than reimplementing their work.
+
 ## Installing
 
 Register this directory as a local plugin marketplace, then install the plugin:
@@ -22,6 +28,7 @@ Register this directory as a local plugin marketplace, then install the plugin:
 
 ## Status
 
-v1 — process core. See `docs/superpowers/specs/` for the design history and `BACKLOG.md` for
-what's deliberately deferred (a `/orc-*` command layer is tracked as #1). See `VERIFICATION.md`
-for the dogfood script that confirms these skills actually work once installed in a real project.
+v1 (process core) + v2 (`/orc-code`) shipped. See `docs/superpowers/specs/` for the design history
+and `BACKLOG.md` for what's deliberately deferred (real per-stack defaults research is #4,
+`/orc-data` is #5, hook-based enforcement is #3). See `VERIFICATION.md` for the dogfood script
+that confirms everything actually works once installed in a real project.
