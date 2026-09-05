@@ -1,9 +1,11 @@
-# Orclab v1 verification script
+# Orclab verification script
 
-Run these scenarios in a **fresh Claude Code session, in the Orcshot project directory**
-(`~/projects/orcshot`), after installing Orclab per `README.md`. Orcshot already has a real
-`BACKLOG.md` and a real `RELEASING.md` in exactly the shape these skills model from, making it a
-better verification target than a throwaway project.
+Run these scenarios in a **fresh Claude Code session** after installing/reinstalling Orclab per
+`README.md`. Scenarios 1-4 (v1's skills) run in the Orcshot project directory (`~/projects/orcshot`)
+— it already has a real `BACKLOG.md` and a real `RELEASING.md` in exactly the shape these skills
+model from, making it a better verification target than a throwaway project. Scenarios 5-8
+(`/orc-code`) specify their own target directory per scenario, since they cover different
+situations (empty scratch dir, existing project, etc.).
 
 ## Scenario 1: backlog-discipline
 
@@ -50,6 +52,48 @@ better verification target than a throwaway project.
 2. **Expected:** `BACKLOG.md` is created first, with the exact standard header from
    `skills/backlog-discipline/SKILL.md`'s "If `BACKLOG.md` doesn't exist yet" section, and then
    the new entry is added below it as `#1`.
+
+## Scenario 5: /orc-code new-project flow, no default exists
+
+1. In a throwaway empty scratch directory, run `/orc-code` and say you want to start something
+   new, in Python, as a CLI tool.
+2. **Expected:** since no Python default exists in the Defaults Table, Claude asks directly what
+   stack/framework you want rather than proposing anything.
+3. Answer with a simple choice (e.g. plain stdlib, no framework) and let it scaffold.
+4. **Expected:** a real project directory is created, and Claude runs a real verification command
+   (e.g. `python -m py_compile` on the created file, or an equivalent check) and reports it passed
+   before declaring the task done.
+
+## Scenario 6: /orc-code new-project flow, a default exists
+
+1. In a throwaway empty scratch directory, run `/orc-code` and say you want to start something
+   new, in Java, as a desktop app.
+2. **Expected:** Claude proposes "Java + Spring + JavaFX" specifically (the one confirmed Defaults
+   Table entry), and lets you confirm or override it.
+3. Override it with a different stack (e.g. plain Swing, no Spring) and confirm Claude proceeds
+   with your override, not the proposed default.
+
+## Scenario 7: /orc-code add-to-existing flow
+
+1. In an existing project (e.g. Orcshot itself), run `/orc-code` and describe a small, real
+   addition you'd want made, without saying "new" or "existing" explicitly if possible — see
+   whether Claude asks the routing question or infers it correctly from context.
+2. **Expected:** if the `feature-dev` plugin is installed, Claude states plainly that it's using
+   feature-dev's own workflow, and that workflow's real behavior (codebase exploration, clarifying
+   questions before implementation) is visible. If `feature-dev` is NOT installed, Claude states
+   plainly that this flow needs it and offers to help install it, rather than attempting the
+   feature ad hoc.
+
+## Scenario 8: /orc-code refactor flow, both invocation forms
+
+1. In an existing project with a clear single language (e.g. a small Java or Python file), run
+   `/orc-code refactor` explicitly, describing a version/language migration.
+2. **Expected:** Claude states plainly it's using `code-modernization`'s workflow (if installed) or
+   states the missing-dependency message (if not).
+3. Separately, run bare `/orc-code migrate this to a different language` (no literal "refactor"
+   keyword) describing a similarly clear migration intent.
+4. **Expected:** Claude routes to the same Refactor Flow without needing the literal keyword,
+   demonstrating the intent-classification routing from Step 0 of `commands/orc-code.md`.
 
 ## Recording the result
 
