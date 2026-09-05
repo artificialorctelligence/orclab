@@ -95,6 +95,44 @@ situations (empty scratch dir, existing project, etc.).
 4. **Expected:** Claude routes to the same Refactor Flow without needing the literal keyword,
    demonstrating the intent-classification routing from Step 0 of `commands/orc-code.md`.
 
+## Scenario 9: /orc-version increment, local-only
+
+1. In Orclab's own repo, run `/orc-version increment major`.
+2. **Expected:** since the current version is `0.3.0`, the result is `1.0.0` — both `plugin.json`
+   and `marketplace.json`'s version fields update to `"1.0.0"`, a changelog entry is drafted from
+   real git history since the `v0.3.0` tag, you're asked whether to add/change anything before
+   it's written, and a new commit + local tag `v1.0.0` are created.
+3. **Expected throughout:** nothing is pushed anywhere, and no GitHub Release is created — confirm
+   with `git log origin/main..HEAD` that the new commit hasn't reached the remote.
+4. Revert this probe afterward (`git reset --hard v0.3.0` — a real, deliberate throwaway test, not
+   a change to keep) unless you actually want to keep the bump.
+
+## Scenario 10: /orc-version bare invocation
+
+1. In Orclab's own repo, run `/orc-version` with no arguments.
+2. **Expected:** the current version (`0.3.0`, or whatever it's been bumped to) is reported,
+   followed by the increment/set menu — and nothing else happens; no files change.
+
+## Scenario 11: /orc-version release
+
+1. After running Scenario 9 (or any real bump) and deciding to keep it, run
+   `/orc-version release`.
+2. **Expected:** the commit and tag get pushed to `origin`, and a real GitHub Release is created
+   at `https://github.com/artificialorctelligence/orclab/releases` — confirm by checking that URL
+   or via `gh release list`.
+
+## Scenario 12: /orc-help in core vs. project context
+
+1. In Orclab's own repo, run `/orc-help`.
+2. **Expected:** reports "core" context, the real current version, and a live-read synopsis of
+   all commands present in `commands/*.md` at the time it's run (not a stale hardcoded list).
+3. In a different project that has Orclab installed (e.g. Orcshot, once dogfooded there), run
+   `/orc-help` again.
+4. **Expected:** reports "project" context, the same Orclab version as step 1 (assuming no bump
+   happened in between), and the same command synopsis.
+5. Run `/orc` (bare) in either location.
+6. **Expected:** identical output to `/orc-help` in the same location.
+
 ## Recording the result
 
 Note the outcome of each scenario (pass/fail, with specifics) either back in this conversation or
