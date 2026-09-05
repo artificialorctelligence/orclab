@@ -1,0 +1,15 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "orclab",
+  "description": "Project-discipline skills distilled from real practice: backlog tracking, release checklists, and live-environment registries.",
+  "owner": {
+    "name": "direflail"
+  },
+  "plugins": [
+    {
+      "name": "orclab",
+      "description": "Project-discipline skills distilled from real practice: backlog tracking, release checklists, and live-environment registries.",
+      "source": "./"
+    }
+  ]
+}
