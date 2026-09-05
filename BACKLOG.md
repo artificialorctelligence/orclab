@@ -95,3 +95,30 @@ is a new subsystem, and the choice of base framework has wide-reaching downstrea
 anything built on it), separate from v1's spec/plan and from #1's command-layer work. Likely needs
 its own research spike comparing 2-3 real candidates against Orclab's actual target platforms
 before a design gets proposed, not a decision made from the comparison table alone.
+
+## #3: Real enforcement for the discipline v1 only guides — not yet decided how
+
+Raised by direflail (2026-09-04) right after v1 shipped, once it became clear that v1's three
+skills (`backlog-discipline`, `release-checklist`, `environment-registry`) are pure guidance: text
+Claude reads and follows, with nothing that fails a commit or blocks an action if the discipline
+is violated (wrong `BACKLOG.md` numbering, a `RELEASING.md` step silently duplicating CI, an
+environment-registry entry that leaked into git instead of memory). direflail had been planning to
+build enforcement via the `/orc-*` command idea (#1), but flagged this as possibly its own
+consideration, separate from #1, worth discussing before deciding where it belongs.
+
+**What "enforcement" would actually mean, concretely** (not yet built, not yet designed): a
+Claude Code `hooks/` script that runs on a real event (e.g. before a commit, or after Claude edits
+`BACKLOG.md`) and actually checks the discipline mechanically — re-parses `BACKLOG.md` for
+duplicate or reused entry numbers, checks that a resolved entry's original text is still present
+verbatim, or similar — rather than trusting that Claude read and correctly applied the SKILL.md
+prose. This is a fundamentally different kind of thing than a skill: a skill shapes behavior by
+being read; a hook (or a CI lint step) verifies an outcome regardless of how it was produced.
+
+**Open question, explicitly not resolved here:** whether this belongs inside the `/orc-*`
+command-layer sub-project (#1), as its own sub-project, or as small additions directly to v1's
+existing three skills (each skill could ship its own optional lint script, without needing the
+command layer at all). direflail asked to hold off deciding and talk it through first.
+
+**Next step, when picked up:** a conversation (or a fresh `superpowers:brainstorming` pass, if it
+turns out to be Architectural-sized) specifically about where enforcement fits relative to #1 and
+to v1's existing skills — before any hook or lint script gets designed.
