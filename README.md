@@ -1,7 +1,7 @@
 # Orclab
 
-Reusable project-discipline skills for Claude Code, distilled from real practice on other
-projects (starting with Orcshot).
+Reusable project-discipline skills and commands for Claude Code, distilled from real practice on
+other projects (starting with Orcshot).
 
 ## Skills
 

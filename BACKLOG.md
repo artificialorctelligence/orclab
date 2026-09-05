@@ -4,7 +4,7 @@ Open items not yet scheduled into a task. Each entry keeps the context that led 
 "what," but "why this matters" — so picking it up later doesn't require re-deriving the reasoning
 from scratch.
 
-## #1: `/orc-*` command namespace with parameter routing and stack defaults — a future sub-project, not v1
+## #1: `/orc-*` command namespace with parameter routing and stack defaults (RESOLVED 2026-09-05)
 
 Raised by direflail while reviewing the Orclab v1 (process core) design (2026-09-04), explicitly
 as spitballing to check whether it should change v1's scope. It shouldn't, and doesn't — v1 (see
@@ -45,6 +45,19 @@ stored/overridden per project.
 **Next step, when picked up:** a fresh `superpowers:brainstorming` pass (Architectural path,
 given it's a new subsystem with its own command surface and inference logic), separate from v1's
 spec and plan.
+
+**Resolved for real, not just tracked**: shipped as `/orc-code` (Orclab v2, 2026-09-05) — see
+`docs/superpowers/specs/2026-09-05-orclab-v2-orc-code-command-design.md` and its companion plan.
+Both of this entry's own open questions got real answers: natural-language routing without a
+literal invocation is handled by reading `$ARGUMENTS` for intent (the same read-and-classify
+mechanism Claude Code's own skill matching already uses, not a separate classifier) rather than
+requiring the literal keyword; per-language/stack defaults are baked directly into
+`commands/orc-code.md`'s own Defaults Table, editable in place, currently holding exactly one
+real, confirmed entry (see #4 for the much larger, still-open research behind which defaults
+belong there). `/orc-code` covers new-project, add-to-existing, and refactor work by wrapping
+`feature-dev` and `code-modernization` rather than reimplementing them. Whether more `/orc-*`
+commands beyond `/orc-code` get built is now a separate, forward-looking question — `/orc-data` is
+already tracked on its own as #5.
 
 ## #2: A base visual/design-system layer for apps Orclab helps build — a future sub-project, not v1
 

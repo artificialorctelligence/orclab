@@ -98,5 +98,5 @@ situations (empty scratch dir, existing project, etc.).
 ## Recording the result
 
 Note the outcome of each scenario (pass/fail, with specifics) either back in this conversation or
-as a new `BACKLOG.md` entry in Orclab itself if something needs fixing before v1 is considered
-done.
+as a new `BACKLOG.md` entry in Orclab itself if something needs fixing before this work is
+considered done.
