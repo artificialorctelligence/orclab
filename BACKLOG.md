@@ -301,3 +301,27 @@ Scenario 9's revert instruction compute the expected new-major tag from the real
 rather than assuming `v1.0.0` specifically — or, more simply, tell the reader to check
 `git tag --list 'v*' --sort=-v:refname | head -1` right before deciding what to delete, rather
 than hardcoding any literal tag name at all.
+
+## #9: v5's plan never tagged its own release — caught only by tagging v0.6.0 and noticing v0.5.0 missing (RESOLVED 2026-09-06)
+
+Found 2026-09-06 while tagging v0.6.0: `git tag --list 'v*'` showed `v0.3.0`, `v0.4.0`, `v0.6.0` —
+no `v0.5.0`, despite the currency-discipline/verify-before-asserting release having been built,
+merged, and pushed under that version number. Not a deleted or lost tag — `git log --oneline --all
+| grep 0.5.0` confirmed the version-bump commit (`1eb34c7`) is real and on `main`; it was simply
+never tagged. Checked against v3's and v4's own plans: both explicitly included a "create the git
+tag" step in their versioning task. v5's plan, drafted the same way, dropped that step — a real
+gap in the plan itself, not an execution slip.
+
+**Fixed for real, not just tracked:** retroactively tagged `v0.5.0` at `1eb34c7` (2026-09-06,
+local-only, matching the existing convention that tags stay local until an explicit release
+action). All four version tags (`v0.3.0`–`v0.6.0`) now present and correct.
+
+**Why this matters beyond the one missing tag:** every future `/orc-*`-command or version-bump
+plan risks the same silent gap unless the versioning task template itself is checked against a
+real prior example (v3/v4) before being reused, not just written from memory of "what a version
+bump task looks like."
+
+**Next step, when picked up:** none needed for this instance — closing it here as resolved. Worth
+remembering during future plan-writing (`superpowers:writing-plans`) for any Orclab version-bump
+task: copy the git-tag step from an existing plan (e.g. v4's) rather than re-deriving the task
+from scratch.
