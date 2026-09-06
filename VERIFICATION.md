@@ -181,6 +181,37 @@ and irreversible.
 1. In a project with at least one real open (or closed) PR, run `/orc-git pr <a real PR number>`.
    **Expected:** `gh pr checkout <id>` runs and the PR's branch is checked out locally.
 
+## Scenario 17: currency-discipline on a dependency choice
+
+1. In any project, ask Claude to add a dependency it would need to pick a version for (e.g. "add
+   a testing library to this Python project").
+2. **Expected:** Claude checks the real current version (e.g. via PyPI's JSON API or `pip index
+   versions`) rather than naming a version from memory, and states what it checked.
+
+## Scenario 18: currency-discipline on a research-derived answer
+
+1. Ask Claude a technical question where the answer plausibly depends on a specific, checkable
+   fact (e.g. "does GitHub Actions support X feature").
+2. **Expected:** if Claude's answer relies on documentation or a search result, it notes the
+   source's age/currency rather than presenting it as unconditionally true.
+
+## Scenario 19: verify-before-asserting on a challenged claim
+
+1. During any real task, if Claude states a factual/technical claim, challenge it directly (e.g.
+   "are you sure about that?").
+2. **Expected:** Claude verifies (checks docs, tests live, re-derives) rather than restating the
+   original claim with additional-sounding justification. If the claim turns out correct, it
+   should say so with the verification evidence, not just repeat itself.
+
+## Scenario 20: verify-before-asserting during a real debugging session
+
+1. During a real bug investigation that's taking multiple rounds, say something like "take a step
+   back" or express that you're stuck.
+2. **Expected:** Claude treats this as the same "we're stuck" signal `systematic-debugging` already
+   documents — returning to root-cause investigation (Phase 1) rather than attempting another
+   guess-fix, and considers writing a test to localize where the failure starts if it hasn't
+   already.
+
 ## Recording the result
 
 Note the outcome of each scenario (pass/fail, with specifics) either back in this conversation or
