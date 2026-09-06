@@ -38,6 +38,12 @@ Register this directory as a local plugin marketplace, then install the plugin:
     /plugin marketplace add ~/projects/orclab
     /plugin install orclab@orclab
 
+**Known gap, confirmed live (2026-09-06):** the `/orc-*` commands (`commands/*.md`) work correctly
+via the CLI, but the Claude Desktop client doesn't register plugin `commands/*.md` files as slash
+commands at all — typing `/orc-code` or `/orc` there returns "Unknown command." Skills don't have
+this problem. See `CLAUDE.md` for what this means for future components; existing commands don't
+yet have a Desktop-compatible wrapper skill.
+
 ## Status
 
 v1 (process core) + v2 (`/orc-code`) + v3 (`/orc-version`, `/orc-help`/`/orc`) + v4 (`/orc-git`) +
@@ -45,5 +51,12 @@ v5 (`currency-discipline`, `verify-before-asserting`) shipped. See `docs/superpo
 the design history, `CHANGELOG.md` for what actually changed release to release, and `BACKLOG.md`
 for what's deliberately deferred (real per-stack defaults research is #4, `/orc-data` is #5,
 hook-based enforcement is #3, per-language manifest version-sync is #6, distribution-channel
-metrics is #7). See `VERIFICATION.md` for the dogfood script that confirms everything actually
-works once installed in a real project.
+metrics is #7, stale VERIFICATION.md version literals is #8). See `VERIFICATION.md` for the
+dogfood script that confirms everything actually works once installed in a real project.
+
+## Developing Orclab
+
+See `CLAUDE.md` for real, verified guidance on how Claude Code's command/skill system actually
+works — commands vs. skills, invocation determinism, `disable-model-invocation`, sub-skill
+isolation, and bundling scripts — learned while building `/orc-code` through `/orc-git`. Read it
+before designing the next `/orc-*` command or skill.
