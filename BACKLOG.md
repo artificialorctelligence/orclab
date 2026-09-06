@@ -214,3 +214,53 @@ not detect or write to any other language's version-holding file.
 **Next step, when picked up:** likely one format at a time (Maven first, or whatever direflail
 actually needs first for real work), each with its own real syntax handled correctly — not a
 generic "detect any manifest" abstraction built speculatively ahead of a second real case.
+
+## #7: Distribution-channel download/install metrics — carried over from Orcshot #186, direflail wants Orclab to own this eventually
+
+Raised by direflail (2026-09-06), explicitly carrying over Orcshot's own `BACKLOG.md` #186 (raised
+there 2026-08-28, still open, not resolved on that side) and widening it: direflail wants whatever
+this becomes to live in Orclab, not as an Orcshot-specific script, since any project publishing to
+multiple distribution channels would want the same thing. Not wanted yet — direflail's own words:
+"it doesn't have to be done yet."
+
+**The original ask, verbatim from Orcshot's #186:** "find out what metrics we can get about how
+many downloads we get. i don't want anything but numbers to make myself feel good." An explicit
+constraint, not just phrasing — this is about reading whatever numbers each distribution channel
+already publishes on its own, never about adding tracking, telemetry, or analytics to a project
+that doesn't already have it. No phone-home code, nothing that reports on real users.
+
+**What Orcshot's #186 already confirmed real, carried over here rather than re-derived:**
+GitHub Releases exposes a genuine per-asset download counter today — `gh release view <tag>
+--json assets` returns a real `downloadCount` field per asset. Trivial to check for any project
+with a real release.
+
+**What Orcshot's #186 left unchecked, still genuinely open:** whether Launchpad exposes any public
+download/install statistics for PPA packages at all — a known, long-standing gap/frustration in
+the Launchpad community (unlike Debian's own opt-in popularity-contest mechanism), never confirmed
+one way or the other. Also unchecked: whether a PPA `apt install` is even the kind of thing
+Launchpad *could* count, since PPA downloads happen from Launchpad's own mirror infrastructure,
+not a single trackable endpoint the way a GitHub Release asset is.
+
+**Real widening beyond what #186 itself covers**, per direflail's own explicit framing today
+(apt/Snap/Flatpak, not just apt/GitHub): Snap Store publishes real, documented install/metrics
+data (`snapcraft metrics <snap-name>` and the Snap Store's own developer dashboard) — not yet
+confirmed live for any real project, just known to exist as a real mechanism worth checking.
+Flathub also publishes real public per-app download statistics (flathub.org/stats and a
+documented API) — also not yet confirmed live, same status.
+
+**Why this belongs in Orclab, not Orcshot:** the actual mechanism per channel (GitHub's API,
+`snapcraft metrics`, Flathub's stats API, whatever Launchpad turns out to offer or not) is
+identical for any project publishing through that channel — this is exactly the kind of "core"
+guidance direflail's own taxonomy describes, not something specific to Orcshot's own packaging.
+
+**Scope boundary:** nothing built, nothing even fully researched yet — Launchpad's real
+availability is still unconfirmed, and Snap/Flatpak's mechanisms are named but not yet verified
+live against a real project. Not assigned to a specific Orclab command yet either (could end up
+inside `/orc-version`'s own territory, given its adjacency to release/versioning, or its own
+command, or something else entirely) — that's an open design question for whenever this gets
+picked up, not decided here.
+
+**Next step, when picked up:** finish the real research first (confirm Launchpad's actual
+capability one way or the other, verify `snapcraft metrics` and Flathub's stats API live against
+a real published project) before any `superpowers:brainstorming` pass on what Orclab actually
+builds from it.
