@@ -145,3 +145,40 @@ one needs the same "check it's actually available, tell the user plainly if not"
    sub-component `disable-model-invocation: true` and invoke it explicitly by name.
 5. Does the capability already exist as a real skill (built-in, or from another plugin)? Wrap it
    — with an availability check — rather than rebuilding it.
+
+## Marketplace/install gotchas, found dogfooding v6 in Desktop (2026-09-06)
+
+Three real, separate bugs stacked on top of each other while getting v6 actually working live —
+worth naming individually so a future reinstall failure doesn't get misdiagnosed as any one of
+them by pattern-matching on the symptom alone:
+
+1. **`owner`/`author` requires a `name` string — email-only is invalid schema.** Dropping `name`
+   entirely (to satisfy "no personal name in the byline") silently broke every
+   `marketplace add`/`marketplace update` call after that commit, with a confusing downstream
+   symptom ("Plugin not found in marketplace" / "marketplace.json no longer present") that has
+   nothing to do with schema on its face. Fix: keep `name` (a non-personal value like the plugin's
+   own name is fine), add `email` alongside it, never replace `name` outright.
+2. **A `github`-sourced marketplace registration fetches `marketplace.json` via GitHub's API, not
+   local git credentials.** For a private repo this comes back as if the file doesn't exist at
+   all (not a permissions error) — confirmed live, `claude plugin marketplace update` reported
+   "The marketplace.json file is no longer present in this repository" for a file that `gh api`
+   confirmed was present on the default branch the whole time. A plain `git fetch`/`pull` in the
+   same repo worked fine (inherits the user's own git credential helper) — it's specifically the
+   marketplace-refresh code path that has no private-repo auth of its own. Fix, for a
+   personal/local-only plugin: register the marketplace by local path
+   (`claude plugin marketplace add ~/path/to/repo`) instead of by GitHub `owner/repo` — this
+   avoids the GitHub API entirely and reads the working tree directly.
+3. **A locally-registered marketplace clone does not auto-refresh on plugin reinstall.** Desktop
+   (and the CLI) keep their own clone under `~/.claude/plugins/marketplaces/<name>` (shared state
+   across CLI and Desktop on the same machine); uninstalling and reinstalling the *plugin* reuses
+   that existing clone as-is rather than re-pulling it. A stale clone silently caps the installed
+   version at whatever commit it was cloned from. Fix: `git -C
+   ~/.claude/plugins/marketplaces/<name> fetch && git reset --hard origin/main`, or remove and
+   re-add the marketplace registration outright, before assuming a reinstall picked up new code.
+4. **A freshly (re)installed plugin does not become available mid-conversation.** Skills/commands
+   load when a conversation starts; an existing chat thread in Desktop kept reporting "Unknown
+   command" and ambient natural-language misses even after the plugin was correctly reinstalled
+   with the right version and skill count. A brand-new chat picked it up immediately, both via
+   explicit invocation (`/orclab:orc-code`) and ambient matching ("i want to use orc-code to make
+   a java project" correctly inferred both the new-project path and the language). **Always test
+   a fresh install/update in a new conversation, not the one used to debug the install.**

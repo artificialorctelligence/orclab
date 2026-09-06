@@ -215,9 +215,11 @@ and irreversible.
 
 ## Scenario 21: /orc-* wrapper skills work in Claude Desktop
 
-1. In a Desktop session (the client that failed on `commands/*.md` before this release), invoke
-   each of the five skills at least once by its literal name: `/orc-code`, `/orc-version`,
-   `/orc-help`, `/orc`, `/orc-git`.
+1. In a **fresh** Desktop session started after the plugin is installed/updated (an existing chat
+   thread will not pick up a mid-conversation reinstall — see `CLAUDE.md`'s gotcha #4), invoke
+   each of the five skills at least once, either by its bare name or its plugin-qualified form if
+   Desktop's autocomplete inserts one (`/orc-code` or `/orclab:orc-code` — confirmed live,
+   2026-09-06): `/orc-code`, `/orc-version`, `/orc-help`, `/orc`, `/orc-git`.
 2. **Expected:** each one succeeds — no "Unknown command" — and produces the same real behavior
    as its underlying `commands/*.md` file (e.g. `/orc-help` reports the real version and command
    synopsis, `/orc-code` asks its real questions).
