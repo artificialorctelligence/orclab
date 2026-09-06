@@ -30,7 +30,7 @@ correction.
 ## Relationship to superpowers' `systematic-debugging`
 
 This skill reinforces that skill, it doesn't duplicate or replace it. `systematic-debugging`
-already has a "your human partner's Signals You're Doing It Wrong" table, and entries like
+already has a "your human partner's Signals You're Doing It Wrong" list, and entries like
 "'We're stuck?' (frustrated) - Your approach isn't working" and "Stop guessing" describe exactly
 what a phrase like "take a step back" signals in different words. Any phrasing of that signal
 means the same thing: STOP, return to Phase 1, verify rather than defend.
@@ -40,6 +40,11 @@ narrowly: writing a test to *localize* where a bug's root cause lives is valid a
 Phase 1's evidence-gathering — not only as the Phase 4 pre-fix formality that skill's own text
 emphasizes. Writing tests progressively closer to the actual failure point is itself a
 verification technique, not just a confirmation step for a fix you already believe is right.
+
+**Distinct from superpowers' `verification-before-completion`**, which gates claims that work is
+*done* (no completion claim without fresh verification evidence) — this skill governs what to do
+when a claim you already made gets *challenged*, before completion is even in question. The two
+are easy to confuse by name; they fire at different moments.
 
 ## What NOT to do
 

@@ -98,10 +98,11 @@ situations (empty scratch dir, existing project, etc.).
 ## Scenario 9: /orc-version increment, local-only
 
 1. In Orclab's own repo, run `/orc-version increment major`.
-2. **Expected:** since the current version is `0.4.0`, the result is `1.0.0` — both `plugin.json`
-   and `marketplace.json`'s version fields update to `"1.0.0"`, a changelog entry is drafted from
-   real git history since the `v0.4.0` tag, you're asked whether to add/change anything before
-   it's written, and a new commit + local tag `v1.0.0` are created.
+2. **Expected:** whatever `plugin.json` currently reports as the version, incrementing major
+   resets minor and point to `0` (e.g. `0.5.0` → `1.0.0`) — both `plugin.json` and
+   `marketplace.json`'s version fields update accordingly, a changelog entry is drafted from real
+   git history since the current version's own git tag, you're asked whether to add/change
+   anything before it's written, and a new commit + local tag for the new version are created.
 3. **Expected throughout:** nothing is pushed anywhere, and no GitHub Release is created — confirm
    with `git log origin/main..HEAD` that the new commit hasn't reached the remote.
 4. Revert this probe afterward — **confirm you're about to drop exactly the probe commit you just

@@ -43,12 +43,12 @@ index (which can lag) or recalled/trained knowledge (which has a hard cutoff):
 - Java: Maven Central's search API
 - Go: `go list -m -versions <module>`
 
-If the relevant package manager isn't installed locally, fetch the registry's real API endpoint
-directly instead — it works regardless of local tooling.
+If the relevant package manager isn't installed locally, use `WebFetch` against the registry's
+real API endpoint directly instead — it works regardless of local tooling.
 
 **Language/runtime "current stable" status** — check the language's own official release page
-directly, cross-checked against a real, well-known lifecycle-tracking resource such as
-endoflife.date. Verify the resource itself is still live and accurate at time of use — don't
+directly via `WebFetch`, cross-checked against a real, well-known lifecycle-tracking resource such
+as endoflife.date. Verify the resource itself is still live and accurate at time of use — don't
 assume from memory that a reference site's content is current.
 
 **Evaluating whether a found answer is stale** — check the source's own stated date where visible;

@@ -27,3 +27,6 @@ the rework becomes necessary.
 > Before building around that assumption, checking the current Wayland protocol docs and testing
 > directly on a real, current Wayland session — capabilities change release to release, and a
 > remembered limitation from an older version may no longer hold."
+
+See `verify-before-asserting`'s own worked example for the other half of this same real story —
+what happens when that assumption gets challenged and defended instead of checked.

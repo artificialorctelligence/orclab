@@ -4,6 +4,9 @@ Adapted from a real lesson: a claim about a platform's capabilities was asserted
 defended against a direct, correct challenge instead of checked — costing real time and trust that
 a single verification step would have avoided.
 
+See `currency-discipline`'s own worked example for the other half of this same real story — the
+assumption itself, before it was ever challenged.
+
 ## Bad: defending the original claim
 
 > Claude: "Wayland doesn't support `<capability>` — that's a known platform limitation."
