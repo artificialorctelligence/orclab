@@ -12,6 +12,11 @@ other projects (starting with Orcshot).
   against whatever CI already automates.
 - **environment-registry** — register real, live test environments (VMs, containers, staging
   servers, devices) as Claude memory, never as a git-tracked file, never storing credentials.
+- **currency-discipline** — check that a chosen dependency, version, or technical approach is
+  actually current before committing to it, with real, concrete per-ecosystem verification
+  mechanisms.
+- **verify-before-asserting** — verify a challenged factual/technical claim instead of defending
+  it; reinforces superpowers' own `systematic-debugging` signal recognition.
 
 ## Commands
 
@@ -35,9 +40,10 @@ Register this directory as a local plugin marketplace, then install the plugin:
 
 ## Status
 
-v1 (process core) + v2 (`/orc-code`) + v3 (`/orc-version`, `/orc-help`/`/orc`) + v4 (`/orc-git`)
-shipped. See `docs/superpowers/specs/` for the design history, `CHANGELOG.md` for what actually
-changed release to release, and `BACKLOG.md` for what's deliberately deferred (real per-stack
-defaults research is #4, `/orc-data` is #5, hook-based enforcement is #3, per-language manifest
-version-sync is #6). See `VERIFICATION.md` for the dogfood script that confirms everything
-actually works once installed in a real project.
+v1 (process core) + v2 (`/orc-code`) + v3 (`/orc-version`, `/orc-help`/`/orc`) + v4 (`/orc-git`) +
+v5 (`currency-discipline`, `verify-before-asserting`) shipped. See `docs/superpowers/specs/` for
+the design history, `CHANGELOG.md` for what actually changed release to release, and `BACKLOG.md`
+for what's deliberately deferred (real per-stack defaults research is #4, `/orc-data` is #5,
+hook-based enforcement is #3, per-language manifest version-sync is #6, distribution-channel
+metrics is #7). See `VERIFICATION.md` for the dogfood script that confirms everything actually
+works once installed in a real project.

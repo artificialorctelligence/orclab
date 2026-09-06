@@ -1,7 +1,7 @@
 {
   "name": "orclab",
-  "description": "Project-discipline skills and commands distilled from real practice: backlog tracking, release checklists, live-environment registries, a deterministic /orc-code entry point for new-project, existing-project, and refactor work, /orc-version for versioning the current project, and /orc-git for common git/GitHub shortcuts.",
-  "version": "0.4.0",
+  "description": "Project-discipline skills and commands distilled from real practice: backlog tracking, release checklists, live-environment registries, currency and verification discipline, a deterministic /orc-code entry point for new-project, existing-project, and refactor work, /orc-version for versioning the current project, and /orc-git for common git/GitHub shortcuts.",
+  "version": "0.5.0",
   "author": {
     "name": "direflail"
   }

@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.5.0] - 2026-09-06
+
+### Added
+- `currency-discipline` — checks that a chosen dependency, version, or technical approach is
+  actually current, and that research relied on is checked for age, before trusting it. Names
+  real verification mechanisms per ecosystem (registry APIs, official release pages), not just
+  "check if it's current."
+- `verify-before-asserting` — verifies a challenged factual/technical claim instead of defending
+  it, and reinforces (without duplicating) superpowers' own `systematic-debugging` signal
+  recognition and test-based root-cause localization.
+
 ## [0.4.0] - 2026-09-05
 
 ### Added
