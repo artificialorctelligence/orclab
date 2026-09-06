@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.4.0] - 2026-09-05
+
+### Added
+- `/orc-git` — shortcuts for common git/GitHub operations: connect a repo (`repo <url>`), commit
+  with a drafted message (`commit`), push (`push`), commit-then-push (`commit-push`/`cp`),
+  branch/switch (`branch`/`switch`), and check out a PR (`pr <id>`). The first command to actually
+  populate `.orclab/` (a connected repo's URL), reserved since v3 but unused until now.
+
 ## [0.3.0] - 2026-09-05
 
 ### Added

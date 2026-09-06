@@ -1,15 +1,15 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "orclab",
-  "description": "Project-discipline skills and commands distilled from real practice: backlog tracking, release checklists, live-environment registries, a deterministic /orc-code entry point for new-project, existing-project, and refactor work, and /orc-version for versioning the current project.",
+  "description": "Project-discipline skills and commands distilled from real practice: backlog tracking, release checklists, live-environment registries, a deterministic /orc-code entry point for new-project, existing-project, and refactor work, /orc-version for versioning the current project, and /orc-git for common git/GitHub shortcuts.",
   "owner": {
     "name": "direflail"
   },
   "plugins": [
     {
       "name": "orclab",
-      "description": "Project-discipline skills and commands distilled from real practice: backlog tracking, release checklists, live-environment registries, a deterministic /orc-code entry point for new-project, existing-project, and refactor work, and /orc-version for versioning the current project.",
-      "version": "0.3.0",
+      "description": "Project-discipline skills and commands distilled from real practice: backlog tracking, release checklists, live-environment registries, a deterministic /orc-code entry point for new-project, existing-project, and refactor work, /orc-version for versioning the current project, and /orc-git for common git/GitHub shortcuts.",
+      "version": "0.4.0",
       "source": "./"
     }
   ]

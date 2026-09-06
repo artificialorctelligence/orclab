@@ -23,6 +23,8 @@ other projects (starting with Orcshot).
   (`/orc-version release`).
 - **/orc-help** (alias: **/orc**) — reports Orclab's own running version and a synopsis of its
   available commands.
+- **/orc-git** — shortcuts for common git/GitHub operations: connect a repo, commit with a
+  drafted message, push, commit-then-push (alias `cp`), branch/switch, and check out a PR.
 
 ## Installing
 
@@ -33,9 +35,9 @@ Register this directory as a local plugin marketplace, then install the plugin:
 
 ## Status
 
-v1 (process core) + v2 (`/orc-code`) + v3 (`/orc-version`, `/orc-help`/`/orc`) shipped. See
-`docs/superpowers/specs/` for the design history, `CHANGELOG.md` for what actually changed release
-to release, and `BACKLOG.md` for what's deliberately deferred (real per-stack defaults research is
-#4, `/orc-data` is #5, hook-based enforcement is #3, per-language manifest version-sync is #6). See
-`VERIFICATION.md` for the dogfood script that confirms everything actually works once installed in
-a real project.
+v1 (process core) + v2 (`/orc-code`) + v3 (`/orc-version`, `/orc-help`/`/orc`) + v4 (`/orc-git`)
+shipped. See `docs/superpowers/specs/` for the design history, `CHANGELOG.md` for what actually
+changed release to release, and `BACKLOG.md` for what's deliberately deferred (real per-stack
+defaults research is #4, `/orc-data` is #5, hook-based enforcement is #3, per-language manifest
+version-sync is #6). See `VERIFICATION.md` for the dogfood script that confirms everything
+actually works once installed in a real project.
