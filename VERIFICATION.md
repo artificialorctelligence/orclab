@@ -138,6 +138,46 @@ something public and irreversible.
 5. Run `/orc` (bare) in either location.
 6. **Expected:** identical output to `/orc-help` in the same location.
 
+## Scenario 13: /orc-git repo, all three directory states
+
+1. In a throwaway empty scratch directory, run `/orc-git repo <a real, small test repo URL>`.
+   **Expected:** the repo is cloned directly into the (empty) directory.
+2. In a different throwaway directory that's already a git repo with no `origin` set, run
+   `/orc-git repo <some URL>`. **Expected:** `origin` is set to that URL, no confirmation asked
+   (since nothing existing was being overwritten).
+3. In that same directory, run `/orc-git repo <a different URL>`. **Expected:** Claude shows the
+   currently-set URL and asks for confirmation before changing it — it does not silently overwrite.
+4. **Expected throughout:** `.orclab/git-repo.json` is created with the connected URL, and
+   `.gitignore` gains a `.orclab/` entry if it didn't already have one.
+
+## Scenario 14: /orc-git commit, clean tree and real changes
+
+1. In a project with no uncommitted changes, run `/orc-git commit`. **Expected:** Claude reports
+   there's nothing to commit and stops — no empty commit is created.
+2. Make a real, small change, then run `/orc-git commit`. **Expected:** a real commit message is
+   drafted from the actual diff (not a generic placeholder) and committed immediately — no
+   confirmation question asked first.
+3. Make another change, then run `/orc-git commit this is extra context`. **Expected:** the
+   drafted message includes "this is extra context" as an addition, not as a replacement of the
+   drafted description.
+
+## Scenario 15: /orc-git push, commit-push/cp, and branch/switch aliases
+
+1. After Scenario 14 commits something, run `/orc-git push` on a branch that's never been pushed
+   before. **Expected:** it pushes with `-u origin <branch>` (sets upstream), with no confirmation
+   prompt.
+2. Make another small change, run `/orc-git commit-push`, then separately (on a different real
+   change) run `/orc-git cp`. **Expected:** both produce identical commit-then-push behavior.
+3. Run `/orc-git branch a-test-branch-name` (a branch that doesn't exist yet), then run
+   `/orc-git switch a-test-branch-name` again. **Expected:** the first call creates and switches to
+   it; the second call just switches (branch already exists) — both subcommand names behave
+   identically.
+
+## Scenario 16: /orc-git pr
+
+1. In a project with at least one real open (or closed) PR, run `/orc-git pr <a real PR number>`.
+   **Expected:** `gh pr checkout <id>` runs and the PR's branch is checked out locally.
+
 ## Recording the result
 
 Note the outcome of each scenario (pass/fail, with specifics) either back in this conversation or
