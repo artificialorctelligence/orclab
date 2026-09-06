@@ -265,7 +265,7 @@ capability one way or the other, verify `snapcraft metrics` and Flathub's stats 
 a real published project) before any `superpowers:brainstorming` pass on what Orclab actually
 builds from it.
 
-## #8: Two stale version literals left in VERIFICATION.md, found during v5's own final review
+## #8: Two stale version literals left in VERIFICATION.md, found during v5's own final review (RESOLVED 2026-09-06)
 
 Found during the currency-discipline/verify-before-asserting (v5) final review's fix round
 (2026-09-06). That review caught and fixed Scenario 9's version anchor (it hardcoded `0.4.0`/
@@ -301,6 +301,11 @@ Scenario 9's revert instruction compute the expected new-major tag from the real
 rather than assuming `v1.0.0` specifically — or, more simply, tell the reader to check
 `git tag --list 'v*' --sort=-v:refname | head -1` right before deciding what to delete, rather
 than hardcoding any literal tag name at all.
+
+**Resolved for real, not just tracked:** both instances fixed exactly as described above. Scenario
+10 now reads "the current version (whatever `plugin.json` currently reports)" with no literal
+number. Scenario 9's revert step now finds the actual tag it just created via
+`git tag --list 'v*' --sort=-v:refname | head -1` instead of assuming `v1.0.0`.
 
 ## #9: v5's plan never tagged its own release — caught only by tagging v0.6.0 and noticing v0.5.0 missing (RESOLVED 2026-09-06)
 

@@ -106,15 +106,17 @@ situations (empty scratch dir, existing project, etc.).
 3. **Expected throughout:** nothing is pushed anywhere, and no GitHub Release is created — confirm
    with `git log origin/main..HEAD` that the new commit hasn't reached the remote.
 4. Revert this probe afterward — **confirm you're about to drop exactly the probe commit you just
-   made** (`git log -1` should show the version-bump commit `/orc-version` just created), then run
-   `git tag -d v1.0.0 && git reset --hard HEAD~1`. Do not use a hardcoded version tag to revert to
-   — the "current" version keeps changing release to release, and reverting to a stale tag would
-   discard real, unrelated work made since that tag, not just this probe.
+   made** (`git log -1` should show the version-bump commit `/orc-version` just created), then find
+   the tag it created with `git tag --list 'v*' --sort=-v:refname | head -1` (the newest tag —
+   never assume it's `v1.0.0`; that's only correct while Orclab's major version is still `0`) and
+   run `git tag -d <that tag> && git reset --hard HEAD~1`. Do not use a hardcoded version tag to
+   revert to — the "current" version keeps changing release to release, and reverting to a stale
+   tag would discard real, unrelated work made since that tag, not just this probe.
 
 ## Scenario 10: /orc-version bare invocation
 
 1. In Orclab's own repo, run `/orc-version` with no arguments.
-2. **Expected:** the current version (`0.4.0`, or whatever it's been bumped to) is reported,
+2. **Expected:** the current version (whatever `plugin.json` currently reports) is reported,
    followed by the increment/set menu — and nothing else happens; no files change.
 
 ## Scenario 11: /orc-version release
