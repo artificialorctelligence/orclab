@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.6.0] - 2026-09-06
+
+### Added
+- A matching `skills/<name>/SKILL.md` for each of the five `/orc-*` commands (`orc-code`,
+  `orc-version`, `orc-help`, `orc`, `orc-git`) — each a thin pointer to its real `commands/*.md`
+  content, mirroring `orc.md`'s own existing pattern. Fixes a real, confirmed bug: the Claude
+  Desktop client never registered plugin `commands/*.md` files as slash commands at all, so none
+  of the `/orc-*` commands worked there even though the plugin showed installed. Skills don't have
+  this problem — Desktop supports them. `commands/*.md` are unchanged and still serve the CLI.
+- `CLAUDE.md` — real, verified guidance on Claude Code's command/skill system, used to design the
+  five wrapper skills above: all five stay default-invocable (no `disable-model-invocation`),
+  matching `/cat-code`-style dual invocation, since none of their primary behavior is a pure
+  one-shot side effect the way the docs' own `/deploy` example is.
+
 ## [0.5.0] - 2026-09-06
 
 ### Added

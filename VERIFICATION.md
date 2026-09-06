@@ -213,6 +213,28 @@ and irreversible.
    guess-fix, and considers writing a test to localize where the failure starts if it hasn't
    already.
 
+## Scenario 21: /orc-* wrapper skills work in Claude Desktop
+
+1. In a Desktop session (the client that failed on `commands/*.md` before this release), invoke
+   each of the five skills at least once by its literal name: `/orc-code`, `/orc-version`,
+   `/orc-help`, `/orc`, `/orc-git`.
+2. **Expected:** each one succeeds — no "Unknown command" — and produces the same real behavior
+   as its underlying `commands/*.md` file (e.g. `/orc-help` reports the real version and command
+   synopsis, `/orc-code` asks its real questions).
+3. Separately, in the CLI, confirm the original `/orc-*` commands still work exactly as before —
+   this release is additive, not a replacement.
+
+## Scenario 22: /orc-* skills fire from a natural sentence, not just the literal slash
+
+1. In a fresh session, say something like "I want to use orc-code to build a small CLI tool" —
+   no literal slash.
+2. **Expected:** the `orc-code` skill fires and follows its real structured flow (asking language,
+   name, type, checking the Defaults Table) — not generic freelanced advice.
+3. **Expected throughout:** none of the five skills fire ambiently on unrelated requests — e.g. a
+   plain "help me commit this" (with no mention of `orc-git` by name) should not automatically
+   trigger `orc-git`'s skill, since none of the five are meant to compete for attention outside an
+   explicit or clearly-named request.
+
 ## Recording the result
 
 Note the outcome of each scenario (pass/fail, with specifics) either back in this conversation or

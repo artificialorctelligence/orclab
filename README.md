@@ -20,6 +20,10 @@ other projects (starting with Orcshot).
 
 ## Commands
 
+Each command below also ships as a matching skill (`skills/<name>/SKILL.md`, a thin pointer to the
+same content) so it works in Claude Desktop too, not just the CLI — see "Known gap, now fixed"
+below.
+
 - **/orc-code** — start a new project, add to an existing one, or refactor/migrate existing code.
   Routes deterministically to one of three flows, wrapping the `feature-dev` and
   `code-modernization` plugins where applicable rather than reimplementing their work.
@@ -38,17 +42,19 @@ Register this directory as a local plugin marketplace, then install the plugin:
     /plugin marketplace add ~/projects/orclab
     /plugin install orclab@orclab
 
-**Known gap, confirmed live (2026-09-06):** the `/orc-*` commands (`commands/*.md`) work correctly
-via the CLI, but the Claude Desktop client doesn't register plugin `commands/*.md` files as slash
-commands at all — typing `/orc-code` or `/orc` there returns "Unknown command." Skills don't have
-this problem. See `CLAUDE.md` for what this means for future components; existing commands don't
-yet have a Desktop-compatible wrapper skill.
+**Known gap, now fixed (found 2026-09-06, fixed same day):** the `/orc-*` commands
+(`commands/*.md`) always worked via the CLI, but the Claude Desktop client never registered plugin
+`commands/*.md` files as slash commands at all — typing `/orc-code` or `/orc` there returned
+"Unknown command." Skills don't have this problem, which is why each command now also ships as a
+matching skill (see `CLAUDE.md` for the full story and the design checklist this produced for
+future components).
 
 ## Status
 
 v1 (process core) + v2 (`/orc-code`) + v3 (`/orc-version`, `/orc-help`/`/orc`) + v4 (`/orc-git`) +
-v5 (`currency-discipline`, `verify-before-asserting`) shipped. See `docs/superpowers/specs/` for
-the design history, `CHANGELOG.md` for what actually changed release to release, and `BACKLOG.md`
+v5 (`currency-discipline`, `verify-before-asserting`) + v6 (Desktop-compatible skill wrappers for
+every `/orc-*` command) shipped. See `docs/superpowers/specs/` for the design history,
+`CHANGELOG.md` for what actually changed release to release, and `BACKLOG.md`
 for what's deliberately deferred (real per-stack defaults research is #4, `/orc-data` is #5,
 hook-based enforcement is #3, per-language manifest version-sync is #6, distribution-channel
 metrics is #7, stale VERIFICATION.md version literals is #8). See `VERIFICATION.md` for the
