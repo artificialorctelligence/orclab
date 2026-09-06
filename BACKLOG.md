@@ -264,3 +264,40 @@ picked up, not decided here.
 capability one way or the other, verify `snapcraft metrics` and Flathub's stats API live against
 a real published project) before any `superpowers:brainstorming` pass on what Orclab actually
 builds from it.
+
+## #8: Two stale version literals left in VERIFICATION.md, found during v5's own final review
+
+Found during the currency-discipline/verify-before-asserting (v5) final review's fix round
+(2026-09-06). That review caught and fixed Scenario 9's version anchor (it hardcoded `0.4.0`/
+`v0.4.0`, stale the moment the branch bumped Orclab past that version) — but two adjacent, real
+instances of the same staleness pattern were spotted by the re-review as explicitly out of that
+fix's scope, and parked here instead of looping further on an already-clean fix round.
+
+**Instance 1 — Scenario 10's own hardcoded example:** `VERIFICATION.md`'s Scenario 10 still reads
+"the current version (`0.4.0`, or whatever it's been bumped to)" — the hedge ("or whatever it's
+been bumped to") makes the scenario still technically correct, but the literal `0.4.0` example is
+now stale now that Orclab is at `0.5.0`. Same class of defect Scenario 9 just got fixed for, one
+scenario left half-addressed.
+
+**Instance 2 — Scenario 9's own revert command:** step 4's revert instruction hardcodes
+`git tag -d v1.0.0 && git reset --hard HEAD~1`. This is only correct because Orclab's current
+major version is `0` — any `increment major` from a `0.x.y` version lands on `1.0.0`, which is
+what makes the literal tag name right today. The moment Orclab's own real version reaches `1.0.0`
+and gets bumped again, this same probe (`increment major` from, say, `1.4.0`) would produce
+`2.0.0`, and the hardcoded `v1.0.0` in the revert command would be wrong — deleting a tag that
+was never created, and quietly reverting the wrong thing (or nothing at all) instead.
+
+**Why this matters, concretely, not hypothetically:** `VERIFICATION.md` is the actual dogfood
+script someone runs by hand — a stale literal here isn't cosmetic, it produces a confusing failure
+or a silent no-op exactly when the script is supposed to be proving the real tool works.
+
+**Scope boundary:** both instances are wording/literal fixes only — no change to `/orc-version`
+itself, no design question open here. This is purely "make the verification script's own examples
+stop hardcoding a version number that keeps changing."
+
+**Next step, when picked up:** reword Scenario 10's example the same way Scenario 9's was just
+fixed (reference "whatever `plugin.json` currently reports," not a literal number), and make
+Scenario 9's revert instruction compute the expected new-major tag from the real current version
+rather than assuming `v1.0.0` specifically — or, more simply, tell the reader to check
+`git tag --list 'v*' --sort=-v:refname | head -1` right before deciding what to delete, rather
+than hardcoding any literal tag name at all.
