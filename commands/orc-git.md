@@ -8,6 +8,11 @@ argument-hint: repo <url> | commit [text] | push | commit-push [text] | cp [text
 You are running git/GitHub shortcuts via the `/orc-git` command. Route based on the first word of
 `$ARGUMENTS`.
 
+If the first word doesn't match any of the subcommands below (`repo`, `commit`, `push`,
+`commit-push`, `cp`, `branch`, `switch`, `pr`), or a subcommand that requires an argument (`repo`,
+`branch`, `switch`, `pr`) is invoked without one, say so plainly, show the bare-invocation listing
+below, and stop — don't guess at an unlisted git operation or proceed without a required argument.
+
 ## Bare invocation (no arguments)
 
 List the available subcommands:
@@ -31,8 +36,11 @@ Stop here — do not proceed to any subcommand logic on a bare invocation.
 1. **Ensure GitHub auth**: run `gh auth status`. If it reports not logged in, run `gh auth login`
    first. If already authenticated, continue.
 2. **Determine the current directory's git state**:
-   - **Already a git repo** (`git rev-parse --git-dir` succeeds): check the current `origin`
-     remote with `git remote get-url origin` (this may fail if none is set — that's fine).
+   - **Already a git repo** (`git rev-parse --show-toplevel` succeeds AND its output matches the
+     current directory — this correctly distinguishes "cwd is itself a repo root" from "cwd is
+     merely inside some ancestor repo," which a bare `git rev-parse --git-dir` check would wrongly
+     treat as the same case): check the current `origin` remote with `git remote get-url origin`
+     (this may fail if none is set — that's fine).
      - No `origin` set: run `git remote add origin <url>`.
      - `origin` already set and matches `<url>`: nothing to change, report that it's already
        connected.
@@ -41,16 +49,22 @@ Stop here — do not proceed to any subcommand logic on a bare invocation.
        overwrite a differing existing remote.
    - **Not a git repo, and the directory is empty**: run `git clone <url> .`.
    - **Not a git repo, and the directory has files**: ask directly whether to clone `<url>` into a
-     new subdirectory (named after the repo) instead, or initialize the current directory as a git
-     repo with `<url>` set as `origin` via `git init && git remote add origin <url>` (without
+     new subdirectory named after the repo (`git clone <url> <repo-name>`, where `<repo-name>` is
+     the repo's own name parsed from `<url>`) instead, or initialize the current directory as a
+     git repo with `<url>` set as `origin` via `git init && git remote add origin <url>` (without
      pulling any history). Don't guess between these two outcomes.
-3. **Save the connection**: create `.orclab/` if it doesn't exist, and write
-   `.orclab/git-repo.json` with this exact content (substituting the real URL):
+3. **Save the connection — only if one was actually established.** Skip this step entirely if the
+   user declined to overwrite a differing `origin` in Step 2, or otherwise chose not to proceed.
+   Otherwise, create `.orclab/` if it doesn't exist **in the directory that actually ended up
+   connected** (the new subdirectory, if the user chose to clone into one; the current working
+   directory in every other case), and write `.orclab/git-repo.json` there with this exact content
+   (substituting the real URL):
    ```json
    {"url": "<url>"}
    ```
-   If `.gitignore` doesn't already contain a `.orclab/` entry, append one on its own line — check
-   first with a search so you don't add a duplicate entry if one's already there.
+   If that same directory's `.gitignore` doesn't already contain a `.orclab/` entry, append one on
+   its own line — check first with a search so you don't add a duplicate entry if one's already
+   there.
 
 ## commit [text]
 
@@ -67,7 +81,8 @@ Stop here — do not proceed to any subcommand logic on a bare invocation.
 
 ## push
 
-1. Determine the current branch: `git branch --show-current`.
+1. Determine the current branch: `git branch --show-current`. If this returns empty (a detached
+   HEAD), report that plainly and stop — there's no branch to push.
 2. Check if it has an upstream: `git rev-parse --abbrev-ref <branch>@{upstream}` (this fails if
    there's no upstream set — that's the signal to use the second command below instead of the
    first).

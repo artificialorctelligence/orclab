@@ -98,27 +98,30 @@ situations (empty scratch dir, existing project, etc.).
 ## Scenario 9: /orc-version increment, local-only
 
 1. In Orclab's own repo, run `/orc-version increment major`.
-2. **Expected:** since the current version is `0.3.0`, the result is `1.0.0` — both `plugin.json`
+2. **Expected:** since the current version is `0.4.0`, the result is `1.0.0` — both `plugin.json`
    and `marketplace.json`'s version fields update to `"1.0.0"`, a changelog entry is drafted from
-   real git history since the `v0.3.0` tag, you're asked whether to add/change anything before
+   real git history since the `v0.4.0` tag, you're asked whether to add/change anything before
    it's written, and a new commit + local tag `v1.0.0` are created.
 3. **Expected throughout:** nothing is pushed anywhere, and no GitHub Release is created — confirm
    with `git log origin/main..HEAD` that the new commit hasn't reached the remote.
-4. Revert this probe afterward (`git reset --hard v0.3.0` — a real, deliberate throwaway test, not
-   a change to keep) unless you actually want to keep the bump.
+4. Revert this probe afterward — **confirm you're about to drop exactly the probe commit you just
+   made** (`git log -1` should show the version-bump commit `/orc-version` just created), then run
+   `git tag -d v1.0.0 && git reset --hard HEAD~1`. Do not use a hardcoded version tag to revert to
+   — the "current" version keeps changing release to release, and reverting to a stale tag would
+   discard real, unrelated work made since that tag, not just this probe.
 
 ## Scenario 10: /orc-version bare invocation
 
 1. In Orclab's own repo, run `/orc-version` with no arguments.
-2. **Expected:** the current version (`0.3.0`, or whatever it's been bumped to) is reported,
+2. **Expected:** the current version (`0.4.0`, or whatever it's been bumped to) is reported,
    followed by the increment/set menu — and nothing else happens; no files change.
 
 ## Scenario 11: /orc-version release
 
-**Caution:** if Scenario 9's probe bump wasn't kept (i.e. you already ran `git reset --hard
-v0.3.0` to revert it), don't run this scenario against that reverted state — only run it against
-a real bump you actually intend to publish. This is the only scenario in this script that makes
-something public and irreversible.
+**Caution:** if Scenario 9's probe bump wasn't kept (i.e. you already ran the revert commands
+above), don't run this scenario against that reverted state — only run it against a real bump you
+actually intend to publish. This is the only scenario in this script that makes something public
+and irreversible.
 
 1. After running Scenario 9 (or any real bump) and deciding to keep it, run
    `/orc-version release`.
