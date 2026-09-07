@@ -188,10 +188,15 @@ them by pattern-matching on the symptom alone:
    version at whatever commit it was cloned from. Fix: `git -C
    ~/.claude/plugins/marketplaces/<name> fetch && git reset --hard origin/main`, or remove and
    re-add the marketplace registration outright, before assuming a reinstall picked up new code.
-4. **A freshly (re)installed plugin does not become available mid-conversation.** Skills/commands
-   load when a conversation starts; an existing chat thread in Desktop kept reporting "Unknown
-   command" and ambient natural-language misses even after the plugin was correctly reinstalled
-   with the right version and skill count. A brand-new chat picked it up immediately, both via
-   explicit invocation (`/orclab:orc-code`) and ambient matching ("i want to use orc-code to make
-   a java project" correctly inferred both the new-project path and the language). **Always test
-   a fresh install/update in a new conversation, not the one used to debug the install.**
+4. **A freshly (re)installed plugin does not become available mid-conversation — confirmed on
+   both Desktop and the CLI.** Skills/commands load when a conversation starts; an existing chat
+   thread in Desktop kept reporting "Unknown command" and ambient natural-language misses even
+   after the plugin was correctly reinstalled with the right version and skill count. A
+   brand-new chat picked it up immediately, both via explicit invocation (`/orclab:orc-code`) and
+   ambient matching ("i want to use orc-code to make a java project" correctly inferred both the
+   new-project path and the language). Separately confirmed live on the CLI (2026-09-06): after
+   reinstalling Orclab mid-session via `claude plugin uninstall`/`install` (to pick up v7), the
+   `Skill` tool reported `Unknown skill: orclab:orc-publish` in that same long-running session,
+   even though `installed_plugins.json` and the plugin cache both correctly showed the new
+   version. **Always test a fresh install/update in a genuinely new session — CLI or Desktop —
+   not the one used to debug or trigger the install.**
