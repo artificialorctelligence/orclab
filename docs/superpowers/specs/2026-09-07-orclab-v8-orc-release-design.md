@@ -81,8 +81,8 @@ Behavior:
    that produced this entire spec.
 3. Check for existing state (below). If a release is in progress, report position and resume;
    never silently start a second one.
-4. Check preconditions — see below. In short: whatever the doc's own steps declare, plus exactly
-   one built-in check (no release already in progress).
+4. Check preconditions — see below. In short: whatever the doc's own steps declare, plus two
+   built-in checks (no release already in progress; a working-tree report at entry).
 5. Walk the steps in the doc's own order. For each step: run its commands and judge the result
    against the doc's own "what done looks like"; or, if it delegates, invoke the named `/orc-*`
    command; or, if it is marked performed-by-hand, present it and stop for confirmation.
@@ -157,14 +157,37 @@ Four things, and they are not all failures:
    the release resumes at that step.
 2. **A precondition fails** — checked before the step runs, not after.
 
-   **There is exactly one built-in precondition: no release is already in progress.** Everything
-   else comes from the document's own steps. This is deliberate, and the tempting built-in is
-   actively wrong: "the working tree is clean" would fail at every step after Orcshot's step 1,
-   because that process intentionally leaves the version-file edits uncommitted until step 8. A
-   runner cannot reliably tell a release's own in-flight edits from unrelated in-progress work, and
-   guessing would either block every real release or wave through exactly the case that nearly bit
-   this session. The project's own document is where that judgment belongs — a step that must not
-   run against a dirty tree can say so, in the terms that are actually true for that project.
+   **There are exactly two built-in checks.** Everything else comes from the document's own steps.
+
+   1. **No release already in progress** — a hard stop.
+   2. **A working-tree report at entry** — a warning that asks, not a hard block, and run only
+      when *starting* a release, never on resume.
+
+   The second one needs its reasoning recorded, because the obvious stricter version is wrong.
+   "The working tree must be clean," enforced per step, would fail at every step after Orcshot's
+   step 1 — that process intentionally leaves the version-file edits uncommitted until step 8, so a
+   dirty tree from step 2 onward is correct, not suspicious. Enforced as a hard block even just at
+   entry, it is *concretely* broken: Orcshot's repo carries a permanently untracked `.claude/`
+   directory, so a hard block would refuse every release until someone committed it, ignored it, or
+   disabled the check — and a check that cannot be satisfied gets deleted, leaving nothing.
+
+   Leaving it entirely to the document was the cleanest option architecturally and was rejected for
+   a specific reason: Orcshot's `RELEASING.md` does not declare that precondition today and
+   realistically would not have, because nobody knew to write it until this session hit the
+   problem. A design motivated by that failure that would not have prevented it is the wrong trade
+   for tidiness.
+
+   So: at entry, print the real `git status --short` output verbatim and ask whether to proceed.
+   **Printing the actual file list is the entire value, not the warning itself** — a bare "the tree
+   is dirty" gets waved through, while `src/orcshot/app.py | 237 ++------` with 215 deletions is
+   instantly recognizable as unrelated in-progress work. Untracked and modified entries are both
+   shown as git reports them; no classifier tries to suppress one, since that is how the real
+   signal gets suppressed too. This is a stop-and-ask, not a rhetorical pause.
+
+   **This is a floor, not a ceiling.** A document can still declare a stricter, more precise
+   precondition on top of it — "only `pyproject.toml` and `debian/changelog` may be modified" is
+   better than anything generic — and should. The built-in only guarantees a project gets something
+   before anyone has thought it through.
 3. **A human step** — a handoff, not a failure. The runner cannot verify a VM install-test or a
    web-UI click, so it takes the human's word, but it records *what was claimed done* rather than
    silently marking the step complete.
@@ -200,8 +223,10 @@ Two layers, the same hard rule as v7:
    throwaway `RELEASING.md` whose steps are no-ops** — never against a real release, from Orclab's
    own repo. Scenarios must cover: halting on a failed step (and *not* proceeding to the next),
    resuming at the right step afterward, refusing to start while a release is in progress, warning
-   on a changed document hash, recording a skip with its reason, and stopping at a
-   performed-by-hand step.
+   on a changed document hash, recording a skip with its reason, stopping at a performed-by-hand
+   step, and the entry working-tree report — including that it shows the real modified/untracked
+   file list, that answering "proceed" continues normally, and that it does **not** fire again on
+   resume.
 
 ## Global Constraints
 
@@ -213,8 +238,10 @@ Two layers, the same hard rule as v7:
 - The three `release-checklist` conventions are **optional**; a document using none of them must
   still be driveable.
 - **Never invent a release process.** No `RELEASING.md` means report and stop.
-- Exactly **one built-in precondition** (no release already in progress). Every other precondition
-  comes from the document's own steps — notably, there is no built-in clean-working-tree check.
+- Exactly **two built-in checks**: no release already in progress (hard stop), and a working-tree
+  report at entry (prints real `git status --short`, asks whether to proceed, **never blocks**, and
+  runs only when starting a release — never on resume, since step 1 legitimately dirties the tree).
+  Every other precondition comes from the document's own steps.
 - Skips require a recorded reason.
 - A changed `RELEASING.md` hash mid-release warns and stops rather than resuming on step numbers
   that may have shifted.
