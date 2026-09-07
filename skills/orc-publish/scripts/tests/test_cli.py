@@ -196,3 +196,38 @@ def test_main_for_mode_notes_when_selection_tokens_are_ignored(tmp_path, capsys)
     assert exit_code == 0
     captured = capsys.readouterr()
     assert "ignored" in captured.err
+
+
+def test_format_plan_reports_an_action_less_leaf_as_not_yet_actionable(tmp_path):
+    root = load_tree(
+        write_yaml(
+            tmp_path,
+            "channels.yaml",
+            """
+            desktop:
+              python:
+                linux:
+                  snap: {}
+            """,
+        )
+    )
+    leaves = build_plan(root, [])
+    text = format_plan(leaves)
+    assert "desktop.python.linux.snap: (known channel, not yet actionable)" in text
+    assert "no action set" not in text
+
+
+def test_execute_plan_details_an_action_less_leaf_as_not_yet_actionable(tmp_path):
+    root = load_tree(write_yaml(tmp_path, "channels.yaml", "placeholder: {}"))
+    leaves = build_plan(root, [])
+    results = execute_plan(leaves)
+    leaf, status, detail = results[0]
+    assert status == "not attempted"
+    assert detail == "known channel, not yet actionable"
+
+
+def test_format_plan_still_shows_a_real_action_unchanged(tmp_path):
+    root = load_tree(write_yaml(tmp_path, "channels.yaml", 'a: { action: "echo real" }'))
+    text = format_plan(build_plan(root, []))
+    assert "a: echo real" in text
+    assert "not yet actionable" not in text

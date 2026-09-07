@@ -16,6 +16,9 @@ from .selection import SelectionError, resolve_selection, resolve_token
 from .tree import load_tree
 
 
+NOT_ACTIONABLE = "known channel, not yet actionable"
+
+
 def render_filename(template, version):
     """Render a leaf's filename_template for a given version string, or None if unset."""
     return template.replace("<version>", version) if template else None
@@ -31,7 +34,7 @@ def format_plan(leaves):
         return "(no leaves selected)"
     lines = []
     for leaf in leaves:
-        action = leaf.action or "(no action set)"
+        action = leaf.action or f"({NOT_ACTIONABLE})"
         lines.append(f"{leaf.dotted_path}: {action}")
         for req in leaf.requirements:
             lines.append(f"  requirement: {req}")
@@ -56,13 +59,13 @@ def execute_plan(leaves):
 
     Returns a list of (leaf, status, detail) - status is "success", "failed", or
     "not attempted". detail is the action's real stdout on success, the real error text on
-    failure, and "no action set" when not attempted - never silently empty on success, since
+    failure, and "known channel, not yet actionable" when not attempted - never silently empty on success, since
     this is the only evidence an operator gets that a real publish actually happened.
     """
     results = []
     for leaf in leaves:
         if not leaf.action:
-            results.append((leaf, "not attempted", "no action set"))
+            results.append((leaf, "not attempted", NOT_ACTIONABLE))
             continue
         try:
             result = subprocess.run(
