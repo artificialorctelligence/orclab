@@ -79,6 +79,9 @@ For each step, in the document's own order:
 5. On failure: **stop.** Report what failed and the real output. Do not retry, do not skip, do not
    continue to the next step. The user fixes it and re-runs `/orc-release`, which resumes here.
 
+If any `run.py` command — not just `status`; `complete` and `skip` warn on this too — reports
+that `RELEASING.md` has changed, stop and re-read it before continuing.
+
 ## Skipping a step
 
 Only when the user explicitly asks, and only with a real reason:
@@ -101,9 +104,15 @@ release was cleaned up when a public upload already happened is worse than sayin
 
 ## Version handling
 
-Version files are set through `/orc-version` (which delegates to this same script), so there is
-one implementation. Within a release, pass `--no-commit` so the version is set at step 1 without
-committing — the document's own later step does the committing, once the artifact is verified.
+Version files are set through `/orc-version`, so there is one implementation — never write a
+version file yourself. Reach it by reading its real file,
+`${CLAUDE_SKILL_DIR}/../../commands/orc-version.md`, and following its instructions yourself
+(the same pattern this plugin's other components use to reach one another).
+
+Whatever arguments you hand it must include `--no-commit`. Within a release the version is set
+early, at this step, but must **not** be committed here — the document's own later step does the
+committing, once the artifact is verified. Committing at set-time would leave a release commit
+behind for every attempt that never shipped.
 
 After setting a version, always confirm the files agree:
 
