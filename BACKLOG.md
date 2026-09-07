@@ -449,3 +449,42 @@ complete read of Orcshot's `RELEASING.md` as the worked example — the whole do
 any design is proposed. Read `release-checklist`'s SKILL.md and `/orc-version`'s command file in
 full at the same time, since the answer may be "make these two work together properly" rather than
 "add a new component."
+
+## #13: v0.7.0 was never tagged either — the same gap as #9, and #9's own mitigation didn't hold (RESOLVED 2026-09-07)
+
+Found 2026-09-07 while direflail challenged whether `/orc-version` was actually a good idea, which
+prompted checking how version bumps have really been done rather than assuming. `git tag --list`
+showed `v0.3.0` through `v0.6.0` — no `v0.7.0`, despite v7 having shipped, been reviewed, and been
+pushed.
+
+**This is the second occurrence of the exact pattern #9 recorded**, and it is worth being blunt
+that #9's stated mitigation failed. #9's "next step" read: "Worth remembering during future
+plan-writing for any Orclab version-bump task: copy the git-tag step from an existing plan (e.g.
+v4's) rather than re-deriving the task from scratch." v7's plan was written after that entry
+existed, by the same author, and still omitted the tag step. A note reminding a human (or Claude)
+to remember something is not a mechanism.
+
+**The wider finding this surfaced, which matters more than the missing tag:** `/orc-version` has
+essentially never been used, including in its own home project. Its Apply flow commits with the
+exact message `Bump version to X.Y.Z` and nothing else, and tags automatically as step 4. But the
+real bump commits read `orc-publish: SKILL.md, bump to 0.7.0, CHANGELOG, README, VERIFICATION
+scenarios` (`0470c26`), `Add Desktop-compatible skill wrappers..., bump to 0.6.0` (`cfbdaee`), and
+`Add /orc-git command, bump version to 0.4.0` (`427c62b`) — implementation-plan tasks that edited
+the manifests by hand alongside everything else. `1eb34c7`'s message matches `/orc-version`'s
+format, but #9 already established that one was manual too (its plan omitted tagging, which
+`/orc-version` would have done automatically).
+
+So a component was designed, specced, reviewed and shipped in v3, and then every subsequent release
+bypassed it. Both missing tags are the direct, mechanical cost of that.
+
+**Fixed for real:** `v0.7.0` tagged at `ecad9d3` (2026-09-07, local-only per convention) — the
+commit where v7's fix rounds completed and the work was declared done. Commits after that point
+(`0217e59` onward, including `0ac9541`'s real change to `/orc-publish`'s dry-run output) are
+unreleased work accumulating toward the next version, not part of 0.7.0.
+
+**Why no further mitigation is being written here:** the real fix is already in flight. v8's design
+(`docs/superpowers/specs/2026-09-07-orclab-v8-orc-release-design.md`) makes `/orc-version` the one
+place that owns version-setting, with `/orc-release` delegating to it — so tagging stops being
+something a plan author has to remember and becomes something the mechanism does. This entry exists
+as the evidence for that decision, not as a request for another reminder-style note. If v8 ships
+and a third version still goes untagged, that is a real signal the approach is wrong.
