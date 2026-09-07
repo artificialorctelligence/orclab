@@ -157,6 +157,13 @@ configurable, and what the summary line says. All three are answered here.
   The trailing clause is the point. `capture_output=True` is *why* an interactive prompt is
   invisible, and an operator reading a bare "timed out" has no reason to suspect stdin. This is the
   specific confusion #11 recorded ("it just looks like the command has frozen").
+
+  **Correction, made during v11's final fix round.** "no output captured" was written before
+  anyone checked, and it is not reliably true. `subprocess.TimeoutExpired` carries whatever was
+  captured before the timeout — verified directly, and as undecoded `bytes` despite `text=True`.
+  The flagship action, `dpkg-buildpackage && debsign && dput`, is exactly the output-then-hang
+  shape where that matters most. Surfacing it is deliberately deferred, so the string above is
+  still what ships; the gap is recorded as BACKLOG #15.
 - **Visible before you confirm.** The dry-run plan prints each leaf's effective timeout, so the
   Step 2/3 safety gate in `SKILL.md` shows it alongside the action, requirements, and issues.
 - **Exit code.** A timeout is non-zero exit, the same as a failure. The status string differs; the

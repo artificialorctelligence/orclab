@@ -21,7 +21,13 @@ All notable changes to this project are documented here, newest first.
 - A `/orc-publish` action that hangs now reports `timed out` — a status distinct from `failed` —
   with a detail naming the real limit and saying the action may be waiting on stdin. Because
   actions run with output captured, a passphrase prompt produces no visible prompt at all, so the
-  timeout is often the only signal. Closes BACKLOG #11.
+  timeout is often the only signal. The kill reaches the action's whole **process group**, not
+  just the `/bin/sh -c` it started, and fires on interrupt as well as on timeout:
+  `subprocess.run`'s own timeout kills only that shell, so a compound action like
+  `dpkg-buildpackage && debsign && dput` would be reported as `timed out` while `dput` kept
+  uploading — and a retry then double-uploads to a public archive. One consequence worth knowing
+  about: the action now runs with no controlling terminal, so a gpg/pinentry passphrase prompt
+  fails fast with its own error rather than hanging to the limit. Closes BACKLOG #11.
 - A channel leaf with no `action:` reports as `(known channel, not yet actionable)` instead of
   `(no action set)`, matching the wording the distro tree already used for the same idea. A
   deliberate placeholder for a real but not-yet-onboarded channel no longer reads as an omission.

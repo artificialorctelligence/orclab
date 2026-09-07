@@ -483,6 +483,27 @@ implementation got real answers, in
 
 The scope boundary held: nothing here routes around `debsign`'s own interactive behaviour.
 
+**The finding that mattered more than the timeout itself, recorded because the method is worth as
+much as the fact.** The plan prescribed `subprocess.run(..., shell=True, timeout=N)`, and that is
+not sufficient — mid-branch review caught it, and the human ruled the finding over the plan.
+`subprocess.run`'s own timeout kills only the `/bin/sh -c` process it started. A compound action —
+which is what a real publish leaf is, `dpkg-buildpackage && debsign && dput` — does its real work
+in a *grandchild* of that shell, and killing the shell orphans it. The operator is told `timed
+out` while `dput` goes on uploading, and a retry then double-uploads to a public archive. So
+`execute_plan` uses `subprocess.Popen(..., start_new_session=True)` with `communicate(timeout=)`
+and kills the whole process group, not just the shell.
+
+**Two consequences of that deviation, both found in the final fix round rather than assumed.**
+First, the group kill has to fire on *any* exit from `communicate`, not only `TimeoutExpired`: the
+same `start_new_session` that makes the group killable also means a terminal Ctrl-C no longer
+reaches the action, so a timeout-only handler recreated the identical orphan on interrupt.
+Verified both ways under a real SIGINT — in the same process group the grandchild died with the
+interrupt; in a new session with a timeout-only handler it survived. Second, with no controlling
+terminal `/dev/tty` cannot be opened at all, so a gpg/pinentry passphrase prompt — the very case
+this entry was written about — now fails in about a second with a real error rather than hanging
+to the limit. That is an improvement, but it is a *behaviour change* this entry's own scope
+boundary did not anticipate, so it is named here instead of left to be rediscovered.
+
 ## #12: `/orc-publish` models channel fan-out, but a real release is mostly an ordered pipeline — the framework can't yet drive Orcshot's own release
 
 Found 2026-09-06/07, dogfooding `/orc-publish` against Orcshot's real release for the first time.
@@ -629,3 +650,70 @@ validate` without `--strict`, waives this one warning explicitly, or skips valid
 Not urgent — nothing runs it today — but it has to be settled *before* the release process is
 written, not after it fails.
 
+**Correction, layered on 2026-09-07 (v11's final fix round): the bare command does not emit that
+warning at all, and the reason makes this entry more urgent, not less.** This entry says "`claude
+plugin validate` emits exactly one warning against Orclab." In this repo's dual-manifest layout
+that is not what the bare command does. Reproduced independently, twice:
+
+```
+❯ claude plugin validate .
+Validating marketplace manifest: .../.claude-plugin/marketplace.json
+✔ Validation passed
+
+❯ claude plugin validate .claude-plugin/plugin.json
+Validating plugin manifest: .../.claude-plugin/plugin.json
+Validating plugin: .../CLAUDE.md
+⚠ Found 1 warning: ❯ root: CLAUDE.md at the plugin root is not loaded as project context...
+✔ Validation passed with warnings
+```
+
+Given a directory holding both manifests, it validates the **marketplace** one and stops. The
+warning this entry describes appears only when `plugin.json` is named explicitly.
+
+**Why this belongs to `CLAUDE.md`'s negative-control argument, not just to accuracy.** A
+`RELEASING.md` gate running the bare `claude plugin validate .` would check the marketplace
+manifest's structure and *nothing whatsoever* about the plugin, its skills, or the frontmatter
+that carries this project's load-bearing behaviour — and it would print `✔ Validation passed`
+either way. That is precisely what `CLAUDE.md`'s own negative-control section rules out: a check
+that passes for both the right and the wrong input is not a check. The landmine the two bullets
+above describe is real, but the worse outcome is the opposite one — a green gate that never looked
+at the plugin, and a release process that believes it verified something.
+
+So the decision this entry defers now has a third input: whichever way `--strict` goes, the gate
+has to name `.claude-plugin/plugin.json` explicitly, or it validates the wrong file.
+
+
+## #15: a timed-out `/orc-publish` leaf says "no output captured" when output was in fact captured
+
+Found 2026-09-07 during v11's final fix round, checking a code comment rather than trusting it. A
+timed-out leaf reports:
+
+```
+<path>: timed out (timed out after 600s - no output captured, the action may be waiting on stdin)
+```
+
+`subprocess.TimeoutExpired` does carry whatever was captured before the timeout. Verified
+directly: after `echo hello; sleep 5` timed out at 1s, `TimeoutExpired.stdout` was `b'hello\n'` —
+present, and **undecoded bytes** despite `text=True`, because the exception is built from the raw
+buffers before the text wrapper ever sees them.
+
+**Why this matters more than a stray adjective.** The flagship action is
+`dpkg-buildpackage && debsign && dput` — a wall of build output, and *then* a hang. That is
+precisely the output-then-hang shape where the operator is told nothing was captured while the
+build log that would say how far it got is discarded. The other half of the detail line ("may be
+waiting on stdin") stays true and stays useful; it is only the "no output captured" clause that is
+sometimes a lie.
+
+**Deliberately deferred, not overlooked.** Surfacing partial output was explicitly ruled out of
+v11's fix round by direflail. The in-code comment at the `except subprocess.TimeoutExpired` handler
+in `skills/orc-publish/scripts/orc_publish/cli.py` was corrected to say what is actually true — the
+output exists and is not surfaced yet — rather than the false claim that capture never completed.
+`docs/superpowers/specs/2026-09-07-orclab-v11-publish-pipeline-gaps-design.md` carries the same
+correction against its own hardcoded example.
+
+**Next step, when picked up:** surface `e.stdout`/`e.stderr` in the timeout detail the same way the
+`failed` branch surfaces `e.stderr`, and reword the clause so it is honest when there is genuinely
+nothing (a leaf that hung before printing anything is a real and different signal). It needs a
+`.decode()` — the bytes are not decoded for you on this path, and the `failed` branch's strings
+are, so the two branches cannot share the same handling as written. One test per shape: output
+then hang, and hang with no output.

@@ -46,8 +46,8 @@ stop.
 python3 ${CLAUDE_SKILL_DIR}/scripts/run.py <selection tokens> --dry-run
 ```
 
-Show the user the exact list this prints — every leaf, its real action, and any
-`requirement:`/`issue:` lines beneath it, verbatim, not paraphrased. A leaf's requirements/issues
+Show the user the exact list this prints — every leaf, its real action, its `timeout:` line, and
+any `requirement:`/`issue:` lines beneath it, verbatim, not paraphrased. A leaf's requirements/issues
 often name something the user needs to do *before* confirming (e.g. unlocking a signing key) —
 don't let those scroll by unread. This is the safety gate. **Never skip straight to execution**,
 even if the request sounded confident ("just publish everything," "ship it all").
@@ -66,8 +66,8 @@ python3 ${CLAUDE_SKILL_DIR}/scripts/run.py <same selection tokens>
 ```
 
 Report the exact summary it prints, per leaf: success (with the real output, if any), failed
-(with the real error text), or not attempted. Never paraphrase a failure away, and never claim
-success for a leaf the summary doesn't confirm succeeded.
+(with the real error text), timed out (with the real limit), or not attempted. Never paraphrase a
+failure away, and never claim success for a leaf the summary doesn't confirm succeeded.
 
 ## Notes
 
@@ -85,7 +85,11 @@ success for a leaf the summary doesn't confirm succeeded.
 - A leaf reported as `timed out` is distinct from one reported as `failed`, and the distinction is
   worth relaying exactly. Because actions run with their output captured, a command waiting on
   stdin for a passphrase produces no visible prompt at all — a timeout is often the only signal
-  that something is waiting on input rather than working.
+  that something is waiting on input rather than working. One case no longer reaches a timeout at
+  all: a prompt on the terminal rather than on stdin (gpg/pinentry, which is what `debsign` uses)
+  now fails fast as `failed`, with its own `/dev/tty` error text, because the action runs in its
+  own session with no controlling terminal. So the timeout is the signal for the *other* kinds of
+  wait — relay that error text plainly when you see it rather than waiting out the limit.
 - A channel leaf with no `action:` reports as `(known channel, not yet actionable)` and is never
   attempted. That is a real, deliberate state — a target the project knows about but has no
   publish mechanism for yet — not a misconfiguration to fix.

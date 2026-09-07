@@ -1,10 +1,14 @@
 """Parse a project's RELEASING.md into ordered steps.
 
 RELEASING.md is the single definition of a release's steps - this module only reads it. The
-four prose conventions (preconditions, performed-by-hand, delegation, irreversible) are all
-OPTIONAL: a document using none of them parses fine, with every marker field left at its
-default. That backward compatibility is load-bearing, not incidental - real documents predate
-the conventions.
+prose conventions this parser extracts (preconditions, performed-by-hand, delegation,
+irreversible) are all OPTIONAL: a document using none of them parses fine, with every marker
+field left at its default. That backward compatibility is load-bearing, not incidental - real
+documents predate the conventions.
+
+`release-checklist` documents one further convention, `**One-time setup:**`, deliberately absent
+from that list: its whole behaviour is that the runner reads the step's own prose and asks, so
+there is no field for a parser to extract. Expect this list to be shorter than that document's.
 """
 
 import hashlib

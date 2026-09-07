@@ -496,6 +496,32 @@ until the v8 final review.
 6. **Expected:** the run's exit code is non-zero. A timeout is a failing verdict even though its
    status string differs from `failed`.
 
+## Scenario 43: a timed-out compound action leaves nothing running behind it
+
+1. In a throwaway scratch directory, create `.orclab/publish/channels.yaml`. The nested `sh -c`
+   matters: inside a plain `(...)` subshell, `$$` expands to the *outer* shell's PID, and step 5
+   would then check a process that was killed directly and pass without proving anything.
+
+   ```yaml
+   test:
+     compound:
+       action: "true && sh -c 'echo $$ > /tmp/orc-verify-43.pid; sleep 120'"
+       timeout: 2
+   ```
+2. `rm -f /tmp/orc-verify-43.pid`, then run `/orc-publish`, confirm the dry-run list, and let it
+   run for real.
+3. **Expected:** `test.compound` reports `timed out` after about two seconds, and the run's exit
+   code is non-zero.
+4. Check the recorded grandchild: `kill -0 $(cat /tmp/orc-verify-43.pid)`.
+5. **Expected:** it fails with "No such process". The grandchild — the part that would still have
+   been uploading — is gone, not merely reparented and sleeping out its remaining 118 seconds. If
+   it is still alive, the process-group kill is broken and the `timed out` report is a lie.
+6. Change `timeout:` to `60`, `rm -f /tmp/orc-verify-43.pid`, run it again, and press Ctrl-C a few
+   seconds in — while the action is underway, well before the timeout could fire.
+7. **Expected:** step 4's check fails the same way. The grandchild is gone on interrupt too. An
+   operator cancelling a real `dput` must not be left with it still uploading, because the retry
+   then double-uploads to a public archive.
+
 ## Recording the result
 
 Note the outcome of each scenario (pass/fail, with specifics) either back in this conversation or
