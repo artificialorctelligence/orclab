@@ -36,6 +36,25 @@ Each step is a `## N. <short imperative title>` heading, followed by:
 - **What "done" looks like** for anything requiring judgment (e.g. "must be fully green," "zero
   errors, warnings reviewed individually").
 
+### Optional markers a step can carry
+
+Four optional prose markers. They are read by `/orc-release` when it drives the checklist, but
+they are written for a human first — someone following the document by hand wants "don't start
+this if X" every bit as much as an automated runner does. **All four are optional; a document
+using none of them is still complete and still driveable.**
+
+- **Preconditions** — what must be true before the step starts, written as
+  `**Preconditions:** <what must be true>`. Prefer the specific and checkable ("this version is
+  not already published to the PPA") over the generic ("everything is ready").
+- **Performed by hand** — `**Performed by hand.**` for a step (or part of one) a person carries
+  out rather than a command: a click in a web UI, a manual install-test on real hardware, a
+  visual confirmation. A step may be partly manual; say so where the manual part begins.
+- **Delegation** — `**Run:** /some-command` when the step's work is done by an existing command
+  rather than by literal shell commands written out here.
+- **Irreversible** — `**Irreversible.**` when the step does something that cannot be undone:
+  publishing to a public archive, pushing a tag, creating a release. This is what lets an
+  abandoned release distinguish what can be rolled back from what merely has to be reported.
+
 ## Cross-referencing CI
 
 If a step (or part of one) already runs automatically in CI, say so explicitly in that step, e.g.:

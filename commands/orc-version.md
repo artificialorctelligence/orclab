@@ -1,6 +1,6 @@
 ---
 description: Set or increment the current project's version, draft a changelog entry from real git history, tag the commit, and optionally cut a real GitHub Release.
-argument-hint: <major>.<minor>[.<point>] | increment <major|minor|point> | release [tag]
+argument-hint: <major>.<minor>[.<point>] | increment <major|minor|point> | release [tag] [--no-commit]
 ---
 
 # /orc-version
@@ -109,20 +109,51 @@ Once the new version string is determined (from either flow above):
      what's worth recording.
    - Prepend the finalized entry to `CHANGELOG.md`, directly below its header.
 
-2. **Update manifests, if present.**
-   - If `.claude-plugin/plugin.json` exists, update its `"version"` field to the new version.
-   - If `.claude-plugin/marketplace.json` also exists, update its `plugins[0].version` field to
-     the new version too — **add the field if it doesn't already exist**. (A real, confirmed gap:
-     omitting this field causes Claude Code's own plugin installer to record the plugin's version
-     as the literal string `"unknown"`, with a genuinely broken install directory to match — this
-     isn't cosmetic.)
+2. **Update every version-holding file.**
 
-3. **Commit.**
+   Run Orclab's own version-file module rather than hand-editing — it is the single owner of
+   version-setting, it handles each format's real syntax, and it is covered by real tests. The
+   script lives at `<orclab plugin root>/skills/orc-release/scripts/run.py`, where the plugin
+   root is the parent of the `commands/` directory this file lives in:
+
+   ```bash
+   python3 <orclab plugin root>/skills/orc-release/scripts/run.py version-set X.Y.Z
+   ```
+
+   For a project with a `debian/changelog`, pass the changelog body too (the same content
+   drafted in step 1, as Debian-style `*` bullets):
+
+   ```bash
+   python3 <...>/run.py version-set X.Y.Z --changelog-body '* What changed.'
+   ```
+
+   Supported formats: `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`,
+   `pyproject.toml`, `debian/changelog`. A project using none of them has no version file to
+   update; say so plainly rather than inventing one.
+
+   Then confirm every file agrees:
+
+   ```bash
+   python3 <...>/run.py version-verify
+   ```
+
+3. **Commit — unless `--no-commit` was passed.**
+
+   If `$ARGUMENTS` contains `--no-commit`, **stop here**. Report the new version and which files
+   were changed, and do not commit or tag. This exists because a real release process often
+   separates setting the version from committing it: a packaged app builds, lints, publishes and
+   install-tests against the uncommitted version edits, and commits only once the artifact is
+   verified — so committing at bump time would leave a `Release vX.Y.Z` commit behind for every
+   attempt that never released.
+
+   Otherwise (the default, unchanged behavior):
+
    ```bash
    git add CHANGELOG.md .claude-plugin/plugin.json .claude-plugin/marketplace.json
    git commit -m "Bump version to X.Y.Z"
    ```
-   (Only `git add` the manifest files if they actually exist and were updated.)
+
+   (Only `git add` the files that actually exist and were updated.)
 
 4. **Tag — local only.**
    ```bash
