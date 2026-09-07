@@ -387,6 +387,48 @@ until the v8 final review.
 8. Separately, mid-release (one step still outstanding), ask to finish.
 9. **Expected:** refused, naming the outstanding step, with the release still in progress.
 
+## Scenario 36: /orc-reload refuses outside a plugin project
+
+1. In a throwaway scratch directory that is not a Claude Code plugin, run `/orc-reload`.
+2. **Expected:** it reports plainly that this isn't a plugin project and stops. It must not go
+   hunting for something to reinstall, and must not run any `claude plugin` command.
+
+## Scenario 37: /orc-reload on a directory-sourced marketplace
+
+1. In Orclab's own repo (registered by local path — confirm with
+   `python3 -c "import json;print(json.load(open('$HOME/.claude/plugins/known_marketplaces.json'))['orclab']['source'])"`),
+   run `/orc-reload`.
+2. **Expected:** it reports the currently-installed version and the version `plugin.json` expects,
+   notes there's no cached clone to refresh for a directory source, runs uninstall+install, then
+   confirms the expected version is really present in
+   `~/.claude/plugins/cache/orclab/orclab/` — quoting the real version, not assuming it.
+3. **Expected:** it ends by stating that this session still has the old version loaded and a fresh
+   session is required. That statement must appear every time, not only when something looked
+   wrong.
+4. If the working tree is dirty, **expected:** it says so, since a directory-sourced install picks
+   up uncommitted changes.
+
+## Scenario 38: /orc-reload does not silently reinstall from a stale clone
+
+1. This one needs a `github`-sourced marketplace. If you have one registered whose cached clone at
+   `~/.claude/plugins/marketplaces/<name>` is behind its remote, run `/orc-reload` in that
+   project. (If you have none, note this scenario as untested rather than faking it.)
+2. **Expected:** it detects the clone is behind, **stops**, and hands you the exact `git fetch`
+   plus `reset --hard` command to run yourself.
+3. **Expected:** it does **not** run `reset --hard` on your checkout, and does not proceed with a
+   reinstall that would install the stale code while appearing to succeed.
+
+## Scenario 39: /orc-reload reports a failed reinstall as failed
+
+1. Temporarily make the reinstall unable to reach the expected version — e.g. bump
+   `plugin.json`'s version without committing, in a project whose marketplace source is a git
+   clone rather than the working tree, so the installed version can't match.
+2. Run `/orc-reload`.
+3. **Expected:** after the install commands exit cleanly, it checks the cache, finds the expected
+   version absent, and says the reinstall did **not** work. It must not report success just
+   because the commands returned zero.
+4. Revert the probe.
+
 ## Recording the result
 
 Note the outcome of each scenario (pass/fail, with specifics) either back in this conversation or

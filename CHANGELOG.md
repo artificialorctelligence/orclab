@@ -2,6 +2,32 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.9.0] - 2026-09-07
+
+### Added
+- `/orc-reload` — reinstalls the plugin in the current project so a fresh session picks up your
+  latest changes. Built because "I changed the plugin, why is it still running the old version"
+  has several genuinely different causes that all present identically: a `github`-sourced
+  marketplace keeps a cached clone that does **not** refresh on reinstall, Desktop's Update button
+  is often greyed out for a `directory`-sourced one, and a schema-invalid manifest reports a
+  downstream symptom naming neither the field nor the validation. It distinguishes those, refuses
+  to `reset --hard` anyone's checkout on their behalf, verifies the expected version actually
+  landed rather than trusting a clean exit, and always ends by saying a reinstall cannot take
+  effect in the running session. Ships as a skill only, and reads whatever plugin project it's
+  invoked in — so it works for plugins other than Orclab.
+
+### Fixed
+- `find_project_root` now prefers the nearest `RELEASING.md` over the enclosing git root, so a
+  subproject carrying its own release document inside a larger repo is no longer told that
+  document doesn't exist.
+- `/orc-release`'s `allowed-tools` narrowed from unscoped `Bash` back to `Read`,
+  `Bash(python3 *)`, `Bash(git status *)`. Pre-approving arbitrary `Bash` removed the permission
+  prompt from the project's own release commands — `dput`, `debuild` — which are precisely the
+  irreversible operations that most deserve one. The prompt is the gate.
+- The v8 spec listed `abort` as a release's only exit (the design error its own final review
+  caught) and claimed `abort` rolls back commits and tags. It does neither — the CLI makes no git
+  or shell call at all. Both corrected, with `finish` documented alongside `abort`.
+
 ## [0.8.0] - 2026-09-07
 
 ### Added

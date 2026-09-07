@@ -40,6 +40,10 @@ below.
 - **/orc-release** — drive this project's own `RELEASING.md` end to end: ordered steps, real
   gates, human-step handoffs, and a position cursor so a release survives across sessions. Halts
   on failure. Ships as a skill only.
+- **/orc-reload** — reinstall the plugin you're currently developing so a fresh session picks up
+  your changes, distinguishing the several causes that all look like "the reinstall didn't work"
+  and verifying the expected version actually landed. Works for any plugin project, not just
+  Orclab. Ships as a skill only.
 
 ## Installing
 
@@ -59,7 +63,8 @@ future components).
 
 v1 (process core) + v2 (`/orc-code`) + v3 (`/orc-version`, `/orc-help`/`/orc`) + v4 (`/orc-git`) +
 v5 (`currency-discipline`, `verify-before-asserting`) + v6 (Desktop-compatible skill wrappers for
-every `/orc-*` command) + v7 (`/orc-publish`) + v8 (`/orc-release`) shipped. See `docs/superpowers/specs/` for the design history,
+every `/orc-*` command) + v7 (`/orc-publish`) + v8 (`/orc-release`) + v9 (`/orc-reload`) shipped.
+See `docs/superpowers/specs/` for the design history,
 `CHANGELOG.md` for what actually changed release to release, and `BACKLOG.md`
 for what's deliberately deferred (real per-stack defaults research is #4, `/orc-data` is #5,
 hook-based enforcement is #3, per-language manifest version-sync is #6, distribution-channel
