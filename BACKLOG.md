@@ -563,3 +563,39 @@ place that owns version-setting, with `/orc-release` delegating to it — so tag
 something a plan author has to remember and becomes something the mechanism does. This entry exists
 as the evidence for that decision, not as a request for another reminder-style note. If v8 ships
 and a third version still goes untagged, that is a real signal the approach is wrong.
+
+## #14: `claude plugin validate --strict` fails on Orclab's own CLAUDE.md — settle before writing a RELEASING.md
+
+Found 2026-09-07 while confirming that a `metadata:` marker in SKILL.md frontmatter is accepted
+(it is — see `CLAUDE.md`). `claude plugin validate` emits exactly one warning against Orclab:
+
+```
+❯ root: CLAUDE.md at the plugin root is not loaded as project context. To ship context with your
+  plugin, use a skill (skills/<name>/SKILL.md) instead.
+```
+
+Plain `validate` passes with the warning. `--strict` promotes warnings to errors and **fails,
+exit 1, on that warning alone** — confirmed live.
+
+**The warning is accurate, and the current layout is still correct.** Consumers who install
+Orclab genuinely never see `CLAUDE.md`; it is not injected into their sessions. That is exactly
+what `CLAUDE.md` says about itself ("not something Orclab ships to consuming projects"), and it
+still does its real job — inside the orclab repo it is that project's own `CLAUDE.md` and loads
+normally. This is a false positive against intent, not a defect to fix.
+
+**Two ways it bites later, which is why it's tracked rather than ignored:**
+- `plugin validate` appears nowhere in this repo today, and Orclab has no `RELEASING.md` of its
+  own — despite shipping `/orc-release`, which drives other projects' release processes. The
+  moment someone writes one and adds the obvious `claude plugin validate --strict` gate, Orclab
+  fails its own release gate on a file that is deliberately, correctly there. A landmine planted
+  ahead of the process that will step on it.
+- The warning recommends the wrong remedy for this case. "Use a skill instead" would move
+  Orclab's internal development guidance into a shipped skill, pushing it into every consuming
+  project's context — precisely the boundary `CLAUDE.md` draws against. A future session with
+  less context will read a helpful-sounding suggestion and do the wrong thing.
+
+**Decision needed when picked up:** whether Orclab's eventual `RELEASING.md` runs `plugin
+validate` without `--strict`, waives this one warning explicitly, or skips validate altogether.
+Not urgent — nothing runs it today — but it has to be settled *before* the release process is
+written, not after it fails.
+

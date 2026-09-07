@@ -10,24 +10,56 @@ Every claim below was actually checked — against the real, current official do
 live, direct behavior observed in a real session — not assumed from memory. Where something is
 inference rather than a confirmed fact, it's labeled as such.
 
-## Commands and Skills are different things, not merged
+## Commands are the legacy form of Skills — Orclab ships skills only
 
-A `commands/*.md` file and a `skills/<name>/SKILL.md` file are distinct component types. An
-early research pass this project did wrongly concluded they'd been "merged into the same
-interface" — that came from a blog aggregation, not the primary docs, and doesn't hold up:
-Anthropic's own plugins reference describes them as separate ("commands are simple markdown
-files; skills are directories with `SKILL.md`").
+**Settled against the primary docs (2026-09-07).** The plugins reference and the plugin guide
+both describe `commands/` in the same words: *"Skills as flat Markdown files. **Use `skills/` for
+new plugins**."* They are not two component types with different capabilities — `commands/` is
+the legacy flat layout of the same thing. That is why the precedence rule reads the way it does:
+*"if a skill and a command share the same name, the skill takes precedence."*
+
+Two consequences worth stating outright, because an earlier pass of this file got both wrong:
+- Skills support a **superset** of command frontmatter. Commands ignore `name` and `paths`;
+  everything else — `$ARGUMENTS`, positional `$1`/`$2`, the `arguments` field, `argument-hint`,
+  `allowed-tools`, `disable-model-invocation` — behaves identically in a `SKILL.md`.
+- A plugin skill's invocable name comes from its **directory name**, not its `name:` field. The
+  skills doc says otherwise; the docs are wrong. Confirmed live against the installed `aikido`
+  plugin, whose skill directory `issues` carries `name: aikido-issues` and yet loads as
+  `aikido:issues`.
+
+**As of v0.10.0 Orclab has no `commands/` directory.** All components are skills.
 
 **Real, confirmed bug, not theoretical**: the Claude Desktop client does not register plugin
 `commands/*.md` files as slash commands at all. Confirmed live — `/orclab:orc` and `/orclab`
 both returned "Unknown command" in that client, on an install that worked correctly via the CLI.
 Skills, by contrast, invoke correctly there (confirmed via `ponytail`'s real `/ponytail`).
 
-**What this means for every future `/orc-*` command**: if it needs to work in Desktop (which is
-the actual daily-driver surface, not the CLI), it needs a thin wrapper Skill too — the same
-"point at the real content, don't duplicate it" pattern `orc.md` already uses to reach
-`orc-help.md`. `commands/*.md` stays for CLI use; the wrapper Skill is additive, not a
-replacement.
+**Refinement, confirmed live (2026-09-07) — with a wrapper skill present, Desktop doesn't fail,
+it warns spuriously and then works.** The "Unknown command" observation above predates v6's
+wrapper skills. Once a component ships both, typing the bare `/orc-git commit` in Desktop shows a
+toast — *"/orc-git isn't a recognized command here. Some commands only work in the Claude Code
+terminal."* — and then runs correctly anyway via the wrapper skill.
+
+That toast comes from Desktop's own UI bundle (`resources/ion-dist`, i18n id `+9dhXtDFu6`), not
+from `claude-code` and not from the agent. At its call site it is fired as a side effect inside a
+comma expression whose actual branch condition is a *different* predicate, so it is advisory, not
+a rejection. The validator tests the typed name against its own command registry and never
+consults skills — which is exactly why a perfectly working skill still trips it.
+
+**Workaround, confirmed live: type the namespaced form.** `/orclab:orc-git commit` produces no
+toast and runs identically; the bare `/orc-git commit` warns first, then runs. Nothing in the
+plugin can suppress the bare-form toast — there is no frontmatter field or naming convention that
+registers a plugin command with that UI validator, so it is Anthropic's to fix.
+
+**The practical trap:** do not debug a wrapper skill because of this toast. It fires on a
+component that is working correctly, and the wrapper is the reason it works at all.
+
+**What this means for every future `/orc-*` component: build it as a skill, full stop.** The
+older guidance here said `commands/*.md` "stays for CLI use" and the wrapper skill was "additive,
+not a replacement." That was wrong on its own terms — because the skill wins any name collision,
+the wrapper shadowed its own command file in the CLI too, so those command files were never
+serving the CLI. They had become content that the wrappers happened to `Read`. v0.10.0 folded
+each body into its skill and deleted `commands/` outright.
 
 ## The determinism spectrum: explicit invocation vs. ambient matching
 
@@ -135,8 +167,8 @@ one needs the same "check it's actually available, tell the user plainly if not"
 
 ## Checklist for designing a new `/orc-*` thing
 
-1. Does it need to work in Desktop? If yes, it needs a wrapper Skill, not just a `commands/*.md`
-   file.
+1. Build it as `skills/<name>/SKILL.md`. There is no `commands/` directory any more, and the
+   docs tell plugin authors to use `skills/` for new work.
 2. Is it conversational/workflow-starting, or one-shot/side-effecting? The former stays default
    (natural-language triggerable); the latter gets `disable-model-invocation: true`.
 3. Does its description reference its own real name explicitly, to give ambient matching the
@@ -145,9 +177,12 @@ one needs the same "check it's actually available, tell the user plainly if not"
    sub-component `disable-model-invocation: true` and invoke it explicitly by name.
 5. Does the capability already exist as a real skill (built-in, or from another plugin)? Wrap it
    — with an availability check — rather than rebuilding it.
-6. Does it ship skill-only (no `commands/*.md`)? Then `/orc-help`'s Step 3 enumeration needs to
-   already cover `skills/orc-*/SKILL.md`, not just `commands/*.md` — verify it does, since a
-   skill-only component silently vanishes from Orclab's own command listing otherwise.
+6. Is it named `orc-<something>` (or `orc` itself)? `/orc-help`'s Step 3 enumerates
+   `skills/orc*/SKILL.md` — no hyphen, so `skills/orc` is caught too — and that prefix is the
+   only thing separating Orclab's commands from its discipline skills. A component named without
+   it silently vanishes from Orclab's own command listing. If the `orc` prefix is ever dropped,
+   Step 3 needs a different discriminator; a `metadata:` key is the documented way (confirmed
+   live to load without error), since unknown *top-level* frontmatter keys are not.
 
 ## Running the bundled-script test suites
 
@@ -158,6 +193,30 @@ from any working directory or invocation form. Run a given skill's suite with:
 ```bash
 cd skills/<skill-name>/scripts && python3 -m pytest tests/ -v
 ```
+
+## `claude plugin validate` does not check skill frontmatter
+
+Confirmed live (2026-09-07) with a negative control, not assumed. Two copies of Orclab, identical
+except for one line in `skills/orc-git/SKILL.md` — one with a custom key correctly nested under
+`metadata:`, the other with the same key as an unsupported *top-level* frontmatter field, which
+the skills docs say is a hard error when packaging a skill for upload — produced byte-identical
+output: `✔ Validation passed with warnings`.
+
+So `plugin validate` checks manifest/marketplace structure and file layout. It does not read
+frontmatter contents. **"Validation passed" is not evidence that a skill's frontmatter is
+well-formed**, and it must never be cited as one in a release checklist.
+
+This matters more here than it first looks, because Orclab's frontmatter is load-bearing
+behavior, not decoration. A misspelled `disable-model-invocation` would silently make a
+side-effecting skill (`/orc-publish`, `/orc-release`) model-invocable again — the exact property
+the design checklist's item 2 exists to decide — and validate would report a clean pass. If
+frontmatter is ever to be checked mechanically, it needs Orclab's own lint, which is the same
+shape as the `hooks/scripts/` work in BACKLOG #3.
+
+**The method is worth as much as the fact:** without the negative control, that passing run would
+have looked like proof the `metadata:` marker was safe. It proved nothing — a check that passes
+for both the right and the wrong input isn't a check. Any future "I verified it with the official
+tool" claim needs the same control before it counts.
 
 ## Marketplace/install gotchas, found dogfooding v6 in Desktop (2026-09-06)
 

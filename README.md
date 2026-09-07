@@ -52,12 +52,11 @@ Register this directory as a local plugin marketplace, then install the plugin:
     /plugin marketplace add ~/projects/orclab
     /plugin install orclab@orclab
 
-**Known gap, now fixed (found 2026-09-06, fixed same day):** the `/orc-*` commands
-(`commands/*.md`) always worked via the CLI, but the Claude Desktop client never registered plugin
-`commands/*.md` files as slash commands at all — typing `/orc-code` or `/orc` there returned
-"Unknown command." Skills don't have this problem, which is why each command now also ships as a
-matching skill (see `CLAUDE.md` for the full story and the design checklist this produced for
-future components).
+**Every `/orc-*` component is a skill** (`skills/<name>/SKILL.md`). Orclab briefly shipped a
+parallel `commands/*.md` layer as well; that was removed in v0.10.0 once the docs settled the
+question — `commands/` is the legacy flat form of a skill, and a skill wins any name collision,
+so the command files were shadowed by their own wrappers everywhere. See `CLAUDE.md` for the full
+story and the design checklist it produced.
 
 ## Status
 

@@ -15,7 +15,7 @@ dependent chain, where step 6 uploading irreversibly to a public archive is only
 step 2's tests actually passed.
 
 `allowed-tools` deliberately pre-approves only this skill's own plumbing — `Read` for
-`commands/orc-version.md`, `python3` for the `run.py` calls below, and `git status` for the
+`skills/orc-version/SKILL.md`, `python3` for the `run.py` calls below, and `git status` for the
 working-tree report. **The project's own release commands are deliberately NOT pre-approved.**
 
 That is a feature, not an oversight. `pytest` is harmless; `dput` uploads irreversibly to a public
@@ -164,7 +164,7 @@ Pass that on in full; the user's tree really is inconsistent until they do it.
 
 Version files are set through `/orc-version`, so there is one implementation — never write a
 version file yourself. Reach it by reading its real file,
-`${CLAUDE_SKILL_DIR}/../../commands/orc-version.md`, and following its instructions yourself
+`${CLAUDE_SKILL_DIR}/../orc-version/SKILL.md`, and following its instructions yourself
 (the same pattern this plugin's other components use to reach one another).
 
 Whatever arguments you hand it must include `--no-commit`. Within a release the version is set

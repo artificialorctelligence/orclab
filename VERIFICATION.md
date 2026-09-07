@@ -93,7 +93,7 @@ situations (empty scratch dir, existing project, etc.).
 3. Separately, run bare `/orc-code migrate this to a different language` (no literal "refactor"
    keyword) describing a similarly clear migration intent.
 4. **Expected:** Claude routes to the same Refactor Flow without needing the literal keyword,
-   demonstrating the intent-classification routing from Step 0 of `commands/orc-code.md`.
+   demonstrating the intent-classification routing from Step 0 of `skills/orc-code/SKILL.md`.
 
 ## Scenario 9: /orc-version increment, local-only
 
@@ -136,7 +136,8 @@ and irreversible.
 
 1. In Orclab's own repo, run `/orc-help`.
 2. **Expected:** reports "core" context, the real current version, and a live-read synopsis of
-   all commands present in `commands/*.md` at the time it's run (not a stale hardcoded list).
+   all commands present as `skills/orc*/SKILL.md` at the time it's run (not a stale hardcoded
+   list).
 3. In a different project that has Orclab installed (e.g. Orcshot, once dogfooded there), run
    `/orc-help` again.
 4. **Expected:** reports "project" context, the same Orclab version as step 1 (assuming no bump
@@ -223,10 +224,10 @@ and irreversible.
    Desktop's autocomplete inserts one (`/orc-code` or `/orclab:orc-code` — confirmed live,
    2026-09-06): `/orc-code`, `/orc-version`, `/orc-help`, `/orc`, `/orc-git`.
 2. **Expected:** each one succeeds — no "Unknown command" — and produces the same real behavior
-   as its underlying `commands/*.md` file (e.g. `/orc-help` reports the real version and command
+   as its `skills/<name>/SKILL.md` (e.g. `/orc-help` reports the real version and command
    synopsis, `/orc-code` asks its real questions).
-3. Separately, in the CLI, confirm the original `/orc-*` commands still work exactly as before —
-   this release is additive, not a replacement.
+3. Separately, in the CLI, confirm the same `/orc-*` skills work there too — one component
+   serves both surfaces, and since v0.10.0 there is no parallel `commands/` layer behind them.
 
 ## Scenario 22: /orc-* skills fire from a natural sentence, not just the literal slash
 
