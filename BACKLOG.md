@@ -432,7 +432,7 @@ constructed inline by each scenario.
 guessing — this entry exists to hold the "come back to this" intent, not to pre-decide what's
 missing.
 
-## #11: `/orc-publish`'s `execute_plan` has no subprocess timeout — a real hang risk, not yet fixed
+## #11: `/orc-publish`'s `execute_plan` has no subprocess timeout — a real hang risk, not yet fixed (RESOLVED 2026-09-07)
 
 Found during the final whole-branch review of `/orc-publish` (v7, 2026-09-06). `execute_plan` in
 `skills/orc-publish/scripts/orc_publish/cli.py` runs each leaf's `action` via `subprocess.run`
@@ -465,6 +465,23 @@ with the run just appearing to hang, otherwise.
 whether it's per-leaf configurable via the channel tree, what happens to the summary line for a
 leaf that times out — presumably a new `"timed out"` status distinct from `"failed"`) before
 implementing it.
+
+**Fixed for real (2026-09-07, Orclab v11).** All three decisions this entry asked for before
+implementation got real answers, in
+`docs/superpowers/specs/2026-09-07-orclab-v11-publish-pipeline-gaps-design.md`:
+
+- **Per-leaf, with a default.** `timeout` is a leaf key; `execute_plan` uses a leaf's own value
+  when set, and `--timeout <seconds>` moves the default for a whole run without overriding a leaf
+  that deliberately set a tighter one.
+- **600 seconds.** Deliberately a "something is wrong" ceiling rather than a performance budget.
+  This entry's own objection — that `dput` and a local build script don't share a reasonable
+  timeout — is answered by the per-leaf override, not by the default.
+- **A distinct `timed out` status**, as this entry anticipated, whose detail names the real limit
+  *and* says the action may be waiting on stdin. That last clause exists because
+  `capture_output=True` is precisely why a `debsign` prompt is invisible, which is the confusion
+  this entry recorded ("it just looks like the command has frozen").
+
+The scope boundary held: nothing here routes around `debsign`'s own interactive behaviour.
 
 ## #12: `/orc-publish` models channel fan-out, but a real release is mostly an ordered pipeline — the framework can't yet drive Orcshot's own release
 
@@ -524,6 +541,19 @@ complete read of Orcshot's `RELEASING.md` as the worked example — the whole do
 any design is proposed. Read `release-checklist`'s SKILL.md and `/orc-version`'s command file in
 full at the same time, since the answer may be "make these two work together properly" rather than
 "add a new component."
+
+**Already closed by v8 (recorded 2026-09-07).** This entry's open design question — "does Orclab
+need a pipeline concept — ordered steps, gates/preconditions, and a way to represent a step a
+*human* performs — with `/orc-publish` becoming one stage within it" — was answered yes and built
+as `/orc-release`. Ordered steps that halt on failure, `**Preconditions:**`, `**Performed by
+hand.**`, `**Run:** /some-command` delegation, and a cross-session state cursor all shipped in
+v0.8.0. This entry's own "next step" (a fresh brainstorming pass from a complete read of Orcshot's
+`RELEASING.md`) is what produced that design.
+
+It is recorded here rather than left ambiguous because v11's brainstorming pass initially treated
+this entry as open and nearly re-designed something that already exists. What v11 *did* find was
+narrower and genuinely uncovered by v8 — one-time onboarding, honest reporting of a not-yet-usable
+channel, and #11's timeout — all three closed in v11.
 
 ## #13: v0.7.0 was never tagged either — the same gap as #9, and #9's own mitigation didn't hold (RESOLVED 2026-09-07)
 

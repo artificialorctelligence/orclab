@@ -430,6 +430,72 @@ until the v8 final review.
    because the commands returned zero.
 4. Revert the probe.
 
+## Scenario 40: a one-time-setup check that passes is not re-run
+
+1. In a throwaway scratch directory, create a synthetic `RELEASING.md`. Its commands are written
+   inline rather than in fenced blocks, so the whole file stays a single, unambiguous fence-free
+   document — `/orc-release` warns about unclosed fences for good reason.
+
+   ```markdown
+   # Cutting a test release
+
+   ## 1. Set up the store
+
+   **One-time setup:** registering the store name, once per account.
+
+   Check whether it is already done: `test -f already-registered`
+
+   If it is not, register it: `touch already-registered && echo REGISTERED-FOR-REAL`
+
+   ## 2. Ship
+
+   Run: `echo shipped`
+   ```
+
+   Add a `pyproject.toml` with `[project]`, a `name`, and `version = "0.1.0"`, then
+   `touch already-registered`.
+2. Run `/orc-release`, proceed past the working-tree report, target `0.2.0`, and let it reach
+   step 1.
+3. **Expected:** it runs only `test -f already-registered`, reports that the setup is already in
+   place, and carries on. It must **not** run the register command — `REGISTERED-FOR-REAL` must
+   never appear anywhere in the output.
+
+## Scenario 41: a failing one-time-setup check stops and asks
+
+1. Same scratch directory and `RELEASING.md` as Scenario 40, but `rm -f already-registered` first,
+   and clear any release state so the run starts clean.
+2. Run `/orc-release` and let it reach step 1.
+3. **Expected:** the check fails and it **stops** — naming exactly what is missing, in the
+   document's own words, and asking whether you want it set up now. It must not run the register
+   command on its own initiative, and must not report the step as a failure it cannot recover
+   from.
+4. Say no.
+5. **Expected:** it does not proceed to step 2, and `already-registered` still does not exist.
+6. Re-run, and this time say yes.
+7. **Expected:** only now does it run the register command, `REGISTERED-FOR-REAL` appears, and
+   `already-registered` exists afterwards.
+
+## Scenario 42: /orc-publish times out a hanging action and reports an un-onboarded channel honestly
+
+1. In a throwaway scratch directory, create `.orclab/publish/channels.yaml`:
+
+   ```yaml
+   test:
+     hangs:
+       action: "sleep 30"
+       timeout: 2
+     snap: {}
+   ```
+2. Run `/orc-publish` and read the dry-run list.
+3. **Expected:** `test.hangs` shows its action followed by a `timeout: 2s` line; `test.snap` shows
+   `(known channel, not yet actionable)` and no timeout line at all.
+4. Confirm, and let it run for real.
+5. **Expected:** `test.hangs` reports `timed out` — not `failed` — with a detail naming the real
+   2s limit and saying the action may be waiting on stdin. `test.snap` reports
+   `not attempted (known channel, not yet actionable)`.
+6. **Expected:** the run's exit code is non-zero. A timeout is a failing verdict even though its
+   status string differs from `failed`.
+
 ## Recording the result
 
 Note the outcome of each scenario (pass/fail, with specifics) either back in this conversation or
