@@ -9,6 +9,7 @@ from orc_publish.cli import (
     execute_plan,
     format_plan,
     format_summary,
+    main,
     render_filename,
     run_for,
 )
@@ -124,3 +125,51 @@ def test_run_for_raises_when_the_target_is_a_branch_not_a_leaf(tmp_path):
     )
     with pytest.raises(SelectionError):
         run_for(root, "mint")
+
+
+def test_format_plan_reports_no_leaves_selected_when_empty():
+    assert format_plan([]) == "(no leaves selected)"
+
+
+def test_execute_plan_surfaces_successful_stdout_in_the_result(tmp_path):
+    root = load_tree(
+        write_yaml(tmp_path, "channels.yaml", 'a: { action: "echo hello-from-a" }')
+    )
+    leaves = build_plan(root, [])
+    results = execute_plan(leaves)
+    leaf, status, detail = results[0]
+    assert status == "success"
+    assert "hello-from-a" in detail
+
+
+def test_main_dry_run_does_not_execute_any_action(tmp_path):
+    path = write_yaml(
+        tmp_path, "channels.yaml", f'a: {{ action: "touch {tmp_path}/sentinel" }}'
+    )
+    exit_code = main(["--channels", path, "--dry-run"])
+    assert exit_code == 0
+    assert not (tmp_path / "sentinel").exists()
+
+
+def test_main_real_run_executes_the_action(tmp_path):
+    path = write_yaml(
+        tmp_path, "channels.yaml", f'a: {{ action: "touch {tmp_path}/sentinel" }}'
+    )
+    exit_code = main(["--channels", path])
+    assert exit_code == 0
+    assert (tmp_path / "sentinel").exists()
+
+
+def test_main_reports_a_clean_error_for_a_missing_channels_file(tmp_path, capsys):
+    exit_code = main(["--channels", str(tmp_path / "does-not-exist.yaml")])
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert "error:" in captured.err
+
+
+def test_main_for_mode_notes_when_selection_tokens_are_ignored(tmp_path, capsys):
+    path = write_yaml(tmp_path, "distro.yaml", "mint: { x11: { channel: 'a.b' } }")
+    exit_code = main(["ignored-token", "--distro", path, "--for", "mint.x11"])
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert "ignored" in captured.err

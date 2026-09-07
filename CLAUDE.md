@@ -145,6 +145,9 @@ one needs the same "check it's actually available, tell the user plainly if not"
    sub-component `disable-model-invocation: true` and invoke it explicitly by name.
 5. Does the capability already exist as a real skill (built-in, or from another plugin)? Wrap it
    — with an availability check — rather than rebuilding it.
+6. Does it ship skill-only (no `commands/*.md`)? Then `/orc-help`'s Step 3 enumeration needs to
+   already cover `skills/orc-*/SKILL.md`, not just `commands/*.md` — verify it does, since a
+   skill-only component silently vanishes from Orclab's own command listing otherwise.
 
 ## Marketplace/install gotchas, found dogfooding v6 in Desktop (2026-09-06)
 

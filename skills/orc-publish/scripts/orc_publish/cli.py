@@ -10,6 +10,8 @@ import argparse
 import subprocess
 import sys
 
+import yaml
+
 from .selection import SelectionError, resolve_selection, resolve_token
 from .tree import load_tree
 
@@ -25,6 +27,8 @@ def build_plan(channel_root, tokens):
 
 
 def format_plan(leaves):
+    if not leaves:
+        return "(no leaves selected)"
     lines = []
     for leaf in leaves:
         action = leaf.action or "(no action set)"
@@ -47,7 +51,9 @@ def execute_plan(leaves):
     """Run each leaf's action. An independent failure doesn't stop the remaining leaves.
 
     Returns a list of (leaf, status, detail) - status is "success", "failed", or
-    "not attempted"; detail is the real error text on failure, empty otherwise.
+    "not attempted". detail is the action's real stdout on success, the real error text on
+    failure, and "no action set" when not attempted - never silently empty on success, since
+    this is the only evidence an operator gets that a real publish actually happened.
     """
     results = []
     for leaf in leaves:
@@ -55,10 +61,11 @@ def execute_plan(leaves):
             results.append((leaf, "not attempted", "no action set"))
             continue
         try:
-            subprocess.run(
+            result = subprocess.run(
                 leaf.action, shell=True, check=True, capture_output=True, text=True
             )
-            results.append((leaf, "success", ""))
+            detail = (result.stdout or "").strip()
+            results.append((leaf, "success", detail))
         except subprocess.CalledProcessError as e:
             detail = (e.stderr or "").strip() or str(e)
             results.append((leaf, "failed", detail))
@@ -85,28 +92,43 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     if args.for_distro:
+        if args.selection:
+            print(
+                "note: selection tokens are ignored when --for is used",
+                file=sys.stderr,
+                flush=True,
+            )
         try:
             distro_root = load_tree(args.distro)
-            print(run_for(distro_root, args.for_distro))
+        except (FileNotFoundError, yaml.YAMLError) as e:
+            print(f"error: could not load {args.distro}: {e}", file=sys.stderr, flush=True)
+            return 1
+        try:
+            print(run_for(distro_root, args.for_distro), flush=True)
         except SelectionError as e:
-            print(f"error: {e}", file=sys.stderr)
+            print(f"error: {e}", file=sys.stderr, flush=True)
             return 1
         return 0
 
-    channel_root = load_tree(args.channels)
+    try:
+        channel_root = load_tree(args.channels)
+    except (FileNotFoundError, yaml.YAMLError) as e:
+        print(f"error: could not load {args.channels}: {e}", file=sys.stderr, flush=True)
+        return 1
+
     try:
         leaves = build_plan(channel_root, args.selection)
     except SelectionError as e:
-        print(f"error: {e}", file=sys.stderr)
+        print(f"error: {e}", file=sys.stderr, flush=True)
         return 1
 
-    print(format_plan(leaves))
+    print(format_plan(leaves), flush=True)
 
     if args.dry_run:
         return 0
 
     results = execute_plan(leaves)
-    print(format_summary(results))
+    print(format_summary(results), flush=True)
     return 0 if all(status != "failed" for _, status, _ in results) else 1
 
 

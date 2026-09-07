@@ -34,9 +34,13 @@ field is exactly `orclab`. Its containing directory is Orclab's own installed ro
 
 (Skip this step entirely if Step 2 ended in the project-context/no-match case — it already told
 you to stop.) In the plugin root established by Step 2 — the discovered installed root, or the
-current working directory fallback in core context — list every file under `commands/*.md`. For
-each one,
-read its `description` frontmatter field. Present a one-line synopsis per command, in this shape:
+current working directory fallback in core context — enumerate two sources and merge them by
+name, since not every component has both: every file under `commands/*.md`, AND every
+`skills/orc-*/SKILL.md` (a component may ship as a skill only, with no `commands/*.md`
+counterpart — `/orc-publish` is the first example, and there may be more over time). For a name
+present in both (the v6 wrapper skills), read the description from the `commands/*.md` file; for
+a name present only as a skill, read its description from the skill's own `description`
+frontmatter field. Present one line per unique command name, in this shape:
 
 ```
 Orclab vX.Y.Z (running in <core|project> context)
@@ -46,9 +50,11 @@ Commands:
   /orc-version  — <real description field from orc-version.md>
   /orc-help     — <real description field from orc-help.md>
   /orc          — <real description field from orc.md>
+  /orc-git      — <real description field from orc-git.md>
+  /orc-publish  — <real description field from skills/orc-publish/SKILL.md's frontmatter>
 ```
 
-Always read the REAL `description` field from each real command file found in Step 3 — the
-example above shows the format, not literal text to reuse. If a future command is added, it
-appears here automatically because this step lists whatever `commands/*.md` files actually exist,
-rather than a hardcoded list.
+Always read the REAL `description` field from each real command/skill file found in this step —
+the example above shows the format, not literal text to reuse. If a future command or skill-only
+component is added, it appears here automatically because this step lists whatever files actually
+exist, rather than a hardcoded list.

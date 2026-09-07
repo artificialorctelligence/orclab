@@ -356,3 +356,37 @@ constructed inline by each scenario.
 **Next step, when picked up:** ask direflail what specifically felt underspecified, rather than
 guessing — this entry exists to hold the "come back to this" intent, not to pre-decide what's
 missing.
+
+## #11: `/orc-publish`'s `execute_plan` has no subprocess timeout — a real hang risk, not yet fixed
+
+Found during the final whole-branch review of `/orc-publish` (v7, 2026-09-06). `execute_plan` in
+`skills/orc-publish/scripts/orc_publish/cli.py` runs each leaf's `action` via `subprocess.run`
+with no `timeout` argument. A leaf action that blocks on stdin hangs the entire `/orc-publish` run
+indefinitely, with no way to know which leaf is stuck — `capture_output=True` means the process's
+own prompt never even reaches the terminal, so it just looks like the command has frozen. This
+isn't hypothetical: Orcshot's own real PPA publish step already uses `debsign`, which prompts
+interactively for a GPG passphrase, and `debsign` is exactly the kind of action a real
+`channels.yaml` leaf would wrap once Orcshot's own follow-on dogfooding task (populating real
+`.orclab/publish/` content, per the design spec's explicit scope note) gets underway.
+
+**Why this is deferred, not fixed now:** picking a correct timeout value is itself a real design
+question, not something to guess at speculatively. Different real actions have legitimately
+different normal durations — a `dput` upload and a local build script don't share a reasonable
+timeout — so a single hardcoded number would either falsely abort a slow-but-healthy upload or
+fail to catch a hang quickly enough. This needs its own real decision (a per-leaf configurable
+timeout? a global default with an override? something else?), not a number picked to make this
+finding go away.
+
+**Scope boundary:** this is about the generic mechanism — `execute_plan` itself needing a timeout
+strategy — not about routing around `debsign`'s own interactive-prompt behavior specifically (e.g.
+via `--no-tty` or a pre-supplied passphrase). Those are separate, narrower questions that belong to
+whoever actually wires up `debsign` as a real leaf action, not to this generic mechanism fix.
+
+**Explicit flag for whoever picks up Orcshot's own follow-on dogfooding task:** know about this
+risk before running `/orc-publish` against a real `debsign`-based action — you will hit it live,
+with the run just appearing to hang, otherwise.
+
+**Next step, when picked up:** design a timeout strategy for `execute_plan` (default value,
+whether it's per-leaf configurable via the channel tree, what happens to the summary line for a
+leaf that times out — presumably a new `"timed out"` status distinct from `"failed"`) before
+implementing it.
