@@ -108,3 +108,69 @@ def verify_consistency(root):
         if v is not None:
             versions[rel] = v
     return (len(set(versions.values())) <= 1, versions)
+
+
+# --- debian/changelog -------------------------------------------------------
+#
+# Structurally unlike every other format here: a log to prepend to, not a field to overwrite.
+# Three things this must get right, each a real failure mode rather than a hypothetical:
+#   1. Idempotence. Prepending twice for one version leaves two entries for it; a re-run or a
+#      resumed release would do exactly that. Guarded by replacing a matching top entry.
+#   2. The target series is inherited from the previous entry, never guessed - Launchpad
+#      rejects an upload whose series is not one the PPA supports.
+#   3. The maintainer is inherited from the previous entry, not read from `git config` - the
+#      previous entry is definitionally what the package uses, while git config is whoever
+#      happens to be running the command.
+
+import email.utils
+
+_CL_HEADER = re.compile(
+    r"^(?P<source>\S+) \((?P<version>[^)]+)\) (?P<series>\S+); urgency=(?P<urgency>\S+)\s*$",
+    re.MULTILINE,
+)
+_CL_SIGNATURE = re.compile(r"^ -- (?P<maintainer>.+?)  (?P<date>.+?)\s*$", re.MULTILINE)
+
+
+def _changelog_current_version(text):
+    """Upstream version of the top entry (the Debian revision suffix stripped)."""
+    m = _CL_HEADER.search(text)
+    if not m:
+        return None
+    return m.group("version").rsplit("-", 1)[0]
+
+
+def _write_changelog(root, relpath, version, body=None, debian_revision="1", **_ignored):
+    if not body or not body.strip():
+        raise ValueError("a debian/changelog entry requires a body")
+
+    text = _read_text(root, relpath)
+    top = _CL_HEADER.search(text)
+    if not top:
+        raise ValueError(f"{relpath} has no parseable top entry to inherit from")
+
+    source = top.group("source")
+    series = top.group("series")
+    urgency = top.group("urgency")
+
+    sig = _CL_SIGNATURE.search(text)
+    if not sig:
+        raise ValueError(f"{relpath} has no parseable signature line to inherit from")
+    maintainer = sig.group("maintainer")
+
+    # Idempotence guard: if the top entry is already this version, replace it rather than
+    # stacking a duplicate (a resumed or re-run release hits this for real).
+    if _changelog_current_version(text) == version:
+        next_header = _CL_HEADER.search(text, top.end())
+        rest = text[next_header.start() :] if next_header else ""
+    else:
+        rest = text
+
+    indented = "\n".join(
+        ("  " + line.strip()) if line.strip() else "" for line in body.strip().splitlines()
+    )
+    entry = (
+        f"{source} ({version}-{debian_revision}) {series}; urgency={urgency}\n"
+        f"\n{indented}\n\n"
+        f" -- {maintainer}  {email.utils.formatdate(localtime=True)}\n"
+    )
+    _write_text(root, relpath, entry + ("\n" + rest.lstrip("\n") if rest.strip() else ""))

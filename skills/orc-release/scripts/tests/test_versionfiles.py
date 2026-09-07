@@ -1,4 +1,5 @@
 import json
+import re
 import textwrap
 
 import pytest
@@ -143,3 +144,98 @@ def test_verify_consistency_on_a_project_with_no_version_files(tmp_path):
 def test_unknown_format_raises_rather_than_guessing(tmp_path):
     with pytest.raises(ValueError, match="unsupported"):
         read_version(str(tmp_path), "Cargo.toml")
+
+
+CHANGELOG = """
+    orcshot (0.2.0-1) noble; urgency=medium
+
+      * Adds internationalization.
+
+     -- Orcshot <orc@example.com>  Wed, 26 Aug 2026 21:02:48 -0500
+
+    orcshot (0.1.1-3) noble; urgency=medium
+
+      * Fixes a debconf warning.
+
+     -- Orcshot <orc@example.com>  Sun, 23 Aug 2026 14:45:00 -0500
+    """
+
+
+def test_read_changelog_returns_the_top_entry_version(tmp_path):
+    write(tmp_path, "debian/changelog", CHANGELOG)
+    assert read_version(str(tmp_path), "debian/changelog") == "0.2.0"
+
+
+def test_detect_finds_debian_changelog(tmp_path):
+    write(tmp_path, "debian/changelog", CHANGELOG)
+    assert detect(str(tmp_path)) == ["debian/changelog"]
+
+
+def test_write_changelog_prepends_a_new_entry(tmp_path):
+    p = write(tmp_path, "debian/changelog", CHANGELOG)
+    write_version(str(tmp_path), "debian/changelog", "0.3.0", body="* Adds Snap and Flatpak.")
+    text = p.read_text()
+    assert text.startswith("orcshot (0.3.0-1) noble; urgency=medium")
+    assert "orcshot (0.2.0-1) noble; urgency=medium" in text
+    assert "Adds Snap and Flatpak." in text
+
+
+def test_write_changelog_inherits_series_and_maintainer_from_the_previous_entry(tmp_path):
+    p = write(
+        tmp_path,
+        "debian/changelog",
+        """
+        orcshot (0.2.0-1) jammy; urgency=low
+
+          * Older.
+
+         -- Real Maintainer <real@example.com>  Wed, 26 Aug 2026 21:02:48 -0500
+        """,
+    )
+    write_version(str(tmp_path), "debian/changelog", "0.3.0", body="* New.")
+    text = p.read_text()
+    assert "orcshot (0.3.0-1) jammy; urgency=low" in text
+    assert "-- Real Maintainer <real@example.com>" in text
+
+
+def test_write_changelog_is_idempotent_for_the_same_version(tmp_path):
+    p = write(tmp_path, "debian/changelog", CHANGELOG)
+    write_version(str(tmp_path), "debian/changelog", "0.3.0", body="* First.")
+    write_version(str(tmp_path), "debian/changelog", "0.3.0", body="* Second.")
+    text = p.read_text()
+    assert text.count("orcshot (0.3.0-1)") == 1
+    assert "Second." in text
+    assert "First." not in text
+
+
+def test_write_changelog_produces_a_parseable_signature_line(tmp_path):
+    p = write(tmp_path, "debian/changelog", CHANGELOG)
+    write_version(str(tmp_path), "debian/changelog", "0.3.0", body="* New.")
+    sig = [line for line in p.read_text().splitlines() if line.startswith(" -- ")][0]
+    # Exactly one leading space, then "-- name <email>", then TWO spaces, then the date.
+    assert re.match(r"^ -- .+ <.+>  \w{3}, \d{2} \w{3} \d{4} \d{2}:\d{2}:\d{2} [+-]\d{4}$", sig)
+
+
+def test_write_changelog_honours_an_explicit_debian_revision(tmp_path):
+    p = write(tmp_path, "debian/changelog", CHANGELOG)
+    write_version(
+        str(tmp_path), "debian/changelog", "0.3.0", body="* New.", debian_revision="2"
+    )
+    assert "orcshot (0.3.0-2) noble" in p.read_text()
+
+
+def test_write_changelog_requires_a_body(tmp_path):
+    write(tmp_path, "debian/changelog", CHANGELOG)
+    with pytest.raises(ValueError, match="body"):
+        write_version(str(tmp_path), "debian/changelog", "0.3.0")
+
+
+def test_write_changelog_preserves_the_source_package_name(tmp_path):
+    p = write(
+        tmp_path,
+        "debian/changelog",
+        "someotherpkg (1.0.0-1) noble; urgency=medium\n\n  * x\n\n"
+        " -- M <m@e.com>  Wed, 26 Aug 2026 21:02:48 -0500\n",
+    )
+    write_version(str(tmp_path), "debian/changelog", "1.1.0", body="* y")
+    assert p.read_text().startswith("someotherpkg (1.1.0-1) noble")
