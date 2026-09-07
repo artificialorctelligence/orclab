@@ -34,22 +34,33 @@ Two consequences worth stating outright, because an earlier pass of this file go
 both returned "Unknown command" in that client, on an install that worked correctly via the CLI.
 Skills, by contrast, invoke correctly there (confirmed via `ponytail`'s real `/ponytail`).
 
-**Refinement, confirmed live (2026-09-07) — with a wrapper skill present, Desktop doesn't fail,
-it warns spuriously and then works.** The "Unknown command" observation above predates v6's
-wrapper skills. Once a component ships both, typing the bare `/orc-git commit` in Desktop shows a
-toast — *"/orc-git isn't a recognized command here. Some commands only work in the Claude Code
-terminal."* — and then runs correctly anyway via the wrapper skill.
+**Refinement, confirmed live (2026-09-07) — Desktop doesn't fail, it warns falsely and then
+works.** The "Unknown command" observation above predates v6's wrapper skills. Typing the bare
+`/orc-version` in Desktop shows a toast — *"/orc-version isn't a recognized command here. Some
+commands only work in the Claude Code terminal."* — and then resolves and runs correctly anyway.
 
-That toast comes from Desktop's own UI bundle (`resources/ion-dist`, i18n id `+9dhXtDFu6`), not
-from `claude-code` and not from the agent. At its call site it is fired as a side effect inside a
-comma expression whose actual branch condition is a *different* predicate, so it is advisory, not
-a rejection. The validator tests the typed name against its own command registry and never
-consults skills — which is exactly why a perfectly working skill still trips it.
+**The trigger is solely whether the submitted text is namespaced.** Accepting the autocomplete
+menu *rewrites the input* to `/orclab:orc-version`, which is silent. Pressing Escape to dismiss
+the menu submits the bare `/orc-version`, which warns. Same command, same session, seconds apart
+— reproducible on demand via the Escape key.
 
-**Workaround, confirmed live: type the namespaced form.** `/orclab:orc-git commit` produces no
-toast and runs identically; the bare `/orc-git commit` warns first, then runs. Nothing in the
-plugin can suppress the bare-form toast — there is no frontmatter field or naming convention that
-registers a plugin command with that UI validator, so it is Anthropic's to fix.
+The toast comes from Desktop's own UI bundle (`resources/ion-dist`, i18n id `+9dhXtDFu6`), not
+from `claude-code` and not from the agent. It is fired as a side effect inside a comma expression
+whose actual branch condition is a different predicate, so it is advisory, not a rejection. The
+predicate is an exact case-insensitive match of the submitted name against a loaded command
+list's `name` or `aliases`; plugin skills appear there under their **namespaced** name only. The
+menu shows the bare form as a secondary label (`orclab:orc-version (orc-version)`), but that
+label is not an alias, which is why the bare submission misses.
+
+**It has nothing to do with how Orclab is built.** It still occurs on v0.10.0, which ships no
+`commands/` directory at all. Theories that fit the early evidence and are all wrong, recorded so
+they don't get re-derived: that the bare name must share the plugin's name prefix; that a skill
+and command sharing a name suppresses the bare alias; that it's a load-timing race. The Escape-key
+reproduction ruled out every one of them.
+
+**Workaround: accept the autocomplete rather than dismissing it**, or type the namespaced form.
+Nothing in the plugin can suppress the bare-form toast, so it is Anthropic's to fix; reported
+upstream on `anthropics/claude-code`.
 
 **The practical trap:** do not debug a wrapper skill because of this toast. It fires on a
 component that is working correctly, and the wrapper is the reason it works at all.
