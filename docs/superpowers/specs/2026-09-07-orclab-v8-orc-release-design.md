@@ -7,6 +7,11 @@ guiding through `RELEASING.md`'s real ordered steps, enforcing its gates, checki
 before acting, handing off cleanly at human steps, and remembering where it is across the hours or
 days a real release spans.
 
+That includes owning the version's whole lifecycle across the release, not just setting it once:
+writing it consistently to every file that holds it, verifying that consistency rather than
+assuming it, carrying it through all the steps, and — when a release is abandoned partway — rolling
+back what can be rolled back while stating plainly what cannot.
+
 ## Why this exists
 
 Found dogfooding `/orc-publish` against Orcshot's real release (2026-09-06/07), and recorded as
@@ -40,32 +45,51 @@ eleven. A real release is mostly an ordered pipeline; v7 built the fan-out.
 
 ## Scope
 
-**In scope:** a new `/orc-release` skill (pipeline runner + state cursor), three optional new prose
-conventions in `release-checklist`, and the bundled script + tests supporting them.
+**In scope:**
+- A new `/orc-release` skill — pipeline runner and state cursor.
+- **The version's whole lifecycle across a release**: setting it consistently across every file
+  that holds it, verifying that consistency, carrying it through all steps, and backing it out on
+  abort. This closes **BACKLOG #6** and resolves the **`/orc-version` ordering conflict** below,
+  rather than deferring them.
+- **Four** optional new prose conventions in `release-checklist`.
+- The bundled scripts + tests supporting all of the above.
 
 **Explicitly out of scope:**
-- **BACKLOG #6** (per-language manifest version bumping — `pyproject.toml`, `debian/changelog`) and
-  the **`/orc-version` commit-ordering conflict** described below. Both stay open. Because
-  `RELEASING.md` is the source of truth and its steps carry literal commands, Orcshot's steps 1, 8
-  and 10 are driveable without `/orc-version` at all — so neither blocks this work.
 - **Any change to `/orc-publish`.** It is reached from a release via delegation, unchanged.
 - **Populating any real project's release content.** Orclab ships the mechanism; a consuming
   project's `RELEASING.md` and `.orclab/` content are its own, per `CLAUDE.md`'s dogfooding rules.
+- **Version-file formats no real project here uses.** See "Per-format handlers" below — this is a
+  deliberate limit, not an oversight.
 
-### The `/orc-version` ordering conflict (documented, not fixed here)
+### Why the version lifecycle is in scope (it nearly wasn't)
 
-Worth recording because it was found during this design and is not obvious: `/orc-version`'s
-"Apply the new version" flow does draft-changelog → update-manifests → **commit → tag** as one
-atomic move. Orcshot's real process deliberately splits those — step 1 *edits* the version files,
-and commit/tag/push does not happen until step 8, *after* the build, lint, PPA upload and
-install-tests have all passed. The point is not committing a release until the artifact is
-verified. Running `/orc-version` on Orcshot today would commit at step 1, violating its real
-dependency order. This is a design assumption that does not survive a packaged-app release, not a
-missing feature. It needs its own pass; it does not block v8.
+This spec's first draft treated version handling as out of scope, reasoning that `RELEASING.md`
+step 1 carries literal file-editing instructions, so the runner could just follow them. direflail
+rejected that, correctly: "we need a version number to be set and to be consistent, and it is
+eventually going to have to survive all steps of the process... if a step fails, you report on it.
+we either back out the version change on the steps it did work on, or if we can't you tell me about
+it."
+
+That is right, and the original scoping was routing around a gap rather than closing it. Following
+step 1's instructions covers *setting* a version once. It does not cover keeping two files
+agreeing, carrying the version through eleven steps, or deciding what happens to those edits when
+step 4 fails. Nothing in the design owned any of that.
+
+### The `/orc-version` ordering conflict
+
+`/orc-version`'s "Apply the new version" flow does draft-changelog → update-manifests →
+**commit → tag** as one atomic move. That is correct for Orclab itself, where a version bump
+essentially *is* the release. It does not survive a packaged-app release: Orcshot's process
+deliberately separates those by six steps — step 1 *edits* the version files, and commit/tag/push
+does not happen until step 8, *after* the build, lint, PPA upload and install-tests have all
+passed. That ordering is the safety property. Committing at step 1 means every failed release
+attempt leaves a `Release vX.Y.Z` commit behind for something that never released.
+
+This is a design assumption, not a missing feature — and v8 resolves it via `--no-commit` below.
 
 ## Architecture
 
-Four pieces, one of which is "nothing changes."
+Five pieces, one of which is "nothing changes."
 
 ### 1. `/orc-release` — the pipeline runner
 
@@ -103,10 +127,11 @@ selected channel and reports each honestly; `/orc-release` then treats "any chan
 
 `.orclab/release/state.json` in the consuming project. Holds:
 
-- the target version
+- the target version, and the version it replaced (needed to roll back)
 - the path to the `RELEASING.md` being driven, and a hash of its content
 - which steps are complete, by number **and** title
 - which steps were skipped, each with its recorded reason
+- which completed steps were marked irreversible in the document
 - when the release started, and when state was last updated
 
 This is a position marker, not a second description of the process — there is exactly one
@@ -117,10 +142,57 @@ steps when a new one is inserted mid-document. If the doc changed since the rele
 may no longer mean the step 7 that was started. On resume, a changed hash produces a warning and a
 stop, not a silent continue.
 
-### 3. `release-checklist` grows three optional conventions
+### 3. The version lifecycle — `/orc-version` extended
+
+The version is the spine of a release: set at step 1, it must stay consistent across every file
+that holds it, survive all eleven steps, and be recoverable if the release is abandoned. All of
+this lives in `/orc-version`, not in `/orc-release` — one place owns what it means to set a
+project's version. `/orc-release` delegates.
+
+**Per-format handlers, not generic detection.** v8 implements exactly the formats real projects
+here use:
+
+| Format | Shape |
+|---|---|
+| `.claude-plugin/plugin.json` + `marketplace.json` | existing behavior, unchanged |
+| `pyproject.toml` | a `version = "X.Y.Z"` field |
+| `debian/changelog` | **not a field to overwrite** — a new entry to prepend |
+
+More formats get added when a real project needs one. BACKLOG #6's own reasoning stands and is
+being followed, not overridden: each format carries real syntax and a real risk that a sloppy write
+breaks a build, so this is a per-format feature rather than one speculative "detect any manifest"
+abstraction.
+
+`debian/changelog` deserves its own note because it is structurally unlike the others: it takes a
+new entry with a strict format (package name, version, target series, urgency, body, and an
+RFC-2822 signature line), where the *series* must be a real Ubuntu series the PPA supports —
+Orcshot's own `RELEASING.md` warns that `unstable` is rejected outright by Launchpad. But
+`/orc-version` already drafts changelog content from real git history for `CHANGELOG.md`; this is
+the same drafting rendered into a different format. That unifies existing behavior rather than
+duplicating it.
+
+**`--no-commit`** resolves the ordering conflict. `/orc-version`'s apply flow splits: draft content
+→ write every version-holding file → **stop**. Committing and tagging become the caller's business.
+Default behavior is unchanged, so Orclab's own bump flow keeps working exactly as today.
+`/orc-release` passes `--no-commit` at step 1, and the document's own step 8 does the committing.
+
+**Consistency is verified, not assumed.** After setting, every version-holding file is read back and
+confirmed to agree; a mismatch is reported rather than silently shipped. Orcshot's `RELEASING.md`
+already states why this matters — the two files "must match, or the built `.deb`'s own version
+won't line up with the source tree that produced it" — but nothing verified it until now. Because
+the state cursor records the target version, `/orc-release` can re-run this check cheaply at any
+later step, catching a stray edit or a bad merge mid-release.
+
+**Rollback on abort, honest about its limits.** `/orc-release abort` backs out what it did locally —
+version-file edits, and any commit or tag it created — and for steps marked irreversible (see the
+fourth convention below) that already completed, it reports plainly what stands and cannot be
+undone. Aborting at step 9 does not pretend it can unpublish step 6's PPA upload; it tells you the
+upload is permanent and that the version number is consumed.
+
+### 4. `release-checklist` grows four optional conventions
 
 Added to its existing "Structuring steps" guidance (which today covers why-the-step-exists, exact
-commands, and what-done-looks-like). All three are plain prose, human-first — someone following the
+commands, and what-done-looks-like). All four are plain prose, human-first — someone following the
 document by hand wants "don't start this if X" every bit as much as the runner does.
 
 - **Preconditions** — what must be true before the step starts. Orcshot's step 6 would state that
@@ -130,12 +202,18 @@ document by hand wants "don't start this if X" every bit as much as the runner d
   `dput` and then needs a human Launchpad "Copy packages" click for the resolute series. The runner
   executes what it can, then stops for the human portion.
 - **Delegation** — a step may name an `/orc-*` command to run instead of literal commands.
+- **Irreversible** — the step does something that cannot be undone (publishing to a public archive,
+  pushing a tag, creating a release). This is what gives abort a real basis for separating what it
+  can roll back from what it must simply report. It is equally useful to a human reader deciding
+  whether to proceed.
 
-**All three are optional, and absence is not an error.** Orcshot's `RELEASING.md` exists today with
+**All four are optional, and absence is not an error.** Orcshot's `RELEASING.md` exists today with
 none of them and must remain driveable — the runner simply has less information and asks more.
-Adopting them improves a document; it is never a migration requirement.
+Adopting them improves a document; it is never a migration requirement. In particular, with no
+irreversibility markers, abort reports every completed step and states plainly that it cannot
+determine which were reversible, rather than guessing.
 
-### 4. `/orc-publish` — unchanged
+### 5. `/orc-publish` — unchanged
 
 No rework. It becomes reachable from a release through delegation.
 
@@ -145,8 +223,13 @@ No rework. It becomes reachable from a release through delegation.
 /orc-release                    start a new release, or resume one in progress
 /orc-release status             report position; change nothing
 /orc-release skip <reason>      skip the current step, recording the reason
-/orc-release abort              discard in-progress release state (confirmed first)
+/orc-release abort              abandon the release: roll back what is reversible,
+                                report what is not (confirmed first)
 ```
+
+`abort` is not merely "forget the state file." It rolls back the version-file edits and any commit
+or tag the release created, then reports every completed irreversible step as something that
+stands. See "Rollback on abort" above.
 
 ## What stops a run
 
@@ -206,27 +289,33 @@ little gain.
 
 Mirroring v7's division, which held up well:
 
-- **The bundled script owns what is deterministic and has real bug surface**: extracting numbered
-  step boundaries from a markdown document, and reading/writing/advancing the state cursor
-  (including hash comparison and skip recording).
-- **Claude owns the judgment**: reading a step's body for the optional prose markers, and deciding
-  whether a step's real output means it passed.
+- **The bundled scripts own what is deterministic and has real bug surface**: extracting numbered
+  step boundaries from a markdown document; reading/writing/advancing the state cursor (including
+  hash comparison, skip recording, and irreversible-step recording); and **reading and writing each
+  version file format**, since a malformed `pyproject.toml` or `debian/changelog` write breaks a
+  real build.
+- **Claude owns the judgment**: reading a step's body for the optional prose markers, drafting
+  changelog content from git history, and deciding whether a step's real output means it passed.
 
 ## Testing
 
 Two layers, the same hard rule as v7:
 
-1. **Real automated tests** for the bundled script, committed to Orclab: step extraction from a
-   markdown document (including a document using none of the optional conventions), state
-   read/write/advance, doc-hash change detection, and skip-with-reason recording.
+1. **Real automated tests** for the bundled scripts, committed to Orclab:
+   - step extraction from a markdown document, including one using none of the optional conventions
+   - state read/write/advance, doc-hash change detection, skip-with-reason recording
+   - **per-format version read/write**: `pyproject.toml`, `debian/changelog` (correct entry format,
+     correct prepending, target series preserved), `plugin.json`/`marketplace.json`
+   - **consistency verification**, including a deliberately mismatched pair being detected
+   - **rollback**: restoring the prior version across every file it wrote
 2. **`VERIFICATION.md` scenarios** for the command's end-to-end behavior, run against a **synthetic
    throwaway `RELEASING.md` whose steps are no-ops** — never against a real release, from Orclab's
    own repo. Scenarios must cover: halting on a failed step (and *not* proceeding to the next),
    resuming at the right step afterward, refusing to start while a release is in progress, warning
    on a changed document hash, recording a skip with its reason, stopping at a performed-by-hand
-   step, and the entry working-tree report — including that it shows the real modified/untracked
-   file list, that answering "proceed" continues normally, and that it does **not** fire again on
-   resume.
+   step, the entry working-tree report (showing the real modified/untracked file list, continuing
+   on "proceed", and **not** firing again on resume), and **abort rolling back version edits while
+   reporting a completed irreversible step as standing**.
 
 ## Global Constraints
 
@@ -235,8 +324,19 @@ Two layers, the same hard rule as v7:
   never step definitions.
 - The runner **reads `RELEASING.md` in full before acting on any step**.
 - **Halt on failure.** Never continue past a failed step, and never auto-retry or auto-skip.
-- The three `release-checklist` conventions are **optional**; a document using none of them must
-  still be driveable.
+- The four `release-checklist` conventions are **optional**; a document using none of them must
+  still be driveable. With no irreversibility markers, abort reports every completed step and says
+  plainly it cannot determine which were reversible, rather than guessing.
+- **One place owns version-setting.** `/orc-version` does it; `/orc-release` delegates. Version
+  logic is never duplicated into the runner.
+- `/orc-version`'s **default behavior is unchanged** — `--no-commit` is additive, so Orclab's own
+  existing bump flow keeps working exactly as it does today.
+- Version files are **verified consistent** after being set, never assumed.
+- **Per-format version handlers only** for formats a real project here uses (`plugin.json`,
+  `marketplace.json`, `pyproject.toml`, `debian/changelog`). No speculative generic
+  manifest-detection abstraction.
+- **Abort never overstates what it can undo.** It rolls back local edits/commits/tags and reports
+  completed irreversible steps as permanent.
 - **Never invent a release process.** No `RELEASING.md` means report and stop.
 - Exactly **two built-in checks**: no release already in progress (hard stop), and a working-tree
   report at entry (prints real `git status --short`, asks whether to proceed, **never blocks**, and
