@@ -46,9 +46,11 @@ stop.
 python3 ${CLAUDE_SKILL_DIR}/scripts/run.py <selection tokens> --dry-run
 ```
 
-Show the user the exact list this prints — every leaf and its real action, verbatim, not
-paraphrased. This is the safety gate. **Never skip straight to execution**, even if the request
-sounded confident ("just publish everything," "ship it all").
+Show the user the exact list this prints — every leaf, its real action, and any
+`requirement:`/`issue:` lines beneath it, verbatim, not paraphrased. A leaf's requirements/issues
+often name something the user needs to do *before* confirming (e.g. unlocking a signing key) —
+don't let those scroll by unread. This is the safety gate. **Never skip straight to execution**,
+even if the request sounded confident ("just publish everything," "ship it all").
 
 ## Step 3: Get an explicit go-ahead for that specific list
 

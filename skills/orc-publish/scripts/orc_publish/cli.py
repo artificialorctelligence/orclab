@@ -33,6 +33,10 @@ def format_plan(leaves):
     for leaf in leaves:
         action = leaf.action or "(no action set)"
         lines.append(f"{leaf.dotted_path}: {action}")
+        for req in leaf.requirements:
+            lines.append(f"  requirement: {req}")
+        for issue in leaf.issues:
+            lines.append(f"  issue: {issue}")
     return "\n".join(lines)
 
 

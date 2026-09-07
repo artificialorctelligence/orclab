@@ -42,6 +42,29 @@ def test_format_plan_lists_each_leaf_and_its_action(tmp_path):
     assert "desktop.python.linux.snap: echo publish-snap" in text
 
 
+def test_format_plan_includes_a_leafs_requirements_and_issues(tmp_path):
+    root = load_tree(
+        write_yaml(
+            tmp_path,
+            "channels.yaml",
+            """
+            desktop:
+              python:
+                linux:
+                  ppa:
+                    noble:
+                      action: "echo publish"
+                      requirements: ["gpg key registered to the Launchpad account"]
+                      issues: ["unlock gpg-agent before running for real"]
+            """,
+        )
+    )
+    leaves = build_plan(root, [])
+    text = format_plan(leaves)
+    assert "requirement: gpg key registered to the Launchpad account" in text
+    assert "issue: unlock gpg-agent before running for real" in text
+
+
 def test_build_plan_raises_selection_error_for_an_unknown_token(tmp_path):
     root = load_tree(write_yaml(tmp_path, "channels.yaml", "a: { action: 'true' }"))
     with pytest.raises(SelectionError):
