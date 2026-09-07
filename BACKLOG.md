@@ -192,7 +192,7 @@ to be built from scratch — the same "wrap, don't reinvent" instinct already ap
 being a thin wrapper (same shape as `/orc-code refactor`) rather than new logic. Then a fresh
 `superpowers:brainstorming` pass for whatever gap remains.
 
-## #6: Per-language manifest version detection/sync for /orc-version — deferred, same reasoning as #4
+## #6: Per-language manifest version detection/sync for /orc-version — deferred, same reasoning as #4 (PARTIALLY ADDRESSED 2026-09-07 — still open for the formats it names)
 
 Raised by direflail (2026-09-05) while designing `/orc-version` (see
 `docs/superpowers/specs/2026-09-05-orclab-v3-orc-version-orc-help-design.md`): when Orclab is
@@ -214,6 +214,27 @@ not detect or write to any other language's version-holding file.
 **Next step, when picked up:** likely one format at a time (Maven first, or whatever direflail
 actually needs first for real work), each with its own real syntax handled correctly — not a
 generic "detect any manifest" abstraction built speculatively ahead of a second real case.
+
+**Partially addressed by v8 (2026-09-07), and deliberately NOT closed.** v8's `/orc-release`
+work built the mechanism this entry describes — real per-format read/write handlers in
+`skills/orc-release/scripts/orc_release/versionfiles.py`, detection of which version-holding
+files a project actually has, consistency verification across all of them, and rollback — and it
+followed this entry's own "one format at a time" reasoning exactly rather than overriding it.
+
+**But none of the three formats this entry names shipped.** v8 implemented `pyproject.toml` and
+`debian/changelog` (plus the pre-existing `.claude-plugin/plugin.json` / `marketplace.json`),
+because those are the formats real projects here use today — Orcshot's release needed them. `#6`
+was raised about `pom.xml`, `package.json` and `Cargo.toml`, and not one of those has a handler.
+v8's own `CHANGELOG.md` entry originally claimed "Closes BACKLOG #6"; that claim was wrong and
+has been corrected to say what actually shipped. Recording that here rather than quietly deleting
+it: the mechanism landing is not the same as the ask landing.
+
+**What remains open, concretely:** add a handler for `package.json`, `Cargo.toml`, or `pom.xml`
+when a real project here needs one. The cost is now much lower than when this entry was written —
+`versionfiles.py` is the single place that owns version-setting, so a new format is one
+read/write pair plus its entry in `KNOWN_FORMATS`, not a new mechanism. The first-touch
+"suggest a starting version from what's already there" half of the original ask is also still
+unbuilt.
 
 ## #7: Distribution-channel download/install metrics — carried over from Orcshot #186, direflail wants Orclab to own this eventually
 

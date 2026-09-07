@@ -257,3 +257,155 @@ def test_skip_warns_on_stderr_when_the_document_changed_but_still_succeeds(tmp_p
     err = capsys.readouterr().err.lower()
     assert "warning" in err
     assert "shifted" in err
+
+
+# --- Fix round 2 -------------------------------------------------------------
+
+
+def _finish_every_step(root):
+    for n in (1, 2, 3):
+        main(["--root", root, "complete", str(n)])
+
+
+def test_finish_refuses_while_a_step_is_outstanding_and_names_it(tmp_path, capsys):
+    root = setup_project(tmp_path)
+    main(["--root", root, "start", "0.2.0"])
+    main(["--root", root, "complete", "1"])
+    assert main(["--root", root, "finish"]) == 1
+    err = capsys.readouterr().err
+    assert "step 2" in err
+    assert "Upload" in err
+    assert load_state(root) is not None
+
+
+def test_finish_closes_a_completed_release_and_lets_the_next_one_start(tmp_path, capsys):
+    root = setup_project(tmp_path)
+    main(["--root", root, "start", "0.2.0"])
+    _finish_every_step(root)
+    assert main(["--root", root, "finish"]) == 0
+    out = capsys.readouterr().out
+    assert "0.2.0" in out
+    assert "Upload" in out  # the irreversible step is named in the summary
+    assert load_state(root) is None
+    assert not (tmp_path / STATE_PATH).exists()
+    # The whole point: a shipped release no longer blocks the next one forever.
+    assert main(["--root", root, "start", "0.3.0"]) == 0
+
+
+def test_finish_reports_skipped_steps_with_their_reasons(tmp_path, capsys):
+    root = setup_project(tmp_path)
+    main(["--root", root, "start", "0.2.0"])
+    main(["--root", root, "complete", "1"])
+    main(["--root", root, "complete", "2"])
+    main(["--root", root, "skip", "3", "--reason", "verified during install-test"])
+    assert main(["--root", root, "finish"]) == 0
+    assert "verified during install-test" in capsys.readouterr().out
+
+
+def test_finish_never_rolls_a_version_file_back(tmp_path):
+    root = setup_project(tmp_path)
+    main(["--root", root, "start", "0.2.0"])
+    main(["--root", root, "version-set", "0.2.0"])
+    _finish_every_step(root)
+    assert main(["--root", root, "finish"]) == 0
+    assert 'version = "0.2.0"' in (tmp_path / "pyproject.toml").read_text()
+
+
+def test_steps_warns_on_stderr_about_non_contiguous_numbering_but_still_returns_them(
+    tmp_path, capsys
+):
+    root = setup_project(
+        tmp_path, doc="# R\n\n## 1. One\n\nx\n\n## 2. Two\n\nx\n\n## 5. Five\n\nx\n"
+    )
+    assert main(["--root", root, "steps"]) == 0
+    captured = capsys.readouterr()
+    assert "1, 2, 5" in captured.err
+    assert [s["number"] for s in json.loads(captured.out)] == [1, 2, 5]
+
+
+def test_steps_warns_when_an_unclosed_fence_is_hiding_the_rest_of_the_release(tmp_path, capsys):
+    root = setup_project(tmp_path, doc="# R\n\n## 1. One\n\n```\n\n## 2. Two\n\n## 3. Three\n")
+    assert main(["--root", root, "steps"]) == 0
+    captured = capsys.readouterr()
+    assert "never closed" in captured.err
+    assert [s["number"] for s in json.loads(captured.out)] == [1]
+
+
+def test_status_surfaces_the_numbering_warning_too(tmp_path, capsys):
+    root = setup_project(
+        tmp_path, doc="# R\n\n## 1. One\n\nx\n\n## 3. Three\n\nx\n"
+    )
+    assert main(["--root", root, "status"]) == 0
+    assert "contiguous" in capsys.readouterr().err
+
+
+def test_an_inline_backtick_fence_does_not_hide_the_rest_of_the_steps(tmp_path, capsys):
+    root = setup_project(
+        tmp_path,
+        doc=(
+            "# R\n\n## 1. Bump\n\nUse the ``` fence marker in prose.\n\n"
+            "## 2. Test\n\nx\n\n## 3. Upload\n\n**Irreversible.**\n"
+        ),
+    )
+    assert main(["--root", root, "steps"]) == 0
+    assert [s["number"] for s in json.loads(capsys.readouterr().out)] == [1, 2, 3]
+
+
+def test_version_set_writes_nothing_when_a_detected_file_is_unparseable(tmp_path, capsys):
+    root = setup_project(tmp_path)
+    (tmp_path / ".claude-plugin").mkdir()
+    (tmp_path / ".claude-plugin/plugin.json").write_text('{"name": "x", "version":')
+    assert main(["--root", root, "version-set", "0.2.0"]) == 1
+    err = capsys.readouterr().err
+    assert "plugin.json" in err
+    assert "nothing was written" in err
+    assert 'version = "0.1.0"' in (tmp_path / "pyproject.toml").read_text()
+
+
+def test_version_verify_fails_when_the_files_agree_but_miss_the_release_target(tmp_path, capsys):
+    root = setup_project(tmp_path)
+    main(["--root", root, "start", "0.2.0"])
+    # Every file consistent at 0.1.0 - what a bad merge looks like mid-release.
+    assert main(["--root", root, "version-verify"]) == 1
+    err = capsys.readouterr().err
+    assert "0.1.0" in err
+    assert "0.2.0" in err
+
+
+def test_version_verify_passes_against_the_release_target_once_set(tmp_path):
+    root = setup_project(tmp_path)
+    main(["--root", root, "start", "0.2.0"])
+    main(["--root", root, "version-set", "0.2.0"])
+    assert main(["--root", root, "version-verify"]) == 0
+
+
+def test_a_subcommand_run_from_a_subdirectory_still_finds_the_document(tmp_path, monkeypatch, capsys):
+    root = setup_project(tmp_path)
+    (tmp_path / ".git").mkdir()
+    sub = tmp_path / "src" / "deep"
+    sub.mkdir(parents=True)
+    monkeypatch.chdir(sub)
+    assert main(["steps"]) == 0  # no --root: must walk up to the git root
+    assert [s["number"] for s in json.loads(capsys.readouterr().out)] == [1, 2, 3]
+
+
+def test_abort_says_so_when_it_leaves_the_version_files_disagreeing(tmp_path, capsys):
+    root = setup_project(tmp_path)
+    add_debian_changelog(tmp_path)
+    main(["--root", root, "start", "0.2.0"])
+    main(["--root", root, "version-set", "0.2.0", "--changelog-body", "* Release."])
+    assert main(["--root", root, "abort"]) == 0
+    out = capsys.readouterr().out
+    # pyproject.toml rolls back to 0.1.0; debian/changelog's entry is deliberately left at
+    # 0.2.0 - abort must name that disagreement, not just the rollback.
+    assert "DISAGREE" in out
+    assert "pyproject.toml: 0.1.0" in out
+    assert "debian/changelog: 0.2.0" in out
+
+
+def test_abort_names_the_changelog_md_entry_it_does_not_touch(tmp_path, capsys):
+    root = setup_project(tmp_path)
+    (tmp_path / "CHANGELOG.md").write_text("# Changelog\n")
+    main(["--root", root, "start", "0.2.0"])
+    assert main(["--root", root, "abort"]) == 0
+    assert "CHANGELOG.md" in capsys.readouterr().out

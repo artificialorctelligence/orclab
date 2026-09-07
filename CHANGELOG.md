@@ -14,7 +14,9 @@ All notable changes to this project are documented here, newest first.
 - Version-lifecycle handling across a whole release: per-format read/write for `pyproject.toml`,
   `debian/changelog`, `.claude-plugin/plugin.json` and `marketplace.json`; consistency
   verification after setting; and rollback on abort that reports plainly what it cannot undo.
-  Closes BACKLOG #6.
+  This is the first real per-format version handling in Orclab, covering the formats projects
+  here actually use — it does not cover `pom.xml`, `package.json` or `Cargo.toml`, which is what
+  BACKLOG #6 asked for, so that entry stays open for those.
 - `/orc-version --no-commit` — sets the version without committing, so a release can build, lint,
   publish and install-test against the uncommitted edits and commit only once the artifact is
   verified. The previous behavior (bump, commit, tag as one move) is unchanged by default.

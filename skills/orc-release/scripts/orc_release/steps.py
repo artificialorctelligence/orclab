@@ -26,55 +26,77 @@ _DELEGATES = re.compile(r"\*\*Run:\*\*\s*(/[\w-]+)", re.IGNORECASE)
 # Any heading for body boundary detection
 _ANY_HEADING = re.compile(r"^##\s", re.MULTILINE)
 
+# A fence only opens or closes at the start of a line (leading whitespace allowed).
+_FENCE_LINE = re.compile(r"^[ \t]*(`{3,}|~{3,})")
+
 
 def _get_fenced_regions(text):
     """Return list of (start, end) tuples for fenced code blocks (``` or ~~~).
 
-    Respects opening fence's character and length for matching closing fence.
+    Fences are anchored to line start (leading whitespace allowed), per CommonMark. Scanning
+    for the delimiter at ANY offset is a real bug, not a nicety: a stray ``` used inline in
+    ordinary prose opens a fence that swallows the rest of the document, so every following
+    step disappears and the runner drives a release that silently skips its own gates.
+
+    The opening fence's character and length are respected when matching the close.
     """
+    return _scan_fences(text)[0]
+
+
+def _scan_fences(text):
+    """(regions, line number where an unterminated fence opened or None)."""
     regions = []
-    i = 0
-    while i < len(text):
-        # Check for fence start
-        if i + 2 < len(text) and text[i:i+3] in ('```', '~~~'):
-            fence_char = text[i]
-            fence_len = 1
-            while i + fence_len < len(text) and text[i + fence_len] == fence_char:
-                fence_len += 1
+    open_start = None
+    open_marker = None
+    open_line = None
+    pos = 0
+    for lineno, line in enumerate(text.splitlines(keepends=True), start=1):
+        m = _FENCE_LINE.match(line)
+        if m:
+            marker = m.group(1)
+            if open_start is None:
+                open_start, open_marker, open_line = pos, marker, lineno
+            elif marker[0] == open_marker[0] and len(marker) >= len(open_marker):
+                regions.append((open_start, pos + len(line)))
+                open_start = None
+        pos += len(line)
+    if open_start is not None:
+        # Unterminated fence: everything after it is code as far as markdown is concerned, so
+        # every step below it disappears. unclosed_fence_warning() surfaces that to a human.
+        regions.append((open_start, len(text)))
+        return regions, open_line
+    return regions, None
 
-            fence_start = i
-            i += fence_len
-            # Skip to end of line
-            while i < len(text) and text[i] != '\n':
-                i += 1
-            if i < len(text):
-                i += 1  # skip newline
 
-            # Look for closing fence with same character and sufficient length
-            found_close = False
-            while i < len(text):
-                if i + 2 < len(text) and text[i:i+3] in ('```', '~~~'):
-                    close_char = text[i]
-                    if close_char == fence_char:
-                        close_len = 0
-                        while i + close_len < len(text) and text[i + close_len] == close_char:
-                            close_len += 1
-                        if close_len >= fence_len:
-                            # Found closing fence
-                            regions.append((fence_start, i + close_len))
-                            i = i + close_len
-                            found_close = True
-                            break
-                i += 1
+def unclosed_fence_warning(text):
+    """Warn when the document ends inside a fence, or None when it doesn't.
 
-            if not found_close:
-                # No closing fence found, treat to end of text
-                regions.append((fence_start, len(text)))
-                i = len(text)
-        else:
-            i += 1
+    This is the direct symptom, and it catches what numbering_warning() cannot: a fence left
+    open near the end swallows only the trailing steps, so what survives still looks contiguous
+    while the release quietly loses its last gates.
+    """
+    line = _scan_fences(text)[1]
+    if line is None:
+        return None
+    return (
+        f"warning: a code fence opened at line {line} is never closed - every step below it is "
+        f"being read as code and will not be run; RELEASING.md may be malformed"
+    )
 
-    return regions
+
+def numbering_warning(steps):
+    """Warn when step numbers aren't contiguous from 1, or None when they are.
+
+    Warns and never fails - a project may legitimately number oddly, and refusing would strand
+    it with no way to run a release at all.
+    """
+    numbers = [s.number for s in steps]
+    if not numbers or numbers == list(range(1, len(numbers) + 1)):
+        return None
+    return (
+        f"warning: found steps {', '.join(str(n) for n in numbers)} - expected contiguous "
+        f"numbering from 1; RELEASING.md may be malformed or a code fence may be unclosed"
+    )
 
 
 def _is_in_fenced_block(pos, fenced_regions):

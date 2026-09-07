@@ -1,6 +1,12 @@
 import textwrap
 
-from orc_release.steps import Step, doc_hash, parse_steps
+from orc_release.steps import (
+    Step,
+    doc_hash,
+    numbering_warning,
+    parse_steps,
+    unclosed_fence_warning,
+)
 
 
 DOC_PLAIN = textwrap.dedent(
@@ -199,3 +205,76 @@ def test_fenced_block_containing_heading_marker_does_not_end_step():
     assert len(steps) == 1
     assert "More prose after the fence" in steps[0].body
     assert "still code" in steps[0].body
+
+
+# --- Fix round 2 -------------------------------------------------------------
+
+
+def test_inline_backticks_in_prose_do_not_swallow_the_rest_of_the_document():
+    """A ``` used mid-sentence is not a fence, so every following step still parses."""
+    steps = parse_steps(
+        textwrap.dedent(
+            """
+            ## 1. Bump version
+
+            Use the ``` fence marker in prose.
+
+            ## 2. Run tests
+
+            Must be green.
+
+            ## 3. Upload to PPA
+
+            **Irreversible.**
+            """
+        )
+    )
+    assert [s.number for s in steps] == [1, 2, 3]
+    assert steps[2].is_irreversible is True
+
+
+def test_an_indented_fence_still_opens_a_block():
+    steps = parse_steps(
+        textwrap.dedent(
+            """
+            ## 1. One
+
+              ```
+              ## 99. not a real step
+              ```
+
+            Done.
+
+            ## 2. Two
+
+            Body.
+            """
+        )
+    )
+    assert [s.number for s in steps] == [1, 2]
+
+
+def test_contiguous_numbering_produces_no_warning():
+    assert numbering_warning(parse_steps(DOC_PLAIN)) is None
+
+
+def test_an_unclosed_fence_is_warned_about_even_when_numbering_still_looks_contiguous():
+    """The trailing-steps case: what survives parsing is [1], which contiguity can't flag."""
+    text = "## 1. A\n\n```\n\n## 2. B\n\n## 3. C\n"
+    steps = parse_steps(text)
+    assert [s.number for s in steps] == [1]
+    assert numbering_warning(steps) is None
+    warning = unclosed_fence_warning(text)
+    assert "never closed" in warning
+    assert "line 3" in warning
+
+
+def test_a_closed_fence_produces_no_warning():
+    assert unclosed_fence_warning("## 1. A\n\n```\ncode\n```\n\n## 2. B\n") is None
+
+
+def test_non_contiguous_numbering_is_named_in_the_warning():
+    steps = parse_steps("## 1. A\n\nx\n\n## 2. B\n\nx\n\n## 5. C\n\nx\n")
+    warning = numbering_warning(steps)
+    assert "1, 2, 5" in warning
+    assert "contiguous" in warning

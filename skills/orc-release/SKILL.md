@@ -1,7 +1,7 @@
 ---
 name: orc-release
 description: Use when the user explicitly asks to use orc-release, or types /orc-release, to drive a project's own RELEASING.md release process end to end - running its ordered steps, enforcing its gates, and tracking where the release is across sessions.
-allowed-tools: Bash(python3 *), Bash(git status *)
+allowed-tools: Read, Bash
 ---
 
 # orc-release
@@ -13,6 +13,29 @@ definition of the steps — this skill never invents a release process, and neve
 continues past a failed channel. Publish channels are independent siblings; release steps are a
 dependent chain, where step 6 uploading irreversibly to a public archive is only valid because
 step 2's tests actually passed.
+
+`allowed-tools` is `Read, Bash` because this skill genuinely needs both: `Read` for
+`commands/orc-version.md`, and unscoped `Bash` because it runs **the project's own documented
+commands** — `pytest`, `debuild`, `dput`, whatever that document says — which cannot be enumerated
+ahead of time. That breadth carries a real obligation: **only ever run commands the document
+itself states, or the `run.py` calls below.** Never invent a command, and never widen a step's
+command beyond what is written.
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `run.py steps` | Parse `RELEASING.md` into its numbered steps |
+| `run.py status` | Report position; changes nothing |
+| `run.py start X.Y.Z` | Begin a release |
+| `run.py complete <N>` | Record a step as done |
+| `run.py skip <N> --reason "<why>"` | Record a deliberate skip |
+| `run.py finish` | Close a release that actually shipped: summarize and clear state, rolling back **nothing** |
+| `run.py abort` | Abandon a release: roll back what is reversible, report what is not |
+| `run.py version-set`, `version-verify`, `version-rollback` | Version-file handling (see below) |
+
+`run.py` finds the project root by walking up to the git root, so it works from any subdirectory.
+`--root <path>` overrides that when you need to point it somewhere else.
 
 ## Step 0: Read the whole document first
 
@@ -82,6 +105,28 @@ For each step, in the document's own order:
 If any `run.py` command — not just `status`; `complete` and `skip` warn on this too — reports
 that `RELEASING.md` has changed, stop and re-read it before continuing.
 
+If a command warns about an **unclosed code fence** or about **non-contiguous step numbers**, stop
+and re-read the document before acting. Both mean the parsed step list may be shorter than the
+real release — an unclosed fence swallows every step below it, so a release that looks finished
+may never have reached its own test gate or its irreversible upload.
+
+### Closing the release
+
+When the **last** step passes, the release is over — close it:
+
+```
+python3 ${CLAUDE_SKILL_DIR}/scripts/run.py finish
+```
+
+It refuses while any step is still outstanding, and otherwise prints a summary (version, steps
+completed, steps skipped with reasons, irreversible steps that now stand) and clears the state
+cursor. **It rolls back nothing.** Relay its summary to the user.
+
+**Never use `abort` to close a finished release.** `abort` is for *abandoning* one: it rolls the
+version files back to their pre-release values, which on a repo whose release commit and tag
+already exist is straightforwardly wrong. `finish` is the only correct end of a release that
+shipped.
+
 ## Skipping a step
 
 Only when the user explicitly asks, and only with a real reason:
@@ -98,9 +143,14 @@ Never skip a step on your own initiative.
 python3 ${CLAUDE_SKILL_DIR}/scripts/run.py abort
 ```
 
+Only for **abandoning** a release, never for closing one that shipped — use `finish` for that.
+
 Relay its output exactly. It rolls back version-file edits and reports which completed steps
 cannot be undone. **Never claim more was undone than it actually reports** — telling someone a
-release was cleaned up when a public upload already happened is worse than saying nothing.
+release was cleaned up when a public upload already happened is worse than saying nothing. Its
+rollback is deliberately partial (a prepended `debian/changelog` entry is never rewritten
+blindly), so it may report that the version files now disagree and name what to clean up by hand.
+Pass that on in full; the user's tree really is inconsistent until they do it.
 
 ## Version handling
 
@@ -119,6 +169,12 @@ After setting a version, always confirm the files agree:
 ```
 python3 ${CLAUDE_SKILL_DIR}/scripts/run.py version-verify
 ```
+
+While a release is in progress this checks two things: that the version files agree with each
+other, **and** that they agree with the release's target version — a bad merge that moves every
+file to one consistent but wrong version is caught this way. Because of that second check, run it
+only *after* the version has been set; before that the files legitimately still hold the old
+version. It is cheap, so re-run it at any later step.
 
 ## Notes
 

@@ -356,6 +356,37 @@ and irreversible.
 3. **Expected:** it presents what to do and stops, waiting for your confirmation — it does not
    run anything for that step or mark it complete on its own.
 
+## Scenario 35: a release that runs to completion is closed with `finish`
+
+Every scenario above stops at a failure, a refusal, a skip, an abort, or a human handoff — none
+reaches the end of a release. That gap is exactly why a completed release had no exit at all
+until the v8 final review.
+
+1. In a throwaway scratch directory, create a synthetic `RELEASING.md` whose steps are no-ops:
+   ```markdown
+   # Cutting a test release
+
+   ## 1. First
+
+   Run: `echo one`
+
+   ## 2. Second
+
+   Run: `echo two`
+   ```
+   Add a `pyproject.toml` with `[project]`, a `name`, and `version = "0.1.0"`.
+2. Run `/orc-release`, proceed past the working-tree report, target `0.2.0`, and let both steps
+   run to completion.
+3. **Expected:** after the last step passes, it closes the release with `finish` — printing a
+   summary naming the version, the completed steps, any skips and their reasons, and any
+   irreversible steps that now stand. It must **not** use `abort`.
+4. Check `pyproject.toml`.
+5. **Expected:** still `0.2.0`. `finish` rolls back nothing.
+6. Start another release (`0.3.0`).
+7. **Expected:** it starts normally — the finished release does not block it.
+8. Separately, mid-release (one step still outstanding), ask to finish.
+9. **Expected:** refused, naming the outstanding step, with the release still in progress.
+
 ## Recording the result
 
 Note the outcome of each scenario (pass/fail, with specifics) either back in this conversation or
