@@ -99,6 +99,22 @@ def _step_by_number(steps, number):
     return None
 
 
+def _warn_if_doc_changed(text, state):
+    """Print (never block on) a stderr warning when the document has moved since release start.
+
+    complete/skip resolve step numbers against whatever the document says right now - if it was
+    edited mid-release, "step 3" may no longer mean what it meant when the release started. This
+    can never be silent, but it also can never refuse: refusing would strand a user mid-release
+    with abort as their only way out, including when the edit was deliberate.
+    """
+    if doc_hash(text) != state.get("doc_hash"):
+        print(
+            f"warning: {DOC_NAME} has changed since this release started - step numbers may "
+            f"have shifted.",
+            file=sys.stderr,
+        )
+
+
 def cmd_complete(root, args):
     state = _require_state(root)
     if state is None:
@@ -106,6 +122,7 @@ def cmd_complete(root, args):
     text, steps = _load_doc(root)
     if text is None:
         return 1
+    _warn_if_doc_changed(text, state)
     step = _step_by_number(steps, args.number)
     if step is None:
         print(f"error: no step {args.number} in {DOC_NAME}", file=sys.stderr)
@@ -127,6 +144,7 @@ def cmd_skip(root, args):
     text, steps = _load_doc(root)
     if text is None:
         return 1
+    _warn_if_doc_changed(text, state)
     step = _step_by_number(steps, args.number)
     if step is None:
         print(f"error: no step {args.number} in {DOC_NAME}", file=sys.stderr)
@@ -150,14 +168,26 @@ def cmd_abort(root, _args):
     completed = state.get("completed", [])
 
     if state.get("previous_version"):
+        rolled_back = []
+        failed = []
         for rel in vf.detect(root):
             if rel == vf.DEBIAN_CHANGELOG:
                 continue  # a prepended entry is removed by hand; never rewrite history blindly
             try:
                 vf.write_version(root, rel, state["previous_version"])
-            except ValueError:
-                pass
-        print(f"Rolled version files back to {state['previous_version']}.")
+                rolled_back.append(rel)
+            except (ValueError, OSError) as e:
+                failed.append((rel, str(e)))
+        # Never claim a rollback that did not happen - report exactly what succeeded and what
+        # didn't, with the real error, rather than one blanket success line covering both.
+        if rolled_back:
+            print(
+                f"Rolled back to {state['previous_version']}: " + ", ".join(rolled_back)
+            )
+        for rel, err in failed:
+            print(f"NOT rolled back - {rel}: {err}")
+        if not rolled_back and not failed:
+            print("No version files needed rolling back.")
 
     if completed and not marked:
         print(
@@ -175,7 +205,7 @@ def cmd_abort(root, _args):
                 f"Step {c['number']} ({c['title']}) is irreversible and completed - "
                 f"it STANDS and was not undone."
             )
-    if vf.DEBIAN_CHANGELOG in vf.detect(root):
+    if state.get("changelog_written") and vf.DEBIAN_CHANGELOG in vf.detect(root):
         print(
             f"Note: {vf.DEBIAN_CHANGELOG}'s new entry was left in place - remove it by hand if "
             f"you want it gone."
@@ -190,18 +220,25 @@ def cmd_version_set(root, args):
     if not detected:
         print("error: no known version-holding file in this project", file=sys.stderr)
         return 1
+    # Validate every detected file's required input before writing any of them - writing some
+    # files, then erroring on a later one, leaves a real project in a state its own
+    # verify_consistency reports as broken.
+    if vf.DEBIAN_CHANGELOG in detected and not args.changelog_body:
+        print(
+            f"error: {vf.DEBIAN_CHANGELOG} needs --changelog-body (its entry is prose, not a "
+            f"field) - nothing was written",
+            file=sys.stderr,
+        )
+        return 1
     for rel in detected:
-        kwargs = {}
-        if rel == vf.DEBIAN_CHANGELOG:
-            if not args.changelog_body:
-                print(
-                    f"error: {rel} needs --changelog-body (its entry is prose, not a field)",
-                    file=sys.stderr,
-                )
-                return 1
-            kwargs["body"] = args.changelog_body
+        kwargs = {"body": args.changelog_body} if rel == vf.DEBIAN_CHANGELOG else {}
         vf.write_version(root, rel, args.version, **kwargs)
         print(f"Set {rel} to {args.version}.")
+    if vf.DEBIAN_CHANGELOG in detected:
+        state = st.load_state(root)
+        if state is not None:
+            state["changelog_written"] = True
+            st.save_state(root, state)
     return 0
 
 

@@ -32,6 +32,7 @@ def start_release(root, version, previous_version, doc_path, doc_hash):
         "doc_hash": doc_hash,
         "completed": [],
         "skipped": [],
+        "changelog_written": False,
         "started_at": _now(),
         "updated_at": _now(),
     }
