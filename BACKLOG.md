@@ -330,3 +330,29 @@ bump task looks like."
 remembering during future plan-writing (`superpowers:writing-plans`) for any Orclab version-bump
 task: copy the git-tag step from an existing plan (e.g. v4's) rather than re-deriving the task
 from scratch.
+
+## #10: Solidify /orc-publish's testing strategy beyond what the spec settles for v7
+
+Raised by direflail (2026-09-06) during the `/orc-publish` design's testing section: the spec
+settles for real unit tests on the tree-resolver script (path resolution, subtree-select+exclude,
+shared-cascade merging, unset-channel skip) plus `VERIFICATION.md` scenarios run against a
+synthetic throwaway tree with no-op leaf actions — deliberately never testing against a real
+destination from Orclab's own repo. direflail wants this strategy solidified further, but was
+explicit it doesn't need to happen before `/orc-publish` ships.
+
+**What's already decided, not open for re-litigation here:** the two-layer split itself (real
+automated tests for the resolver logic; hand-run dogfood scenarios for command behavior) and the
+synthetic-tree-only rule for Orclab's own verification (real-destination testing is the separate
+Orcshot dogfooding task's job, not this one).
+
+**What's actually open:** unspecified — direflail flagged a general instinct that this needs more
+rigor without naming the specific gap yet. Likely candidates worth raising when this is picked up:
+whether the resolver's unit tests need to cover deeper trees than the two-to-three-level examples
+seen during design (Orcshot's own real component/channel/distro trees, once dogfooded, would be a
+real stress test), and whether the synthetic throwaway tree used in `VERIFICATION.md` should be
+checked into the repo as a fixture (so its shape doesn't drift from what the scenarios assume) or
+constructed inline by each scenario.
+
+**Next step, when picked up:** ask direflail what specifically felt underspecified, rather than
+guessing — this entry exists to hold the "come back to this" intent, not to pre-decide what's
+missing.
