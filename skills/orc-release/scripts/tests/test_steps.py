@@ -157,3 +157,45 @@ def test_step_is_a_plain_dataclass_with_expected_fields():
     assert s.is_manual is False
     assert s.delegates_to is None
     assert s.is_irreversible is False
+
+
+def test_multiline_preconditions_are_captured_fully():
+    """Preconditions that wrap to multiple lines are captured in full, not truncated."""
+    steps = parse_steps(
+        textwrap.dedent(
+            """
+            ## 6. Upload to the PPA
+
+            **Preconditions:** this version is not already published; gpg-agent is
+            unlocked and the signing key is loaded.
+
+            Run: `dput ...`
+            """
+        )
+    )
+    assert steps[0].preconditions == [
+        "this version is not already published; gpg-agent is unlocked and the signing key is loaded."
+    ]
+
+
+def test_fenced_block_containing_heading_marker_does_not_end_step():
+    """A ## line inside a fenced code block does not falsely end the step body."""
+    steps = parse_steps(
+        textwrap.dedent(
+            """
+            ## 2. Run a command
+
+            Here's how to run it:
+
+            ```
+            ## this looks like a heading but is inside a fence
+            still code
+            ```
+
+            More prose after the fence.
+            """
+        )
+    )
+    assert len(steps) == 1
+    assert "More prose after the fence" in steps[0].body
+    assert "still code" in steps[0].body
