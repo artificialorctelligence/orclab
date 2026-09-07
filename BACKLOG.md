@@ -109,7 +109,7 @@ anything built on it), separate from v1's spec/plan and from #1's command-layer 
 its own research spike comparing 2-3 real candidates against Orclab's actual target platforms
 before a design gets proposed, not a decision made from the comparison table alone.
 
-## #3: Real enforcement for the discipline v1 only guides — not yet decided how
+## #3: Real enforcement for the discipline v1 only guides — not yet decided how (RESOLVED 2026-09-07)
 
 Raised by direflail (2026-09-04) right after v1 shipped, once it became clear that v1's three
 skills (`backlog-discipline`, `release-checklist`, `environment-registry`) are pure guidance: text
@@ -135,6 +135,60 @@ command layer at all). direflail asked to hold off deciding and talk it through 
 **Next step, when picked up:** a conversation (or a fresh `superpowers:brainstorming` pass, if it
 turns out to be Architectural-sized) specifically about where enforcement fits relative to #1 and
 to v1's existing skills — before any hook or lint script gets designed.
+
+**Update (2026-09-07), from a real leak — enforcement now has a concrete highest-value target:**
+A session diagnosing a `gh` auth banner printed a live OAuth token straight into the transcript by
+running `gh auth token` as a throwaway diagnostic. That produced a new discipline skill,
+`skills/secret-hygiene/SKILL.md` — which is guidance in exactly the sense this entry is about:
+prose Claude reads, with nothing that mechanically stops the command from running next time.
+
+It also sharpens this entry's open question rather than just adding to it. For `BACKLOG.md`
+numbering, guidance-only is survivable — a wrong entry number is caught later and corrected. A
+printed secret is not correctable at all: it lands in the model's context, every subsequent API
+request, and the on-disk session JSONL simultaneously, and the only remedy is rotation, which is
+the user's work. That asymmetry makes `secret-hygiene` the discipline with by far the strongest
+case for real enforcement, and the natural first hook to build if this entry gets picked up —
+ahead of the `BACKLOG.md` linting this entry originally imagined.
+
+**Mechanism, confirmed live (2026-09-07):** a Claude Code plugin really can ship hooks, via a
+`hooks/hooks.json` file at the plugin root alongside `.claude-plugin/plugin.json` — verified
+against the real installed `gitkraken-hooks` plugin in this environment, which registers
+`PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `SessionStart`, `SessionEnd`,
+`UserPromptSubmit` and `Notification`, each as `{matcher, hooks: [{type: "command", command}]}`.
+Orclab ships no `hooks/` directory today. **Still unverified, and the thing to check first:** the
+exact contract by which a `PreToolUse` hook *denies* a tool call rather than merely observing it —
+do not design against a remembered answer, confirm it against the current docs (`currency-discipline`).
+
+
+**RESOLVED 2026-09-07 — enforcement exists, scoped to the one discipline that most needed it.**
+Shipped: `hooks/hooks.json` registering a `PreToolUse` hook matched to `Bash`, backed by
+`hooks/scripts/secret_guard.py`. Run its suite with
+`cd hooks/scripts && python3 -m pytest tests/ -v` (48 tests). It denies the narrow set of commands
+whose entire stdout is a credential, and every denial names the safe alternative so a block
+redirects the work instead of dead-ending it.
+
+**The three-way open question above is answered by what shipped, and the answer is the third
+option** — small additions alongside the existing skills, not inside #1's command layer and not
+its own sub-project. Enforcement turned out to be per-discipline rather than a general mechanism:
+this hook knows about secrets specifically, and a future `BACKLOG.md` linter would share the
+`hooks/` directory with it and nothing else.
+
+**Deliberate scope limits, not oversights:**
+- Only `secret-hygiene` is enforced. The `BACKLOG.md` numbering and `RELEASING.md` step checks
+  this entry opened with are still guidance-only, and stayed that way on purpose: those failures
+  are correctable after the fact, while a printed secret never is. Raise a fresh entry if the
+  numbering discipline actually starts drifting in practice — don't pre-build for it.
+- The guard fails open on any internal error, and a `# orclab:allow-secret` marker bypasses it.
+  Both are intentional. A hook that wedges every Bash call in every project Orclab is installed
+  in would be a worse outcome than the leak it prevents, and a bypass that must be typed
+  explicitly leaves the decision visible in the transcript.
+
+**A real bug its own tests caught, worth remembering:** the first implementation read the trailing
+`2>&1` of the motivating leak command as a stdout capture and allowed it straight through — the
+guard would have missed the exact incident that produced it. Redirect detection now requires a
+genuine stdout redirect (no fd digit before `>`, no `>&` form). Writing the regression test for
+the real command first, rather than for a tidied-up version of it, is what surfaced that.
+
 
 ## #4: Real per-language/per-domain default stacks for /orc-code — mostly undecided, one confirmed
 
