@@ -78,3 +78,14 @@ success for a leaf the summary doesn't confirm succeeded.
   what the user meant.
 - A missing or malformed `channels.yaml`/`distro.yaml` (past Step 1's existence check — e.g. bad
   YAML syntax) is reported the same way: an `error:` line on stderr. Relay it plainly.
+- Every action runs under a timeout — a leaf's own `timeout:` (seconds) if it sets one, otherwise
+  600 seconds. `--timeout <seconds>` changes that default for a whole run; a leaf's own value
+  still wins over it. The dry-run plan prints each actionable leaf's effective timeout, so it is
+  visible in the Step 2 list before you confirm anything.
+- A leaf reported as `timed out` is distinct from one reported as `failed`, and the distinction is
+  worth relaying exactly. Because actions run with their output captured, a command waiting on
+  stdin for a passphrase produces no visible prompt at all — a timeout is often the only signal
+  that something is waiting on input rather than working.
+- A channel leaf with no `action:` reports as `(known channel, not yet actionable)` and is never
+  attempted. That is a real, deliberate state — a target the project knows about but has no
+  publish mechanism for yet — not a misconfiguration to fix.

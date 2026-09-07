@@ -15,6 +15,7 @@ from orc_publish.cli import (
     main,
     render_filename,
     run_for,
+    timeout_error,
 )
 
 
@@ -306,3 +307,83 @@ def test_execute_plan_kills_the_whole_process_group_on_timeout(tmp_path):
 
     time.sleep(3)
     assert not sentinel.exists()
+
+
+def test_format_plan_shows_each_actionable_leafs_effective_timeout(tmp_path):
+    root = load_tree(
+        write_yaml(
+            tmp_path,
+            "channels.yaml",
+            """
+            a: { action: "true", timeout: 45 }
+            b: { action: "true" }
+            c: {}
+            """,
+        )
+    )
+    text = format_plan(build_plan(root, []))
+    assert "  timeout: 45s" in text
+    assert "  timeout: 600s" in text
+    # An action-less leaf runs nothing, so it has no timeout to show.
+    assert text.splitlines()[-1] == "c: (known channel, not yet actionable)"
+
+
+def test_format_plan_reflects_a_run_wide_default_override(tmp_path):
+    root = load_tree(write_yaml(tmp_path, "channels.yaml", 'b: { action: "true" }'))
+    text = format_plan(build_plan(root, []), default_timeout=30)
+    assert "  timeout: 30s" in text
+
+
+def test_a_leafs_own_timeout_beats_a_run_wide_override(tmp_path):
+    root = load_tree(
+        write_yaml(tmp_path, "channels.yaml", 'a: { action: "true", timeout: 45 }')
+    )
+    leaf = build_plan(root, [])[0]
+    assert effective_timeout(leaf, default_timeout=30) == 45
+
+
+def test_timeout_error_rejects_a_non_integer_timeout(tmp_path):
+    root = load_tree(
+        write_yaml(tmp_path, "channels.yaml", 'a: { action: "true", timeout: "soon" }')
+    )
+    message = timeout_error(build_plan(root, []))
+    assert message is not None
+    assert "a: timeout must be a positive whole number of seconds" in message
+
+
+def test_timeout_error_rejects_zero_and_booleans(tmp_path):
+    zero = load_tree(
+        write_yaml(tmp_path, "zero.yaml", 'a: { action: "true", timeout: 0 }')
+    )
+    assert timeout_error(build_plan(zero, [])) is not None
+    boolean = load_tree(
+        write_yaml(tmp_path, "bool.yaml", 'a: { action: "true", timeout: true }')
+    )
+    assert timeout_error(build_plan(boolean, [])) is not None
+
+
+def test_timeout_error_accepts_a_valid_and_an_unset_timeout(tmp_path):
+    root = load_tree(
+        write_yaml(
+            tmp_path,
+            "channels.yaml",
+            """
+            a: { action: "true", timeout: 45 }
+            b: { action: "true" }
+            """,
+        )
+    )
+    assert timeout_error(build_plan(root, [])) is None
+
+
+def test_main_reports_a_bad_timeout_as_an_error_even_in_dry_run(tmp_path, capsys):
+    path = write_yaml(
+        tmp_path, "channels.yaml", 'a: { action: "true", timeout: "soon" }'
+    )
+    assert main(["--channels", path, "--dry-run"]) == 1
+    assert "error:" in capsys.readouterr().err
+
+
+def test_main_timeout_flag_changes_the_default(tmp_path):
+    path = write_yaml(tmp_path, "channels.yaml", 'a: { action: "sleep 5" }')
+    assert main(["--channels", path, "--timeout", "1"]) == 1

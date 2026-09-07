@@ -35,18 +35,39 @@ def build_plan(channel_root, tokens):
     return resolve_selection(channel_root, tokens)
 
 
-def format_plan(leaves):
+def format_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
     if not leaves:
         return "(no leaves selected)"
     lines = []
     for leaf in leaves:
-        action = leaf.action or f"({NOT_ACTIONABLE})"
-        lines.append(f"{leaf.dotted_path}: {action}")
+        if leaf.action:
+            lines.append(f"{leaf.dotted_path}: {leaf.action}")
+            lines.append(f"  timeout: {effective_timeout(leaf, default_timeout)}s")
+        else:
+            lines.append(f"{leaf.dotted_path}: ({NOT_ACTIONABLE})")
         for req in leaf.requirements:
             lines.append(f"  requirement: {req}")
         for issue in leaf.issues:
             lines.append(f"  issue: {issue}")
     return "\n".join(lines)
+
+
+def timeout_error(leaves):
+    """The first leaf-level `timeout:` that isn't usable, as a message - or None.
+
+    YAML turns `timeout: true` into a bool, and bool is a subclass of int, so it has to be
+    rejected explicitly rather than passing the isinstance check.
+    """
+    for leaf in leaves:
+        value = leaf.timeout
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            return (
+                f"{leaf.dotted_path}: timeout must be a positive whole number of seconds, "
+                f"got {value!r}"
+            )
+    return None
 
 
 def run_for(distro_root, distro_path):
@@ -139,6 +160,7 @@ def main(argv=None):
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--channels", default=".orclab/publish/channels.yaml")
     parser.add_argument("--distro", default=".orclab/publish/distro.yaml")
+    parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_SECONDS)
     args = parser.parse_args(argv)
 
     if args.for_distro:
@@ -172,12 +194,17 @@ def main(argv=None):
         print(f"error: {e}", file=sys.stderr, flush=True)
         return 1
 
-    print(format_plan(leaves), flush=True)
+    bad_timeout = timeout_error(leaves)
+    if bad_timeout:
+        print(f"error: {bad_timeout}", file=sys.stderr, flush=True)
+        return 1
+
+    print(format_plan(leaves, default_timeout=args.timeout), flush=True)
 
     if args.dry_run:
         return 0
 
-    results = execute_plan(leaves)
+    results = execute_plan(leaves, default_timeout=args.timeout)
     print(format_summary(results), flush=True)
     return 0 if all(status not in ("failed", "timed out") for _, status, _ in results) else 1
 
