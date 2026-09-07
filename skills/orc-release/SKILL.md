@@ -98,6 +98,8 @@ For each step, in the document's own order:
 2. **Carry it out:**
    - Marked **performed by hand** → present what the human must do, then stop and wait for their
      confirmation. Record what they say they did; never mark it complete on your own.
+   - Carrying a **One-time setup:** block → run **only its check**, never its setup commands.
+     See "One-time setup blocks" below.
    - Marked **Run: /some-command** → invoke that command. If it reports any failure, this step has
      failed.
    - Otherwise → run the document's own commands.
@@ -109,6 +111,34 @@ For each step, in the document's own order:
    ```
 5. On failure: **stop.** Report what failed and the real output. Do not retry, do not skip, do not
    continue to the next step. The user fixes it and re-runs `/orc-release`, which resumes here.
+
+### One-time setup blocks
+
+A step may carry a `**One-time setup:**` block — something done once and then never again:
+registering a store name, submitting an app for review, creating a signing key, adding a
+per-machine config file. It always states how to tell whether it is already in place.
+
+1. **Run only that check.** It is read-only by construction. Never run the setup commands to find
+   out whether they were needed.
+2. **Check passes** → the setup is already there. Say so, and carry on with the rest of the step.
+3. **Check fails** → **stop.** Name exactly what is missing, in the document's own words, and ask
+   whether the user wants it set up now — asking whatever the setup itself needs (which account,
+   which key, which store name). Only run the setup commands once they say yes.
+
+**Never run a setup command unprompted, and never treat a failed check as a step failure you can
+resolve on your own initiative. Standing up a distribution channel is always something the user
+asks for directly.**
+
+Two real reasons this is a hard rule and not a preference:
+- A store-name registration succeeds exactly once. Running it blindly on the next release fails,
+  and halts a release on a step that was already fine.
+- A Flathub submission is a pull request other people review over days. It is not a command that
+  completes inside a release, and it must never be opened as a side effect of one.
+
+Setup state is deliberately **not** recorded in the release cursor. Setup is per-machine and
+per-account; the cursor is per-release. A stored "setup done" flag would be confidently wrong the
+first time a release is cut from somewhere else — which a check that reads the real world cannot
+be.
 
 If any `run.py` command — not just `status`; `complete` and `skip` warn on this too — reports
 that `RELEASING.md` has changed, stop and re-read it before continuing.

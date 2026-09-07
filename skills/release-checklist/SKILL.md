@@ -38,9 +38,9 @@ Each step is a `## N. <short imperative title>` heading, followed by:
 
 ### Optional markers a step can carry
 
-Four optional prose markers. They are read by `/orc-release` when it drives the checklist, but
+Five optional prose markers. They are read by `/orc-release` when it drives the checklist, but
 they are written for a human first — someone following the document by hand wants "don't start
-this if X" every bit as much as an automated runner does. **All four are optional; a document
+this if X" every bit as much as an automated runner does. **All five are optional; a document
 using none of them is still complete and still driveable.**
 
 - **Preconditions** — what must be true before the step starts, written as
@@ -54,6 +54,16 @@ using none of them is still complete and still driveable.**
 - **Irreversible** — `**Irreversible.**` when the step does something that cannot be undone:
   publishing to a public archive, pushing a tag, creating a release. This is what lets an
   abandoned release distinguish what can be rolled back from what merely has to be reported.
+- **One-time setup** — `**One-time setup:** <what it is, and what it is scoped to — per machine,
+  per account, per project>` for something done once and then never again: registering a store
+  name, submitting an app for review, creating a signing key, adding a per-machine config file.
+  Write it inside the step that needs it, not in a separate section of its own.
+
+  A one-time-setup block **must state how to tell it is already in place** — a real command, or a
+  real observation — held to the same standard as `**Preconditions:**` above: specific and
+  checkable, not generic. Without that, a runner has nothing to test and is reduced to asking
+  blind, and a reader coming back six months later can't tell whether they already did it.
+  Follow the check with the setup commands themselves.
 
 ## Cross-referencing CI
 
