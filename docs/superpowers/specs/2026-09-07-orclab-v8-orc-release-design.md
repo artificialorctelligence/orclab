@@ -223,13 +223,26 @@ No rework. It becomes reachable from a release through delegation.
 /orc-release                    start a new release, or resume one in progress
 /orc-release status             report position; change nothing
 /orc-release skip <reason>      skip the current step, recording the reason
+/orc-release finish             close out a completed release: clear state, roll back nothing
 /orc-release abort              abandon the release: roll back what is reversible,
                                 report what is not (confirmed first)
 ```
 
-`abort` is not merely "forget the state file." It rolls back the version-file edits and any commit
-or tag the release created, then reports every completed irreversible step as something that
-stands. See "Rollback on abort" above.
+**`finish` and `abort` are the two exits, and they are not interchangeable.** `finish` closes a
+release that actually shipped — it verifies every step is complete, prints a summary, and clears
+state **without touching any version file**. `abort` abandons a release that did not ship.
+
+Using `abort` to close a finished release would roll the version files back to their pre-release
+values on a repo whose release commit and tag already exist — which is why `finish` exists as a
+distinct command rather than `abort` doubling as "I'm done." (This spec's first draft listed
+`abort` as the only exit; that was a real design error, caught by the final whole-branch review
+before merge.)
+
+`abort` is not merely "forget the state file." It rolls back the version-file edits it can, names
+any it could not, reports every completed irreversible step as something that stands, and states
+plainly when the project is left with its version files disagreeing. It does **not** touch git —
+no commit is reverted and no tag is deleted; anything already committed or tagged is the human's
+to unwind, and abort says so rather than implying otherwise. See "Rollback on abort" above.
 
 ## What stops a run
 

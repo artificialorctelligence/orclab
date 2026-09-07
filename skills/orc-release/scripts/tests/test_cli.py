@@ -389,6 +389,35 @@ def test_a_subcommand_run_from_a_subdirectory_still_finds_the_document(tmp_path,
     assert [s["number"] for s in json.loads(capsys.readouterr().out)] == [1, 2, 3]
 
 
+def test_a_subproject_with_its_own_document_wins_over_the_enclosing_git_root(
+    tmp_path, monkeypatch, capsys
+):
+    # A monorepo package (or a vendored subproject) carrying its own RELEASING.md is its own
+    # release unit. Stopping at the enclosing .git would tell it its document doesn't exist.
+    (tmp_path / ".git").mkdir()
+    (tmp_path / "RELEASING-not-this-one.md").write_text("# enclosing repo, no release doc\n")
+    pkg = tmp_path / "packages" / "foo"
+    pkg.mkdir(parents=True)
+    setup_project(pkg)
+    monkeypatch.chdir(pkg)
+    assert main(["steps"]) == 0
+    assert [s["number"] for s in json.loads(capsys.readouterr().out)] == [1, 2, 3]
+
+
+def test_a_subdirectory_of_a_subproject_still_finds_the_subproject(
+    tmp_path, monkeypatch, capsys
+):
+    (tmp_path / ".git").mkdir()
+    pkg = tmp_path / "packages" / "foo"
+    pkg.mkdir(parents=True)
+    setup_project(pkg)
+    deep = pkg / "src" / "deep"
+    deep.mkdir(parents=True)
+    monkeypatch.chdir(deep)
+    assert main(["steps"]) == 0
+    assert [s["number"] for s in json.loads(capsys.readouterr().out)] == [1, 2, 3]
+
+
 def test_abort_says_so_when_it_leaves_the_version_files_disagreeing(tmp_path, capsys):
     root = setup_project(tmp_path)
     add_debian_changelog(tmp_path)

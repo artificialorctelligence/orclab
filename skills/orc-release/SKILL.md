@@ -1,7 +1,7 @@
 ---
 name: orc-release
 description: Use when the user explicitly asks to use orc-release, or types /orc-release, to drive a project's own RELEASING.md release process end to end - running its ordered steps, enforcing its gates, and tracking where the release is across sessions.
-allowed-tools: Read, Bash
+allowed-tools: Read, Bash(python3 *), Bash(git status *)
 ---
 
 # orc-release
@@ -14,12 +14,20 @@ continues past a failed channel. Publish channels are independent siblings; rele
 dependent chain, where step 6 uploading irreversibly to a public archive is only valid because
 step 2's tests actually passed.
 
-`allowed-tools` is `Read, Bash` because this skill genuinely needs both: `Read` for
-`commands/orc-version.md`, and unscoped `Bash` because it runs **the project's own documented
-commands** — `pytest`, `debuild`, `dput`, whatever that document says — which cannot be enumerated
-ahead of time. That breadth carries a real obligation: **only ever run commands the document
-itself states, or the `run.py` calls below.** Never invent a command, and never widen a step's
-command beyond what is written.
+`allowed-tools` deliberately pre-approves only this skill's own plumbing — `Read` for
+`commands/orc-version.md`, `python3` for the `run.py` calls below, and `git status` for the
+working-tree report. **The project's own release commands are deliberately NOT pre-approved.**
+
+That is a feature, not an oversight. `pytest` is harmless; `dput` uploads irreversibly to a public
+archive. Since a downstream project's commands can't be enumerated ahead of time, the honest
+choice is to let each one surface a permission prompt at the moment it runs — a visible
+confirmation immediately before the irreversible thing happens, on exactly the operations that
+most deserve one. Granting unscoped `Bash` would buy fewer prompts by removing that friction from
+the riskiest steps in the whole process.
+
+Expect several prompts during a real release, and treat each as the gate it is. The standing
+obligation holds regardless: **only ever run commands the document itself states, or the `run.py`
+calls below.** Never invent a command, and never widen a step's command beyond what is written.
 
 ## Commands
 

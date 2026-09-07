@@ -22,15 +22,22 @@ DOC_NAME = "RELEASING.md"
 
 
 def find_project_root(start="."):
-    """Walk up from `start` to the git root, falling back to `start` itself.
+    """Walk up from `start` for the nearest RELEASING.md, then the git root, then `start`.
 
     Defaulting to the process's cwd made every subcommand report "no RELEASING.md in this
     project" from any subdirectory - a false negative on the one message that must never be
     wrong, told to a user who does have one. --root still overrides this explicitly.
+
+    The document is checked BEFORE .git at each level, and that order is the whole point: a
+    subproject carrying its own RELEASING.md inside a larger repo (a monorepo package, a
+    vendored subproject) is its own release unit. Stopping at the enclosing .git would hand
+    that project the exact false negative this function exists to prevent.
     """
     start = os.path.abspath(start)
     d = start
     while True:
+        if os.path.exists(os.path.join(d, DOC_NAME)):
+            return d
         if os.path.exists(os.path.join(d, ".git")):
             return d
         parent = os.path.dirname(d)
