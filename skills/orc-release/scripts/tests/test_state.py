@@ -117,3 +117,39 @@ def test_clear_state_on_absent_state_is_not_an_error(tmp_path):
 def test_state_file_is_valid_readable_json(tmp_path):
     start_release(str(tmp_path), "0.3.0", "0.2.0", "RELEASING.md", "abc")
     json.loads((tmp_path / STATE_PATH).read_text())
+
+
+def test_skip_then_complete_raises_and_leaves_state_unchanged(tmp_path):
+    state = start_release(str(tmp_path), "0.3.0", "0.2.0", "RELEASING.md", "abc")
+    state = mark_skipped(state, 6, "Upload to the PPA", "thought it wasn't needed yet")
+    original_state = json.dumps(state, sort_keys=True)
+    with pytest.raises(ValueError, match="6"):
+        mark_complete(state, 6, "Upload to the PPA", irreversible=True)
+    assert json.dumps(state, sort_keys=True) == original_state
+    assert irreversible_completed(state) == []
+
+
+def test_complete_then_skip_raises_and_leaves_state_unchanged(tmp_path):
+    state = start_release(str(tmp_path), "0.3.0", "0.2.0", "RELEASING.md", "abc")
+    state = mark_complete(state, 1, "Step one")
+    original_state = json.dumps(state, sort_keys=True)
+    with pytest.raises(ValueError, match="1"):
+        mark_skipped(state, 1, "Step one", "skipped after complete")
+    assert json.dumps(state, sort_keys=True) == original_state
+
+
+def test_complete_twice_is_still_idempotent_not_an_error(tmp_path):
+    state = start_release(str(tmp_path), "0.3.0", "0.2.0", "RELEASING.md", "abc")
+    state = mark_complete(state, 1, "Step one")
+    # Second complete on same number should be a silent no-op, not a ValueError
+    state = mark_complete(state, 1, "Step one")
+    assert completed_numbers(state) == [1]
+    assert len(state["completed"]) == 1
+
+
+def test_irreversible_tracking_after_guard_is_correct(tmp_path):
+    state = start_release(str(tmp_path), "0.3.0", "0.2.0", "RELEASING.md", "abc")
+    state = mark_complete(state, 6, "Upload to the PPA", irreversible=True)
+    assert irreversible_completed(state) == [
+        {"number": 6, "title": "Upload to the PPA", "irreversible": True}
+    ]

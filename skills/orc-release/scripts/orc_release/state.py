@@ -63,7 +63,11 @@ def is_in_progress(root):
 
 def mark_complete(state, number, title, irreversible=False):
     """Record a step as done. Idempotent - re-running a step does not duplicate the entry."""
-    if number not in completed_numbers(state):
+    skipped_numbers = [s["number"] for s in state.get("skipped", [])]
+    if number in skipped_numbers:
+        raise ValueError(f"step {number} was skipped and cannot be completed")
+
+    if number not in [c["number"] for c in state.get("completed", [])]:
         state["completed"].append(
             {"number": number, "title": title, "irreversible": bool(irreversible)}
         )
@@ -74,6 +78,11 @@ def mark_skipped(state, number, title, reason):
     """Record a step as deliberately skipped. A reason is required, never optional."""
     if not reason or not reason.strip():
         raise ValueError("a skip requires a real reason")
+
+    completed_numbers_list = [c["number"] for c in state.get("completed", [])]
+    if number in completed_numbers_list:
+        raise ValueError(f"step {number} was completed and cannot be skipped")
+
     state["skipped"].append(
         {"number": number, "title": title, "reason": reason.strip()}
     )
