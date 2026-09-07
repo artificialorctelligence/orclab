@@ -390,3 +390,62 @@ with the run just appearing to hang, otherwise.
 whether it's per-leaf configurable via the channel tree, what happens to the summary line for a
 leaf that times out — presumably a new `"timed out"` status distinct from `"failed"`) before
 implementing it.
+
+## #12: `/orc-publish` models channel fan-out, but a real release is mostly an ordered pipeline — the framework can't yet drive Orcshot's own release
+
+Found 2026-09-06/07, dogfooding `/orc-publish` against Orcshot's real release for the first time.
+direflail named the pattern directly, and it's the right diagnosis: "i feel like you're finding out
+what to do one piece at a time and then finding out later and we're patching up the process to fix
+it. do you understand the whole process we're trying to do, and then are we applying that to the
+framework?"
+
+**What actually happened:** Orcshot's `.orclab/publish/channels.yaml` was written against
+`RELEASING.md` step 6 in isolation, before anyone had read the document end to end. Every problem
+that followed was a consequence of that, not bad luck — a `../*.changes` glob that would have tried
+to `dput` 33 accumulated past builds (see the fix in Orcshot's own history), a near-miss uploading
+a version already live on Launchpad, a near-miss releasing on top of uncommitted in-progress work,
+and repeated confusion about step ordering. Each was patched individually as it surfaced.
+
+**The real structural finding, once the whole 11-step process was actually read:**
+
+| Orcshot's real release process | What `/orc-publish` models |
+|---|---|
+| 11 ordered steps with real gates (tests before build, lint before upload, CI green before the GitHub Release) | Independent leaves, no ordering, and by explicit design *continues past a failure* |
+| Real preconditions ("is this version already on Launchpad?", "is the tree clean?") | None — no notion of checking destination or local state before acting |
+| Steps that are not shell commands at all: a Launchpad web-UI "Copy packages" click, install-testing on three real machines/VMs, clicking a menu item to verify the update checker | `action:` is a shell string; these steps are invisible to the model entirely |
+| Most steps (1-5, 8-11) are release-wide, not per-channel | Only models the per-channel fan-out |
+
+**The tell, concretely:** Orcshot's own `ppa.noble` leaf had to smuggle `dpkg-buildpackage -S` — a
+*build* — into what is nominally a *publish* action, just to work at all. A leaf action that has to
+build the thing it publishes is a sign the "publish an already-built artifact" abstraction doesn't
+fit the real work.
+
+**In fairness to the v7 spec, this is not a bug in it:** `/orc-publish` was deliberately scoped to
+"push a project's built artifacts to their real distribution destinations," with artifact
+generation explicitly out of scope. It is internally consistent and it does the fan-out part
+genuinely well (the channel/distro split, the dotted-path selection, the dry-run gate all held up
+under real use). The gap is that *"push built artifacts" turned out to be a far thinner slice of
+"release this project" than assumed when it was scoped* — roughly one step out of eleven, and even
+that one doesn't cleanly fit. Orcshot's real process is mostly pipeline; v7 built the fan-out.
+
+**The open design question, deliberately not answered here:** does Orclab need a pipeline concept —
+ordered steps, gates/preconditions, and a way to represent a step a *human* performs (a web-UI
+click, a manual install-test) rather than a shell command — with `/orc-publish` becoming one stage
+within it rather than the whole thing? Adjacent existing pieces that must be considered rather than
+duplicated: `release-checklist` (v1) already maintains a numbered, dependency-ordered
+`RELEASING.md`, which is *exactly* the artifact this would be automating against — so this may be
+much more about giving that skill real teeth than about inventing a new structure. `/orc-version`
+also already owns part of the spine (version bump, changelog, tag, GitHub Release) and BACKLOG #6
+already tracks its per-language manifest gap, which Orcshot hit live (it can't bump
+`pyproject.toml`/`debian/changelog`).
+
+**Why this is not a patch:** the previous items found during this dogfooding pass (#11, and the
+Orcshot-side config fixes) were real but local. This one changes what the framework is for. It
+needs the same `superpowers:brainstorming` → spec → plan treatment `/orc-publish` itself got, not
+another inline fix.
+
+**Next step, when picked up:** a fresh brainstorming pass (Architectural), starting from a real,
+complete read of Orcshot's `RELEASING.md` as the worked example — the whole document first, before
+any design is proposed. Read `release-checklist`'s SKILL.md and `/orc-version`'s command file in
+full at the same time, since the answer may be "make these two work together properly" rather than
+"add a new component."
