@@ -156,3 +156,23 @@ def test_unset_channel_leaf_has_no_channel(tmp_path):
     root = load_tree(path)
     assert root.find(("mint-next", "x11")).channel is None
     assert root.find(("mint-next", "wayland")).channel is None
+
+
+def test_leaf_exposes_its_own_timeout():
+    node = Node(path=("a",), data={"action": "echo hi", "timeout": 30})
+    assert node.timeout == 30
+
+
+def test_leaf_without_a_timeout_reports_none():
+    node = Node(path=("a",), data={"action": "echo hi"})
+    assert node.timeout is None
+
+
+def test_a_node_holding_only_a_timeout_is_still_a_leaf():
+    node = Node(path=("a",), data={"timeout": 30})
+    assert node.is_leaf
+
+
+def test_branch_reports_no_timeout():
+    node = Node(path=(), data={"desktop": {"action": "echo hi"}})
+    assert node.timeout is None

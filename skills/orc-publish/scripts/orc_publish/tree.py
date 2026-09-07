@@ -7,7 +7,9 @@ schema beyond that distinction - depth follows whatever a real project actually 
 
 import yaml
 
-LEAF_KEYS = frozenset({"action", "filename_template", "channel", "requirements", "issues"})
+LEAF_KEYS = frozenset(
+    {"action", "filename_template", "channel", "requirements", "issues", "timeout"}
+)
 
 
 class Node:
@@ -39,6 +41,11 @@ class Node:
     @property
     def channel(self):
         return self._data.get("channel") if self.is_leaf else None
+
+    @property
+    def timeout(self):
+        """The leaf's own timeout in seconds, or None when unset. Not validated here."""
+        return self._data.get("timeout") if self.is_leaf else None
 
     @property
     def requirements(self):
