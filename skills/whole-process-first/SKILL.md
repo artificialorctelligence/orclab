@@ -56,11 +56,15 @@ This is about documented multi-step processes, not about every task:
 - **A single, self-contained step** someone explicitly asks for in isolation ("just run the
   tests"), with no intent to proceed through the rest. Do that step. But if it becomes the first
   step of actually running the process, read the whole thing then.
-- **Emergencies with a known, narrow fix**, where the cost of delay genuinely exceeds the cost of
-  an incomplete model. Say plainly that this is what's happening, and read the rest afterward.
 
-The exception is never "the process looks obvious from step 1," or "I'll read the next step when I
-get to it."
+That's the whole list. In particular, **urgency is not an exception.** Reading a process document
+takes minutes; a wrong model of the process costs far more, and costs it exactly when things are
+already going badly. An "emergency" exception would almost never clear its own bar honestly — it
+would just become the reason reached for, and the band-aid fixes that follow are the expensive
+part, not the reading that got skipped.
+
+The exception is never "the process looks obvious from step 1," "I'll read the next step when I get
+to it," or "there isn't time right now."
 
 ## What NOT to do
 
