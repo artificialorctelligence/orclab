@@ -149,6 +149,16 @@ one needs the same "check it's actually available, tell the user plainly if not"
    already cover `skills/orc-*/SKILL.md`, not just `commands/*.md` — verify it does, since a
    skill-only component silently vanishes from Orclab's own command listing otherwise.
 
+## Running the bundled-script test suites
+
+Any skill bundling real Python (like `orc-publish`) keeps its tests in a `tests/` directory next
+to its `scripts/`, with an empty `conftest.py` at the `scripts/` root so the suite runs correctly
+from any working directory or invocation form. Run a given skill's suite with:
+
+```bash
+cd skills/<skill-name>/scripts && python3 -m pytest tests/ -v
+```
+
 ## Marketplace/install gotchas, found dogfooding v6 in Desktop (2026-09-06)
 
 Three real, separate bugs stacked on top of each other while getting v6 actually working live —
