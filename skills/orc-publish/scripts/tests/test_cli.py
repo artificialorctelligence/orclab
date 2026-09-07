@@ -1,4 +1,5 @@
 import textwrap
+import time
 
 import pytest
 
@@ -283,3 +284,25 @@ def test_main_exits_non_zero_when_a_leaf_times_out(tmp_path):
         tmp_path, "channels.yaml", 'a: { action: "sleep 5", timeout: 1 }'
     )
     assert main(["--channels", path]) == 1
+
+
+def test_execute_plan_kills_the_whole_process_group_on_timeout(tmp_path):
+    # A lone `sleep` execs into the same PID as the shell, so subprocess.run's own
+    # child-only kill would still work on it - that proves nothing about a compound
+    # command. This one forks a grandchild in a subshell, which subprocess.run orphans:
+    # the "timed out" report fires at 1s while the grandchild is still alive, and it
+    # would go on to create the sentinel file at ~3s if left running.
+    sentinel = tmp_path / "orphan"
+    root = load_tree(
+        write_yaml(
+            tmp_path,
+            "channels.yaml",
+            f'a: {{ action: "true && (sleep 3; touch {sentinel})", timeout: 1 }}',
+        )
+    )
+    results = execute_plan(build_plan(root, []))
+    leaf, status, detail = results[0]
+    assert status == "timed out"
+
+    time.sleep(3)
+    assert not sentinel.exists()

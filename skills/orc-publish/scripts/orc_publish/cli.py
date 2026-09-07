@@ -7,6 +7,8 @@ calls this script twice: once with --dry-run, once without, once the user has co
 """
 
 import argparse
+import os
+import signal
 import subprocess
 import sys
 
@@ -79,18 +81,32 @@ def execute_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
             continue
         limit = effective_timeout(leaf, default_timeout)
         try:
-            result = subprocess.run(
+            # start_new_session=True puts the shell in its own process group so a compound
+            # action (pipes, &&, subshells) can be killed as a whole on timeout - subprocess.run
+            # only kills the /bin/sh -c process itself, orphaning whatever it forked. See
+            # BACKLOG #11 follow-up: a timed-out debsign/dput kept running past the report.
+            with subprocess.Popen(
                 leaf.action,
                 shell=True,
-                check=True,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=limit,
-            )
-            detail = (result.stdout or "").strip()
+                start_new_session=True,
+            ) as proc:
+                try:
+                    stdout, stderr = proc.communicate(timeout=limit)
+                except subprocess.TimeoutExpired:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                    proc.wait()
+                    raise
+                if proc.returncode != 0:
+                    raise subprocess.CalledProcessError(
+                        proc.returncode, leaf.action, output=stdout, stderr=stderr
+                    )
+            detail = (stdout or "").strip()
             results.append((leaf, "success", detail))
         except subprocess.TimeoutExpired:
-            # capture_output=True is why an interactive prompt is invisible - say so, or the
+            # stdout/stderr are unavailable here (capture never completed) - say so, or the
             # operator has no reason to suspect stdin at all.
             results.append(
                 (
