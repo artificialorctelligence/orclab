@@ -2,6 +2,38 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.10.0] - 2026-09-07
+
+### Added
+- `skills/secret-hygiene/SKILL.md` — a discipline skill for keeping credentials out of the
+  transcript. Covers why a printed secret is unrecoverable (it lands in the model's context,
+  every subsequent API request, and the on-disk session JSONL at once), masked alternatives for
+  the commands that emit credentials, verify-by-effect over verify-by-value, and the recovery
+  procedure when one leaks anyway. Its description triggers on situations — debugging auth,
+  reading config/env/logs — rather than intent, because nobody sets out to leak a secret.
+- `hooks/hooks.json` and `hooks/scripts/secret_guard.py` — Orclab's first hook. A `PreToolUse`
+  guard on `Bash` that denies the narrow set of commands whose entire stdout is a credential,
+  naming the safe alternative in every denial so a block redirects the work instead of ending it.
+  Fails open on any internal error; a `# orclab:allow-secret` marker bypasses it explicitly. 48
+  tests, run with `cd hooks/scripts && python3 -m pytest tests/ -v`. Closes BACKLOG #3.
+
+### Changed
+- Every `/orc-*` component is now a skill. The five that had both a `commands/*.md` body and a
+  wrapper skill were folded into their `SKILL.md`, carrying `argument-hint` across.
+- `/orc-help`'s Step 3 enumerates a single source, `skills/orc*/SKILL.md` — no hyphen, so
+  `skills/orc` is caught alongside `skills/orc-*` — and its merge-by-name branch is gone.
+- `CLAUDE.md`'s commands-vs-skills guidance corrected against the primary docs, which describe
+  `commands/` as "Skills as flat Markdown files. Use `skills/` for new plugins." Its previous
+  claim that `commands/*.md` "stays for CLI use" was wrong: a skill wins any name collision, so
+  each wrapper shadowed its own command file on the CLI too.
+- Recorded two findings verified live rather than assumed: `claude plugin validate` does not
+  check SKILL.md frontmatter (proven with a negative control), and a plugin skill's invocable
+  name comes from its directory, not its `name:` field (proven against the installed `aikido`
+  plugin).
+
+### Removed
+- The `commands/` directory.
+
 ## [0.9.0] - 2026-09-07
 
 ### Added
