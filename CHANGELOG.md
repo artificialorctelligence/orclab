@@ -2,6 +2,30 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.11.0] - 2026-09-07
+
+### Added
+- `**One-time setup:**` — a fifth optional marker in `release-checklist`, for the step that
+  happens once and then never again (registering a store name, submitting an app for review,
+  creating a signing key, a per-machine config file). It must carry a checkable "how to tell it is
+  already in place," to the same standard as `**Preconditions:**`.
+- `/orc-release`'s rule for that marker: run **only** the check. Passing, say so and carry on;
+  failing, stop, name what is missing, and ask whether the user wants it set up — asking whatever
+  the setup itself needs. Setup commands never run unprompted. Standing up a distribution channel
+  is always something the user asks for directly.
+- A `timeout:` key on a `/orc-publish` channel leaf, a 600-second default, and a `--timeout`
+  override for a whole run that a leaf's own value still beats. The dry-run plan prints each
+  actionable leaf's effective timeout, so it appears in the list the user confirms.
+
+### Changed
+- A `/orc-publish` action that hangs now reports `timed out` — a status distinct from `failed` —
+  with a detail naming the real limit and saying the action may be waiting on stdin. Because
+  actions run with output captured, a passphrase prompt produces no visible prompt at all, so the
+  timeout is often the only signal. Closes BACKLOG #11.
+- A channel leaf with no `action:` reports as `(known channel, not yet actionable)` instead of
+  `(no action set)`, matching the wording the distro tree already used for the same idea. A
+  deliberate placeholder for a real but not-yet-onboarded channel no longer reads as an omission.
+
 ## [0.10.0] - 2026-09-07
 
 ### Added
