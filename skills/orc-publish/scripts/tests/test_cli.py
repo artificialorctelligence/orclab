@@ -349,7 +349,10 @@ def test_execute_plan_kills_the_whole_process_group_on_interrupt(tmp_path, monke
     leaves = build_plan(root, [])
 
     def interrupt_once_the_grandchild_is_up(self, *args, **kwargs):
+        deadline = time.monotonic() + 5
         while not pidfile.exists():
+            if time.monotonic() > deadline:
+                pytest.fail("grandchild never wrote its pidfile - the action may not have started")
             time.sleep(0.01)
         raise KeyboardInterrupt
 
@@ -445,9 +448,11 @@ def test_main_timeout_flag_changes_the_default(tmp_path):
 
 @pytest.mark.parametrize("bad", ["0", "-5"])
 def test_main_rejects_a_non_positive_timeout_flag(tmp_path, capsys, bad):
-    # Held to the same rule as a leaf's own `timeout:`. Unvalidated, `--timeout 0` reported
-    # every leaf as `timed out` without running it, and `--timeout -5` printed the negative
-    # limit in the plan the user confirms and then ran with no timeout at all.
+    # Held to the same rule as a leaf's own `timeout:`. Unvalidated, both `--timeout 0` and
+    # `--timeout -5` would falsely report every leaf as `timed out` without running it -
+    # measured directly (Python 3.12): a negative timeout is an endtime already in the past,
+    # so subprocess.run/Popen.communicate raise TimeoutExpired immediately, in 0.00s, exactly
+    # like 0. Neither ever runs with no timeout.
     path = write_yaml(tmp_path, "channels.yaml", 'a: { action: "true" }')
     assert main(["--channels", path, "--dry-run", "--timeout", bad]) == 1
     err = capsys.readouterr().err
