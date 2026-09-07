@@ -282,6 +282,80 @@ and irreversible.
 3. **Expected:** reports "no channel set (known target, not yet actionable)" — a normal report,
    not an error, and nothing executes.
 
+## Scenario 27: /orc-release refuses to invent a process
+
+1. In a throwaway scratch directory with no `RELEASING.md`, run `/orc-release`.
+2. **Expected:** it reports plainly that there's no `RELEASING.md` and stops, suggesting
+   `release-checklist`. It must not propose or invent any steps.
+
+## Scenario 28: /orc-release halts on a failed step
+
+1. In a throwaway scratch directory, create a synthetic `RELEASING.md`:
+   ```markdown
+   # Cutting a test release
+
+   ## 1. First
+
+   Run: `echo one`
+
+   ## 2. Fails
+
+   Run: `exit 1`
+
+   ## 3. Never reached
+
+   Run: `echo three`
+   ```
+   Add a `pyproject.toml` with `[project]`, a `name`, and `version = "0.1.0"`.
+2. Run `/orc-release`, proceed past the working-tree report, and let it run.
+3. **Expected:** step 1 completes, step 2 fails and the run **stops there** — step 3 never runs.
+   The real error output is reported, not paraphrased.
+
+## Scenario 29: /orc-release resumes at the right step
+
+1. Continuing from Scenario 28, fix step 2 (change `exit 1` to `echo two`) and run
+   `/orc-release` again.
+2. **Expected:** it resumes at step 2 — not step 1 — and warns that `RELEASING.md` changed since
+   the release started.
+
+## Scenario 30: /orc-release refuses to start a second release
+
+1. With Scenario 28's release still in progress, ask to start a new release.
+2. **Expected:** refused, with a plain statement that one is already in progress and that you must
+   resume or abort it.
+
+## Scenario 31: the entry working-tree report
+
+1. In the scratch project, create a stray file (`touch scratch-file.txt`), abort any in-progress
+   release, and start a fresh one.
+2. **Expected:** the real `git status --short` output is shown, including `scratch-file.txt`, and
+   you're asked whether to proceed. Answering yes continues normally — it must not block.
+3. Stop mid-release and resume.
+4. **Expected:** the working-tree report does **not** fire again on resume.
+
+## Scenario 32: a skip is recorded with its reason
+
+1. Mid-release, ask to skip a step, giving a reason.
+2. **Expected:** it's recorded with that reason, and `/orc-release status` shows it. Asking to
+   skip with no reason is refused.
+
+## Scenario 33: abort is honest about what it can't undo
+
+1. Create a synthetic `RELEASING.md` where step 2 carries `**Irreversible.**`, run the release
+   through step 2, then abort.
+2. **Expected:** version files are rolled back to the previous version, and step 2 is reported as
+   irreversible, completed, and **standing** — not claimed as undone.
+3. Repeat with a document carrying **no** markers at all.
+4. **Expected:** abort states plainly that it **cannot determine** which completed steps had
+   external effects, rather than guessing.
+
+## Scenario 34: a human-performed step stops for the human
+
+1. Create a synthetic `RELEASING.md` with a step marked `**Performed by hand.**`.
+2. Run the release up to it.
+3. **Expected:** it presents what to do and stops, waiting for your confirmation — it does not
+   run anything for that step or mark it complete on its own.
+
 ## Recording the result
 
 Note the outcome of each scenario (pass/fail, with specifics) either back in this conversation or

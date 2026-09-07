@@ -2,6 +2,28 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.8.0] - 2026-09-07
+
+### Added
+- `/orc-release` — drives a project's own `RELEASING.md` end to end: reads the whole document
+  before acting, walks its steps in real dependency order, halts on failure (deliberately the
+  opposite of `/orc-publish`, since release steps are a dependent chain and publish channels are
+  independent siblings), stops for human-performed steps, and tracks position across sessions in
+  `.orclab/release/state.json` — a cursor holding only *where* a release is, never a second copy
+  of its steps.
+- Version-lifecycle handling across a whole release: per-format read/write for `pyproject.toml`,
+  `debian/changelog`, `.claude-plugin/plugin.json` and `marketplace.json`; consistency
+  verification after setting; and rollback on abort that reports plainly what it cannot undo.
+  Closes BACKLOG #6.
+- `/orc-version --no-commit` — sets the version without committing, so a release can build, lint,
+  publish and install-test against the uncommitted edits and commit only once the artifact is
+  verified. The previous behavior (bump, commit, tag as one move) is unchanged by default.
+
+### Changed
+- `release-checklist` documents four optional step markers — preconditions, performed-by-hand,
+  delegation, and irreversible — all backward-compatible, since a document using none of them
+  stays fully driveable.
+
 ## [0.7.0] - 2026-09-06
 
 ### Added
