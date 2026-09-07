@@ -7,6 +7,7 @@ calls this script twice: once with --dry-run, once without, once the user has co
 """
 
 import argparse
+import contextlib
 import os
 import signal
 import subprocess
@@ -52,17 +53,23 @@ def format_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
     return "\n".join(lines)
 
 
-def timeout_error(leaves):
-    """The first leaf-level `timeout:` that isn't usable, as a message - or None.
+def is_bad_timeout(value):
+    """True when a timeout value isn't a usable positive whole number of seconds.
 
     YAML turns `timeout: true` into a bool, and bool is a subclass of int, so it has to be
-    rejected explicitly rather than passing the isinstance check.
+    rejected explicitly rather than passing the isinstance check. Shared by the leaf-level
+    `timeout:` check and `--timeout`, so the same setting can't mean two different things.
     """
+    return isinstance(value, bool) or not isinstance(value, int) or value <= 0
+
+
+def timeout_error(leaves):
+    """The first leaf-level `timeout:` that isn't usable, as a message - or None."""
     for leaf in leaves:
         value = leaf.timeout
         if value is None:
             continue
-        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        if is_bad_timeout(value):
             return (
                 f"{leaf.dotted_path}: timeout must be a positive whole number of seconds, "
                 f"got {value!r}"
@@ -103,9 +110,9 @@ def execute_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
         limit = effective_timeout(leaf, default_timeout)
         try:
             # start_new_session=True puts the shell in its own process group so a compound
-            # action (pipes, &&, subshells) can be killed as a whole on timeout - subprocess.run
-            # only kills the /bin/sh -c process itself, orphaning whatever it forked. See
-            # BACKLOG #11 follow-up: a timed-out debsign/dput kept running past the report.
+            # action (pipes, &&, subshells) can be killed as a whole - subprocess.run's own
+            # timeout only kills the /bin/sh -c process itself, orphaning whatever it forked,
+            # so a timed-out dput would keep uploading past the report. See BACKLOG #11.
             with subprocess.Popen(
                 leaf.action,
                 shell=True,
@@ -116,8 +123,15 @@ def execute_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
             ) as proc:
                 try:
                     stdout, stderr = proc.communicate(timeout=limit)
-                except subprocess.TimeoutExpired:
-                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                except BaseException:
+                    # Unconditional, not just on timeout: the same start_new_session that lets
+                    # the group be killed also means a Ctrl-C on this process no longer reaches
+                    # the action, so an interrupt would orphan exactly what the group kill
+                    # exists to catch. TimeoutExpired is a BaseException and is still re-raised
+                    # below, so the timeout path is unchanged. wait(), not communicate(): an
+                    # escaped grandchild can still hold the pipes open.
+                    with contextlib.suppress(ProcessLookupError):
+                        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
                     proc.wait()
                     raise
                 if proc.returncode != 0:
@@ -127,8 +141,10 @@ def execute_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
             detail = (stdout or "").strip()
             results.append((leaf, "success", detail))
         except subprocess.TimeoutExpired:
-            # stdout/stderr are unavailable here (capture never completed) - say so, or the
-            # operator has no reason to suspect stdin at all.
+            # TimeoutExpired does carry whatever was captured before the timeout, as undecoded
+            # bytes despite text=True - it is deliberately not surfaced yet, so "no output
+            # captured" is not always true. See BACKLOG #15. The stdin clause stays either way:
+            # without it an operator has no reason to suspect stdin at all.
             results.append(
                 (
                     leaf,
@@ -162,6 +178,15 @@ def main(argv=None):
     parser.add_argument("--distro", default=".orclab/publish/distro.yaml")
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_SECONDS)
     args = parser.parse_args(argv)
+
+    if is_bad_timeout(args.timeout):
+        print(
+            "error: --timeout must be a positive whole number of seconds, "
+            f"got {args.timeout!r}",
+            file=sys.stderr,
+            flush=True,
+        )
+        return 1
 
     if args.for_distro:
         if args.selection:

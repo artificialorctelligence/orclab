@@ -1,3 +1,6 @@
+import os
+import signal
+import subprocess
 import textwrap
 import time
 
@@ -287,26 +290,77 @@ def test_main_exits_non_zero_when_a_leaf_times_out(tmp_path):
     assert main(["--channels", path]) == 1
 
 
+def grandchild_action(pidfile, sleep_seconds=30):
+    """A compound action whose real work runs in a grandchild that reports its own PID.
+
+    A lone `sleep` execs into the same PID as the shell, so a child-only kill would still
+    reach it - that proves nothing about a compound command. The nested `sh -c` is a genuine
+    grandchild, which a child-only kill orphans. The `$$` has to be inside that nested shell:
+    in a plain `(...)` subshell it expands to the *outer* shell's PID, which would silently
+    turn the assertion into one about a process that was killed directly.
+    """
+    return f"true && sh -c 'echo $$ > {pidfile}; sleep {sleep_seconds}'"
+
+
+def assert_process_gone(pid, timeout=5):
+    """Fail unless `pid` is gone - polled, since reaping a reparented process is asynchronous."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return
+        time.sleep(0.05)
+    os.kill(pid, signal.SIGKILL)
+    pytest.fail(f"grandchild {pid} survived - its process group was not killed")
+
+
 def test_execute_plan_kills_the_whole_process_group_on_timeout(tmp_path):
-    # A lone `sleep` execs into the same PID as the shell, so subprocess.run's own
-    # child-only kill would still work on it - that proves nothing about a compound
-    # command. This one forks a grandchild in a subshell, which subprocess.run orphans:
-    # the "timed out" report fires at 1s while the grandchild is still alive, and it
-    # would go on to create the sentinel file at ~3s if left running.
-    sentinel = tmp_path / "orphan"
+    # The grandchild writes its PID immediately and then sleeps far past the timeout, so this
+    # asks "is it still there?" rather than racing a sentinel file against the check. A kill
+    # that only reaches the shell leaves the grandchild alive for the full 30s.
+    pidfile = tmp_path / "grandchild.pid"
     root = load_tree(
         write_yaml(
             tmp_path,
             "channels.yaml",
-            f'a: {{ action: "true && (sleep 3; touch {sentinel})", timeout: 1 }}',
+            f'a: {{ action: "{grandchild_action(pidfile)}", timeout: 1 }}',
         )
     )
     results = execute_plan(build_plan(root, []))
     leaf, status, detail = results[0]
     assert status == "timed out"
 
-    time.sleep(3)
-    assert not sentinel.exists()
+    assert_process_gone(int(pidfile.read_text()))
+
+
+def test_execute_plan_kills_the_whole_process_group_on_interrupt(tmp_path, monkeypatch):
+    # start_new_session also means a Ctrl-C on this process no longer reaches the action, so
+    # an interrupt orphans exactly what the timeout kill exists to catch - unless the group
+    # kill is unconditional. KeyboardInterrupt stands in for the signal; it takes the same path.
+    pidfile = tmp_path / "grandchild.pid"
+    root = load_tree(
+        write_yaml(
+            tmp_path,
+            "channels.yaml",
+            f'a: {{ action: "{grandchild_action(pidfile)}", timeout: 30 }}',
+        )
+    )
+    leaves = build_plan(root, [])
+
+    def interrupt_once_the_grandchild_is_up(self, *args, **kwargs):
+        while not pidfile.exists():
+            time.sleep(0.01)
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(
+        subprocess.Popen, "communicate", interrupt_once_the_grandchild_is_up
+    )
+    with pytest.raises(KeyboardInterrupt):
+        execute_plan(leaves)
+    monkeypatch.undo()
+
+    assert_process_gone(int(pidfile.read_text()))
 
 
 def test_format_plan_shows_each_actionable_leafs_effective_timeout(tmp_path):
@@ -387,3 +441,14 @@ def test_main_reports_a_bad_timeout_as_an_error_even_in_dry_run(tmp_path, capsys
 def test_main_timeout_flag_changes_the_default(tmp_path):
     path = write_yaml(tmp_path, "channels.yaml", 'a: { action: "sleep 5" }')
     assert main(["--channels", path, "--timeout", "1"]) == 1
+
+
+@pytest.mark.parametrize("bad", ["0", "-5"])
+def test_main_rejects_a_non_positive_timeout_flag(tmp_path, capsys, bad):
+    # Held to the same rule as a leaf's own `timeout:`. Unvalidated, `--timeout 0` reported
+    # every leaf as `timed out` without running it, and `--timeout -5` printed the negative
+    # limit in the plan the user confirms and then ran with no timeout at all.
+    path = write_yaml(tmp_path, "channels.yaml", 'a: { action: "true" }')
+    assert main(["--channels", path, "--dry-run", "--timeout", bad]) == 1
+    err = capsys.readouterr().err
+    assert "error: --timeout must be a positive whole number of seconds" in err
