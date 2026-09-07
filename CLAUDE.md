@@ -200,3 +200,27 @@ them by pattern-matching on the symptom alone:
    even though `installed_plugins.json` and the plugin cache both correctly showed the new
    version. **Always test a fresh install/update in a genuinely new session — CLI or Desktop —
    not the one used to debug or trigger the install.**
+
+## Dogfooding a real project: three different things, three different rules
+
+Found dogfooding `/orc-publish` on Orcshot (2026-09-06): a session nearly ran Orcshot's own real
+release process (a genuine `dpkg-buildpackage`/`debsign`/`dput` upload to a live PPA) as a side
+effect of testing Orclab's publish mechanism — from a context that had no visibility into
+Orcshot's own in-progress state (real, uncommitted tray-modernization work sitting in the working
+tree). Three genuinely different things were tangled together in that near-miss, and they need
+different rules, not one blanket "don't touch other projects":
+
+- **Orclab's own framework source** (`skills/`, `commands/`, `scripts/`, `CLAUDE.md`, `docs/`, its
+  own `BACKLOG.md`) is edited only as deliberate Orclab development — never as an incidental side
+  effect of using the plugin somewhere else.
+- **A consuming project's own `.orclab/` config** (e.g. `.orclab/publish/channels.yaml`) is that
+  project's own data, not Orclab's. Any session working on that project can and should write it
+  directly — including a real end user's own independent session with Orclab installed as a
+  plugin, not just a session dogfooding Orclab itself. Requiring every consuming project's config
+  to be populated from Orclab's own dev repo would defeat the point of shipping a reusable plugin.
+- **A consuming project's own high-stakes real actions** (a real release, deploy, or publish) do
+  not belong in a session centered on Orclab's own development, or in any session that doesn't
+  actually have that project's real current state in view. They belong in a session genuinely
+  centered on that project — real end user's or a dogfooding pass, doesn't matter which, only
+  whether the session can actually see what's really going on there. Testing that such an action
+  *would* work (a dry run, a plan resolution) is fine anywhere; actually executing it is not.
