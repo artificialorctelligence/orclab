@@ -34,6 +34,9 @@ below.
   available commands.
 - **/orc-git** — shortcuts for common git/GitHub operations: connect a repo, commit with a
   drafted message, push, commit-then-push (alias `cp`), branch/switch, and check out a PR.
+- **/orc-publish** — push a project's built artifacts to its own configured distribution
+  channels (PPA, Snap Store, Flathub, npm, etc.), resolved from `.orclab/publish/channels.yaml`
+  and `distro.yaml`. Ships as a skill only — see `CLAUDE.md` for why.
 
 ## Installing
 
@@ -53,7 +56,7 @@ future components).
 
 v1 (process core) + v2 (`/orc-code`) + v3 (`/orc-version`, `/orc-help`/`/orc`) + v4 (`/orc-git`) +
 v5 (`currency-discipline`, `verify-before-asserting`) + v6 (Desktop-compatible skill wrappers for
-every `/orc-*` command) shipped. See `docs/superpowers/specs/` for the design history,
+every `/orc-*` command) + v7 (`/orc-publish`) shipped. See `docs/superpowers/specs/` for the design history,
 `CHANGELOG.md` for what actually changed release to release, and `BACKLOG.md`
 for what's deliberately deferred (real per-stack defaults research is #4, `/orc-data` is #5,
 hook-based enforcement is #3, per-language manifest version-sync is #6, distribution-channel

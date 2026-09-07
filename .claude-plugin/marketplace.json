@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "orclab",
-  "description": "Project-discipline skills and commands distilled from real practice: backlog tracking, release checklists, live-environment registries, currency and verification discipline, a deterministic /orc-code entry point for new-project, existing-project, and refactor work, /orc-version for versioning the current project, and /orc-git for common git/GitHub shortcuts. Every /orc-* command also ships as a matching skill for Claude Desktop compatibility.",
+  "description": "Project-discipline skills and commands distilled from real practice: backlog tracking, release checklists, live-environment registries, currency and verification discipline, a deterministic /orc-code entry point for new-project, existing-project, and refactor work, /orc-version for versioning the current project, and /orc-git for common git/GitHub shortcuts. Every /orc-* command also ships as a matching skill for Claude Desktop compatibility. /orc-publish pushes a project's built artifacts to its own configured distribution channels.",
   "owner": {
     "name": "orclab",
     "email": "orc.shot@yahoo.com"
@@ -9,8 +9,8 @@
   "plugins": [
     {
       "name": "orclab",
-      "description": "Project-discipline skills and commands distilled from real practice: backlog tracking, release checklists, live-environment registries, currency and verification discipline, a deterministic /orc-code entry point for new-project, existing-project, and refactor work, /orc-version for versioning the current project, and /orc-git for common git/GitHub shortcuts. Every /orc-* command also ships as a matching skill for Claude Desktop compatibility.",
-      "version": "0.6.0",
+      "description": "Project-discipline skills and commands distilled from real practice: backlog tracking, release checklists, live-environment registries, currency and verification discipline, a deterministic /orc-code entry point for new-project, existing-project, and refactor work, /orc-version for versioning the current project, and /orc-git for common git/GitHub shortcuts. Every /orc-* command also ships as a matching skill for Claude Desktop compatibility. /orc-publish pushes a project's built artifacts to its own configured distribution channels.",
+      "version": "0.7.0",
       "source": "./"
     }
   ]

@@ -239,6 +239,49 @@ and irreversible.
    trigger `orc-git`'s skill, since none of the five are meant to compete for attention outside an
    explicit or clearly-named request.
 
+## Scenario 23: /orc-publish resolves and dry-runs a synthetic tree without executing anything
+
+1. In a throwaway scratch directory (never Orclab's own repo, never a real project), create
+   `.orclab/publish/channels.yaml`:
+   ```yaml
+   desktop:
+     python:
+       linux:
+         snap: { action: "echo would-publish-snap" }
+         flatpak: { action: "echo would-publish-flatpak" }
+   ```
+2. Run `/orc-publish --dry-run`.
+3. **Expected:** both leaves and their real actions are printed; neither `echo` command actually
+   runs (confirm no output beyond the printed plan itself).
+
+## Scenario 24: /orc-publish executes after confirmation, with a real per-leaf summary
+
+1. Using the same synthetic tree as Scenario 23, ask Claude to run `/orc-publish`.
+2. **Expected:** Claude shows the dry-run plan first and asks for confirmation before running
+   anything — it must not execute on the first pass.
+3. Confirm.
+4. **Expected:** both `echo` commands actually run, and Claude reports a summary showing both
+   leaves as `success`.
+
+## Scenario 25: /orc-publish continues past an independent failure and reports it honestly
+
+1. Add a third leaf to the synthetic tree: `broken: { action: "exit 1" }`.
+2. Run `/orc-publish` (or `/orc-publish desktop.python.linux broken` to include it explicitly)
+   and confirm.
+3. **Expected:** the working leaves still report `success`; `broken` reports `failed`; nothing is
+   silently dropped from the summary, and the failure isn't paraphrased away.
+
+## Scenario 26: /orc-publish --for reports an unset channel plainly, never as an error
+
+1. Create `.orclab/publish/distro.yaml` in the same scratch directory:
+   ```yaml
+   mint-next:
+     x11: {}
+   ```
+2. Run `/orc-publish --for mint-next.x11`.
+3. **Expected:** reports "no channel set (known target, not yet actionable)" — a normal report,
+   not an error, and nothing executes.
+
 ## Recording the result
 
 Note the outcome of each scenario (pass/fail, with specifics) either back in this conversation or

@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.7.0] - 2026-09-06
+
+### Added
+- `/orc-publish` — resolves a project's own `.orclab/publish/channels.yaml` (and, for a
+  distro-scoped query via `--for`, `distro.yaml`) into a concrete list of publish actions, shows
+  it before doing anything, executes it, and reports per-leaf success/failure/not-attempted.
+  Ships as a skill only (no separate `commands/orc-publish.md`) — the first `/orc-*` component
+  designed knowing skills already work on both CLI and Desktop, so there's no reason to create a
+  commands file that would need its own wrapper just to work everywhere. See
+  `docs/superpowers/specs/2026-09-06-orclab-v7-orc-publish-design.md` for the full design,
+  including why distro and channel are modeled as two separate trees rather than one.
+- Orclab's own repo ships zero real channel/distro content for any project, Orcshot included —
+  populating a real project's `.orclab/publish/` trees is a separate follow-on task.
+
 ## [0.6.0] - 2026-09-06
 
 ### Added
