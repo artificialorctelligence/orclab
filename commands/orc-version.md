@@ -1,6 +1,6 @@
 ---
 description: Set or increment the current project's version, draft a changelog entry from real git history, tag the commit, and optionally cut a real GitHub Release.
-argument-hint: <major>.<minor>[.<point>] | increment <major|minor|point> | release [tag] [--no-commit]
+argument-hint: <major>.<minor>[.<point>] | increment <major|minor|point> [--no-commit] | release [tag]
 ---
 
 # /orc-version
