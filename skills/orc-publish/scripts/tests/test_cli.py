@@ -6,6 +6,8 @@ from orc_publish.tree import load_tree
 from orc_publish.selection import SelectionError
 from orc_publish.cli import (
     build_plan,
+    DEFAULT_TIMEOUT_SECONDS,
+    effective_timeout,
     execute_plan,
     format_plan,
     format_summary,
@@ -231,3 +233,53 @@ def test_format_plan_still_shows_a_real_action_unchanged(tmp_path):
     text = format_plan(build_plan(root, []))
     assert "a: echo real" in text
     assert "not yet actionable" not in text
+
+
+def test_effective_timeout_prefers_the_leafs_own_value(tmp_path):
+    root = load_tree(
+        write_yaml(tmp_path, "channels.yaml", 'a: { action: "true", timeout: 45 }')
+    )
+    leaf = build_plan(root, [])[0]
+    assert effective_timeout(leaf) == 45
+
+
+def test_effective_timeout_falls_back_to_the_default(tmp_path):
+    root = load_tree(write_yaml(tmp_path, "channels.yaml", 'a: { action: "true" }'))
+    leaf = build_plan(root, [])[0]
+    assert effective_timeout(leaf) == DEFAULT_TIMEOUT_SECONDS
+    assert DEFAULT_TIMEOUT_SECONDS == 600
+
+
+def test_execute_plan_reports_a_hanging_action_as_timed_out(tmp_path):
+    root = load_tree(
+        write_yaml(tmp_path, "channels.yaml", 'a: { action: "sleep 5", timeout: 1 }')
+    )
+    leaves = build_plan(root, [])
+    results = execute_plan(leaves)
+    leaf, status, detail = results[0]
+    assert status == "timed out"
+    assert "timed out after 1s" in detail
+    assert "waiting on stdin" in detail
+
+
+def test_execute_plan_continues_past_a_timed_out_leaf(tmp_path):
+    root = load_tree(
+        write_yaml(
+            tmp_path,
+            "channels.yaml",
+            """
+            a: { action: "sleep 5", timeout: 1 }
+            b: { action: "true" }
+            """,
+        )
+    )
+    results = execute_plan(build_plan(root, []))
+    statuses = {leaf.dotted_path: status for leaf, status, _ in results}
+    assert statuses == {"a": "timed out", "b": "success"}
+
+
+def test_main_exits_non_zero_when_a_leaf_times_out(tmp_path):
+    path = write_yaml(
+        tmp_path, "channels.yaml", 'a: { action: "sleep 5", timeout: 1 }'
+    )
+    assert main(["--channels", path]) == 1

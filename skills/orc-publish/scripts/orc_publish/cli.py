@@ -18,6 +18,10 @@ from .tree import load_tree
 
 NOT_ACTIONABLE = "known channel, not yet actionable"
 
+# A "something is wrong" ceiling, not a performance budget. A genuinely slow-but-healthy
+# upload sets its own `timeout:` on its leaf rather than raising this. See BACKLOG #11.
+DEFAULT_TIMEOUT_SECONDS = 600
+
 
 def render_filename(template, version):
     """Render a leaf's filename_template for a given version string, or None if unset."""
@@ -54,25 +58,48 @@ def run_for(distro_root, distro_path):
     return f"{node.dotted_path}: no channel set (known target, not yet actionable)"
 
 
-def execute_plan(leaves):
+def effective_timeout(leaf, default_timeout=DEFAULT_TIMEOUT_SECONDS):
+    """The timeout a leaf really runs under: its own if set, otherwise the default."""
+    return leaf.timeout if leaf.timeout is not None else default_timeout
+
+
+def execute_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
     """Run each leaf's action. An independent failure doesn't stop the remaining leaves.
 
-    Returns a list of (leaf, status, detail) - status is "success", "failed", or
-    "not attempted". detail is the action's real stdout on success, the real error text on
-    failure, and "known channel, not yet actionable" when not attempted - never silently empty on success, since
-    this is the only evidence an operator gets that a real publish actually happened.
+    Returns a list of (leaf, status, detail) - status is "success", "failed", "timed out",
+    or "not attempted". detail is the action's real stdout on success, the real error text on
+    failure, and "known channel, not yet actionable" when not attempted - never silently
+    empty on success, since this is the only evidence an operator gets that a real publish
+    actually happened.
     """
     results = []
     for leaf in leaves:
         if not leaf.action:
             results.append((leaf, "not attempted", NOT_ACTIONABLE))
             continue
+        limit = effective_timeout(leaf, default_timeout)
         try:
             result = subprocess.run(
-                leaf.action, shell=True, check=True, capture_output=True, text=True
+                leaf.action,
+                shell=True,
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=limit,
             )
             detail = (result.stdout or "").strip()
             results.append((leaf, "success", detail))
+        except subprocess.TimeoutExpired:
+            # capture_output=True is why an interactive prompt is invisible - say so, or the
+            # operator has no reason to suspect stdin at all.
+            results.append(
+                (
+                    leaf,
+                    "timed out",
+                    f"timed out after {limit}s - no output captured, "
+                    "the action may be waiting on stdin",
+                )
+            )
         except subprocess.CalledProcessError as e:
             detail = (e.stderr or "").strip() or str(e)
             results.append((leaf, "failed", detail))
@@ -136,7 +163,7 @@ def main(argv=None):
 
     results = execute_plan(leaves)
     print(format_summary(results), flush=True)
-    return 0 if all(status != "failed" for _, status, _ in results) else 1
+    return 0 if all(status not in ("failed", "timed out") for _, status, _ in results) else 1
 
 
 if __name__ == "__main__":
