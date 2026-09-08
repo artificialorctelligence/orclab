@@ -161,10 +161,43 @@ my-skill/
 │   └── helper.py
 ```
 
-## Wrap real, existing skills — don't reinvent them
+## Before building anything, name what should already have covered it
+
+**Before proposing to build anything — a component, a script, a hook, a lint, a check — name the
+rule, skill, or component that was supposed to handle this case, and say why it didn't fire.** If
+one exists, the fix is almost always widening its trigger, not adding a second mechanism beside
+it. A new thing policing a rule that already exists is the worst of both: more code, and two
+places to keep in sync.
+
+**This governs every build, not just new `/orc-*` components.** It is deliberately a section of
+its own rather than an item in the design checklist below, because that checklist's heading —
+"designing a new `/orc-*` thing" — is a category a builder can classify themselves out of. That is
+exactly how this rule gets missed.
+
+**Ask the backward question, not the forward one.** "What would catch this?" invents a mechanism
+without ever passing through what already exists. "What was supposed to catch this, and why
+didn't it?" lands on the existing rule immediately. Real case (2026-09-07): a ~60-line
+`BACKLOG.md` linter was proposed to enforce that a resolved entry's heading matches its body — a
+rule `backlog-discipline`'s own "Resolving an entry" step 1 has always stated. That skill had been
+read *in full* earlier in the same session, to follow it while writing an entry. Reading a
+document to execute a task and reading it to answer "does this already solve my problem" surface
+different things; the first does not substitute for the second. The real fix was one paragraph
+widening the existing rule's trigger, and no new code at all.
+
+**Why prose is the weakest place to put a rule — and what to do about it.** Per the determinism
+spectrum above, a rule inside a skill's body fires only if the skill was invoked, *and* the right
+section was read, *and* the reader classified themselves into its trigger. Three conditions, each
+able to fail silently. Every guidance miss recorded here so far has been the third: a trigger
+phrased as an *intent* ("when you resolve an entry", "when designing a new component") that the
+reader described their own work out of. **Phrase a trigger by the situation it applies to, not by
+the intent someone brings to it** — and when one is missed, widen that trigger rather than adding
+a mechanism beside it.
+
+### The specific case: wrapping real, existing skills
 
 The same "wrap, don't reinvent" principle Orclab already applies to `feature-dev` and
-`code-modernization` (in `orc-code.md`) extends to built-in/environment-provided skills too.
+`code-modernization` (in `skills/orc-code/SKILL.md`) extends to built-in/environment-provided
+skills too.
 Example: a real `pptx` skill capable of generating real PowerPoint files, with real bundled
 scripts and hard-won gotchas already documented, already exists in this environment — a future
 `/orc-doc pptx ...`-style command should delegate to it, not rebuild PowerPoint generation from
@@ -174,7 +207,7 @@ scratch.
 universally present (the real `pptx` skill found here lives under a Desktop-specific config
 path, suggesting it may not exist the same way in every client). Any component that delegates to
 one needs the same "check it's actually available, tell the user plainly if not" guard
-`orc-code.md`'s flows already use for `feature-dev`/`code-modernization` — never assume silently.
+`skills/orc-code/SKILL.md`'s flows already use for `feature-dev`/`code-modernization` — never assume silently.
 
 ## Checklist for designing a new `/orc-*` thing
 
@@ -186,8 +219,10 @@ one needs the same "check it's actually available, tell the user plainly if not"
    strongest possible cue?
 4. Does it need to orchestrate a sub-component that should never fire on its own? Give that
    sub-component `disable-model-invocation: true` and invoke it explicitly by name.
-5. Does the capability already exist as a real skill (built-in, or from another plugin)? Wrap it
-   — with an availability check — rather than rebuilding it.
+5. Have you answered "Before building anything, name what should already have covered it" above?
+   That rule binds every build, not only the ones that reach this checklist. Its specific case
+   applies here: if the capability already exists as a real skill (built-in, or from another
+   plugin), wrap it — with an availability check — rather than rebuilding it.
 6. Is it named `orc-<something>` (or `orc` itself)? `/orc-help`'s Step 3 enumerates
    `skills/orc*/SKILL.md` — no hyphen, so `skills/orc` is caught too — and that prefix is the
    only thing separating Orclab's commands from its discipline skills. A component named without
