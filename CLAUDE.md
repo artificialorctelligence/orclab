@@ -59,8 +59,9 @@ and command sharing a name suppresses the bare alias; that it's a load-timing ra
 reproduction ruled out every one of them.
 
 **Workaround: accept the autocomplete rather than dismissing it**, or type the namespaced form.
-Nothing in the plugin can suppress the bare-form toast, so it is Anthropic's to fix; reported
-upstream on `anthropics/claude-code`.
+Nothing in the plugin can suppress the bare-form toast, so it is Anthropic's to fix. Reported
+upstream as [anthropics/claude-code#92738](https://github.com/anthropics/claude-code/issues/92738)
+(2026-09-07) — check there before investigating this again.
 
 **The practical trap:** do not debug a wrapper skill because of this toast. It fires on a
 component that is working correctly, and the wrapper is the reason it works at all.
