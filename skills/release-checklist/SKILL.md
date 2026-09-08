@@ -27,6 +27,21 @@ Steps are numbered in **real dependency order** — the order they must actually
 order they were thought of. Renumber existing steps if a new one needs to be inserted in the
 middle; don't append everything to the end regardless of where it actually belongs.
 
+**Renumbering is not a style preference — sub-numbers make steps disappear.** `/orc-release`
+parses step headings as `^##\s+(\d+)\.\s+(.+?)\s*$`: an integer, a dot, a title. `## 6a.` and
+`## 6b.` match nothing, so a document using them loses *both* steps from the parsed release.
+
+This is a real incident, 2026-09-07, not a hypothetical. Inserting a step into an 11-step
+`RELEASING.md` as `6a`/`6b` produced `warning: found steps 1, 2, 3, 4, 5, 7, 8, 9, 10, 11` — step
+6 gone entirely, so a driven release would walk 1→5 and jump to 7, **skipping a PPA upload and the
+copy that followed it**. The warning caught it; a reader waving past the warning ships a release
+that never publishes. The fix is the rule above: the new step became `7`, and old 7–11 shifted to
+8–12.
+
+When you renumber, **fix the cross-references in the prose too**. Text like "see step 9 below" or
+"before step 10" shifts with the headings, and nothing warns about those — the parser only checks
+the headings. In that same incident three references had to move and five correctly stayed put.
+
 Each step is a `## N. <short imperative title>` heading, followed by:
 - **Why this step exists**, if it's not obvious — especially if it was added because of a real
   past gap (name the gap and when it was found; that context is what stops the step from being
