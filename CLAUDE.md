@@ -184,6 +184,26 @@ document to execute a task and reading it to answer "does this already solve my 
 different things; the first does not substitute for the second. The real fix was one paragraph
 widening the existing rule's trigger, and no new code at all.
 
+**If you genuinely can't name anything**, the rule still has to tell you what to do — a rule made
+only of deflections is friction, not guidance:
+
+1. **Prove it.** Name where you looked — which skills, which docs, which existing scripts. An
+   unsearched "nothing" isn't an answer, it's a skipped question, and it is the answer that would
+   have been given about the linter above by someone who had read the covering skill an hour
+   earlier.
+2. **Ask whether the absence is itself the finding.** A real gap you aren't filling right now is a
+   BACKLOG entry, not a build.
+3. **If there is a real gap, and you are building the solution now:**
+   - **Record the proven absence** — in the commit message or the entry, "searched X, Y, Z;
+     nothing covered it." Whoever comes next asks this same question, and without that they redo
+     the entire search from scratch.
+   - **Phrase the new thing's trigger by the situation it applies to**, not by the intent you had
+     while building it. You are now the answer to this question for the next person; if the only
+     way to find it is already knowing it exists, they will build a third one. This is not the
+     same as widening a missed trigger above — that is repair, this is getting it right at birth.
+   - **Then follow the design checklist below** for what shape it should take. That checklist
+     already answers the "how," and this section deliberately doesn't restate it.
+
 **Why prose is the weakest place to put a rule — and what to do about it.** Per the determinism
 spectrum above, a rule inside a skill's body fires only if the skill was invoked, *and* the right
 section was read, *and* the reader classified themselves into its trigger. Three conditions, each
