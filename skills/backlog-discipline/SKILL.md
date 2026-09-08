@@ -96,6 +96,20 @@ is a complete thought; "this would need its own entry" is not.
 The original entry stays intact above the resolution note. A reader should be able to see both
 the original problem *and* how it was actually closed out, in one place.
 
+**This applies whenever you record that an entry is closed — not only when you're the one closing
+it.** Discovering that earlier work already resolved something is still resolving it, and gets
+both steps: the heading marker and the paragraph. So does adding "a note" that an entry is no
+longer open. If the body says an entry is closed and the title line doesn't, the entry is worse
+than it was before — the heading is the only part anything scans, so it now advertises the
+opposite of what it says.
+
+Orclab's own #12 sat that way: its body recorded that v8 had already closed it, its title line
+didn't, and a later session read the heading, concluded the design question was still open, and
+came close to re-designing a component that had already shipped. The plan that produced it said
+"#12 gets a note recording that v8 already closed it" — a note, never a resolution — so this
+section was never consulted, and every downstream review faithfully checked the work against that
+framing.
+
 ## Deleting an entry
 
 Delete an entry outright — not "mark resolved," not archive it — only when the entry's owner
