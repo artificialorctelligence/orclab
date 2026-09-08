@@ -60,6 +60,30 @@ entry later.>
 Keep it a real paragraph or few, not a checklist stub. The entry should let someone with zero
 memory of this conversation understand the problem and its stakes.
 
+## An entry that says another entry is needed
+
+Sometimes writing one entry surfaces a second, genuinely separate finding. When that happens,
+**create the second entry in the same session, and refer to it by its real number.**
+
+Never write "this would need its own entry" and stop there. That is a promise the file cannot
+keep: prose describing an entry that does not exist is invisible to anyone scanning headings, and
+the work it names is tracked nowhere at all.
+
+This is not hypothetical. Orcshot's #197 ended with "no existing entry tracks that yet - it would
+need its own, separate from this one," describing the single largest piece of work in that
+project's publishing effort. No entry was created. It stayed untracked in both repos until
+someone happened to ask what was still open, a day later, and it became #198 only then.
+
+Two consequences of doing it properly, both worth having:
+- The reader of #197 can follow a number to real, written context instead of a description of
+  context that was never written.
+- A forward-reference that names a number is **mechanically checkable** - does that entry exist?
+  A forward reference written in prose is not checkable by anything.
+
+If the second finding genuinely doesn't warrant its own entry, say why in the first entry rather
+than leaving a dangling promise. "Out of scope here, and not worth tracking separately because X"
+is a complete thought; "this would need its own entry" is not.
+
 ## Resolving an entry
 
 **Never delete or rewrite the original diagnostic text.** Append to it instead:
@@ -96,3 +120,5 @@ everything outside backlog entries themselves, rather than reimplementing it.
 - Don't turn this into a general task list — it's for findings, not routine planned work.
 - Don't silently delete an entry because it looks stale to you — surface the judgment call.
 - Don't compress or summarize an old entry's context to save space — the context is the point.
+- Don't leave a dangling forward-reference. If an entry says another entry is needed, create it
+  and name its number before the session ends.
