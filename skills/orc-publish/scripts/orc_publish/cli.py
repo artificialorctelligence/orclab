@@ -162,17 +162,19 @@ def execute_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
             # without it an operator has no reason to suspect stdin at all.
             captured = "\n".join(filter(None, [_decode(e.stdout), _decode(e.stderr)]))
             if captured:
-                output_clause = f"output captured before it hung:\n{captured}"
-            else:
-                output_clause = "no output captured"
-            results.append(
-                (
-                    leaf,
-                    "timed out",
-                    f"timed out after {limit}s - {output_clause}, "
-                    "the action may be waiting on stdin",
+                # Actionable sentence first, captured output last. A real action's capture is a
+                # wall of build log, and a stdin hint stranded under its final line reads as
+                # part of that output rather than as the tool talking.
+                detail = (
+                    f"timed out after {limit}s - the action may be waiting on stdin. "
+                    f"Output captured before it hung:\n{captured}"
                 )
-            )
+            else:
+                detail = (
+                    f"timed out after {limit}s - no output captured, "
+                    "the action may be waiting on stdin"
+                )
+            results.append((leaf, "timed out", detail))
         except subprocess.CalledProcessError as e:
             detail = (e.stderr or "").strip() or str(e)
             results.append((leaf, "failed", detail))

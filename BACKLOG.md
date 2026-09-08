@@ -705,7 +705,7 @@ for the decision to be settled *before* one is written, and it now is. Writing t
 separate work, and whoever does it inherits a decision instead of a landmine.
 
 
-## #15: a timed-out `/orc-publish` leaf says "no output captured" when output was in fact captured
+## #15: a timed-out `/orc-publish` leaf says "no output captured" when output was in fact captured (RESOLVED 2026-09-07)
 
 Found 2026-09-07 during v11's final fix round, checking a code comment rather than trusting it. A
 timed-out leaf reports:
@@ -739,6 +739,32 @@ nothing (a leaf that hung before printing anything is a real and different signa
 `.decode()` — the bytes are not decoded for you on this path, and the `failed` branch's strings
 are, so the two branches cannot share the same handling as written. One test per shape: output
 then hang, and hang with no output.
+
+**Resolved 2026-09-07.** The timeout detail now surfaces what was captured, decoded defensively
+for both `bytes` and `str` and tolerating a `None` stream. Both shapes were checked against a real
+run, not just against assertions:
+
+```
+a: timed out (timed out after 1s - the action may be waiting on stdin. Output captured before it hung:
+build-line-1
+build-line-2
+build-line-3)
+
+b: timed out (timed out after 1s - no output captured, the action may be waiting on stdin)
+```
+
+"no output captured" survives, correctly, as the honest report for the second shape — a leaf that
+hung before printing anything is a real and different signal, exactly as this entry anticipated.
+
+**One thing the entry did not anticipate, found only by looking at real output.** The first
+implementation put the captured output in the middle of the sentence, leaving
+`build-line-3, the action may be waiting on stdin` — the stdin hint stranded under the last line
+of the log, reading as part of it, and with a real `dpkg-buildpackage` capture it would sit
+hundreds of lines below the fold. The clause order is now inverted: the actionable sentence first,
+the dump last. **Every test passed both before and after that fix**, because they assert
+substrings and substrings survive reordering, so a test now asserts the ordering itself
+(`detail.index("waiting on stdin") < detail.index("hello")`). Rendering is not covered by
+asserting that the right words are present somewhere.
 
 
 ## #16: the process-group-kill tests can't tell "killed" from "waited out" — narrowed by two live controls, not closed

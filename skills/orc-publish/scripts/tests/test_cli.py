@@ -287,6 +287,10 @@ def test_execute_plan_surfaces_output_captured_before_a_timeout(tmp_path):
     assert "hello" in detail
     assert "no output captured" not in detail
     assert "waiting on stdin" in detail
+    # Ordering is load-bearing, not cosmetic: with a real build log the capture runs to
+    # hundreds of lines, and a stdin hint printed after it is buried and reads as part of
+    # the output. Asserted so a future edit can't silently re-invert it.
+    assert detail.index("waiting on stdin") < detail.index("hello")
 
 
 def test_execute_plan_continues_past_a_timed_out_leaf(tmp_path):
