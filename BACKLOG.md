@@ -1233,3 +1233,128 @@ format-specific: a `.tar.xz`, a `.snap` and a `.flatpak` are not inspected the s
 `release-checklist` convention that a build step must be followed by a check *of that artifact*.
 Probably the last one plus one of the first two. Related: **#18** (a publish accepted but not
 landed) and **#20** (where release-adjacent responsibilities live).
+
+## #22: concurrent Orclab agents can collide on numbered resources — a lock, an allocator, and ordered queues
+
+Raised by direflail 2026-09-08, immediately after asking which of the four then-unimplemented specs
+could run concurrently. The map came back mostly clean on files — v12 and v13 both rewrite
+`execute_plan` and must be sequential; #19, v14 and v15 touch disjoint files — but every one of them
+appends a numbered scenario to `VERIFICATION.md`, and two concurrent streams would both read "ends
+at 44" and both write "Scenario 45."
+
+**The problem is two different things wearing one name, and one half is already solved.**
+
+*Filesystem concurrency* — two agents contending for `.git/index.lock`, one's `git add` landing in
+the middle of another's commit — is real and was hit for real on 2026-09-07, when an Orclab-centred
+session and an Orcshot-centred session were both operating in Orcshot's single working tree. **Git
+worktrees already fix that**, and `subagent-driven-development` already creates one per plan, which
+is exactly why all of that day's Orclab work had zero contention while the Orcshot work had all of
+it. Nothing to build.
+
+*Semantic collision* is what survives worktrees. Two agents in separate checkouts both read the same
+committed file, both derive the same "next number," and both are correct given what they can see. No
+lock on the filesystem helps, because they are not contending for a resource — they are independently
+computing the same answer.
+
+**Why detection alone is not enough, which is a correction to this entry's own first framing.** The
+initial argument here was that a duplicate costs five minutes to renumber, so a one-line
+`grep … | sort | uniq -d` beats building anything. That is true for `VERIFICATION.md` and **false
+for `BACKLOG.md`**, and framing the problem around the weaker case got the conclusion wrong:
+
+- Backlog entry numbers are **permanent and never reused** — a stated, load-bearing rule. If two
+  agents both take `#22` and both commit, each referencing `#22` in its commit message and inside
+  the entry text, it cannot be fixed by renumbering, because renumbering is precisely what the rule
+  forbids. The damage is durable.
+- The collision is **sometimes silent**. If both agents append immediately before the same trailing
+  section, git conflicts and someone notices. If they insert in different regions, git merges
+  cleanly and two `#22`s exist with no complaint at all.
+- direflail does not read these files unsolicited (they are working memory for agents, not a status
+  report), so a silent duplicate sits undisturbed until something trips over it.
+
+**This bug class hit three times on 2026-09-07 in purely single-agent work**, which is the argument
+that it is real rather than theoretical: duplicate `BACKLOG` numbers taken by two branches, a
+`RELEASING.md` step renumber that made two steps vanish from the parsed release, and this. Only the
+middle one has a mechanical check today (`/orc-release`'s step parser warns on non-contiguous
+numbering); the other two have none.
+
+### The design direflail proposed
+
+**A file lock**, described accurately: a process arrives, finds no lock, takes it, does whatever is
+needed to be assigned a number and write the file, then releases. A second process finds the lock
+held, waits a few seconds, retries, and errors out after a reasonable period. Works for any number
+of processes. Stale locks need a check — and, direflail's own operational note, a lock found when
+none is expected is worth investigating rather than clearing reflexively.
+
+**One technical correction, because it is the standard way this pattern is broken:** "check whether
+it is locked, then set the lock" is a time-of-check-to-time-of-use race — two processes can both
+observe it free and both proceed. The check and the set must be a single atomic operation:
+`os.open(path, os.O_CREAT | os.O_EXCL)`, or `mkdir`, both atomic on POSIX. Everything else in the
+description is right as stated.
+
+**The real cost is not the lock.** A lock protects a resource only if *every* writer takes it. Today
+"add a backlog entry" is `backlog-discipline` prose instructing Claude to scan the file for the
+highest `N` and edit it directly. An agent doing that without going through an allocator defeats the
+lock completely and silently — it will not even know it should have. So the actual work is
+converting a prose-driven edit into a tool-mediated one: the skill must say "get your number from
+the allocator" rather than "scan for the maximum." That is a larger change than the locking, and it
+is the part that needs deciding. It is also the direction several 2026-09-07 findings already
+pointed: mechanically checkable beats "be careful."
+
+### Ordered queues — and yes, it becomes a scheduler
+
+direflail's follow-on, and the case that makes this more than a lock: *"what if i want to run 12
+then 13 but also simultaneously 19 and 14?"*
+
+That is two lanes, each internally ordered, running in parallel:
+
+```
+lane A:  v12 → v13
+lane B:  #19 → v14
+```
+
+**"Arguably yes" it is a scheduler — but a deliberately small one.** It is N sequential lanes running
+concurrently, not a dependency graph. Nothing needs to express "v13 requires v12 *and* #19"; every
+real ordering constraint found so far is linear within a lane. Keeping it to lanes avoids a DAG
+resolver, cycle detection, and partial-failure semantics, none of which any real case here has
+needed.
+
+**Exclusion and ordering are different mechanisms and should not merge.** The lock gives mutual
+exclusion on a shared resource; the lane gives ordering between work items. Conflating them is how a
+lock grows into a general scheduler nobody asked for. A lane needs no lock to be ordered, and a lock
+needs no lane to be correct.
+
+### Alternatives worth weighing before building
+
+- **Deferred numbering.** Agents write a placeholder (`## Scenario NEXT`) and the number is assigned
+  at merge. Lock-free, no shared state, and it works well for `VERIFICATION.md`. **It does not work
+  for `BACKLOG.md`**, where the entry number is referenced in the commit message and inside the entry
+  text *while the work is happening* — a commit saying "BACKLOG #NEXT" is not usable. The two
+  resources have genuinely different constraints and may deserve different answers, which is worth
+  settling before assuming one mechanism covers both.
+- **Pre-assigned ranges per lane** (lane A takes scenarios 45–47, lane B 48–50). No lock, no
+  allocator, trivially correct. Goes stale the moment scope shifts, and does nothing for `BACKLOG.md`
+  where numbering is global and permanent.
+- **Just serialize.** Costs wall-clock time and nothing else. Genuinely the right answer if
+  concurrent runs stay rare — the collision rate to date is zero, because concurrent streams have
+  never actually been run.
+
+### Scope boundaries
+
+- **Not cross-machine.** PID-liveness staleness checks work on one host and do not survive
+  containers or a shared network filesystem. Every real case here is one machine.
+- **Not a daemon.** No long-running coordinator; a lock file and a lane definition are enough.
+- **Not a DAG.** See above.
+- **Not for `.git/index.lock`.** Git already handles that, and worktrees avoid it.
+
+### Next step, when picked up
+
+A `superpowers:brainstorming` pass. It needs to settle: whether one mechanism covers both
+`BACKLOG.md` and `VERIFICATION.md` or they get different treatments; whether the allocator is a
+bundled script or a hook; how `backlog-discipline` changes from "scan for the maximum" to "ask the
+allocator," and what happens when an agent ignores it; and what a lane definition actually looks
+like given that `subagent-driven-development` already owns per-plan execution and may be the natural
+home rather than a new component.
+
+**Do not build ahead of a real concurrent run.** The honest state is that this is a well-understood
+hazard with a zero incident rate under concurrency, because concurrency has not been used yet. The
+right trigger is the first time two lanes are actually launched.
