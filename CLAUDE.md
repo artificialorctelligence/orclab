@@ -293,6 +293,30 @@ have looked like proof the `metadata:` marker was safe. It proved nothing — a 
 for both the right and the wrong input isn't a check. Any future "I verified it with the official
 tool" claim needs the same control before it counts.
 
+**Worse, the bare command validates the wrong file here.** Given a directory holding both
+manifests — which this repo is — `claude plugin validate .` validates the *marketplace* manifest
+and stops, printing `✔ Validation passed` without ever looking at the plugin, its skills, or the
+frontmatter above. Reproduced twice, 2026-09-07. The `CLAUDE.md` warning below appears only when
+`plugin.json` is named explicitly.
+
+**Settled 2026-09-07 (BACKLOG #14), for whoever writes Orclab's `RELEASING.md`:** the gate is
+
+```bash
+claude plugin validate .claude-plugin/plugin.json
+```
+
+**Name the file, and do not pass `--strict`.** Naming it is not optional polish — the bare form
+checks the marketplace manifest and nothing else, so it is the negative-control failure above in
+live form: green for the right input and the wrong one alike. `--strict` is left off because it
+promotes to an error the one warning Orclab gets — that `CLAUDE.md` at the plugin root is not
+loaded as project context — which is a deliberate, correct layout choice, not a defect. Failing a
+release on it would block on the file doing exactly its job, and the warning's own suggested
+remedy ("use a skill instead") would push Orclab's internal development guidance into every
+consuming project's context, which is the boundary this very file exists to draw.
+
+Expect `✔ Validation passed with warnings`, with that one warning. And per the paragraphs above, a
+pass still says nothing about frontmatter — never write a release step that implies otherwise.
+
 ## Marketplace/install gotchas, found dogfooding v6 in Desktop (2026-09-06)
 
 Three real, separate bugs stacked on top of each other while getting v6 actually working live —

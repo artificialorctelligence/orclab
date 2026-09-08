@@ -615,7 +615,7 @@ something a plan author has to remember and becomes something the mechanism does
 as the evidence for that decision, not as a request for another reminder-style note. If v8 ships
 and a third version still goes untagged, that is a real signal the approach is wrong.
 
-## #14: `claude plugin validate --strict` fails on Orclab's own CLAUDE.md — settle before writing a RELEASING.md
+## #14: `claude plugin validate --strict` fails on Orclab's own CLAUDE.md — settle before writing a RELEASING.md (RESOLVED 2026-09-07)
 
 Found 2026-09-07 while confirming that a `metadata:` marker in SKILL.md frontmatter is accepted
 (it is — see `CLAUDE.md`). `claude plugin validate` emits exactly one warning against Orclab:
@@ -681,6 +681,28 @@ at the plugin, and a release process that believes it verified something.
 
 So the decision this entry defers now has a third input: whichever way `--strict` goes, the gate
 has to name `.claude-plugin/plugin.json` explicitly, or it validates the wrong file.
+
+**Resolved 2026-09-07 — the decision is made, and it is written where it will actually be found.**
+direflail's call: the gate is `claude plugin validate .claude-plugin/plugin.json`, naming the file
+explicitly, **without** `--strict`.
+
+- **Name the file** because the bare form validates the marketplace manifest and stops. A gate
+  that prints `✔ Validation passed` without ever looking at the plugin is green for the right
+  input and the wrong one alike — this entry's own correction above, in live form.
+- **No `--strict`** because it promotes to an error the single warning Orclab gets, on a layout
+  that is deliberate and correct. Failing a release on `CLAUDE.md` doing exactly its job is the
+  landmine the second bullet above predicted, and the warning's suggested remedy would push
+  Orclab's internal guidance into every consuming project's context.
+
+**The resolution is recorded in `CLAUDE.md`'s "`claude plugin validate` does not check skill
+frontmatter" section, not only here.** A resolved BACKLOG entry is not where someone writing a
+release process looks; that section is about this exact tool and is on the minimum search surface.
+Leaving the decision only in the backlog would have reproduced the failure this entry is about —
+a correct answer nobody finds at the moment it matters.
+
+**What is not resolved, deliberately:** Orclab still has no `RELEASING.md`. This entry asked only
+for the decision to be settled *before* one is written, and it now is. Writing that document is
+separate work, and whoever does it inherits a decision instead of a landmine.
 
 
 ## #15: a timed-out `/orc-publish` leaf says "no output captured" when output was in fact captured
