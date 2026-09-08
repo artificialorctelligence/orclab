@@ -191,6 +191,14 @@ only of deflections is friction, not guidance:
    unsearched "nothing" isn't an answer, it's a skipped question, and it is the answer that would
    have been given about the linter above by someone who had read the covering skill an hour
    earlier.
+
+   Naming *a* place you looked satisfies the letter of this while doing none of the work, so there
+   is a floor. **Orclab's minimum search surface: every shipped skill's `SKILL.md`, this file,
+   `BACKLOG.md`, and the bundled scripts under `hooks/scripts/` and `skills/*/scripts/`.** The
+   skills are the ones that matter most and are easiest to skip — a rule living inside a skill
+   body is the least discoverable kind there is, and it is exactly where the linter's covering
+   rule already was. This list is Orclab's own, written against its current layout; if that
+   layout changes the list should read as obviously stale rather than quietly wrong.
 2. **Ask whether the absence is itself the finding.** A real gap you aren't filling right now is a
    BACKLOG entry, not a build.
 3. **If there is a real gap, and you are building the solution now:**
