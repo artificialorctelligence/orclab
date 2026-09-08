@@ -522,6 +522,42 @@ until the v8 final review.
    operator cancelling a real `dput` must not be left with it still uploading, because the retry
    then double-uploads to a public archive.
 
+## Scenario 44: a timed-out leaf's captured output is readable, not buried
+
+Added 2026-09-07. `/orc-publish`'s unit tests assert that the right words appear in a timed-out
+leaf's detail, and they passed both before and after a real defect in it: the captured output was
+placed mid-sentence, stranding "the action may be waiting on stdin" under the log's final line
+where it read as part of the output. Substring assertions survive reordering. Only looking at the
+real rendered output caught it, which is what this scenario is for.
+
+1. In a throwaway scratch directory, create `.orclab/publish/channels.yaml`:
+
+   ```yaml
+   test:
+     noisy:
+       action: "for i in 1 2 3; do echo build-line-$i; done; sleep 30"
+       timeout: 2
+     silent:
+       action: "sleep 30"
+       timeout: 2
+   ```
+2. Run `/orc-publish`, confirm the dry-run list, and let it run for real.
+3. **Expected**, for `test.noisy` — read the summary as an operator would, not as a substring
+   search. The stdin sentence comes **first**, and the captured output **last**:
+
+   ```
+   test.noisy: timed out (timed out after 2s - the action may be waiting on stdin. Output captured before it hung:
+   build-line-1
+   build-line-2
+   build-line-3)
+   ```
+
+   The real publish action this models is `dpkg-buildpackage && debsign && dput` — hundreds of
+   lines of build log, then a hang. If the stdin hint appears *after* the output, it is below the
+   fold on a real run and the operator never sees it.
+4. **Expected**, for `test.silent`: `no output captured, the action may be waiting on stdin`. That
+   is honest here and is its own distinct signal — the action hung before printing anything.
+
 ## Recording the result
 
 Note the outcome of each scenario (pass/fail, with specifics) either back in this conversation or

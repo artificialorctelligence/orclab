@@ -406,7 +406,7 @@ remembering during future plan-writing (`superpowers:writing-plans`) for any Orc
 task: copy the git-tag step from an existing plan (e.g. v4's) rather than re-deriving the task
 from scratch.
 
-## #10: Solidify /orc-publish's testing strategy beyond what the spec settles for v7
+## #10: Solidify /orc-publish's testing strategy beyond what the spec settles for v7 (RESOLVED 2026-09-07)
 
 Raised by direflail (2026-09-06) during the `/orc-publish` design's testing section: the spec
 settles for real unit tests on the tree-resolver script (path resolution, subtree-select+exclude,
@@ -431,6 +431,35 @@ constructed inline by each scenario.
 **Next step, when picked up:** ask direflail what specifically felt underspecified, rather than
 guessing — this entry exists to hold the "come back to this" intent, not to pre-decide what's
 missing.
+
+**Resolved 2026-09-07.** Asked, as this entry's own next step required, rather than guessing.
+direflail scoped it to the second of the two candidates above — the synthetic-tree fixture
+question — and the first was already closed by events: the resolver's unit tests now assert on
+`desktop.python.linux.ppa.noble`, five segments, which is exactly Orcshot's real tree depth.
+
+**The fixture question resolves as "no change," and the reason is the interesting part: the
+premise didn't hold.** The concern was three inline copies of a synthetic tree drifting apart.
+Looking at them, they are not copies — they are deliberately different trees testing different
+properties: Scenario 23/24's `desktop.python.linux.{snap,flatpak}` (resolution, the dry-run gate,
+execution), Scenario 42's `test.{hangs,snap}` (timeout reporting and an action-less leaf), and
+Scenario 43's `test.compound` (the process-group kill). There is no shared tree to extract.
+Scenario 24 already reuses 23's by reference rather than copying it. A single fixture would mean
+one tree serving all three, coupling unrelated scenarios so a change made for one silently alters
+the others — and these are hand-run by a person reading the document, where the YAML sitting
+beside its own expectation is the point rather than an accident.
+
+**The audit did find a real gap in the same strategy, and it is the opposite shape from the one
+this entry guessed at.** The gap is not tree management; it is that unit tests and hand-run
+scenarios cover different failure classes, and one class had nothing. #15's fix passed every unit
+test both before and after a real defect in it — the captured output was placed mid-sentence,
+stranding the stdin hint under the log's last line — because the tests assert substrings and
+substrings survive reordering. Only reading the real rendered output caught it. That is precisely
+what a `VERIFICATION.md` scenario is for, and no scenario covered it. Added as **Scenario 44**,
+which asks the reader to judge the summary as an operator would rather than search it for words.
+
+**So the strategy's two layers hold, with the split sharpened:** unit tests for what is true,
+hand-run scenarios for what is *readable* — and a behaviour whose failure mode is presentation
+rather than logic needs the second, because the first will pass either way.
 
 ## #11: `/orc-publish`'s `execute_plan` has no subprocess timeout — a real hang risk, not yet fixed (RESOLVED 2026-09-07)
 
