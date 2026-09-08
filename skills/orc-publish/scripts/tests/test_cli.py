@@ -264,6 +264,28 @@ def test_execute_plan_reports_a_hanging_action_as_timed_out(tmp_path):
     leaf, status, detail = results[0]
     assert status == "timed out"
     assert "timed out after 1s" in detail
+    # "sleep 5" produces no output at all, so "no output captured" is honest here - it's a
+    # real, different signal from the output-then-hang shape below. See BACKLOG #15.
+    assert "no output captured" in detail
+    assert "waiting on stdin" in detail
+
+
+def test_execute_plan_surfaces_output_captured_before_a_timeout(tmp_path):
+    # The flagship shape: a wall of build output, then a hang. The operator needs to see how
+    # far it got, not be told nothing was captured. See BACKLOG #15.
+    root = load_tree(
+        write_yaml(
+            tmp_path,
+            "channels.yaml",
+            'a: { action: "echo hello; sleep 5", timeout: 1 }',
+        )
+    )
+    results = execute_plan(build_plan(root, []))
+    leaf, status, detail = results[0]
+    assert status == "timed out"
+    assert "timed out after 1s" in detail
+    assert "hello" in detail
+    assert "no output captured" not in detail
     assert "waiting on stdin" in detail
 
 

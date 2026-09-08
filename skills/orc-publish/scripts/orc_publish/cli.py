@@ -88,6 +88,20 @@ def run_for(distro_root, distro_path):
     return f"{node.dotted_path}: no channel set (known target, not yet actionable)"
 
 
+def _decode(stream):
+    """Text from a captured stdout/stderr stream, whatever shape it comes in.
+
+    TimeoutExpired hands back raw bytes (not the text=True str the success/failed branches
+    get) or None when nothing was captured - decode defensively rather than betting the tool
+    on a subprocess implementation detail. See BACKLOG #15.
+    """
+    if stream is None:
+        return ""
+    if isinstance(stream, bytes):
+        stream = stream.decode(errors="replace")
+    return stream.strip()
+
+
 def effective_timeout(leaf, default_timeout=DEFAULT_TIMEOUT_SECONDS):
     """The timeout a leaf really runs under: its own if set, otherwise the default."""
     return leaf.timeout if leaf.timeout is not None else default_timeout
@@ -140,16 +154,22 @@ def execute_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
                     )
             detail = (stdout or "").strip()
             results.append((leaf, "success", detail))
-        except subprocess.TimeoutExpired:
-            # TimeoutExpired does carry whatever was captured before the timeout, as undecoded
-            # bytes despite text=True - it is deliberately not surfaced yet, so "no output
-            # captured" is not always true. See BACKLOG #15. The stdin clause stays either way:
+        except subprocess.TimeoutExpired as e:
+            # TimeoutExpired does carry whatever was captured before the timeout - but as
+            # undecoded bytes despite text=True, because the exception is built from the raw
+            # buffers before the text wrapper ever sees them. A stream that produced nothing
+            # comes back as None, not b"". See BACKLOG #15. The stdin clause stays either way:
             # without it an operator has no reason to suspect stdin at all.
+            captured = "\n".join(filter(None, [_decode(e.stdout), _decode(e.stderr)]))
+            if captured:
+                output_clause = f"output captured before it hung:\n{captured}"
+            else:
+                output_clause = "no output captured"
             results.append(
                 (
                     leaf,
                     "timed out",
-                    f"timed out after {limit}s - no output captured, "
+                    f"timed out after {limit}s - {output_clause}, "
                     "the action may be waiting on stdin",
                 )
             )
