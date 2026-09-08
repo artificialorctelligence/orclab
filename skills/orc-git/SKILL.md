@@ -70,7 +70,8 @@ Stop here — do not proceed to any subcommand logic on a bare invocation.
 
 1. Stage everything: `git add -A`.
 2. Check what's staged: `git diff --cached --stat`. If nothing is staged (a clean tree), report
-   this plainly and stop — do not attempt an empty commit.
+   this plainly and make no commit — never attempt an empty one. Invoked as `commit`, that ends
+   the command; invoked as part of `commit-push`/`cp`, it ends only this half (see below).
 3. Draft a real commit message from the actual staged changes (`git diff --cached --stat` and
    `git diff --cached` for content) — describe what genuinely changed, not a generic placeholder.
 4. If `$ARGUMENTS` has text after `commit` (or after `commit-push`/`cp`, when this behavior is
@@ -83,17 +84,34 @@ Stop here — do not proceed to any subcommand logic on a bare invocation.
 
 1. Determine the current branch: `git branch --show-current`. If this returns empty (a detached
    HEAD), report that plainly and stop — there's no branch to push.
-2. Check if it has an upstream: `git rev-parse --abbrev-ref <branch>@{upstream}` (this fails if
+2. Check whether the branch is actually ahead of its upstream:
+   `git rev-list --count @{upstream}..HEAD` (this fails if there's no upstream — treat that as
+   "there is something to push," since the branch has never been published). If it reports `0`,
+   say so plainly and stop: already in sync, nothing to push.
+3. Check if it has an upstream: `git rev-parse --abbrev-ref <branch>@{upstream}` (this fails if
    there's no upstream set — that's the signal to use the second command below instead of the
    first).
    - Has an upstream: `git push`.
    - No upstream: `git push -u origin <branch>`.
-3. No confirmation prompt — invoking this command directly is the authorization.
+4. No confirmation prompt — invoking this command directly is the authorization.
 
 ## commit-push [text] / cp [text]
 
 Run the full **commit** behavior above (including the same `[text]` folding-in behavior), then
 run the full **push** behavior above. Both subcommand names run this identical sequence.
+
+**Each half is independently conditional — an empty half does not end the command.** This is the
+whole point of the combined form, and getting it wrong makes `cp` useless in a common case:
+
+- Tree dirty → commit it. Tree clean → say so, and carry on to the push.
+- Branch ahead of its upstream → push it. Nothing ahead → say so, and stop.
+
+Both halves being no-ops at once is a legitimate result, not a failure: report it as nothing to
+commit, nothing to push, already in sync.
+
+Found 2026-09-07 by running `/orc-git cp` on a clean tree that had seven unpushed commits. Read
+literally, `commit`'s "stop" ended the whole command and nothing was pushed — the exact situation
+`cp` exists for.
 
 ## branch <name> / switch <name>
 
