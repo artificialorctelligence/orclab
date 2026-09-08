@@ -937,7 +937,21 @@ per-release action" survives contact with App Store Connect has not been checked
 
 **Next step, when picked up:** a `superpowers:brainstorming` pass (Architectural — new component,
 new command surface, and a taxonomy question underneath it), using the 2026-09-07 PPA walkthrough
-as the one worked example that actually exists. Two questions were deliberately left unanswered
+as the one worked example that actually exists.
+
+**An open disagreement to settle in that pass, not before it.** The Orcshot 0.3.0 handover proposes
+that Orclab own "the series-copy mechanism generalised from the existing script" — i.e. a Launchpad
+API client living in the framework. The position taken while building that script was the opposite:
+Orclab ships the mechanism, projects ship their actions, which is the same boundary that keeps
+`dput` in Orcshot's own `channels.yaml` rather than in `/orc-publish`. Generalizing a
+forge-specific client into Orclab would make the framework know about one particular hosting
+provider. Both positions are defensible; the handover's is the stronger one if several projects
+ever publish to Launchpad, and the weaker one if they do not. What is *not* in dispute is which
+properties any implementation must keep, all proven live: a `--check` mode that answers "has the
+one-time authorization happened" without triggering it, a `--dry-run` that authenticates
+anonymously so preconditions are verifiable on an unconfigured machine, refusal to act when the
+source is not `Published` or has no built binaries, and a credentials file at `chmod 0600` that is
+never printed. Two questions were deliberately left unanswered
 when this was raised: whether the component dispatches per channel (`/orc-package ppa`) or is
 PPA-only, and whether it writes the config and `RELEASING.md` steps itself or only instructs.
 Answer **#18** first or alongside — a channel that isn't finished when the command exits changes
@@ -988,6 +1002,26 @@ multi-day human review would be worse than the prose note it replaces.
 `status:` command and/or URL alongside `action:`), a `release-checklist` marker for a step that
 completes later, or both. Answer it alongside **#17**, whose "stand up a channel" question is
 incomplete without it.
+
+**Corroborated independently, and with a live incident, 2026-09-07.** The session driving
+Orcshot's `0.3.0` release reached the same finding from the other direction — not "how do I check
+status" but "this step cannot be tracked honestly." Orcshot's step 6 was three operations with a
+remote wait in the middle: `dpkg-buildpackage`/`debsign`/`dput` (local, seconds), **Launchpad's
+build farm building the upload (remote, ~28 minutes on that release)**, then the copy to
+`resolute`, valid only after the build succeeded. `/orc-release` has one completion state per step,
+so `run.py complete 6` was called while the copy had not happened and *could not* for another half
+hour. **The release was recorded as further along than it was**, and only a manual note to the user
+kept the record straight.
+
+That adds a third option, cheaper than either above and worth weighing first because it needs no
+code at all: **a documented convention that "wait for X, then do Y" must be split into two numbered
+steps.** Orcshot's own document already renumbered to do exactly that (upload is step 6, copy is
+step 7), which is why the same release would now be trackable. A `release-checklist` rule would
+generalize it.
+
+Also worth recording from that release: `dput` printing `Successfully uploaded packages.` says
+nothing about whether the package *built*. The build farm's result is a separate gate from the
+upload's success, which is this entry's whole point stated in the most concrete possible form.
 
 ## #19: `/orc-release`'s `**Run:**` marker silently drops its arguments
 
@@ -1103,3 +1137,71 @@ plumbing to reach it from a release already exists (`/orc-release` delegates ver
 across three shipped commands and touches naming, so it is not an inline edit. Fix **#19** first
 or alongside. Nothing here is urgent: `/orc-version release` works today, and the only real cost
 of the status quo is that nobody can tell the two commands apart from their names.
+
+## #21: nothing inspects an artifact before it is irreversibly published
+
+Raised 2026-09-07 from a handover written by the session that drove Orcshot's `0.3.0` release end
+to end. Everything below was measured from real tarballs during that release, not reasoned about
+afterwards.
+
+**Two publicly-uploaded PPA source packages carried the repository's own `.git` directory.** The
+third was caught only because someone looked:
+
+| Tarball | `.git` entries | agent-state entries | Size |
+|---|---|---|---|
+| `0.1.1-3` (**uploaded, public**) | 1,415 | 0 | 10.8 MB |
+| `0.2.0-1` (**uploaded, public**) | 1,882 | 3 | 14.8 MB |
+| `0.3.0-1` (caught before upload) | 3,061 | 1,330 | 22.6 MB |
+
+By `0.3.0` the payload included whole stale git worktrees carrying a built `.deb` and a `.whl` —
+prebuilt binaries inside a *source* package, which is what lintian's `source-contains-prebuilt-*`
+family exists to catch. After the fix the same tarball was **1.02 MB**.
+
+**Why this is not recoverable after the fact:** a PPA will not accept a re-upload of an existing
+version. There is no undo and no fixing it in place — a mistake costs a version number, and the bad
+artifact stays public.
+
+**The sharpest argument for inspecting the artifact rather than trusting the build config**, and
+the reason a generic check would have caught this on the *first* release: the packaging config was
+actively wrong about its own behaviour. `debian/source/options` listed `tar-ignore = "<pattern>"`
+entries, and its own comment asserted the default VCS/backup exclusions were active. They never
+were. Per `dpkg-source(1)`, quoted from the real man page rather than from memory:
+
+> `-I` by itself adds default `--exclude` options that will filter out control files and
+> directories of the most common revision control systems, backup and swap files and Libtool build
+> output directories.
+
+Those defaults apply **only** when `-I` appears with no pattern. So the config claimed an exclusion
+set it had never enabled, and nothing downstream ever compared the claim to the output.
+(Debian-specific coda, since it fails open and would otherwise be rediscovered: in
+`debian/source/options` the defaults must be re-enabled with the long form and no value —
+`tar-ignore` alone on a line. A bare `-I` there is rejected with
+`dpkg-source: warning: short option not allowed in debian/source/options`, the warning scrolls
+past, and the defaults stay off.)
+
+**What Orclab should own — a preflight, as an `/orc-publish` responsibility.** It is the component
+that knows both the artifact and the destination, and it already has the dry-run gate where such a
+report belongs. A cheap check would list the archive and fail on `.git/`, on agent/tool state
+directories, and on `*.deb`/`*.whl`/`*.so`/`*.exe`, and warn when the size is wildly out of line
+with the previous release. Every one of those three uploads trips at least one of those rules.
+
+**The second lesson is structural rather than a missing check, and it generalizes further:**
+
+> Lint the thing you are shipping, not its sibling.
+
+Orcshot's step 5 ran `lintian` on the binary `.deb` and passed clean every time, while the *source*
+package — the artifact actually being uploaded in the next step — was the broken one. **A checklist
+that lints one artifact and ships a different one has a blind spot by construction**, regardless of
+how good either check is. That belongs in `release-checklist` as a rule about what a verification
+step must be pointed at, not only in `/orc-publish`.
+
+**Scope boundary:** this is about *inspecting* what is about to be published, not about producing
+it correctly. Orcshot's own `debian/source/options` fix is already committed on its side and is not
+Orclab's business; the generic capability is.
+
+**Next step, when picked up:** decide the shape — always-on inspection in `/orc-publish` before any
+irreversible action, an opt-in `preflight:` declaration on a channel leaf (patterns are
+format-specific: a `.tar.xz`, a `.snap` and a `.flatpak` are not inspected the same way), or a
+`release-checklist` convention that a build step must be followed by a check *of that artifact*.
+Probably the last one plus one of the first two. Related: **#18** (a publish accepted but not
+landed) and **#20** (where release-adjacent responsibilities live).
