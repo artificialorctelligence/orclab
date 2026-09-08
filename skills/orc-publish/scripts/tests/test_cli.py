@@ -328,6 +328,28 @@ def grandchild_action(pidfile, sleep_seconds=30):
     return f"true && sh -c 'echo $$ > {pidfile}; sleep {sleep_seconds}'"
 
 
+# A ceiling on how long the two process-group tests may take. Their grandchild sleeps 30s, so
+# without a real group kill `proc.wait()` blocks until that sleep runs out and the test still
+# passes - just 50x slower. That slowdown was the ONLY signal separating a working kill from a
+# wait-it-out pass (BACKLOG #16), and nothing asserted on it. This does. It sits far above the
+# real ~1.2s and far below the 30s a wait-it-out takes, so it fails a regressed kill without
+# being a timing race on a loaded machine.
+KILL_CEILING_SECONDS = 10
+
+
+def assert_returned_promptly(elapsed, what):
+    """Fail unless `what` finished well inside the grandchild's own sleep.
+
+    A pass that took the full sleep means nothing was killed - the call merely waited for the
+    process tree to end on its own, and reported the same outcome a real kill produces.
+    """
+    assert elapsed < KILL_CEILING_SECONDS, (
+        f"{what} took {elapsed:.1f}s, over the {KILL_CEILING_SECONDS}s ceiling - the process "
+        "group was probably not killed, and this only finished because the grandchild's own "
+        "sleep ran out"
+    )
+
+
 def assert_process_gone(pid, timeout=5):
     """Fail unless `pid` is gone - polled, since reaping a reparented process is asynchronous."""
     deadline = time.monotonic() + timeout
@@ -353,11 +375,14 @@ def test_execute_plan_kills_the_whole_process_group_on_timeout(tmp_path):
             f'a: {{ action: "{grandchild_action(pidfile)}", timeout: 1 }}',
         )
     )
+    started = time.monotonic()
     results = execute_plan(build_plan(root, []))
+    elapsed = time.monotonic() - started
     leaf, status, detail = results[0]
     assert status == "timed out"
 
     assert_process_gone(int(pidfile.read_text()))
+    assert_returned_promptly(elapsed, "execute_plan")
 
 
 def test_execute_plan_kills_the_whole_process_group_on_interrupt(tmp_path, monkeypatch):
@@ -385,11 +410,14 @@ def test_execute_plan_kills_the_whole_process_group_on_interrupt(tmp_path, monke
     monkeypatch.setattr(
         subprocess.Popen, "communicate", interrupt_once_the_grandchild_is_up
     )
+    started = time.monotonic()
     with pytest.raises(KeyboardInterrupt):
         execute_plan(leaves)
+    elapsed = time.monotonic() - started
     monkeypatch.undo()
 
     assert_process_gone(int(pidfile.read_text()))
+    assert_returned_promptly(elapsed, "the interrupted execute_plan")
 
 
 def test_format_plan_shows_each_actionable_leafs_effective_timeout(tmp_path):

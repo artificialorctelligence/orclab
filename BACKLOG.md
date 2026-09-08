@@ -767,7 +767,7 @@ substrings and substrings survive reordering, so a test now asserts the ordering
 asserting that the right words are present somewhere.
 
 
-## #16: the process-group-kill tests can't tell "killed" from "waited out" — narrowed by two live controls, not closed
+## #16: the process-group-kill tests can't tell "killed" from "waited out" — narrowed by two live controls, not closed (RESOLVED 2026-09-07)
 
 Found 2026-09-07 reviewing the two tests written for BACKLOG #11's fix,
 `test_execute_plan_kills_the_whole_process_group_on_timeout` and
@@ -824,3 +824,32 @@ a check which passes for both the right and the wrong input is not a check (the 
 validate` frontmatter finding) — this is the same lesson from the other direction: **a negative
 control that removes the wrong thing proves nothing either**, and can produce a confident, wrong
 conclusion in exactly the shape this one did.
+
+**Resolved 2026-09-07 — candidate one, the wall-clock ceiling.** direflail chose it over the
+sleep-tuning alternative, on the reasoning that it asserts the actual property (the kill happened,
+promptly) rather than tuning two sleeps into a gap a slow CI box could still close — the same
+timing-race shape this file's own tests had just been cleaned of.
+
+`KILL_CEILING_SECONDS = 10` and `assert_returned_promptly()` in
+`skills/orc-publish/scripts/tests/test_cli.py`; both process-group tests now time `execute_plan`
+and assert it returned inside that ceiling. Ten sits far above the real ~1.2s and far below the
+30s a wait-it-out takes, so it is not a race on a loaded machine.
+
+**Both controls were re-run against the new assertion, since a fix to a test is worthless unless
+the test now fails where it used to pass:**
+
+- **Control B** (delete the kill entirely, leave `proc.wait()`) — the one that previously passed in
+  60s and proved nothing: now **fails**, `the interrupted execute_plan took 30.0s, over the 10s
+  ceiling - the process group was probably not killed, and this only finished because the
+  grandchild's own sleep ran out`. `2 failed in 60.14s`.
+- **Control A** (child-only `proc.kill()`, the real pre-fix regression): still **fails**, `2 failed
+  in 11.16s` — the existing survival assertion catches it first, as before.
+
+So the tests now fail under both a real regression and the degenerate no-kill case, and the
+message names the actual cause rather than leaving a reader to infer it from a slow run.
+
+**Worth keeping from the same day, one entry over:** #15's fix passed every test both before and
+after a real defect in it, because the tests asserted substrings and the defect was ordering. The
+lesson generalises to this entry — asserting that the right things are *true* is not the same as
+asserting they are true *for the right reason*, and a control that used to pass is the cheapest
+way to tell the difference.
