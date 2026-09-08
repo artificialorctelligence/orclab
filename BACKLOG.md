@@ -223,6 +223,34 @@ strategy, containerization, observability) are different enough from each other 
 as one research question would repeat the same "too much at once" problem this entry itself was
 split out to avoid.
 
+**Vocabulary from #17's design pass, 2026-09-08 — a language default is an *ingredient*.**
+direflail's framing while scoping `/orc-package`: Orclab ships **ingredients** (reusable units of
+knowledge — how to stand up a PPA channel, a default stack for a language), and each project
+assembles the ones it needs into its own **recipe**, which is the project's real, existing config —
+`channels.yaml`, `RELEASING.md`, and for `/orc-code`'s purposes whatever a scaffolded project ends
+up with. Orclab is itself a project with its own recipe, drawing on the same core ingredients as
+anyone else.
+
+That reframes this entry usefully. The "defaults table" is really *the ingredients Orclab ships for
+`/orc-code`*, and its documented fall-through — ask directly when no default exists — is "no
+ingredient for this case yet," which is the same honest state `/orc-publish` reports for a known
+but un-onboarded channel. The scope boundary above is not a workaround; it is an accurate
+ingredient list with one entry in it.
+
+**Deliberate caution, agreed when the framing was raised: take the vocabulary, not a shared
+mechanism.** A channel ingredient (registration, credentials, publish action, confirmation) and a
+language ingredient (framework choices, project layout, build tooling) may share nothing beyond the
+metaphor. They are consumed by different commands and have different shapes. Unifying them into one
+ingredient *system* on the strength of two examples — one of which does not exist yet — would be
+exactly the speculative generality this repo keeps deleting. See **#17**, which takes the same
+vocabulary and holds the same line.
+
+**One question this raises and does not answer:** #17's design lets a user *capture* a channel
+ingredient Orclab does not ship, stored user-level so it survives a plugin reinstall and works for
+someone who will never touch Orclab's source. Whether a settled language stack should be capturable
+the same way — direflail's real Java-desktop preference living somewhere reusable rather than only
+in Orclab's own table — is a genuine question, and is not decided here.
+
 ## #5: `/orc-data` — a command for tracking legacy-system info during refactor work
 
 Raised by direflail (2026-09-05) alongside `/orc-code`'s design, describing the real motivation
