@@ -882,3 +882,109 @@ after a real defect in it, because the tests asserted substrings and the defect 
 lesson generalises to this entry — asserting that the right things are *true* is not the same as
 asserting they are true *for the right reason*, and a control that used to pass is the cheapest
 way to tell the difference.
+
+## #17: what belongs in a `/orc-package` component, and what belongs elsewhere — scope undecided
+
+Raised by direflail 2026-09-07, immediately after automating Orcshot's Launchpad
+noble→resolute copy: "this whole process is going to have to be done for any new project... i'm
+thinking this should be part of the first-time setup stuff for ppa." Then, asked whether it should
+be PPA-only: "it definitely needs to be broader (what if i make a mobile app? cross platform
+windows/linux app?). but i'm not sure what belongs HERE versus elsewhere yet."
+
+**Confirmed by search, not assumed:** nothing in Orclab covers standing up a distribution channel
+today. Searched the minimum surface (`skills/*/SKILL.md`, `CLAUDE.md`, `BACKLOG.md`,
+`hooks/scripts/`, `skills/*/scripts/`). The three hits for PPA/dput/Launchpad are all incidental —
+`release-checklist` uses "already published to the PPA" as an example of a good precondition and
+explicitly warns against assuming `dpkg-buildpackage`-style steps belong everywhere; `orc-publish`
+mentions `debsign` in a timeout note; `orc-release` uses `dput` as its example of a risky command.
+None of them tells you how to make a channel exist.
+
+**"Packaging" is currently four different things wearing one word.** Naming them is most of the
+scoping problem:
+
+| | Thing | What it was for the PPA |
+|---|---|---|
+| 1 | Produce the artifact | `debian/` layout, `dpkg-buildpackage` |
+| 2 | Stand up the destination | create the PPA on Launchpad |
+| 3 | Credentials for it | GPG key registered to Launchpad, `~/.dput.cf`, the OAuth authorization |
+| 4 | Wire it into Orclab | `channels.yaml`, `distro.yaml`, `RELEASING.md` steps |
+
+The 2026-09-07 work did 2, 3 and 4. It never touched 1 — Orcshot's `debian/` already existed.
+
+**The observation a design should start from: 2, 3 and 4 repeat across every channel; 1 does not.**
+Every distribution channel has the same shape — a one-time registration, a credential mechanism, a
+per-release publish action, and often an asynchronous review (see **#18**). The mechanisms differ
+wildly between a PPA, the Snap Store, Flathub, npm, PyPI, the App Store, Play Console and winget;
+the shape does not. That is why the `**One-time setup:**` marker shipped in v0.11.0 fitted the PPA
+copy on its first real use without having been written for it. Producing the artifact is the
+opposite: `debian/control`, an Android keystore and an `.msix` manifest share essentially nothing.
+
+**A supporting argument already in the code:** `/orc-publish`'s tree is already channel-shaped —
+`desktop.python.linux.ppa.noble` is component/platform/os/channel/series. A `/orc-package` scoped
+to channels would *populate* that tree; `/orc-publish` executes it. A mobile app becomes
+`mobile.<lang>.android.play`; a cross-platform desktop app grows `desktop.<lang>.windows.winget`
+beside its Linux channels. Same tree, same fan-out, same `--for` queries, no new structure.
+
+**A candidate cleave, explicitly not a decision:** `/orc-package` owns channels (2, 3, 4), not
+build systems. Producing the artifact is closer to `/orc-code`'s territory, which already owns
+per-language and per-stack defaults — **#4** is the open entry for exactly that. Running the
+release stays `/orc-release`'s.
+
+**What is genuinely unknown, and must not be assumed away:** that shape is proven for exactly one
+channel. Snap and Flathub are researched but unbuilt (Orcshot **#198**). The App Store and Play
+Console add binary signing and multi-day human review, and whether "one-time setup plus a
+per-release action" survives contact with App Store Connect has not been checked at all.
+
+**Next step, when picked up:** a `superpowers:brainstorming` pass (Architectural — new component,
+new command surface, and a taxonomy question underneath it), using the 2026-09-07 PPA walkthrough
+as the one worked example that actually exists. Two questions were deliberately left unanswered
+when this was raised: whether the component dispatches per channel (`/orc-package ppa`) or is
+PPA-only, and whether it writes the config and `RELEASING.md` steps itself or only instructs.
+Answer **#18** first or alongside — a channel that isn't finished when the command exits changes
+what "set up a channel" even means.
+
+## #18: a publish can be accepted without being done — nothing models the wait, or how to check
+
+Raised by direflail 2026-09-07, while scoping **#17**: "we're probably waiting for multi-day
+(probably) human review and be able to check status on where those are at (either via api or by
+giving links to the pages we can check)."
+
+**The gap:** `/orc-publish` reports a leaf as `success` when its action exits 0. For several real
+channels, exit 0 means *accepted*, not *published* — and the difference is hours to days.
+
+| Channel | What exit 0 actually means | How the real state is checkable |
+|---|---|---|
+| PPA upload (`dput`) | queued; Launchpad's build farm has not built it | Launchpad API — `getPublishedSources` / `getPublishedBinaries`, confirmed live 2026-09-07 |
+| PPA series copy | requested; files can take up to 20 minutes to appear | same API |
+| Flathub first submission | a pull request opened, reviewed by people over days | GitHub PR status |
+| Snap Store | uploaded; some confinements need Canonical review | `snapcraft status` / the developer dashboard |
+| App Store / Play | submitted for multi-day human review | App Store Connect / Play Console APIs |
+
+**This is already being worked around by hand, which is the tell that it belongs in the
+framework.** Orcshot's own `ppa.resolute` leaf carries this as a prose `issues:` note: *"The copy
+is asynchronous... A green exit means the copy was accepted, not that it has landed."* That is the
+same pattern the `**One-time setup:**` marker came from — Orcshot's `RELEASING.md` had invented it
+inline twice, inconsistently, before it became a real convention. A per-project prose note is how a
+missing mechanism announces itself.
+
+**Two distinct forms a status check takes**, and a design has to allow both rather than assuming
+the first: a **programmatic** check (a command or API call that returns the real state — the
+Launchpad one is proven, and `scripts/ppa-copy-series.py`'s own precondition check is already
+exactly this), and a **link** to a page a human reads when no API exists or none is worth wiring.
+Both are legitimate; only the first can gate a later step automatically.
+
+**Why this is not just an `/orc-publish` concern:** it interacts with `/orc-release`, where a step
+may not be completable in the session that started it — Orcshot's real release already has this
+shape, since the resolute copy cannot run until the noble build has *succeeded*, not merely been
+accepted. `/orc-release`'s state cursor already survives across sessions, so the pieces may
+largely exist; what is missing is a way for a channel to declare "here is how you find out whether
+this actually landed."
+
+**Scope boundary:** this is about *observing* an asynchronous publish, not about polling or waiting
+on one. Nothing here proposes that Orclab block, retry, or sleep — inventing a polling loop for a
+multi-day human review would be worse than the prose note it replaces.
+
+**Next step, when picked up:** decide whether this is a new leaf field in `channels.yaml` (a
+`status:` command and/or URL alongside `action:`), a `release-checklist` marker for a step that
+completes later, or both. Answer it alongside **#17**, whose "stand up a channel" question is
+incomplete without it.
