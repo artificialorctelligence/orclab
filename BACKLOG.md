@@ -717,3 +717,62 @@ nothing (a leaf that hung before printing anything is a real and different signa
 `.decode()` — the bytes are not decoded for you on this path, and the `failed` branch's strings
 are, so the two branches cannot share the same handling as written. One test per shape: output
 then hang, and hang with no output.
+
+
+## #16: the process-group-kill tests can't tell "killed" from "waited out" — narrowed by two live controls, not closed
+
+Found 2026-09-07 reviewing the two tests written for BACKLOG #11's fix,
+`test_execute_plan_kills_the_whole_process_group_on_timeout` and
+`test_execute_plan_kills_the_whole_process_group_on_interrupt` in
+`skills/orc-publish/scripts/tests/test_cli.py`, together with `grandchild_action` and
+`assert_process_gone` that they share. The real gap: nothing bounds the wall clock of either test,
+and the `except BaseException:` handler in `execute_plan` (`skills/orc-publish/scripts/orc_publish/cli.py`)
+calls `proc.wait()` after the kill attempt — a call that blocks until the child tree actually
+exits, kill or no kill. So a test that never kills anything can still pass, by blocking on
+`proc.wait()` until the grandchild's own sleep runs out on its own, and reporting the same "timed
+out" / `KeyboardInterrupt`-raised outcome the real fix produces.
+
+**Both controls were actually run (2026-09-07), and the real results are the finding — not the
+theory of what they'd probably show:**
+
+- **Control A** — swap `os.killpg(os.getpgid(proc.pid), signal.SIGKILL)` for `proc.kill()`, i.e.
+  the real pre-fix `subprocess.run` behavior, the actual regression these tests exist to catch:
+  **both tests fail**, with `Failed: grandchild <pid> survived - its process group was not
+  killed`, in `2 failed in 11.16s`.
+- **Control B** — delete the kill line entirely, leaving only `proc.wait()`: **both tests pass**,
+  but in `60.11s` instead of the usual ~1.2s — the outer shell waits on its own grandchild, and
+  `proc.wait()` waits on the outer shell, so by the time `assert_process_gone` runs, the grandchild
+  is already gone on its own.
+
+**So the tests are not vacuous.** They genuinely catch the regression they were written for —
+control A proves that plainly, and this matters more than the gap below, because a reader who only
+sees the gap might reasonably conclude the tests should be deleted. They shouldn't. The real gap is
+narrower: a 50x slowdown is the *only* signal separating a real kill (control A's failure mode
+inverted, i.e. the fix working, ~1.2s) from a wait-it-out pass (control B, ~60s) — and nothing in
+either test asserts on wall-clock time, so nothing currently fails if a future change quietly
+regresses the kill back to a no-op that happens to still finish inside CI's patience.
+
+**Scope boundary:** this is not a claim that the fix in BACKLOG #11 is broken — control A shows the
+current code does perform the group kill. This is only about the tests' own ability to *notice* if
+that ever stops being true.
+
+**Two candidate fixes, not chosen between:** assert a wall-clock ceiling on `execute_plan`'s return
+(it should come back at about the leaf's `timeout`, not at the grandchild's full 30s sleep — a
+loose bound like "under 5s" would separate the two cases cleanly without being a flaky tight
+bound); or lengthen the grandchild's sleep relative to `assert_process_gone`'s poll window (already
+5s) enough that a wait-it-out pass becomes wall-clock-impractical for a test suite to tolerate,
+forcing a real kill to be the only way to pass at all.
+
+**How this was found is as much the point as what was found.** An implementer ran control B, saw
+both tests pass, and reported that the tests do not detect a broken kill. That inference was wrong
+on its own terms: deleting the kill line entirely is not the regression these tests exist to catch
+— the real pre-fix behavior was a *child-only* kill (`subprocess.run`'s own timeout, which reaches
+only the `/bin/sh -c` process), not *no* kill at all. Testing "no kill" tests a scenario no real
+regression produces; only control A — swapping in the actual pre-fix kill call — tests the real
+regression. Two earlier agents had separately claimed these tests were verified against negative
+controls, and a third claimed the opposite (that they were vacuous); only actually running the
+correct control resolved the disagreement. This repo's own `CLAUDE.md` already makes the point that
+a check which passes for both the right and the wrong input is not a check (the `claude plugin
+validate` frontmatter finding) — this is the same lesson from the other direction: **a negative
+control that removes the wrong thing proves nothing either**, and can produce a confident, wrong
+conclusion in exactly the shape this one did.
