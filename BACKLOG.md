@@ -988,3 +988,118 @@ multi-day human review would be worse than the prose note it replaces.
 `status:` command and/or URL alongside `action:`), a `release-checklist` marker for a step that
 completes later, or both. Answer it alongside **#17**, whose "stand up a channel" question is
 incomplete without it.
+
+## #19: `/orc-release`'s `**Run:**` marker silently drops its arguments
+
+Found 2026-09-07 while considering whether Orcshot's `RELEASING.md` step 11 should delegate the
+GitHub Release to a command. The delegation marker is parsed by
+`skills/orc-release/scripts/orc_release/steps.py`:
+
+```python
+_DELEGATES = re.compile(r"\*\*Run:\*\*\s*(/[\w-]+)", re.IGNORECASE)
+```
+
+It captures the command name and nothing else. Checked directly rather than inferred from reading
+the pattern:
+
+```
+'**Run:** /orc-publish desktop.python.linux.ppa.resolute' -> delegates_to = '/orc-publish'
+'**Run:** /orc-version release'                           -> delegates_to = '/orc-version'
+'**Run:** /orc-version release v0.3.0'                    -> delegates_to = '/orc-version'
+```
+
+**Two different severities hide in that, and the second is the real finding.** For `/orc-publish`
+the lost argument is a *target*: "publish something" instead of "publish `resolute`". Bad, but the
+command is still the right command. For `/orc-version` the lost word changes **what the command
+does** — `/orc-version` sets a version number, `/orc-version release` pushes a tag and creates a
+public GitHub Release. A structured field saying `/orc-version` for a step that cuts a release is
+not merely incomplete, it names a different action.
+
+**This already affects a real document.** Orcshot's step 7, written 2026-09-07, is
+`**Run:** /orc-publish desktop.python.linux.ppa.resolute` — the channel is being dropped today.
+
+**Why it probably hasn't bitten yet, and why that isn't reassuring.** `/orc-release`'s SKILL.md
+has Claude read each step's full body, so the prose carries the argument even when the parsed
+field doesn't. The behaviour is likely correct in practice. But a structured field that is
+confidently wrong is worse than one that is absent — it is exactly the "check that passes for both
+the right and the wrong input" shape `CLAUDE.md` argues against, and the same class of defect as
+the heading/body divergence in #12 and the sub-numbered steps now covered in `release-checklist`.
+
+**Fix shape:** widen the capture to take the rest of the line (`(/[\w-]+(?:\s+\S+)*)` or simply
+capture to end-of-line and strip), expose it as the delegation's full invocation, and add tests
+for a bare command, a command with one argument, and a command with several. Check whether
+anything consumes `delegates_to` expecting a bare name before widening it.
+
+**Blocks nothing outright, but see #20** — that entry's proposed step 11 delegation
+(`**Run:** /orc-git release`) is the case where the dropped word is most misleading, so fixing
+this first makes that change clean.
+
+## #20: where release-adjacent responsibilities live — `/orc-version release` is misplaced
+
+Raised by direflail 2026-09-07, after asking what the difference between `/orc-version release`
+and `/orc-release` actually is — a question the current naming does not answer. His own framing:
+"that frees up `/orc-version` to JUST be in charge of the version, and `/orc-release` can focus on
+the release, delegating to `/orc-version` as needed."
+
+**The diagnosis, sharpened from naming to risk class.** Everything `/orc-version` does is local and
+reversible: edit a manifest, write a changelog entry, commit, tag locally (tags stay local by this
+project's own convention — see #13). `release` is the single subcommand that pushes to a remote
+*and* creates a public artifact. A dangerous verb sheltering under a benign command name is the
+part that matters, more than the fact that `/orc-version release` and `/orc-release` read alike.
+
+**One correction that constrains any redesign: it must not move *into* `/orc-release`.** That
+skill's first rule is that `RELEASING.md` is the single definition of the steps and it "never
+invents a release process." A `/orc-release` that knew how to create GitHub Releases would be
+doing something the project's own document never asked for — and would be wrong for every project
+that releases to PyPI, an internal deploy, or a Debian archive and nowhere else.
+
+**Proposed destination, agreed in principle but not built: `/orc-git release <tag>`.** `/orc-git`
+already owns forge operations (`gh pr checkout`, connecting a repo); `gh release create` is the
+same family. The earlier objection — that `/orc-git` has no confirmation gates — was against
+bundling a release into `cp` as a chained side effect. As its own explicitly typed subcommand,
+invoking it *is* the deliberate act, exactly as `push` already argues for itself.
+
+**How `/orc-release` then reaches it, and why no new mechanism is needed.** direflail's instinct
+was that the repository host is "another link in that tree" — the project decides it uses GitHub,
+and that delegates to `/orc-git`. That mechanism already exists and it is `RELEASING.md` itself:
+
+```markdown
+## 11. Publish the GitHub Release
+**Run:** /orc-git release
+```
+
+`/orc-release` stays forge-agnostic by construction, because it only follows the document. If a
+project moves to GitLab or Codeberg, that line changes and nothing in `/orc-release` does — the
+same way step 7 delegates a Launchpad copy to `/orc-publish` without `/orc-release` knowing what
+Launchpad is. No `forge.yaml`, no new abstraction. (See **#19** — the delegation marker currently
+drops the `release` argument, which is why that should be fixed first.)
+
+**The insight generalizes past the Release step, which nobody had noticed.** Auditing Orcshot's
+own process for forge coupling: step 9 (`git push`) is host-agnostic and works anywhere; step 10
+is **three `gh run list` calls** and is just as GitHub-specific as step 11. Any real "delegate the
+forge" design has to cover CI confirmation too, not only the Release.
+
+**A hard constraint on any answer, confirmed live 2026-09-07:** Orclab itself has **no
+`RELEASING.md`, 9 tags, and 0 GitHub Releases**. It is precisely the project that would be
+stranded if this capability were reachable only through `/orc-release`, which refuses to run
+without that document. Whatever is decided must leave a directly typable path for a project that
+tags versions but has no written process.
+
+**A latent problem to settle at the same time, not urgent:** `/orc-git` conflates two things.
+`commit`, `push`, `branch` are universal git and work against any host; `repo`, `pr` — and
+`release`, if it lands there — are `gh`, GitHub-only. The name says git; half the command is
+GitHub. Harmless while GitHub is the only forge in use, and the thing that has to be untangled the
+day it isn't.
+
+**An adjacent feature direflail raised, worth building with this rather than after it:** when
+`/orc-release` reaches its "pick a version" step, it should *propose* one rather than only asking —
+reading the commits since the last tag and saying why ("no breaking changes, four features, so a
+minor bump"). Today `/orc-version` takes a number you supply or an explicit `increment
+major|minor|point`. The suggestion is a version decision and belongs in `/orc-version`; the
+plumbing to reach it from a release already exists (`/orc-release` delegates version-setting with
+`--no-commit`).
+
+**Next step, when picked up:** a `superpowers:brainstorming` pass — this moves responsibilities
+across three shipped commands and touches naming, so it is not an inline edit. Fix **#19** first
+or alongside. Nothing here is urgent: `/orc-version release` works today, and the only real cost
+of the status quo is that nobody can tell the two commands apart from their names.
