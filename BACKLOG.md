@@ -504,7 +504,7 @@ this entry was written about — now fails in about a second with a real error r
 to the limit. That is an improvement, but it is a *behaviour change* this entry's own scope
 boundary did not anticipate, so it is named here instead of left to be rediscovered.
 
-## #12: `/orc-publish` models channel fan-out, but a real release is mostly an ordered pipeline — the framework can't yet drive Orcshot's own release
+## #12: `/orc-publish` models channel fan-out, but a real release is mostly an ordered pipeline — the framework can't yet drive Orcshot's own release (RESOLVED 2026-09-07)
 
 Found 2026-09-06/07, dogfooding `/orc-publish` against Orcshot's real release for the first time.
 direflail named the pattern directly, and it's the right diagnosis: "i feel like you're finding out
