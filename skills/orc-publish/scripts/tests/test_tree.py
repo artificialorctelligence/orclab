@@ -207,3 +207,20 @@ def test_a_node_holding_only_the_new_fields_is_still_a_leaf():
 def test_filename_template_is_gone():
     node = Node(path=("a",), data={"action": "echo hi"})
     assert not hasattr(node, "filename_template")
+
+
+def test_a_scalar_preflight_is_read_as_one_rule_not_split_into_characters():
+    """`preflight: no-vcs` instead of `preflight: [no-vcs]` is an easy YAML slip, and a bare
+    list() over a string yields one "rule" per character - reported as
+    `unknown preflight rule(s): n, o, -, v, c, s`, which names neither the real mistake nor
+    anything the reader can act on."""
+    node = Node(path=("a",), data={"action": "echo x", "preflight": "no-vcs"})
+    assert node.preflight == ["no-vcs"]
+
+
+def test_a_preflight_that_is_neither_string_nor_list_does_not_raise():
+    """`preflight: 5` used to reach list(5) and raise TypeError out of the property itself -
+    before any of the callers' own containment, so one malformed leaf killed the whole run and
+    its healthy siblings never executed. Refusing that leaf is the caller's job; not crashing
+    on the way there is this property's."""
+    assert Node(path=("a",), data={"action": "echo x", "preflight": 5}).preflight == ["5"]

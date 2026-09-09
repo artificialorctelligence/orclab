@@ -67,8 +67,22 @@ class Node:
 
     @property
     def preflight(self):
-        """Names of the rule sets that apply. Empty when unset - preflight is opt-in."""
-        return list(self._data.get("preflight", [])) if self.is_leaf else []
+        """Names of the rule sets that apply. Empty when unset - preflight is opt-in.
+
+        A scalar is read as one rule, not iterated. `preflight: no-vcs` instead of
+        `preflight: [no-vcs]` is an easy YAML slip, and a bare list() over a string turns it
+        into one "rule" per character - `unknown preflight rule(s): n, o, -, v, c, s`, which
+        names neither the mistake nor anything actionable. A non-string scalar (`preflight: 5`)
+        raised TypeError out of this property, ahead of every caller's own containment, so one
+        malformed leaf aborted the whole run and its healthy siblings never executed. Refusing
+        such a leaf is the caller's job; getting there without crashing is this property's.
+        """
+        value = self._data.get("preflight", []) if self.is_leaf else []
+        if value is None:
+            return []
+        if isinstance(value, (str, bytes)) or not isinstance(value, (list, tuple, set)):
+            return [str(value)]
+        return list(value)
 
     @property
     def requirements(self):
