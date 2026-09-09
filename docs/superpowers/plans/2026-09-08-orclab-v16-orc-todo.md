@@ -1803,8 +1803,11 @@ def test_it_is_silent_on_a_discarding_command_when_nothing_is_at_risk(tmp_path):
 
 
 def test_it_is_silent_on_a_harmless_command_even_with_entries_at_risk(tmp_path):
-    assert guard("git status", make_repo(tmp_path, dirty=True)) is None
-    assert guard("ls -la", make_repo(tmp_path, dirty=True)) is None
+    # One repo, both commands. make_repo commits, so calling it twice on the same tmp_path
+    # leaves the second commit with nothing to commit and fails inside the helper.
+    repo = make_repo(tmp_path, dirty=True)
+    assert guard("git status", repo) is None
+    assert guard("ls -la", repo) is None
 
 
 def test_it_covers_every_form_that_really_discards(tmp_path):
