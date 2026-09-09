@@ -27,10 +27,37 @@ NOT_ACTIONABLE = "known channel, not yet actionable"
 # upload sets its own `timeout:` on its leaf rather than raising this. See BACKLOG #11.
 DEFAULT_TIMEOUT_SECONDS = 600
 
+# Heuristics over a shell string, so this warns and never refuses - unlike the content rules,
+# which are deterministic checks of real bytes.
+PUBLISH_VERBS = (
+    "dput", "snapcraft upload", "twine upload", "npm publish",
+    "gh release create", "cargo publish",
+)
+BUILD_VERBS = (
+    "dpkg-buildpackage", "debuild", "python -m build", "flatpak-builder", "cargo build",
+)
+
 
 def build_plan(channel_root, tokens):
     """Resolve CLI selection tokens against the channel tree to a list of leaf Nodes."""
     return resolve_selection(channel_root, tokens)
+
+
+def action_shape_warning(leaf):
+    """Warn when one action both builds and irreversibly publishes, so no gate can run between."""
+    action = leaf.action or ""
+    for publish in PUBLISH_VERBS:
+        at = action.find(publish)
+        if at == -1:
+            continue
+        for build in BUILD_VERBS:
+            built = action.find(build)
+            if built != -1 and built < at:
+                return (
+                    "action builds and irreversibly publishes in one command - no gate can run "
+                    "between them. Split the build into prepare: to enable preflight."
+                )
+    return None
 
 
 def format_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
@@ -58,6 +85,9 @@ def format_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
                             "  preflight result: artifact not built yet - "
                             "will be inspected after prepare, at execution time"
                         )
+            warning = action_shape_warning(leaf)
+            if warning:
+                lines.append(f"  warning: {warning}")
         else:
             lines.append(f"{leaf.dotted_path}: ({NOT_ACTIONABLE})")
         for req in leaf.requirements:

@@ -9,6 +9,7 @@ import pytest
 from orc_publish.tree import load_tree
 from orc_publish.selection import SelectionError
 from orc_publish.cli import (
+    action_shape_warning,
     build_plan,
     DEFAULT_TIMEOUT_SECONDS,
     effective_timeout,
@@ -829,3 +830,41 @@ def test_dry_run_does_not_crash_on_a_hanging_artifact_expansion(tmp_path, capsys
     assert main(["--channels", path, "--dry-run"]) == 0
     out = capsys.readouterr().out
     assert "preflight result: artifact path expansion timed out after 1s" in out
+
+
+def _one(tmp_path, action):
+    root = load_tree(write_yaml(tmp_path, "c.yaml", f'a: {{ action: "{action}" }}'))
+    return build_plan(root, [])[0]
+
+
+def test_a_build_then_publish_action_warns(tmp_path):
+    leaf = _one(tmp_path, "dpkg-buildpackage -S && dput ppa:x ../y.changes")
+    warning = action_shape_warning(leaf)
+    assert warning is not None
+    assert "prepare" in warning
+
+
+def test_a_bare_publish_action_does_not_warn(tmp_path):
+    assert action_shape_warning(_one(tmp_path, "dput ppa:x ../y.changes")) is None
+
+
+def test_a_bare_build_action_does_not_warn(tmp_path):
+    assert action_shape_warning(_one(tmp_path, "dpkg-buildpackage -S")) is None
+
+
+def test_publish_before_build_does_not_warn(tmp_path):
+    # Order matters: only a build *preceding* an irreversible publish is the bad shape.
+    assert action_shape_warning(_one(tmp_path, "dput ppa:x f.changes && dpkg-buildpackage -S")) is None
+
+
+def test_an_action_less_leaf_does_not_warn(tmp_path):
+    root = load_tree(write_yaml(tmp_path, "c.yaml", "a: {}"))
+    assert action_shape_warning(build_plan(root, [])[0]) is None
+
+
+def test_the_warning_appears_in_the_dry_run_plan(tmp_path, capsys):
+    path = write_yaml(
+        tmp_path, "channels.yaml", 'a: { action: "dpkg-buildpackage -S && dput ppa:x f.changes" }'
+    )
+    main(["--channels", path, "--dry-run"])
+    assert "one command" in capsys.readouterr().out
