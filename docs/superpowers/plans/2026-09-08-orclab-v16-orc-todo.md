@@ -1623,18 +1623,28 @@ EOF
 - Consumes: nothing at import time — hooks are standalone processes and must not import from a skill's `scripts/` directory. See the File Structure note about the deliberate duplication.
 - Produces: two executables driven entirely by their stdin payload.
 
-- [ ] **Step 1: Verify the `permissionDecision` value against the live docs**
+**Two findings settled before this task was written. Do not re-derive them.**
 
-`secret_guard.py` uses `"deny"`. This guard wants **`"ask"`** — consent, not refusal. Check the
-current Claude Code hooks documentation for whether `PreToolUse` accepts
-`permissionDecision: "ask"`, exactly as `secret_guard.py`'s own docstring records having done.
-Per `orclab:currency-discipline`, check the real live source rather than assuming.
+**1. `permissionDecision` has no `"ask"`.** Checked against the live docs at
+`https://code.claude.com/docs/en/hooks` on 2026-09-09, twice — once for the enumeration and once
+searching the page for the literal string. Only `"allow"` and `"deny"` are documented. So this
+guard **denies**, and offers an escape marker the way `secret_guard.py` already does for
+`# orclab:allow-secret`: re-running with a trailing `# orclab:discard-entries` proceeds. One
+convention in the codebase, not two.
 
-- **If `"ask"` is supported:** use it, and record the verification date in the module docstring.
-- **If it is not:** use `"deny"` with a reason that names the entries at risk and tells the user
-  to commit them or re-run, and record in the docstring that `"ask"` was checked and rejected.
+**2. The obvious list of "discarding" commands is wrong in both directions.** Tested empirically
+on 2026-09-09 against a real repo with a tracked, modified file:
 
-Do not proceed to Step 2 until this is settled — the whole guard hinges on it.
+| Command | Discards a tracked edit? |
+|---|---|
+| `git checkout -- <path>`, `git checkout <path>`, `git restore <path>` | **yes**, unrecoverable |
+| `git reset --hard` | **yes** |
+| `git stash` | vanishes from the tree (recoverable from the stash) |
+| `git clean -fdx` | **no** — only untracked files; a tracked BACKLOG.md is untouched |
+| `git checkout <branch>` / `git switch <branch>` | **no** — the edit carries over, and git refuses rather than overwriting |
+
+`git clean` and bare branch switching must **not** fire. `git checkout <branch>` is the most common
+git command there is; a guard that fires on it is noise within a day, and noise gets waved through.
 
 - [ ] **Step 2: Write the failing tests**
 
@@ -1687,11 +1697,35 @@ def test_it_is_silent_on_a_harmless_command_even_with_entries_at_risk(tmp_path):
     assert guard("ls -la", make_repo(tmp_path, dirty=True)) is None
 
 
-def test_it_covers_every_discarding_form(tmp_path):
+def test_it_covers_every_form_that_really_discards(tmp_path):
     repo = make_repo(tmp_path, dirty=True)
-    for cmd in ["git checkout -- BACKLOG.md", "git checkout main", "git reset --hard",
-                "git stash", "git stash push -u", "git clean -fdx"]:
+    for cmd in ["git checkout -- BACKLOG.md", "git checkout BACKLOG.md", "git checkout .",
+                "git restore BACKLOG.md", "git reset --hard", "git reset --hard HEAD~1",
+                "git stash", "git stash push -u"]:
         assert guard(cmd, repo) is not None, cmd
+
+
+def test_it_stays_silent_on_commands_that_only_look_dangerous(tmp_path):
+    """Verified empirically 2026-09-09: git clean touches only untracked files, and a branch
+    switch carries the edit over rather than discarding it. git checkout <branch> is the most
+    common git command there is - firing on it would make this guard noise within a day."""
+    repo = make_repo(tmp_path, dirty=True)
+    for cmd in ["git clean -fdx", "git clean -fd", "git checkout main", "git switch main",
+                "git restore --staged BACKLOG.md", "git stash list", "git stash pop"]:
+        assert guard(cmd, repo) is None, cmd
+
+
+def test_the_escape_marker_lets_a_deliberate_discard_through(tmp_path):
+    """Same convention secret_guard.py already uses for orclab:allow-secret, so the codebase
+    has one escape idiom rather than two."""
+    repo = make_repo(tmp_path, dirty=True)
+    assert guard("git reset --hard  # orclab:discard-entries", repo) is None
+
+
+def test_the_decision_is_deny_since_ask_is_not_a_documented_value(tmp_path):
+    repo = make_repo(tmp_path, dirty=True)
+    decision = guard("git reset --hard", repo)
+    assert decision["hookSpecificOutput"]["permissionDecision"] == "deny"
 
 
 def test_a_non_bash_tool_is_ignored(tmp_path):
@@ -1861,10 +1895,18 @@ The allocator writes entries without committing them - see orc_todo/allocate.py 
 real findings sit in the canonical working tree until someone commits. Several ordinary git
 commands throw exactly that away.
 
-Two conditions, both required, and the second is what keeps this usable: the command must be
-able to discard uncommitted work, AND there must actually be an uncommitted entry to lose. A
-guard that fires on every `git checkout` is noise, and noise gets waved through - which is the
+Two conditions, both required, and the second is what keeps this usable: the command must
+really discard a tracked modification, AND there must actually be an uncommitted entry to lose.
+A guard that fires on every `git checkout` is noise, and noise gets waved through - which is the
 failure it exists to prevent.
+
+Which commands qualify was settled empirically, not by intuition (2026-09-09): `git clean` only
+removes untracked files, and `git checkout <branch>` carries a modification over rather than
+discarding it. Neither belongs here, and both were in the first draft.
+
+`permissionDecision` has no "ask" - only "allow" and "deny", per the live hooks docs checked
+2026-09-09. So this denies, with a `# orclab:discard-entries` escape marker mirroring
+secret_guard.py's `# orclab:allow-secret`.
 
 Contract: read the hook payload as JSON on stdin, print a `hookSpecificOutput` decision on
 stdout, exit 0. Any other exit status is a non-blocking error, so every unexpected failure here
@@ -1877,14 +1919,26 @@ import sys
 
 from orclab_shared import uncommitted_entries
 
+ALLOW_MARKER = "orclab:discard-entries"
+
+# Only forms that really discard a TRACKED modification - verified empirically 2026-09-09.
+# `git clean` touches only untracked files, and `git checkout <branch>` carries the edit over
+# (git refuses rather than overwriting), so neither belongs here. A guard that fires on
+# `git checkout main` is noise, and noise gets waved through.
 DISCARDS = re.compile(
-    r"\bgit\s+(checkout\b|switch\b|restore\b|reset\s+(--hard|--merge|--keep)\b"
-    r"|stash\b(?!\s+(list|show))|clean\b)"
+    r"\bgit\s+(?:"
+    r"reset\s+(?:--hard|--merge|--keep)\b"
+    r"|stash\b(?!\s+(?:list|show|apply|pop))"
+    r"|restore\b(?!\s+--staged\b)"
+    r"|checkout\s+(?:--\s|\.(?:\s|$)|\S*(?:BACKLOG|VERIFICATION)\.md\b)"
+    r")"
 )
 
 
 def evaluate(command):
-    """The consent reason, or None when this command is not a risk right now."""
+    """The refusal reason, or None when this command is not a risk right now."""
+    if ALLOW_MARKER in command:
+        return None
     if not DISCARDS.search(command):
         return None
     at_risk = uncommitted_entries()
@@ -1892,10 +1946,10 @@ def evaluate(command):
         return None
     listed = "\n".join(f"  {name}: {heading}" for name, heading in at_risk)
     return (
-        "This command can discard uncommitted work, and these entries are not committed yet:\n"
+        "This command discards uncommitted work, and these entries are not committed yet:\n"
         f"{listed}\n"
-        "They were written by the allocator, which never commits. Commit them first if you "
-        "want to keep them."
+        "They were written by the allocator, which never commits. Commit them first, or "
+        f"re-run with a trailing `# {ALLOW_MARKER}` to discard them deliberately."
     )
 
 
@@ -1910,7 +1964,10 @@ def main():
                 {
                     "hookSpecificOutput": {
                         "hookEventName": "PreToolUse",
-                        "permissionDecision": "ask",  # per Step 1's verification
+                        # "ask" is not a documented value - only allow and deny. Checked
+                        # against the live hooks docs 2026-09-09. The escape marker above is
+                        # what stands in for consent.
+                        "permissionDecision": "deny",
                         "permissionDecisionReason": reason,
                     }
                 },
@@ -2032,7 +2089,7 @@ The existing `secret_guard.py` entry must be left exactly as it is:
 - [ ] **Step 6: Run the whole hooks suite**
 
 Run: `cd hooks/scripts && python3 -m pytest tests/ -v`
-Expected: PASS — the existing `secret_guard` tests plus 12 new ones.
+Expected: PASS — the existing `secret_guard` tests plus 15 new ones.
 
 - [ ] **Step 7: Commit**
 
