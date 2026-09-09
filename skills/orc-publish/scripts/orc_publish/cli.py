@@ -1,7 +1,14 @@
 """/orc-publish CLI: resolve a selection, execute it, and report results.
 
-This module never prompts for confirmation itself - --dry-run resolves and prints only,
-normal mode resolves, prints, and executes immediately. The conversational safety gate
+This module never prompts for confirmation itself - --dry-run resolves, prints, and stops
+without running any leaf command, normal mode resolves, prints, and executes immediately.
+
+--dry-run is not entirely subprocess-free: to say what preflight will do it shell-expands each
+leaf's `artifact:` expression, command substitution included, on the same trust boundary as
+`action:` (the project's own config). That is still not a `prepare:`-style side effect - a path
+expression is a read, a build is not - and a dry run deliberately never runs `prepare:`.
+
+The conversational safety gate
 ("always dry-run first, get an explicit yes, then run for real") lives in SKILL.md, which
 calls this script twice: once with --dry-run, once without, once the user has confirmed.
 """
@@ -73,6 +80,25 @@ def action_shape_warning(leaf):
     return None
 
 
+def _preflight_plan_result(leaf, default_timeout):
+    """What the dry-run plan promises preflight will do for one leaf declaring `preflight:`.
+
+    The plan is what an operator consents to, so it reports the real refusal wherever the real
+    run's answer is already knowable without the artifact existing - an unknown rule name, or a
+    `preflight:` with no `artifact:` at all - by asking `preflight_refusal` itself rather than
+    keeping a second copy of those checks. Only a leaf that actually has a `prepare:` step can
+    honestly defer: without one, nothing will build the artifact between now and the action, so
+    a missing file is reported as the `artifact not found:` refusal it will really be.
+    """
+    if unknown_rules(leaf.preflight) or not leaf.artifact:
+        return preflight_refusal(leaf, default_timeout)
+    resolved = _expand_artifact(leaf, effective_timeout(leaf, default_timeout))
+    path, error = resolved
+    if not error and not (path and pathlib.Path(path).is_file()) and leaf.prepare:
+        return "artifact not built yet - will be inspected after prepare, at execution time"
+    return preflight_refusal(leaf, default_timeout, resolved=resolved) or "clean"
+
+
 def _preflight_plan_lines(leaf, default_timeout):
     """The dry-run plan's preflight and action-shape lines for one actionable leaf.
 
@@ -82,21 +108,7 @@ def _preflight_plan_lines(leaf, default_timeout):
     lines = []
     if leaf.preflight:
         lines.append(f"  preflight: {', '.join(leaf.preflight)}")
-        if leaf.artifact:
-            path, error = _expand_artifact(leaf, effective_timeout(leaf, default_timeout))
-            if error:
-                lines.append(f"  preflight result: {error}")
-            elif path and pathlib.Path(path).is_file():
-                refusal = preflight_refusal(leaf, default_timeout, resolved=(path, error))
-                lines.append(
-                    f"  preflight result: {refusal}" if refusal
-                    else "  preflight result: clean"
-                )
-            else:
-                lines.append(
-                    "  preflight result: artifact not built yet - "
-                    "will be inspected after prepare, at execution time"
-                )
+        lines.append(f"  preflight result: {_preflight_plan_result(leaf, default_timeout)}")
     warning = action_shape_warning(leaf)
     if warning:
         lines.append(f"  warning: {warning}")

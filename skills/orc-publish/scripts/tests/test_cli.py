@@ -637,6 +637,36 @@ def test_an_unknown_rule_name_refuses(tmp_path):
     assert "no-such-rule" in detail
 
 
+def test_preflight_with_no_artifact_refuses(tmp_path):
+    root = load_tree(_leaf_yaml(tmp_path, '  preflight: [no-vcs]\n  action: "true"\n'))
+    leaf, status, detail = execute_plan(build_plan(root, []))[0]
+    assert status == "refused"
+    assert detail == "preflight is declared but no artifact: is set - nothing to inspect"
+
+
+# The plan is what the operator says yes to, so for every refusal knowable without the artifact
+# existing, the dry-run line and the real run's detail must be the same sentence - asserted
+# against each other rather than each against its own hardcoded copy.
+@pytest.mark.parametrize(
+    "extra",
+    [
+        "  preflight: [no-vcs]\n",                                     # no artifact: at all
+        '  artifact: "later.tar.gz"\n  preflight: [no-vcss]\n',        # typo'd rule name
+        '  artifact: "typo-in-path.tar.gz"\n  preflight: [no-vcs]\n',  # no prepare: to build it
+    ],
+    ids=["no-artifact", "unknown-rule", "missing-artifact-no-prepare"],
+)
+def test_dry_run_reports_the_refusal_the_real_run_will_give(tmp_path, capsys, extra):
+    path = write_yaml(tmp_path, "channels.yaml", "a:\n" + extra + '  action: "true"\n')
+    assert main(["--channels", path, "--dry-run"]) == 0
+    plan = capsys.readouterr().out
+    assert "will be inspected" not in plan
+
+    _leaf, status, detail = execute_plan(build_plan(load_tree(path), []))[0]
+    assert status == "refused"
+    assert f"preflight result: {detail}" in plan
+
+
 def test_a_refused_leaf_does_not_stop_the_next_one(tmp_path):
     import tarfile
 

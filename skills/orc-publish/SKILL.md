@@ -146,7 +146,9 @@ unverified command as if it worked. `orclab:currency-discipline` covers exactly 
   means a command you ran returned non-zero — relay the distinction rather than flattening it.
 - `artifact:` must name the **archive itself**, not a manifest that references it. Inspecting a
   `.changes` file instead of the `.tar.xz` it lists would check the wrong thing while reporting
-  success.
+  success. It is shell-expanded exactly like `action:` is, command substitution included, so a
+  versioned filename is named the same way the project already derives its version in its own
+  `action:` — `artifact: "../orcshot_$(dpkg-parsechangelog --show-field Version).tar.xz"`.
 - The rules are `no-vcs`, `no-tool-state` and `no-prebuilt-binaries`, opt-in per leaf. They cannot
   be global: a `.snap` is squashfs and legitimately contains `.so` files.
 - A `preflight:` declared on an archive format the inspector cannot read is **refused**, saying the
@@ -155,5 +157,7 @@ unverified command as if it worked. `orclab:currency-discipline` covers exactly 
 - `--allow-preflight-failure` downgrades refusals to warnings for one run and still prints every
   finding. Never pass it on the user's behalf; an irreversible publish over a known-bad artifact is
   their call to make explicitly.
-- A dry-run inspects the artifact if it already exists and says so if it does not. It never runs
-  `prepare` — a dry run that builds is not a dry run.
+- A dry-run inspects the artifact if it already exists, and otherwise reports the refusal the real
+  run will give — only a leaf with a `prepare:` step can honestly defer to "will be inspected after
+  prepare", since nothing else would build the file in between. It never runs `prepare` — a dry run
+  that builds is not a dry run.
