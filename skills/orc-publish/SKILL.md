@@ -93,3 +93,21 @@ failure away, and never claim success for a leaf the summary doesn't confirm suc
 - A channel leaf with no `action:` reports as `(known channel, not yet actionable)` and is never
   attempted. That is a real, deliberate state — a target the project knows about but has no
   publish mechanism for yet — not a misconfiguration to fix.
+- A leaf may declare `prepare:` (a command run first), `artifact:` (the archive to inspect) and
+  `preflight:` (which named rule sets apply). When it does, the order is **prepare → inspect →
+  act**, and a tripped rule reports as `timed out`'s sibling status **`refused`**: nothing ran,
+  because what was about to be published is wrong. That is a different thing from `failed`, which
+  means a command you ran returned non-zero — relay the distinction rather than flattening it.
+- `artifact:` must name the **archive itself**, not a manifest that references it. Inspecting a
+  `.changes` file instead of the `.tar.xz` it lists would check the wrong thing while reporting
+  success.
+- The rules are `no-vcs`, `no-tool-state` and `no-prebuilt-binaries`, opt-in per leaf. They cannot
+  be global: a `.snap` is squashfs and legitimately contains `.so` files.
+- A `preflight:` declared on an archive format the inspector cannot read is **refused**, saying the
+  format is unsupported. That is deliberate — a silent pass on an uninspectable artifact is exactly
+  the failure preflight exists to prevent, wearing a green tick.
+- `--allow-preflight-failure` downgrades refusals to warnings for one run and still prints every
+  finding. Never pass it on the user's behalf; an irreversible publish over a known-bad artifact is
+  their call to make explicitly.
+- A dry-run inspects the artifact if it already exists and says so if it does not. It never runs
+  `prepare` — a dry run that builds is not a dry run.

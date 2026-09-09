@@ -80,6 +80,18 @@ using none of them is still complete and still driveable.**
   blind, and a reader coming back six months later can't tell whether they already did it.
   Follow the check with the setup commands themselves.
 
+## Lint the thing you are shipping, not its sibling
+
+A verification step must be pointed at **the artifact the release actually publishes**. This is not
+a style preference — it is a real 2026-09-07 incident. A project ran `lintian` on its binary `.deb`
+every release and passed clean every time, while the *source* package uploaded in the next step was
+the broken one: it carried the repository's own `.git` directory, 1,415 entries in one published
+release and 1,882 in the next, plus prebuilt binaries inside a source package.
+
+A checklist that verifies one artifact and ships a different one has a blind spot by construction,
+however good either check is. When writing a verification step, name the exact file the publish
+step will upload, and check that one.
+
 ## Cross-referencing CI
 
 If a step (or part of one) already runs automatically in CI, say so explicitly in that step, e.g.:
