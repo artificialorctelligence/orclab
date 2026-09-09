@@ -83,6 +83,16 @@ def test_an_unreadable_format_raises(tmp_path):
         inspect_archive(path, ["no-vcs"])
 
 
+def test_a_truncated_archive_raises_unsupported_archive_not_eoferror(tmp_path):
+    # tarfile.is_tarfile raises EOFError partway through the gzip header on a genuinely
+    # truncated file - not a tarfile.TarError subclass, so it needs its own coverage rather
+    # than trusting that catching TarError alone was enough.
+    archive = make_tar(tmp_path, ["pkg/main.py"])
+    archive.write_bytes(archive.read_bytes()[: archive.stat().st_size // 2])
+    with pytest.raises(UnsupportedArchive):
+        inspect_archive(archive, ["no-vcs"])
+
+
 def test_unknown_rule_names_are_reported(tmp_path):
     assert unknown_rules(["no-vcs", "no-such-rule"]) == ["no-such-rule"]
     assert unknown_rules(ALL_RULES) == []

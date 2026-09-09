@@ -688,3 +688,68 @@ def test_the_override_publishes_anyway_and_still_reports(tmp_path, capsys):
 
 def test_expand_path_runs_command_substitution(tmp_path):
     assert expand_path("$(echo hello).tar.xz", 10) == "hello.tar.xz"
+
+
+def test_expand_path_kills_the_whole_process_group_on_timeout(tmp_path):
+    # Same shape as the action-side process-group tests above: the command substitution in
+    # expand_path's `printf` forks too, so a kill that only reaches the outer shell orphans
+    # the grandchild - the exact bug a bare subprocess.run had.
+    pidfile = tmp_path / "grandchild.pid"
+    expr = f"$({grandchild_action(pidfile)}; echo x).tar.gz"
+    with pytest.raises(subprocess.TimeoutExpired):
+        expand_path(expr, 1)
+    assert_process_gone(int(pidfile.read_text()))
+
+
+def test_a_corrupt_archive_refuses_and_does_not_stop_siblings(tmp_path):
+    import tarfile
+
+    blank = tmp_path / "blank"
+    blank.write_text("")
+    archive = tmp_path / "src.tar.gz"
+    with tarfile.open(archive, "w:gz") as tf:
+        tf.add(blank, arcname="pkg/main.py")
+    archive.write_bytes(archive.read_bytes()[: archive.stat().st_size // 2])
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        f'a: {{ artifact: "{archive}", preflight: [no-vcs], action: "true" }}\n'
+        'b: { action: "true" }\n',
+    )
+    results = execute_plan(build_plan(load_tree(path), []))
+    statuses = {leaf.dotted_path: s for leaf, s, _ in results}
+    details = {leaf.dotted_path: d for leaf, s, d in results}
+    assert statuses == {"a": "refused", "b": "success"}
+    assert "unsupported" in details["a"].lower()
+
+
+def test_main_does_not_crash_on_a_corrupt_artifact(tmp_path):
+    import tarfile
+
+    blank = tmp_path / "blank"
+    blank.write_text("")
+    archive = tmp_path / "src.tar.gz"
+    with tarfile.open(archive, "w:gz") as tf:
+        tf.add(blank, arcname="pkg/main.py")
+    archive.write_bytes(archive.read_bytes()[: archive.stat().st_size // 2])
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        f'a: {{ artifact: "{archive}", preflight: [no-vcs], action: "true" }}\n',
+    )
+    assert main(["--channels", path]) == 1
+
+
+def test_a_hanging_artifact_expansion_refuses_and_does_not_stop_siblings(tmp_path):
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        'a: { artifact: "$(sleep 30; echo x).tar.gz", preflight: [no-vcs], timeout: 1, '
+        'action: "true" }\n'
+        'b: { action: "true" }\n',
+    )
+    results = execute_plan(build_plan(load_tree(path), []))
+    statuses = {leaf.dotted_path: s for leaf, s, _ in results}
+    details = {leaf.dotted_path: d for leaf, s, d in results}
+    assert statuses == {"a": "refused", "b": "success"}
+    assert "timed out" in details["a"]

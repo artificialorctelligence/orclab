@@ -61,13 +61,23 @@ def unknown_rules(rule_names):
 
 
 def _archive_entries(path):
-    """Every member name in the archive. Raises UnsupportedArchive for anything else."""
-    if tarfile.is_tarfile(path):
-        with tarfile.open(path) as tf:
-            return tf.getnames()
-    if zipfile.is_zipfile(path):
-        with zipfile.ZipFile(path) as zf:
-            return zf.namelist()
+    """Every member name in the archive. Raises UnsupportedArchive for anything else.
+
+    "Anything else" includes a file that merely looks like an archive but can't actually be
+    read as one - a truncated .tar.gz makes tarfile.is_tarfile itself raise EOFError (not a
+    TarError subclass) partway through the gzip header, and an unreadable file raises
+    PermissionError. Both are real inputs a broken build can produce, so both are folded into
+    the one exception this function promises to raise.
+    """
+    try:
+        if tarfile.is_tarfile(path):
+            with tarfile.open(path) as tf:
+                return tf.getnames()
+        if zipfile.is_zipfile(path):
+            with zipfile.ZipFile(path) as zf:
+                return zf.namelist()
+    except (OSError, EOFError, tarfile.TarError, zipfile.BadZipFile) as e:
+        raise UnsupportedArchive(str(path)) from e
     raise UnsupportedArchive(str(path))
 
 

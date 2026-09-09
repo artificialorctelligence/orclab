@@ -146,15 +146,14 @@ def expand_path(expr, timeout):
 
     Double-quoted so command substitution still runs but word splitting does not - a path
     with a space stays one path. Same trust boundary as `action`: it is the project's own
-    config, not untrusted input.
+    config, not untrusted input. Routed through `_run` rather than a bare `subprocess.run`
+    so this, too, runs in its own killable process group - an expansion like
+    `$(sleep 20; echo x)` forks just like a compound action does, and a bare `subprocess.run`
+    timeout only kills the /bin/sh -c process, orphaning whatever it forked. Raises
+    subprocess.TimeoutExpired, same as `_run` - the caller decides what a hung expansion means.
     """
-    result = subprocess.run(
-        ["/bin/sh", "-c", f'printf %s "{expr}"'],
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
-    return result.stdout.strip()
+    _returncode, stdout, _stderr = _run(f'printf %s "{expr}"', timeout)
+    return stdout.strip()
 
 
 def preflight_refusal(leaf, default_timeout=DEFAULT_TIMEOUT_SECONDS):
@@ -170,7 +169,11 @@ def preflight_refusal(leaf, default_timeout=DEFAULT_TIMEOUT_SECONDS):
         return f"unknown preflight rule(s): {', '.join(bad)}"
     if not leaf.artifact:
         return "preflight is declared but no artifact: is set - nothing to inspect"
-    path = expand_path(leaf.artifact, effective_timeout(leaf, default_timeout))
+    timeout = effective_timeout(leaf, default_timeout)
+    try:
+        path = expand_path(leaf.artifact, timeout)
+    except subprocess.TimeoutExpired:
+        return f"artifact path expansion timed out after {timeout}s"
     if not path or not pathlib.Path(path).is_file():
         return f"artifact not found: {path or leaf.artifact}"
     try:
