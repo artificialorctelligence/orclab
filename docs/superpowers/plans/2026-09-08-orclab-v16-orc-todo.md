@@ -743,6 +743,28 @@ def test_two_real_concurrent_processes_get_different_numbers(tmp_path):
     assert results == [23, 24], f"got {results}"
     text = (repo / "BACKLOG.md").read_text()
     assert "## #23:" in text and "## #24:" in text, "both entries must land"
+
+
+def test_a_completed_allocation_leaves_no_temp_file_behind(tmp_path):
+    repo = make_repo(tmp_path)
+    alloc.allocate("backlog", "t", "b", cwd=repo)
+    assert not list(repo.glob(".BACKLOG.md.tmp*")), "the temp file must be renamed, not left"
+
+
+def test_a_failed_write_leaves_the_original_file_intact(tmp_path, monkeypatch):
+    """The reason this is atomic at all: write_text() truncates first, so a crash mid-write
+    destroys the one file the allocator deliberately never commits - there is no committed copy
+    to recover from."""
+    repo = make_repo(tmp_path)
+    before = (repo / "BACKLOG.md").read_text()
+
+    def boom(src, dst):
+        raise OSError("simulated failure at the replace step")
+
+    monkeypatch.setattr(alloc.os, "replace", boom)
+    with pytest.raises(OSError):
+        alloc.allocate("backlog", "t", "b", cwd=repo)
+    assert (repo / "BACKLOG.md").read_text() == before, "the original must survive intact"
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -769,6 +791,8 @@ instead by hooks/scripts/backlog_guard.py, which asks before anything discards a
 entry.
 """
 
+import os
+
 from . import state
 from .resources import RESOURCES, insert, render, scan_max
 
@@ -781,6 +805,22 @@ class ResourceMissing(Exception):
 def canonical_file(resource, cwd=None):
     """The one real file every agent reaches, in the main checkout - not the caller's copy."""
     return state.canonical_root(cwd) / resource.filename
+
+
+def _atomic_write(path, text):
+    """Replace the file's contents in one step, never leaving it half-written.
+
+    path.write_text() truncates and then writes, so a crash in that window leaves the file
+    empty - and this is the file the allocator deliberately never commits, so there is no
+    committed copy to recover from. os.replace() is atomic on POSIX: a reader sees the old file
+    or the new one, never a torn one.
+
+    The temp file sits in the same directory on purpose. os.replace is only atomic within one
+    filesystem, and /tmp is routinely a different one.
+    """
+    tmp = path.with_name(f".{path.name}.tmp{os.getpid()}")
+    tmp.write_text(text)
+    os.replace(tmp, path)
 
 
 def next_number(resource, cwd=None):
@@ -806,7 +846,7 @@ def allocate(resource_key, title, body, cwd=None, timeout=10.0):
         raise ResourceMissing(f"{resource.filename} not found at {path}")
     with state.held(f"allocating a {resource.key} number", cwd=cwd, timeout=timeout):
         number = next_number(resource, cwd)
-        path.write_text(insert(path.read_text(), resource, render(resource, number, title, body)))
+        _atomic_write(path, insert(path.read_text(), resource, render(resource, number, title, body)))
         counters = state.read_counters(cwd)
         counters[resource.key] = number
         state.write_counters(counters, cwd)
@@ -816,7 +856,7 @@ def allocate(resource_key, title, body, cwd=None, timeout=10.0):
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cd skills/orc-todo/scripts && python3 -m pytest tests/test_allocate.py -v`
-Expected: PASS, 9 tests. The concurrency test is the slowest; it should still finish in seconds.
+Expected: PASS, 11 tests. The concurrency test is the slowest; it should still finish in seconds.
 
 - [ ] **Step 5: Commit**
 
