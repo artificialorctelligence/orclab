@@ -30,6 +30,10 @@ class LaneMissing(Exception):
     """No such lane, or no such item within it."""
 
 
+class LaneStateCorrupt(Exception):
+    """lanes.json exists but cannot be parsed."""
+
+
 def _lanes_path(cwd=None):
     return state.shared_dir(cwd) / "lanes.json"
 
@@ -57,17 +61,26 @@ def _require_specced(items, cwd=None):
 
 
 def read_lanes(cwd=None):
+    """Every lane. Empty when the file has never been written; raises when it is unreadable.
+
+    Those two cases must not collapse into one. Reading a corrupt file as "no lanes" would let
+    the very next create/modify/delete write a single lane back over every other one, losing
+    them all with nothing reported. Absent is normal; unreadable is a fault.
+    """
     path = _lanes_path(cwd)
     if not path.exists():
         return {}
     try:
         return json.loads(path.read_text())
-    except (ValueError, OSError):
-        return {}
+    except (ValueError, OSError) as e:
+        raise LaneStateCorrupt(
+            f"{path} exists but cannot be read: {e}. Nothing has been changed. "
+            "Inspect it before any lane command writes over it."
+        ) from e
 
 
 def _write_lanes(data, cwd=None):
-    _lanes_path(cwd).write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
+    state.atomic_write(_lanes_path(cwd), json.dumps(data, indent=2, sort_keys=True) + "\n")
 
 
 def create_lane(name, items, cwd=None):

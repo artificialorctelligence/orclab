@@ -2,7 +2,7 @@ import subprocess
 
 import pytest
 
-from orc_todo import lanes
+from orc_todo import lanes, state
 
 
 def make_repo(tmp_path, specs=("v13", "v14", "v15")):
@@ -86,3 +86,13 @@ def test_setting_current_to_an_item_not_in_the_lane_raises(tmp_path):
 def test_read_lanes_is_empty_rather_than_failing_when_nothing_exists(tmp_path):
     repo = make_repo(tmp_path)
     assert lanes.read_lanes(repo) == {}
+
+
+def test_a_corrupt_lane_file_raises_rather_than_reading_as_no_lanes(tmp_path):
+    """Absent and unreadable must not collapse into one answer. Reading a corrupt file as "no
+    lanes" would let the next lane command write a single lane back over every other one."""
+    repo = make_repo(tmp_path)
+    lanes.create_lane("A", ["v13"], cwd=repo)
+    (state.shared_dir(repo) / "lanes.json").write_text("{not json")
+    with pytest.raises(lanes.LaneStateCorrupt):
+        lanes.read_lanes(repo)

@@ -122,7 +122,7 @@ def test_a_failed_write_leaves_the_original_file_intact(tmp_path, monkeypatch):
     def boom(src, dst):
         raise OSError("simulated failure at the replace step")
 
-    monkeypatch.setattr(alloc.os, "replace", boom)
+    monkeypatch.setattr(state.os, "replace", boom)
     with pytest.raises(OSError):
         alloc.allocate("backlog", "t", "b", cwd=repo)
     assert (repo / "BACKLOG.md").read_text() == before, "the original must survive intact"

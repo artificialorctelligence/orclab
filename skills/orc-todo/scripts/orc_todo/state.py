@@ -165,6 +165,23 @@ def clear_lock(cwd=None):
     return True
 
 
+def atomic_write(path, text):
+    """Replace a file's contents in one step, never leaving it half-written.
+
+    Path.write_text() truncates and then writes, so a crash or a concurrent read in that window
+    sees an empty file. Everything this module guards is shared state that is deliberately never
+    committed, so there is no committed copy to fall back on - and a torn read of lanes.json in
+    particular reports "nothing in progress", which is the exact 2026-09-08 failure the lane
+    record exists to prevent.
+
+    The temp file sits in the same directory on purpose. os.replace is only atomic within one
+    filesystem, and /tmp is routinely a different one.
+    """
+    tmp = path.with_name(f".{path.name}.tmp{os.getpid()}")
+    tmp.write_text(text)
+    os.replace(tmp, path)
+
+
 def read_counters(cwd=None):
     path = _counters_path(cwd)
     if not path.exists():
@@ -176,4 +193,4 @@ def read_counters(cwd=None):
 
 
 def write_counters(mapping, cwd=None):
-    _counters_path(cwd).write_text(json.dumps(mapping, indent=2, sort_keys=True) + "\n")
+    atomic_write(_counters_path(cwd), json.dumps(mapping, indent=2, sort_keys=True) + "\n")
