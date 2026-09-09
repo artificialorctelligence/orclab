@@ -12,6 +12,8 @@ instead by hooks/scripts/backlog_guard.py, which asks before anything discards a
 entry.
 """
 
+import os
+
 from . import state
 from .resources import RESOURCES, insert, render, scan_max
 
@@ -24,6 +26,22 @@ class ResourceMissing(Exception):
 def canonical_file(resource, cwd=None):
     """The one real file every agent reaches, in the main checkout - not the caller's copy."""
     return state.canonical_root(cwd) / resource.filename
+
+
+def _atomic_write(path, text):
+    """Replace the file's contents in one step, never leaving it half-written.
+
+    path.write_text() truncates and then writes, so a crash in that window leaves the file
+    empty - and this is the file the allocator deliberately never commits, so there is no
+    committed copy to recover from. os.replace() is atomic on POSIX: a reader sees the old file
+    or the new one, never a torn one.
+
+    The temp file sits in the same directory on purpose. os.replace is only atomic within one
+    filesystem, and /tmp is routinely a different one.
+    """
+    tmp = path.with_name(f".{path.name}.tmp{os.getpid()}")
+    tmp.write_text(text)
+    os.replace(tmp, path)
 
 
 def next_number(resource, cwd=None):
@@ -49,7 +67,7 @@ def allocate(resource_key, title, body, cwd=None, timeout=10.0):
         raise ResourceMissing(f"{resource.filename} not found at {path}")
     with state.held(f"allocating a {resource.key} number", cwd=cwd, timeout=timeout):
         number = next_number(resource, cwd)
-        path.write_text(insert(path.read_text(), resource, render(resource, number, title, body)))
+        _atomic_write(path, insert(path.read_text(), resource, render(resource, number, title, body)))
         counters = state.read_counters(cwd)
         counters[resource.key] = number
         state.write_counters(counters, cwd)

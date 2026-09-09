@@ -104,3 +104,25 @@ def test_two_real_concurrent_processes_get_different_numbers(tmp_path):
     assert results == [23, 24], f"got {results}"
     text = (repo / "BACKLOG.md").read_text()
     assert "## #23:" in text and "## #24:" in text, "both entries must land"
+
+
+def test_a_completed_allocation_leaves_no_temp_file_behind(tmp_path):
+    repo = make_repo(tmp_path)
+    alloc.allocate("backlog", "t", "b", cwd=repo)
+    assert not list(repo.glob(".BACKLOG.md.tmp*")), "the temp file must be renamed, not left"
+
+
+def test_a_failed_write_leaves_the_original_file_intact(tmp_path, monkeypatch):
+    """The reason this is atomic at all: write_text() truncates first, so a crash mid-write
+    destroys the one file the allocator deliberately never commits - there is no committed copy
+    to recover from."""
+    repo = make_repo(tmp_path)
+    before = (repo / "BACKLOG.md").read_text()
+
+    def boom(src, dst):
+        raise OSError("simulated failure at the replace step")
+
+    monkeypatch.setattr(alloc.os, "replace", boom)
+    with pytest.raises(OSError):
+        alloc.allocate("backlog", "t", "b", cwd=repo)
+    assert (repo / "BACKLOG.md").read_text() == before, "the original must survive intact"
