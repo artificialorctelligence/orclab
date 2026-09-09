@@ -22,6 +22,19 @@ from .tree import load_tree
 
 
 NOT_ACTIONABLE = "known channel, not yet actionable"
+NO_METRICS = "known channel, no metrics source"
+
+# Every leaf command key. "action" publishes (writes, needs the SKILL.md confirmation gate);
+# "metrics" reads back numbers a channel already publishes about itself (safe, no gate). They
+# share the whole execution path - selection, timeout, process-group kill, output capture -
+# because the only thing that differs is which key holds the command. BACKLOG #18's proposed
+# `status:` is the same shape again: add it to tree.LEAF_KEYS and to NOT_SET below.
+NOT_SET = {"action": NOT_ACTIONABLE, "metrics": NO_METRICS}
+
+# `prepare:` and `preflight:` gate the *action* path only. A metrics query publishes nothing,
+# so there is no irreversible step to gate - and running a project's build just to answer a
+# read-only download-count question would be wrong on its own terms.
+GATED_COMMAND_KEY = "action"
 
 # A "something is wrong" ceiling, not a performance budget. A genuinely slow-but-healthy
 # upload sets its own `timeout:` on its leaf rather than raising this. See BACKLOG #11.
@@ -60,36 +73,49 @@ def action_shape_warning(leaf):
     return None
 
 
-def format_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
+def _preflight_plan_lines(leaf, default_timeout):
+    """The dry-run plan's preflight and action-shape lines for one actionable leaf.
+
+    Action path only - `format_plan` calls this only for GATED_COMMAND_KEY, so a `--metrics`
+    plan never inspects an artifact.
+    """
+    lines = []
+    if leaf.preflight:
+        lines.append(f"  preflight: {', '.join(leaf.preflight)}")
+        if leaf.artifact:
+            path, error = _expand_artifact(leaf, effective_timeout(leaf, default_timeout))
+            if error:
+                lines.append(f"  preflight result: {error}")
+            elif path and pathlib.Path(path).is_file():
+                refusal = preflight_refusal(leaf, default_timeout, resolved=(path, error))
+                lines.append(
+                    f"  preflight result: {refusal}" if refusal
+                    else "  preflight result: clean"
+                )
+            else:
+                lines.append(
+                    "  preflight result: artifact not built yet - "
+                    "will be inspected after prepare, at execution time"
+                )
+    warning = action_shape_warning(leaf)
+    if warning:
+        lines.append(f"  warning: {warning}")
+    return lines
+
+
+def format_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS, command_key="action"):
     if not leaves:
         return "(no leaves selected)"
     lines = []
     for leaf in leaves:
-        if leaf.action:
-            lines.append(f"{leaf.dotted_path}: {leaf.action}")
+        command = leaf.command(command_key)
+        if command:
+            lines.append(f"{leaf.dotted_path}: {command}")
             lines.append(f"  timeout: {effective_timeout(leaf, default_timeout)}s")
-            if leaf.preflight:
-                lines.append(f"  preflight: {', '.join(leaf.preflight)}")
-                if leaf.artifact:
-                    path, error = _expand_artifact(leaf, effective_timeout(leaf, default_timeout))
-                    if error:
-                        lines.append(f"  preflight result: {error}")
-                    elif path and pathlib.Path(path).is_file():
-                        refusal = preflight_refusal(leaf, default_timeout, resolved=(path, error))
-                        lines.append(
-                            f"  preflight result: {refusal}" if refusal
-                            else "  preflight result: clean"
-                        )
-                    else:
-                        lines.append(
-                            "  preflight result: artifact not built yet - "
-                            "will be inspected after prepare, at execution time"
-                        )
-            warning = action_shape_warning(leaf)
-            if warning:
-                lines.append(f"  warning: {warning}")
+            if command_key == GATED_COMMAND_KEY:
+                lines.extend(_preflight_plan_lines(leaf, default_timeout))
         else:
-            lines.append(f"{leaf.dotted_path}: ({NOT_ACTIONABLE})")
+            lines.append(f"{leaf.dotted_path}: ({NOT_SET[command_key]})")
         for req in leaf.requirements:
             lines.append(f"  requirement: {req}")
         for issue in leaf.issues:
@@ -159,6 +185,10 @@ def _run(command, limit):
     whole group is killed on any exception - a compound shell command forks, so killing only the
     shell orphans the grandchild that is doing the real work. Interrupts take that path too, not
     just timeouts: start_new_session means a Ctrl-C no longer reaches the child by itself.
+
+    Every path that spawns a subprocess routes through here - a leaf's `prepare:`, an
+    `artifact:` path expansion, a leaf's `action:` and a leaf's `metrics:` alike - so the
+    process-group handling below exists exactly once.
     """
     # start_new_session=True puts the shell in its own process group so a compound
     # action (pipes, &&, subshells) can be killed as a whole - subprocess.run's own
@@ -252,46 +282,61 @@ def preflight_refusal(leaf, default_timeout=DEFAULT_TIMEOUT_SECONDS, resolved=No
     return None
 
 
-def execute_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS, allow_preflight_failure=False):
-    """Run each leaf's action. An independent failure doesn't stop the remaining leaves.
+def execute_plan(
+    leaves,
+    default_timeout=DEFAULT_TIMEOUT_SECONDS,
+    command_key="action",
+    allow_preflight_failure=False,
+):
+    """Run each leaf's command under `command_key`. One failure doesn't stop the others.
 
     Returns a list of (leaf, status, detail) - status is "success", "failed", "timed out",
-    "refused", or "not attempted". detail is the action's real stdout on success, the real
-    error text on failure, and "known channel, not yet actionable" when not attempted - never
+    "refused", or "not attempted". detail is the command's real stdout on success, the real
+    error text on failure, and the per-key "not set" wording when not attempted - never
     silently empty on success, since this is the only evidence an operator gets that a real
     publish actually happened.
+
+    On the *action* path the order is **prepare -> inspect -> act**, and a tripped preflight
+    rule reports "refused" without the action ever running. `--metrics` skips both gates
+    entirely: it publishes nothing, so there is no irreversible step to gate, and running a
+    project's build to answer a read-only download-count query would be wrong.
     """
     results = []
     for leaf in leaves:
-        if not leaf.action:
-            results.append((leaf, "not attempted", NOT_ACTIONABLE))
+        command = leaf.command(command_key)
+        if not command:
+            results.append((leaf, "not attempted", NOT_SET[command_key]))
             continue
 
-        if leaf.prepare:
-            try:
-                rc, _out, err = _run(leaf.prepare, effective_timeout(leaf, default_timeout))
-            except subprocess.TimeoutExpired:
-                results.append(
-                    (leaf, "timed out", f"prepare timed out after {effective_timeout(leaf, default_timeout)}s")
-                )
-                continue
-            if rc != 0:
-                results.append((leaf, "failed", (err or "").strip() or f"prepare exited {rc}"))
-                continue
+        if command_key == GATED_COMMAND_KEY:
+            if leaf.prepare:
+                prepare_limit = effective_timeout(leaf, default_timeout)
+                try:
+                    rc, _out, err = _run(leaf.prepare, prepare_limit)
+                except subprocess.TimeoutExpired:
+                    results.append(
+                        (leaf, "timed out", f"prepare timed out after {prepare_limit}s")
+                    )
+                    continue
+                if rc != 0:
+                    results.append(
+                        (leaf, "failed", (err or "").strip() or f"prepare exited {rc}")
+                    )
+                    continue
 
-        refusal = preflight_refusal(leaf, default_timeout)
-        if refusal and not allow_preflight_failure:
-            results.append((leaf, "refused", refusal))
-            continue
-        if refusal:
-            print(f"warning: {leaf.dotted_path}: {refusal}", flush=True)
+            refusal = preflight_refusal(leaf, default_timeout)
+            if refusal and not allow_preflight_failure:
+                results.append((leaf, "refused", refusal))
+                continue
+            if refusal:
+                print(f"warning: {leaf.dotted_path}: {refusal}", flush=True)
 
         limit = effective_timeout(leaf, default_timeout)
         try:
-            returncode, stdout, stderr = _run(leaf.action, limit)
+            returncode, stdout, stderr = _run(command, limit)
             if returncode != 0:
                 raise subprocess.CalledProcessError(
-                    returncode, leaf.action, output=stdout, stderr=stderr
+                    returncode, command, output=stdout, stderr=stderr
                 )
             detail = (stdout or "").strip()
             results.append((leaf, "success", detail))
@@ -332,11 +377,29 @@ def format_summary(results):
     return "\n".join(lines)
 
 
+def scripts_dir():
+    """This script bundle's own directory, as an absolute path.
+
+    Exported to every leaf command as $ORC_PUBLISH_SCRIPTS so a project's channels.yaml can
+    invoke Orclab's own bundled helpers (metrics/launchpad_ppa.py) by a stable name. Derived
+    from __file__ rather than from $CLAUDE_SKILL_DIR, which is not set in every context a
+    skill's Bash calls actually run in - confirmed unset live, 2026-09-08.
+    """
+    return str(pathlib.Path(__file__).resolve().parent.parent)
+
+
 def main(argv=None):
+    os.environ["ORC_PUBLISH_SCRIPTS"] = scripts_dir()
     parser = argparse.ArgumentParser(prog="orc-publish")
     parser.add_argument("selection", nargs="*")
     parser.add_argument("--for", dest="for_distro")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--metrics",
+        action="store_true",
+        help="run each selected leaf's `metrics:` command instead of its `action:` - a "
+        "read-only report of the numbers that channel already publishes about itself",
+    )
     parser.add_argument("--channels", default=".orclab/publish/channels.yaml")
     parser.add_argument("--distro", default=".orclab/publish/distro.yaml")
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_SECONDS)
@@ -388,7 +451,8 @@ def main(argv=None):
         print(f"error: {bad_timeout}", file=sys.stderr, flush=True)
         return 1
 
-    print(format_plan(leaves, default_timeout=args.timeout), flush=True)
+    command_key = "metrics" if args.metrics else "action"
+    print(format_plan(leaves, default_timeout=args.timeout, command_key=command_key), flush=True)
 
     if args.dry_run:
         return 0
@@ -396,6 +460,7 @@ def main(argv=None):
     results = execute_plan(
         leaves,
         default_timeout=args.timeout,
+        command_key=command_key,
         allow_preflight_failure=args.allow_preflight_failure,
     )
     print(format_summary(results), flush=True)

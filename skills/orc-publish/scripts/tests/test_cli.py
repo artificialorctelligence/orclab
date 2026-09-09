@@ -868,3 +868,127 @@ def test_the_warning_appears_in_the_dry_run_plan(tmp_path, capsys):
     )
     main(["--channels", path, "--dry-run"])
     assert "one command" in capsys.readouterr().out
+
+
+# --metrics: the same execution path, reading a different leaf key. See BACKLOG #7.
+
+
+def metrics_tree(tmp_path):
+    return load_tree(
+        write_yaml(
+            tmp_path,
+            "channels.yaml",
+            """
+            ppa:
+              noble:
+                action: "echo PUBLISHED"
+                metrics: "echo 42 downloads"
+              snap: {}
+            """,
+        )
+    )
+
+
+def test_metrics_runs_the_metrics_command_not_the_action(tmp_path):
+    leaves = build_plan(metrics_tree(tmp_path), ["ppa.noble"])
+    results = execute_plan(leaves, command_key="metrics")
+    assert results[0][1] == "success"
+    assert results[0][2] == "42 downloads"
+
+
+def test_action_is_still_the_default_command_key(tmp_path):
+    leaves = build_plan(metrics_tree(tmp_path), ["ppa.noble"])
+    assert execute_plan(leaves)[0][2] == "PUBLISHED"
+
+
+def test_format_plan_shows_the_metrics_command_under_metrics(tmp_path):
+    leaves = build_plan(metrics_tree(tmp_path), ["ppa.noble"])
+    assert "ppa.noble: echo 42 downloads" in format_plan(leaves, command_key="metrics")
+
+
+def test_a_leaf_without_metrics_is_reported_as_having_no_metrics_source(tmp_path):
+    """Distinct wording from an action-less leaf: 'not yet actionable' would be a lie about a
+    channel that publishes fine and simply has no counter wired up."""
+    leaves = build_plan(metrics_tree(tmp_path), ["ppa.snap"])
+    assert "no metrics source" in format_plan(leaves, command_key="metrics")
+    assert execute_plan(leaves, command_key="metrics")[0][2] == "known channel, no metrics source"
+
+
+def test_main_with_metrics_runs_metrics_and_leaves_the_action_alone(tmp_path, capsys):
+    marker = tmp_path / "published"
+    channels = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        f"""
+        ppa:
+          noble:
+            action: "touch {marker}"
+            metrics: "echo 7"
+        """,
+    )
+    assert main(["ppa.noble", "--metrics", "--channels", channels]) == 0
+    assert "ppa.noble: success (7)" in capsys.readouterr().out
+    assert not marker.exists(), "--metrics must never run a leaf's publish action"
+
+
+def test_main_exports_the_scripts_dir_to_leaf_commands(tmp_path, capsys):
+    """A project's channels.yaml calls Orclab's own bundled readers by $ORC_PUBLISH_SCRIPTS,
+    because $CLAUDE_SKILL_DIR is not set in every context these commands really run in."""
+    channels = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        'ppa: { noble: { metrics: "test -f $ORC_PUBLISH_SCRIPTS/metrics/launchpad_ppa.py" } }',
+    )
+    assert main(["ppa.noble", "--metrics", "--channels", channels]) == 0
+    assert "ppa.noble: success" in capsys.readouterr().out
+
+
+# The two features meeting: the preflight gate belongs to the action path only.
+
+
+def test_metrics_ignores_prepare_and_preflight(tmp_path, capsys):
+    """A metrics query publishes nothing, so there is nothing to gate. Running the project's
+    build to answer a read-only download-count question would be wrong, and a leaf whose
+    artifact does not exist yet must still be able to report its numbers."""
+    prepared = tmp_path / "prepared"
+    channels = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        f"""
+        ppa:
+          noble:
+            action: "echo PUBLISHED"
+            metrics: "echo 42 downloads"
+            prepare: "touch {prepared}"
+            artifact: "{tmp_path}/never-built.tar"
+            preflight: ["no-vcs"]
+        """,
+    )
+    assert main(["ppa.noble", "--metrics", "--channels", channels]) == 0
+    out = capsys.readouterr().out
+    assert "ppa.noble: success (42 downloads)" in out
+    assert "refused" not in out
+    assert "preflight" not in out, "a --metrics plan must not inspect an artifact"
+    assert not prepared.exists(), "--metrics must never run a leaf's prepare:"
+
+
+def test_the_action_path_still_refuses_that_same_leaf(tmp_path):
+    """The negative control for the test above: the identical leaf, run as an action, does
+    hit the gate - so the metrics pass is skipping the gate, not the gate being absent."""
+    root = load_tree(
+        write_yaml(
+            tmp_path,
+            "channels.yaml",
+            f"""
+            ppa:
+              noble:
+                action: "echo PUBLISHED"
+                metrics: "echo 42 downloads"
+                artifact: "{tmp_path}/never-built.tar"
+                preflight: ["no-vcs"]
+            """,
+        )
+    )
+    leaf, status, detail = execute_plan(build_plan(root, ["ppa.noble"]))[0]
+    assert status == "refused"
+    assert "artifact not found" in detail
