@@ -2,6 +2,45 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.12.0] - 2026-09-08
+
+### Added
+- Three optional leaf fields for `/orc-publish`: `prepare:`, `artifact:` and `preflight:`. A leaf
+  can now declare a separate build step (`prepare:`), the real file it publishes (`artifact:`),
+  and a list of named rules to check that file against (`preflight:`) before its `action:` ever
+  runs. All three default to absent, so no existing `channels.yaml` changes behaviour.
+- An archive inspector reading `.tar`/`.zip` via stdlib, checking named rules against the entries
+  it finds: a VCS directory (`no-vcs`), agent/tool state, and prebuilt binaries
+  (`.deb`/`.whl`/`.so`/`.exe`). Rules are named and opt-in rather than a global glob list, because
+  the checks cannot be globalised — a `.snap` legitimately contains `.so` files.
+- `refused`, a new leaf status distinct from `failed`: a tripped preflight rule stops the action
+  before it runs, because what is about to be published is wrong rather than because running it
+  failed — the fix is different, and an operator reading the summary needs to know which happened.
+  Non-zero exit, siblings continue, offending entries are capped at five with the real total
+  stated rather than a wall of every match.
+- `--allow-preflight-failure`, a run-level override that downgrades a refusal to a warning for one
+  run and still prints every finding in full — loud, not silent. It must be typed each time; there
+  is no config-level opt-out, because publishing a known-bad artifact should cost a deliberate
+  keystroke.
+- A dry-run warning when one `action:` string both builds and publishes (a build verb followed by
+  a publish verb with no gate between them) — the shape that made preflight look impossible for a
+  leaf like this in the first place. It warns rather than refuses, since it is a regex over a shell
+  string and will have false positives, unlike the content rules which read real bytes.
+- Scenario 45 in `VERIFICATION.md`: a preflight refusal, its `--allow-preflight-failure` override,
+  and a clean re-run, read end to end as an operator would read them.
+
+### Removed
+- `filename_template` and `render_filename`, shipped dead in v7 (declared, parsed, unit-tested,
+  never called from the main flow) and superseded by `artifact:`, which now names the published
+  file for real.
+
+### Fixed
+- `orc-publish`'s `SKILL.md` said a refusal means "nothing ran" — wrong once `prepare:` exists,
+  since a declared `prepare:` already ran to completion, with real side effects, before the
+  refusal check fires.
+
+Closes BACKLOG #21.
+
 ## [0.11.0] - 2026-09-07
 
 ### Added
