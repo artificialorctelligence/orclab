@@ -1710,3 +1710,31 @@ more words would not have fixed any of them, and the fix for #2 and #5 was one s
 request with *"add one task to the backlog."* `backlog-discipline`'s "not a general task list" line
 is being removed by v16 partly on the argument that the file is substantially a task list. Its owner
 calling an entry a task, unprompted, is the strongest evidence available that the removal is right.
+
+**Correction, same day, from direflail — this entry flattened a distinction that matters.** The ask
+was *"think more user-centric"*, and it was written up above as *be* more user-centric. direflail's
+own words: *"the former means you still think and act as yourself, but you spare some cycles to
+think things through as if you were a human, particularly when it comes to user-facing stuff."* Not
+a request to become a different kind of reasoner - a request to spend cycles simulating the other
+side of the table.
+
+**The reasoning error that produced the flattening, which is the part worth keeping.** The paragraph
+above argues the failure is self-concealing, and concludes the fix must therefore be mechanical
+habit *instead of* judgment. That conflates two different capacities:
+
+- **Noticing** that the user lacks a fact - genuinely unavailable, for the reason given: the fact is
+  present, so nothing registers as absent.
+- **Simulating** a reader who has not seen what this context has seen - a check that can be run on
+  purpose, needing no prior noticing at all.
+
+Only the first is blocked. The argument slid from "I cannot perceive the gap" to "so do not try to,"
+and those do not connect. The four habits remain right, but they are the floor rather than the
+answer: a deliberate pass over any user-facing design, read as someone who has not been in this
+conversation, is the thing actually being asked for.
+
+**And the cost argument was under-weighted.** direflail: *"that's going to help keep us from going
+in two different directions and having to go back and refactor."* This is not only about clarity in
+the moment. `/orc-lane` was designed, argued for, and had questions built on top of it before the
+reframe to `/orc-todo` arrived - all of which was thrown away. That is the same economics as **#25**:
+work done twice because two views of the problem never met early enough. A simulated pass during
+design is paid in a paragraph; skipping it is paid in a rewrite.
