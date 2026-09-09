@@ -1278,7 +1278,11 @@ def run(args, repo, capsys, stdin=None, monkeypatch=None):
     # --cwd is a top-level option, so it MUST precede the subcommand. argparse assigns
     # options after a subcommand to that subparser, and this one is not defined there.
     code = main(["--cwd", str(repo), *args])
-    return code, capsys.readouterr().out
+    captured = capsys.readouterr()
+    # Both streams. main() prints errors to stderr, which is correct and stays that way; what
+    # these assertions care about is what the operator actually sees, and in a terminal that is
+    # the two interleaved.
+    return code, captured.out + captured.err
 
 
 def test_list_shows_open_entries_one_line_each_and_marks_resolved_ones_absent(tmp_path, capsys):
