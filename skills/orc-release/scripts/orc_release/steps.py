@@ -25,7 +25,7 @@ _PRECONDITION = re.compile(
 )
 _MANUAL = re.compile(r"\*\*Performed by hand\.?\*\*", re.IGNORECASE)
 _IRREVERSIBLE = re.compile(r"\*\*Irreversible\.?\*\*", re.IGNORECASE)
-_DELEGATES = re.compile(r"\*\*Run:\*\*\s*(/[\w-]+)", re.IGNORECASE)
+_DELEGATES = re.compile(r"\*\*Run:\*\*\s*(/[\w-]+.*)", re.IGNORECASE)
 
 # Any heading for body boundary detection
 _ANY_HEADING = re.compile(r"^##\s", re.MULTILINE)
@@ -158,7 +158,9 @@ def parse_steps(text):
                 body=body,
                 preconditions=preconditions,
                 is_manual=bool(_MANUAL.search(body)),
-                delegates_to=(_DELEGATES.search(body).group(1) if _DELEGATES.search(body) else None),
+                delegates_to=(
+                    _DELEGATES.search(body).group(1).rstrip() if _DELEGATES.search(body) else None
+                ),
                 is_irreversible=bool(_IRREVERSIBLE.search(body)),
             )
         )

@@ -100,6 +100,32 @@ def test_delegation_is_extracted():
     assert steps[0].delegates_to == "/orc-publish"
 
 
+def test_delegation_with_one_argument_is_extracted():
+    steps = parse_steps(
+        textwrap.dedent(
+            """
+            ## 7. Publish to the PPA
+
+            **Run:** /orc-publish desktop.python.linux.ppa.resolute
+            """
+        )
+    )
+    assert steps[0].delegates_to == "/orc-publish desktop.python.linux.ppa.resolute"
+
+
+def test_delegation_with_several_arguments_is_extracted():
+    steps = parse_steps(
+        textwrap.dedent(
+            """
+            ## 11. Cut the release
+
+            **Run:** /orc-version release v0.3.0
+            """
+        )
+    )
+    assert steps[0].delegates_to == "/orc-version release v0.3.0"
+
+
 def test_irreversible_is_detected():
     steps = parse_steps(
         textwrap.dedent(
