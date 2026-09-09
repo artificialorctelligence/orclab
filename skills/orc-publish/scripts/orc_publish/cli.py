@@ -44,9 +44,11 @@ def format_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
             if leaf.preflight:
                 lines.append(f"  preflight: {', '.join(leaf.preflight)}")
                 if leaf.artifact:
-                    path = expand_path(leaf.artifact, effective_timeout(leaf, default_timeout))
-                    if path and pathlib.Path(path).is_file():
-                        refusal = preflight_refusal(leaf, default_timeout)
+                    path, error = _expand_artifact(leaf, effective_timeout(leaf, default_timeout))
+                    if error:
+                        lines.append(f"  preflight result: {error}")
+                    elif path and pathlib.Path(path).is_file():
+                        refusal = preflight_refusal(leaf, default_timeout, resolved=(path, error))
                         lines.append(
                             f"  preflight result: {refusal}" if refusal
                             else "  preflight result: clean"
@@ -171,11 +173,31 @@ def expand_path(expr, timeout):
     return stdout.strip()
 
 
-def preflight_refusal(leaf, default_timeout=DEFAULT_TIMEOUT_SECONDS):
+def _expand_artifact(leaf, timeout):
+    """Expand `leaf.artifact` once, turning a hang into a message instead of a crash.
+
+    Returns (path, error): on success `error` is None; on a timed-out expansion `path` is
+    None and `error` is the message to show, whether that ends up on a dry-run plan line or
+    in a real preflight refusal. The one guarded call site both `format_plan` and
+    `preflight_refusal` route through, so a hanging `artifact:` expression can never reach a
+    caller that forgot to catch `subprocess.TimeoutExpired` itself - and a caller that
+    already has a `(path, error)` from here can hand it to `preflight_refusal` via
+    `resolved=` instead of expanding the same expression a second time.
+    """
+    try:
+        return expand_path(leaf.artifact, timeout), None
+    except subprocess.TimeoutExpired:
+        return None, f"artifact path expansion timed out after {timeout}s"
+
+
+def preflight_refusal(leaf, default_timeout=DEFAULT_TIMEOUT_SECONDS, resolved=None):
     """Why this leaf must not publish, or None if it may.
 
     Returns None when the leaf declares no preflight - the check is opt-in, and a leaf that
-    asks for nothing is not silently held to anything.
+    asks for nothing is not silently held to anything. `resolved` is an optional
+    already-computed `(path, error)` pair from `_expand_artifact`, for a caller (the dry-run
+    plan) that expanded `leaf.artifact` itself and would otherwise cause a second shell-out
+    for the same expression; omit it and this expands it itself, exactly as before.
     """
     if not leaf.preflight:
         return None
@@ -184,11 +206,11 @@ def preflight_refusal(leaf, default_timeout=DEFAULT_TIMEOUT_SECONDS):
         return f"unknown preflight rule(s): {', '.join(bad)}"
     if not leaf.artifact:
         return "preflight is declared but no artifact: is set - nothing to inspect"
-    timeout = effective_timeout(leaf, default_timeout)
-    try:
-        path = expand_path(leaf.artifact, timeout)
-    except subprocess.TimeoutExpired:
-        return f"artifact path expansion timed out after {timeout}s"
+    if resolved is None:
+        resolved = _expand_artifact(leaf, effective_timeout(leaf, default_timeout))
+    path, error = resolved
+    if error:
+        return error
     if not path or not pathlib.Path(path).is_file():
         return f"artifact not found: {path or leaf.artifact}"
     try:

@@ -778,7 +778,11 @@ def test_dry_run_reports_findings_when_the_artifact_already_exists(tmp_path, cap
         f'a: {{ artifact: "{tmp_path}/src.tar.gz", preflight: [no-vcs], action: "true" }}\n',
     )
     assert main(["--channels", path, "--dry-run"]) == 0
-    assert "no-vcs" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    # "no-vcs" alone appears unconditionally in the "preflight: no-vcs" declaration line
+    # even when the artifact is never inspected - assert on the rendered inspection result
+    # instead, which only an actual `inspect_archive` call over the real archive produces.
+    assert "preflight result: no-vcs: 1 entries, first 1: pkg/.git/config" in out
 
 
 def test_dry_run_says_inspection_is_deferred_when_the_artifact_is_not_built_yet(
@@ -810,3 +814,18 @@ def test_dry_run_lists_the_preflight_rules_a_leaf_declares(tmp_path, capsys):
     )
     main(["--channels", path, "--dry-run"])
     assert "no-vcs, no-tool-state" in capsys.readouterr().out
+
+
+def test_dry_run_does_not_crash_on_a_hanging_artifact_expansion(tmp_path, capsys):
+    # Before this fix, format_plan called expand_path directly and let
+    # subprocess.TimeoutExpired propagate - a dry run, the safety gate the user reads before
+    # confirming, must never crash instead of reporting.
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        'a: { artifact: "$(sleep 30; echo x).tar.gz", preflight: [no-vcs], timeout: 1, '
+        'action: "true" }\n',
+    )
+    assert main(["--channels", path, "--dry-run"]) == 0
+    out = capsys.readouterr().out
+    assert "preflight result: artifact path expansion timed out after 1s" in out
