@@ -1634,3 +1634,79 @@ zero, so #22's own "do not build ahead of a real concurrent run" trigger has gen
 one detail worth carrying in - neither session pushed until the end, so the canonical-file question
 #22 already flags (the main checkout, or a path outside every worktree) is load-bearing rather than
 incidental. A lock on a file inside each worktree would have protected nothing here.
+
+## #26: Claude's designs and explanations are built inside-out — the user has to ask for facts Claude already had
+
+Raised by direflail 2026-09-09, at the end of the session that produced v16's spec and plan, and
+raised as a working-relationship problem rather than a defect: *"your plans are good, if you're an
+AI... i just want us to work better together."*
+
+**The pattern, stated more precisely than "be more user-centric":** Claude reasons from the
+mechanism outward and explains from the conclusion backwards. Both are natural from inside a context
+where every premise is already loaded, and both are invisible from there — nothing feels missing,
+because for Claude nothing is. The user is the only party who can see the gap, so the user ends up
+doing the work of finding it.
+
+**Five real instances from that one session**, recorded concretely because a vague pattern is
+unfixable:
+
+1. **A design built outward from a lock.** Claude proposed an `/orc-lane` command whose surface was
+   organised around the lock, the allocator and the lane record — three pieces of machinery, two of
+   which a person can never interact with. direflail: *"what you're designing doesn't make sense to
+   a user. there's no command i can call to do something to the file lock."* The reframe to
+   `/orc-todo`, organised around the backlog a person actually looks at, came entirely from them.
+2. **Designing against a file never shown.** Claude spent several exchanges arguing that
+   `VERIFICATION.md` belonged in the allocator's scope without once showing what it contains.
+   direflail had to ask outright: *"tell me what VERIFICATION.md stores and give me an example of
+   format."* The answer took one command and immediately made the scope question decidable.
+3. **A premise skipped entirely.** Claude reported that an allocated entry "lands on main's branch,
+   not the feature branch" as though that followed obviously. It only follows if you already know
+   `subagent-driven-development` creates a worktree per plan, so a repo holds N copies of
+   `BACKLOG.md`. direflail: *"i don't understand what the repo has to do with any of this."*
+4. **An assumption never stated, then mistaken for a proposal.** Because Claude never said lanes do
+   not create branches, direflail reasonably asked whether they did — *"are you proposing that each
+   lane creates its own branch and the merge is where the trouble here is?"* The answer was no on
+   both counts, and neither had ever been written down.
+5. **A four-day-old line cited as settled authority.** Claude quoted `backlog-discipline`'s "Don't
+   turn this into a general task list" as a constraint on the design. direflail: *"IS BACKLOG.md a
+   task list? ... and who wrote backlog-discipline and why does it say this"*. Checking took one
+   `git log`: they wrote it on 2026-09-04, the commit body is empty, and ten of twelve open entries
+   are things that need doing. The line was deleted.
+
+A sixth, different in kind but the same root: Claude reopened the already-settled decision that all
+agents write one canonical `BACKLOG.md`, and direflail had to say *"i thought we had resolved
+that."* Settled context decayed silently rather than being tracked.
+
+**What should already have covered this, and why none of it fired.** `verify-before-asserting`
+covers a claim that gets challenged — it fires after the user pushes back, which is exactly one step
+too late here. `whole-process-first` covers reading a document before acting on it, not showing it
+to the person you are designing with. `superpowers:brainstorming` requires asking questions one at a
+time and proposing trade-offs, and Claude did both; it says nothing about surfacing the artifacts a
+person needs in order to answer those questions. `CLAUDE.md`'s "name what should already have
+covered it" is about mechanisms, not explanations. **There is a genuine gap, and it is not a matter
+of widening an existing trigger.**
+
+**Why this is harder than it looks, and the reason it is an entry rather than a fix.** The obvious
+remedy — a rule saying "explain more" or "show your sources" — is the weakest possible form, and
+`CLAUDE.md` already says why: prose fires only if the skill was invoked, the section was read, and
+the reader classified themselves into its trigger. Worse, this failure is *self-concealing*. Every
+other rule in this repo fires on a situation Claude can observe. Here the situation is "the user
+lacks a fact I have," which Claude by construction cannot see — the fact is present, so nothing
+registers as absent. A trigger phrased around noticing the gap will never fire, because noticing is
+the part that fails.
+
+That points at cheap structural habits rather than judgment: showing the artifact under discussion
+before arguing about it, stating premises about the environment before conclusions that rest on
+them, checking the provenance of any in-repo rule before citing it as a constraint, and keeping
+settled decisions somewhere they cannot quietly decay. All four are mechanical and none require
+Claude to detect its own blind spot first. Whether they belong in a skill, in `CLAUDE.md`, or in the
+brainstorming flow is undecided.
+
+**Scope boundary:** this is about how Claude designs and explains, not about output length. Four of
+the five instances above were Claude being *too brief on premises while being long on conclusions* —
+more words would not have fixed any of them, and the fix for #2 and #5 was one shell command each.
+
+**One incidental confirmation, recorded because it settles a live question:** direflail opened this
+request with *"add one task to the backlog."* `backlog-discipline`'s "not a general task list" line
+is being removed by v16 partly on the argument that the file is substantially a task list. Its owner
+calling an entry a task, unprompted, is the strongest evidence available that the removal is right.
