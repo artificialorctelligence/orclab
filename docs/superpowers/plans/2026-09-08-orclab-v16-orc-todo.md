@@ -368,6 +368,23 @@ def clear_lock(cwd=None):
     return True
 
 
+def atomic_write(path, text):
+    """Replace a file's contents in one step, never leaving it half-written.
+
+    Path.write_text() truncates and then writes, so a crash or a concurrent read in that window
+    sees an empty file. Everything this module guards is shared state that is deliberately never
+    committed, so there is no committed copy to fall back on - and a torn read of lanes.json in
+    particular reports "nothing in progress", which is the exact 2026-09-08 failure the lane
+    record exists to prevent.
+
+    The temp file sits in the same directory on purpose. os.replace is only atomic within one
+    filesystem, and /tmp is routinely a different one.
+    """
+    tmp = path.with_name(f".{path.name}.tmp{os.getpid()}")
+    tmp.write_text(text)
+    os.replace(tmp, path)
+
+
 def read_counters(cwd=None):
     path = _counters_path(cwd)
     if not path.exists():
@@ -379,7 +396,7 @@ def read_counters(cwd=None):
 
 
 def write_counters(mapping, cwd=None):
-    _counters_path(cwd).write_text(json.dumps(mapping, indent=2, sort_keys=True) + "\n")
+    atomic_write(_counters_path(cwd), json.dumps(mapping, indent=2, sort_keys=True) + "\n")
 ```
 
 - [ ] **Step 4: Run the tests to verify they pass**
@@ -761,7 +778,7 @@ def test_a_failed_write_leaves_the_original_file_intact(tmp_path, monkeypatch):
     def boom(src, dst):
         raise OSError("simulated failure at the replace step")
 
-    monkeypatch.setattr(alloc.os, "replace", boom)
+    monkeypatch.setattr(state.os, "replace", boom)
     with pytest.raises(OSError):
         alloc.allocate("backlog", "t", "b", cwd=repo)
     assert (repo / "BACKLOG.md").read_text() == before, "the original must survive intact"
@@ -791,8 +808,6 @@ instead by hooks/scripts/backlog_guard.py, which asks before anything discards a
 entry.
 """
 
-import os
-
 from . import state
 from .resources import RESOURCES, insert, render, scan_max
 
@@ -806,21 +821,6 @@ def canonical_file(resource, cwd=None):
     """The one real file every agent reaches, in the main checkout - not the caller's copy."""
     return state.canonical_root(cwd) / resource.filename
 
-
-def _atomic_write(path, text):
-    """Replace the file's contents in one step, never leaving it half-written.
-
-    path.write_text() truncates and then writes, so a crash in that window leaves the file
-    empty - and this is the file the allocator deliberately never commits, so there is no
-    committed copy to recover from. os.replace() is atomic on POSIX: a reader sees the old file
-    or the new one, never a torn one.
-
-    The temp file sits in the same directory on purpose. os.replace is only atomic within one
-    filesystem, and /tmp is routinely a different one.
-    """
-    tmp = path.with_name(f".{path.name}.tmp{os.getpid()}")
-    tmp.write_text(text)
-    os.replace(tmp, path)
 
 
 def next_number(resource, cwd=None):
@@ -846,7 +846,7 @@ def allocate(resource_key, title, body, cwd=None, timeout=10.0):
         raise ResourceMissing(f"{resource.filename} not found at {path}")
     with state.held(f"allocating a {resource.key} number", cwd=cwd, timeout=timeout):
         number = next_number(resource, cwd)
-        _atomic_write(path, insert(path.read_text(), resource, render(resource, number, title, body)))
+        state.atomic_write(path, insert(path.read_text(), resource, render(resource, number, title, body)))
         counters = state.read_counters(cwd)
         counters[resource.key] = number
         state.write_counters(counters, cwd)
@@ -921,7 +921,7 @@ import subprocess
 
 import pytest
 
-from orc_todo import lanes
+from orc_todo import lanes, state
 
 
 def make_repo(tmp_path, specs=("v13", "v14", "v15")):
@@ -1005,6 +1005,16 @@ def test_setting_current_to_an_item_not_in_the_lane_raises(tmp_path):
 def test_read_lanes_is_empty_rather_than_failing_when_nothing_exists(tmp_path):
     repo = make_repo(tmp_path)
     assert lanes.read_lanes(repo) == {}
+
+
+def test_a_corrupt_lane_file_raises_rather_than_reading_as_no_lanes(tmp_path):
+    """Absent and unreadable must not collapse into one answer. Reading a corrupt file as "no
+    lanes" would let the next lane command write a single lane back over every other one."""
+    repo = make_repo(tmp_path)
+    lanes.create_lane("A", ["v13"], cwd=repo)
+    (state.shared_dir(repo) / "lanes.json").write_text("{not json")
+    with pytest.raises(lanes.LaneStateCorrupt):
+        lanes.read_lanes(repo)
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -1049,6 +1059,10 @@ class LaneMissing(Exception):
     """No such lane, or no such item within it."""
 
 
+class LaneStateCorrupt(Exception):
+    """lanes.json exists but cannot be parsed."""
+
+
 def _lanes_path(cwd=None):
     return state.shared_dir(cwd) / "lanes.json"
 
@@ -1076,17 +1090,26 @@ def _require_specced(items, cwd=None):
 
 
 def read_lanes(cwd=None):
+    """Every lane. Empty when the file has never been written; raises when it is unreadable.
+
+    Those two cases must not collapse into one. Reading a corrupt file as "no lanes" would let
+    the very next create/modify/delete write a single lane back over every other one, losing
+    them all with nothing reported. Absent is normal; unreadable is a fault.
+    """
     path = _lanes_path(cwd)
     if not path.exists():
         return {}
     try:
         return json.loads(path.read_text())
-    except (ValueError, OSError):
-        return {}
+    except (ValueError, OSError) as e:
+        raise LaneStateCorrupt(
+            f"{path} exists but cannot be read: {e}. Nothing has been changed. "
+            "Inspect it before any lane command writes over it."
+        ) from e
 
 
 def _write_lanes(data, cwd=None):
-    _lanes_path(cwd).write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
+    state.atomic_write(_lanes_path(cwd), json.dumps(data, indent=2, sort_keys=True) + "\n")
 
 
 def create_lane(name, items, cwd=None):
@@ -1154,7 +1177,7 @@ def in_progress(cwd=None):
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cd skills/orc-todo/scripts && python3 -m pytest tests/test_lanes.py -v`
-Expected: PASS, 10 tests.
+Expected: PASS, 11 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -1603,7 +1626,7 @@ if __name__ == "__main__":
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cd skills/orc-todo/scripts && python3 -m pytest tests/ -v`
-Expected: PASS — all 55 tests (11 + 11 + 9 + 10 + 14).
+Expected: PASS — all 58 tests (11 + 11 + 11 + 11 + 14).
 
 - [ ] **Step 5: Write SKILL.md**
 
