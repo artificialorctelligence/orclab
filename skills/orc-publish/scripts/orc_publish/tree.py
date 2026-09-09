@@ -8,7 +8,7 @@ schema beyond that distinction - depth follows whatever a real project actually 
 import yaml
 
 LEAF_KEYS = frozenset(
-    {"action", "filename_template", "channel", "requirements", "issues", "timeout"}
+    {"action", "metrics", "filename_template", "channel", "requirements", "issues", "timeout"}
 )
 
 
@@ -33,6 +33,15 @@ class Node:
     @property
     def action(self):
         return self._data.get("action") if self.is_leaf else None
+
+    @property
+    def metrics(self):
+        """A read-only command printing this channel's own published download numbers."""
+        return self._data.get("metrics") if self.is_leaf else None
+
+    def command(self, key):
+        """The leaf's command under `key` ("action" or "metrics"), or None if unset."""
+        return self._data.get(key) if self.is_leaf else None
 
     @property
     def filename_template(self):

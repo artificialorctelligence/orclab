@@ -318,7 +318,7 @@ read/write pair plus its entry in `KNOWN_FORMATS`, not a new mechanism. The firs
 "suggest a starting version from what's already there" half of the original ask is also still
 unbuilt.
 
-## #7: Distribution-channel download/install metrics — carried over from Orcshot #186, direflail wants Orclab to own this eventually
+## #7: Distribution-channel download/install metrics — carried over from Orcshot #186, direflail wants Orclab to own this eventually (PARTIALLY ADDRESSED 2026-09-08 — Launchpad confirmed, Snap/Flathub still unverified)
 
 Raised by direflail (2026-09-06), explicitly carrying over Orcshot's own `BACKLOG.md` #186 (raised
 there 2026-08-28, still open, not resolved on that side) and widening it: direflail wants whatever
@@ -367,6 +367,53 @@ picked up, not decided here.
 capability one way or the other, verify `snapcraft metrics` and Flathub's stats API live against
 a real published project) before any `superpowers:brainstorming` pass on what Orclab actually
 builds from it.
+
+**Launchpad's capability confirmed live, 2026-09-08 — it does count PPA downloads.** The entry
+above framed this as a known Launchpad gap that might not exist at all. That framing was wrong,
+and it is the reason this was left unresearched for two days. Launchpad's public API exposes a
+real per-binary-publication download counter, anonymously, no auth and no credentials file:
+
+```bash
+curl -sS "https://api.launchpad.net/1.0/~<owner>/+archive/ubuntu/<ppa>?ws.op=getPublishedBinaries"
+# then, per entry in that result:
+curl -sS "<entry.self_link>?ws.op=getDownloadCount"
+```
+
+Run against the real `ppa:artificialorctelligence/orcshot`: 82 binary publications, **90 downloads
+in total**, all of it on `0.1.1-2` and `0.1.1-3`; `0.2.0` and `0.3.0` were at zero. A
+`getDailyDownloadTotals` operation exists on the same object and returned `{}` for a zero-count
+publication — real, but not yet seen returning data.
+
+**Two caveats that shape what the number means, both found in that same run**, and both worth
+carrying into whatever gets built rather than presenting a bare total as if it were users:
+- The count is **per binary publication** — one record per (package, version, series,
+  architecture). That is not double counting: a 24.04 user really does fetch the `noble`
+  publication and a 26.04 user the `resolute` one, so summing across series is correct. It does
+  mean there is no single "downloads for this PPA" number to read; you have to list every
+  publication and ask each one, ~75 HTTP round trips for a PPA this small.
+- Every architecture within a series read **identically** — `0.1.1-3` is exactly 4 on `amd64`,
+  and also 4 on `s390x`, `riscv64`, `i386`, `armhf`, `ppc64el`, `arm64`. Orcshot has no plausible
+  s390x users, and a real user population does not distribute itself uniformly across seven
+  architectures. That is something walking the archive index, not people. So the honest reading
+  of "90" is closer to *a handful of automated passes over two versions* than to 90 anyone. The
+  counter is real; what it counts is fetches of the `.deb`. This caveat is printed as part of the
+  tool's own output rather than left in documentation, because a bare total invites exactly the
+  misreading this bullet had to correct once already.
+
+**Still genuinely unverified:** `snapcraft metrics` and Flathub's stats API. Not for lack of
+trying — Orcshot has never been onboarded to either (its own `channels.yaml` records both as
+action-less leaves, confirmed live 2026-09-07: `snap info orcshot` finds no such snap, and both
+the Flathub API and `flathub/org.orcshot.Orcshot` 404). There is no real published project to
+check them against yet, so these stay unverified until a real Snap Store or Flathub publish
+exists — see Orcshot's own BACKLOG #198/#197.
+
+**Design settled, same day, and built:** this became `--metrics` on `/orc-publish` rather than a
+component of its own. The reasoning is in the "Why this belongs in Orclab" paragraph above, taken
+one step further — the config that declares *where a project publishes* is the same config that
+says where to go count, so the metrics read is a second command key (`metrics:`) on the same
+`channels.yaml` leaf that already carries `action:`. No new tree, no new selection syntax, no new
+config file. See **#18**, whose proposed `status:` key is the identical shape against the same
+leaves; that entry stays open, but its mechanism is now a two-line change rather than a design.
 
 ## #8: Two stale version literals left in VERIFICATION.md, found during v5's own final review (RESOLVED 2026-09-06)
 
@@ -1050,6 +1097,19 @@ generalize it.
 Also worth recording from that release: `dput` printing `Successfully uploaded packages.` says
 nothing about whether the package *built*. The build farm's result is a separate gate from the
 upload's success, which is this entry's whole point stated in the most concrete possible form.
+
+**The mechanism half of this got built for a different reason, 2026-09-08 (see #7).** `/orc-publish`
+now takes `--metrics`, which runs a leaf's `metrics:` command instead of its `action:` — the same
+selection, timeout, process-group kill and capture path, parameterized by which key holds the
+command. That is exactly the shape this entry's "next step" proposes for `status:`: adding it is
+now a two-line change (`tree.LEAF_KEYS`, and `cli.NOT_SET`, which is where the per-key wording for
+an unset command lives), not a design.
+
+What that does **not** settle is everything this entry is actually about: whether a `status:`
+command is even the right answer versus a link a human reads, versus the no-code option of
+splitting "wait for X, then do Y" into two numbered release steps. The cheap mechanism arriving
+first is a reason to be more careful here, not less — it makes the wrong answer as easy to build
+as the right one. Decide it alongside **#17** as this entry already says.
 
 ## #19: `/orc-release`'s `**Run:**` marker silently drops its arguments (RESOLVED 2026-09-08)
 

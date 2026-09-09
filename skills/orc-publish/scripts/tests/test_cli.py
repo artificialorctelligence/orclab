@@ -511,3 +511,76 @@ def test_main_rejects_a_non_positive_timeout_flag(tmp_path, capsys, bad):
     assert main(["--channels", path, "--dry-run", "--timeout", bad]) == 1
     err = capsys.readouterr().err
     assert "error: --timeout must be a positive whole number of seconds" in err
+
+
+# --metrics: the same execution path, reading a different leaf key. See BACKLOG #7.
+
+
+def metrics_tree(tmp_path):
+    return load_tree(
+        write_yaml(
+            tmp_path,
+            "channels.yaml",
+            """
+            ppa:
+              noble:
+                action: "echo PUBLISHED"
+                metrics: "echo 42 downloads"
+              snap: {}
+            """,
+        )
+    )
+
+
+def test_metrics_runs_the_metrics_command_not_the_action(tmp_path):
+    leaves = build_plan(metrics_tree(tmp_path), ["ppa.noble"])
+    results = execute_plan(leaves, command_key="metrics")
+    assert results[0][1] == "success"
+    assert results[0][2] == "42 downloads"
+
+
+def test_action_is_still_the_default_command_key(tmp_path):
+    leaves = build_plan(metrics_tree(tmp_path), ["ppa.noble"])
+    assert execute_plan(leaves)[0][2] == "PUBLISHED"
+
+
+def test_format_plan_shows_the_metrics_command_under_metrics(tmp_path):
+    leaves = build_plan(metrics_tree(tmp_path), ["ppa.noble"])
+    assert "ppa.noble: echo 42 downloads" in format_plan(leaves, command_key="metrics")
+
+
+def test_a_leaf_without_metrics_is_reported_as_having_no_metrics_source(tmp_path):
+    """Distinct wording from an action-less leaf: 'not yet actionable' would be a lie about a
+    channel that publishes fine and simply has no counter wired up."""
+    leaves = build_plan(metrics_tree(tmp_path), ["ppa.snap"])
+    assert "no metrics source" in format_plan(leaves, command_key="metrics")
+    assert execute_plan(leaves, command_key="metrics")[0][2] == "known channel, no metrics source"
+
+
+def test_main_with_metrics_runs_metrics_and_leaves_the_action_alone(tmp_path, capsys):
+    marker = tmp_path / "published"
+    channels = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        f"""
+        ppa:
+          noble:
+            action: "touch {marker}"
+            metrics: "echo 7"
+        """,
+    )
+    assert main(["ppa.noble", "--metrics", "--channels", channels]) == 0
+    assert "ppa.noble: success (7)" in capsys.readouterr().out
+    assert not marker.exists(), "--metrics must never run a leaf's publish action"
+
+
+def test_main_exports_the_scripts_dir_to_leaf_commands(tmp_path, capsys):
+    """A project's channels.yaml calls Orclab's own bundled readers by $ORC_PUBLISH_SCRIPTS,
+    because $CLAUDE_SKILL_DIR is not set in every context these commands really run in."""
+    channels = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        'ppa: { noble: { metrics: "test -f $ORC_PUBLISH_SCRIPTS/metrics/launchpad_ppa.py" } }',
+    )
+    assert main(["ppa.noble", "--metrics", "--channels", channels]) == 0
+    assert "ppa.noble: success" in capsys.readouterr().out

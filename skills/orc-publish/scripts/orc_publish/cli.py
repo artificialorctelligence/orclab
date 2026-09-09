@@ -9,6 +9,7 @@ calls this script twice: once with --dry-run, once without, once the user has co
 import argparse
 import contextlib
 import os
+import pathlib
 import signal
 import subprocess
 import sys
@@ -20,6 +21,14 @@ from .tree import load_tree
 
 
 NOT_ACTIONABLE = "known channel, not yet actionable"
+NO_METRICS = "known channel, no metrics source"
+
+# Every leaf command key. "action" publishes (writes, needs the SKILL.md confirmation gate);
+# "metrics" reads back numbers a channel already publishes about itself (safe, no gate). They
+# share the whole execution path - selection, timeout, process-group kill, output capture -
+# because the only thing that differs is which key holds the command. BACKLOG #18's proposed
+# `status:` is the same shape again: add it to tree.LEAF_KEYS and to NOT_SET below.
+NOT_SET = {"action": NOT_ACTIONABLE, "metrics": NO_METRICS}
 
 # A "something is wrong" ceiling, not a performance budget. A genuinely slow-but-healthy
 # upload sets its own `timeout:` on its leaf rather than raising this. See BACKLOG #11.
@@ -36,16 +45,17 @@ def build_plan(channel_root, tokens):
     return resolve_selection(channel_root, tokens)
 
 
-def format_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
+def format_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS, command_key="action"):
     if not leaves:
         return "(no leaves selected)"
     lines = []
     for leaf in leaves:
-        if leaf.action:
-            lines.append(f"{leaf.dotted_path}: {leaf.action}")
+        command = leaf.command(command_key)
+        if command:
+            lines.append(f"{leaf.dotted_path}: {command}")
             lines.append(f"  timeout: {effective_timeout(leaf, default_timeout)}s")
         else:
-            lines.append(f"{leaf.dotted_path}: ({NOT_ACTIONABLE})")
+            lines.append(f"{leaf.dotted_path}: ({NOT_SET[command_key]})")
         for req in leaf.requirements:
             lines.append(f"  requirement: {req}")
         for issue in leaf.issues:
@@ -107,7 +117,7 @@ def effective_timeout(leaf, default_timeout=DEFAULT_TIMEOUT_SECONDS):
     return leaf.timeout if leaf.timeout is not None else default_timeout
 
 
-def execute_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
+def execute_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS, command_key="action"):
     """Run each leaf's action. An independent failure doesn't stop the remaining leaves.
 
     Returns a list of (leaf, status, detail) - status is "success", "failed", "timed out",
@@ -118,8 +128,9 @@ def execute_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
     """
     results = []
     for leaf in leaves:
-        if not leaf.action:
-            results.append((leaf, "not attempted", NOT_ACTIONABLE))
+        command = leaf.command(command_key)
+        if not command:
+            results.append((leaf, "not attempted", NOT_SET[command_key]))
             continue
         limit = effective_timeout(leaf, default_timeout)
         try:
@@ -128,7 +139,7 @@ def execute_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
             # timeout only kills the /bin/sh -c process itself, orphaning whatever it forked,
             # so a timed-out dput would keep uploading past the report. See BACKLOG #11.
             with subprocess.Popen(
-                leaf.action,
+                command,
                 shell=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -150,7 +161,7 @@ def execute_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
                     raise
                 if proc.returncode != 0:
                     raise subprocess.CalledProcessError(
-                        proc.returncode, leaf.action, output=stdout, stderr=stderr
+                        proc.returncode, command, output=stdout, stderr=stderr
                     )
             detail = (stdout or "").strip()
             results.append((leaf, "success", detail))
@@ -191,11 +202,29 @@ def format_summary(results):
     return "\n".join(lines)
 
 
+def scripts_dir():
+    """This script bundle's own directory, as an absolute path.
+
+    Exported to every leaf command as $ORC_PUBLISH_SCRIPTS so a project's channels.yaml can
+    invoke Orclab's own bundled helpers (metrics/launchpad_ppa.py) by a stable name. Derived
+    from __file__ rather than from $CLAUDE_SKILL_DIR, which is not set in every context a
+    skill's Bash calls actually run in - confirmed unset live, 2026-09-08.
+    """
+    return str(pathlib.Path(__file__).resolve().parent.parent)
+
+
 def main(argv=None):
+    os.environ["ORC_PUBLISH_SCRIPTS"] = scripts_dir()
     parser = argparse.ArgumentParser(prog="orc-publish")
     parser.add_argument("selection", nargs="*")
     parser.add_argument("--for", dest="for_distro")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--metrics",
+        action="store_true",
+        help="run each selected leaf's `metrics:` command instead of its `action:` - a "
+        "read-only report of the numbers that channel already publishes about itself",
+    )
     parser.add_argument("--channels", default=".orclab/publish/channels.yaml")
     parser.add_argument("--distro", default=".orclab/publish/distro.yaml")
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_SECONDS)
@@ -246,12 +275,13 @@ def main(argv=None):
         print(f"error: {bad_timeout}", file=sys.stderr, flush=True)
         return 1
 
-    print(format_plan(leaves, default_timeout=args.timeout), flush=True)
+    command_key = "metrics" if args.metrics else "action"
+    print(format_plan(leaves, default_timeout=args.timeout, command_key=command_key), flush=True)
 
     if args.dry_run:
         return 0
 
-    results = execute_plan(leaves, default_timeout=args.timeout)
+    results = execute_plan(leaves, default_timeout=args.timeout, command_key=command_key)
     print(format_summary(results), flush=True)
     return 0 if all(status not in ("failed", "timed out") for _, status, _ in results) else 1
 
