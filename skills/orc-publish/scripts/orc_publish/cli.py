@@ -9,12 +9,14 @@ calls this script twice: once with --dry-run, once without, once the user has co
 import argparse
 import contextlib
 import os
+import pathlib
 import signal
 import subprocess
 import sys
 
 import yaml
 
+from .inspect import UnsupportedArchive, format_findings, inspect_archive, unknown_rules
 from .selection import SelectionError, resolve_selection, resolve_token
 from .tree import load_tree
 
@@ -102,51 +104,125 @@ def effective_timeout(leaf, default_timeout=DEFAULT_TIMEOUT_SECONDS):
     return leaf.timeout if leaf.timeout is not None else default_timeout
 
 
-def execute_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
+def _run(command, limit):
+    """Run one command to completion under `limit` seconds.
+
+    Returns (returncode, stdout, stderr). Raises subprocess.TimeoutExpired, which the caller
+    turns into whatever it means in that context. The process starts in its own session and its
+    whole group is killed on any exception - a compound shell command forks, so killing only the
+    shell orphans the grandchild that is doing the real work. Interrupts take that path too, not
+    just timeouts: start_new_session means a Ctrl-C no longer reaches the child by itself.
+    """
+    # start_new_session=True puts the shell in its own process group so a compound
+    # action (pipes, &&, subshells) can be killed as a whole - subprocess.run's own
+    # timeout only kills the /bin/sh -c process itself, orphaning whatever it forked,
+    # so a timed-out dput would keep uploading past the report. See BACKLOG #11.
+    with subprocess.Popen(
+        command,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    ) as proc:
+        try:
+            stdout, stderr = proc.communicate(timeout=limit)
+        except BaseException:
+            # Unconditional, not just on timeout: the same start_new_session that lets
+            # the group be killed also means a Ctrl-C on this process no longer reaches
+            # the action, so an interrupt would orphan exactly what the group kill
+            # exists to catch. TimeoutExpired is a BaseException and is still re-raised
+            # below, so the timeout path is unchanged. wait(), not communicate(): an
+            # escaped grandchild can still hold the pipes open.
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            proc.wait()
+            raise
+        return proc.returncode, stdout, stderr
+
+
+def expand_path(expr, timeout):
+    """Shell-expand an artifact path the same way an action is shell-expanded.
+
+    Double-quoted so command substitution still runs but word splitting does not - a path
+    with a space stays one path. Same trust boundary as `action`: it is the project's own
+    config, not untrusted input.
+    """
+    result = subprocess.run(
+        ["/bin/sh", "-c", f'printf %s "{expr}"'],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+    return result.stdout.strip()
+
+
+def preflight_refusal(leaf, default_timeout=DEFAULT_TIMEOUT_SECONDS):
+    """Why this leaf must not publish, or None if it may.
+
+    Returns None when the leaf declares no preflight - the check is opt-in, and a leaf that
+    asks for nothing is not silently held to anything.
+    """
+    if not leaf.preflight:
+        return None
+    bad = unknown_rules(leaf.preflight)
+    if bad:
+        return f"unknown preflight rule(s): {', '.join(bad)}"
+    if not leaf.artifact:
+        return "preflight is declared but no artifact: is set - nothing to inspect"
+    path = expand_path(leaf.artifact, effective_timeout(leaf, default_timeout))
+    if not path or not pathlib.Path(path).is_file():
+        return f"artifact not found: {path or leaf.artifact}"
+    try:
+        findings = inspect_archive(path, leaf.preflight)
+    except UnsupportedArchive:
+        return f"unsupported archive format, cannot inspect: {path}"
+    if findings:
+        return format_findings(findings)
+    return None
+
+
+def execute_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS, allow_preflight_failure=False):
     """Run each leaf's action. An independent failure doesn't stop the remaining leaves.
 
     Returns a list of (leaf, status, detail) - status is "success", "failed", "timed out",
-    or "not attempted". detail is the action's real stdout on success, the real error text on
-    failure, and "known channel, not yet actionable" when not attempted - never silently
-    empty on success, since this is the only evidence an operator gets that a real publish
-    actually happened.
+    "refused", or "not attempted". detail is the action's real stdout on success, the real
+    error text on failure, and "known channel, not yet actionable" when not attempted - never
+    silently empty on success, since this is the only evidence an operator gets that a real
+    publish actually happened.
     """
     results = []
     for leaf in leaves:
         if not leaf.action:
             results.append((leaf, "not attempted", NOT_ACTIONABLE))
             continue
+
+        if leaf.prepare:
+            try:
+                rc, _out, err = _run(leaf.prepare, effective_timeout(leaf, default_timeout))
+            except subprocess.TimeoutExpired:
+                results.append(
+                    (leaf, "timed out", f"prepare timed out after {effective_timeout(leaf, default_timeout)}s")
+                )
+                continue
+            if rc != 0:
+                results.append((leaf, "failed", (err or "").strip() or f"prepare exited {rc}"))
+                continue
+
+        refusal = preflight_refusal(leaf, default_timeout)
+        if refusal and not allow_preflight_failure:
+            results.append((leaf, "refused", refusal))
+            continue
+        if refusal:
+            print(f"warning: {leaf.dotted_path}: {refusal}", flush=True)
+
         limit = effective_timeout(leaf, default_timeout)
         try:
-            # start_new_session=True puts the shell in its own process group so a compound
-            # action (pipes, &&, subshells) can be killed as a whole - subprocess.run's own
-            # timeout only kills the /bin/sh -c process itself, orphaning whatever it forked,
-            # so a timed-out dput would keep uploading past the report. See BACKLOG #11.
-            with subprocess.Popen(
-                leaf.action,
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                start_new_session=True,
-            ) as proc:
-                try:
-                    stdout, stderr = proc.communicate(timeout=limit)
-                except BaseException:
-                    # Unconditional, not just on timeout: the same start_new_session that lets
-                    # the group be killed also means a Ctrl-C on this process no longer reaches
-                    # the action, so an interrupt would orphan exactly what the group kill
-                    # exists to catch. TimeoutExpired is a BaseException and is still re-raised
-                    # below, so the timeout path is unchanged. wait(), not communicate(): an
-                    # escaped grandchild can still hold the pipes open.
-                    with contextlib.suppress(ProcessLookupError):
-                        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-                    proc.wait()
-                    raise
-                if proc.returncode != 0:
-                    raise subprocess.CalledProcessError(
-                        proc.returncode, leaf.action, output=stdout, stderr=stderr
-                    )
+            returncode, stdout, stderr = _run(leaf.action, limit)
+            if returncode != 0:
+                raise subprocess.CalledProcessError(
+                    returncode, leaf.action, output=stdout, stderr=stderr
+                )
             detail = (stdout or "").strip()
             results.append((leaf, "success", detail))
         except subprocess.TimeoutExpired as e:
@@ -194,6 +270,7 @@ def main(argv=None):
     parser.add_argument("--channels", default=".orclab/publish/channels.yaml")
     parser.add_argument("--distro", default=".orclab/publish/distro.yaml")
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_SECONDS)
+    parser.add_argument("--allow-preflight-failure", action="store_true")
     args = parser.parse_args(argv)
 
     if is_bad_timeout(args.timeout):
@@ -246,9 +323,15 @@ def main(argv=None):
     if args.dry_run:
         return 0
 
-    results = execute_plan(leaves, default_timeout=args.timeout)
+    results = execute_plan(
+        leaves,
+        default_timeout=args.timeout,
+        allow_preflight_failure=args.allow_preflight_failure,
+    )
     print(format_summary(results), flush=True)
-    return 0 if all(status not in ("failed", "timed out") for _, status, _ in results) else 1
+    return 0 if all(
+        status not in ("failed", "timed out", "refused") for _, status, _ in results
+    ) else 1
 
 
 if __name__ == "__main__":

@@ -13,9 +13,11 @@ from orc_publish.cli import (
     DEFAULT_TIMEOUT_SECONDS,
     effective_timeout,
     execute_plan,
+    expand_path,
     format_plan,
     format_summary,
     main,
+    preflight_refusal,
     run_for,
     timeout_error,
 )
@@ -502,3 +504,187 @@ def test_main_rejects_a_non_positive_timeout_flag(tmp_path, capsys, bad):
     assert main(["--channels", path, "--dry-run", "--timeout", bad]) == 1
     err = capsys.readouterr().err
     assert "error: --timeout must be a positive whole number of seconds" in err
+
+
+def _leaf_yaml(tmp_path, extra):
+    return write_yaml(tmp_path, "channels.yaml", "a:\n" + extra)
+
+
+def test_prepare_runs_before_the_action(tmp_path):
+    root = load_tree(
+        _leaf_yaml(
+            tmp_path,
+            f'  prepare: "touch {tmp_path}/built"\n'
+            f'  action: "test -f {tmp_path}/built && touch {tmp_path}/published"\n',
+        )
+    )
+    results = execute_plan(build_plan(root, []))
+    assert results[0][1] == "success"
+    assert (tmp_path / "published").exists()
+
+
+def test_a_failing_prepare_fails_the_leaf_and_the_action_never_runs(tmp_path):
+    root = load_tree(
+        _leaf_yaml(
+            tmp_path,
+            '  prepare: "echo build-broke 1>&2; exit 1"\n'
+            f'  action: "touch {tmp_path}/published"\n',
+        )
+    )
+    leaf, status, detail = execute_plan(build_plan(root, []))[0]
+    assert status == "failed"
+    assert "build-broke" in detail
+    assert not (tmp_path / "published").exists()
+
+
+def test_a_prepare_that_hangs_times_out_and_the_action_never_runs(tmp_path):
+    root = load_tree(
+        _leaf_yaml(
+            tmp_path,
+            '  prepare: "sleep 30"\n'
+            '  timeout: 1\n'
+            f'  action: "touch {tmp_path}/published"\n',
+        )
+    )
+    leaf, status, detail = execute_plan(build_plan(root, []))[0]
+    assert status == "timed out"
+    assert "prepare" in detail
+    assert not (tmp_path / "published").exists()
+
+
+def test_a_dirty_artifact_refuses_and_the_action_never_runs(tmp_path):
+    import tarfile
+
+    blank = tmp_path / "blank"
+    blank.write_text("")
+    with tarfile.open(tmp_path / "src.tar.gz", "w:gz") as tf:
+        tf.add(blank, arcname="pkg/.git/config")
+    root = load_tree(
+        _leaf_yaml(
+            tmp_path,
+            f'  artifact: "{tmp_path}/src.tar.gz"\n'
+            '  preflight: [no-vcs]\n'
+            f'  action: "touch {tmp_path}/published"\n',
+        )
+    )
+    leaf, status, detail = execute_plan(build_plan(root, []))[0]
+    assert status == "refused"
+    assert "no-vcs" in detail
+    assert not (tmp_path / "published").exists()
+
+
+def test_a_clean_artifact_publishes(tmp_path):
+    import tarfile
+
+    blank = tmp_path / "blank"
+    blank.write_text("")
+    with tarfile.open(tmp_path / "src.tar.gz", "w:gz") as tf:
+        tf.add(blank, arcname="pkg/main.py")
+    root = load_tree(
+        _leaf_yaml(
+            tmp_path,
+            f'  artifact: "{tmp_path}/src.tar.gz"\n'
+            '  preflight: [no-vcs]\n'
+            f'  action: "touch {tmp_path}/published"\n',
+        )
+    )
+    assert execute_plan(build_plan(root, []))[0][1] == "success"
+    assert (tmp_path / "published").exists()
+
+
+def test_a_missing_artifact_refuses(tmp_path):
+    root = load_tree(
+        _leaf_yaml(
+            tmp_path,
+            f'  artifact: "{tmp_path}/never-built.tar.gz"\n'
+            '  preflight: [no-vcs]\n'
+            '  action: "true"\n',
+        )
+    )
+    leaf, status, detail = execute_plan(build_plan(root, []))[0]
+    assert status == "refused"
+    assert "not found" in detail
+
+
+def test_an_unreadable_format_refuses_naming_the_format_not_a_rule(tmp_path):
+    (tmp_path / "thing.snap").write_bytes(b"hsqs definitely not tar or zip")
+    root = load_tree(
+        _leaf_yaml(
+            tmp_path,
+            f'  artifact: "{tmp_path}/thing.snap"\n'
+            '  preflight: [no-vcs]\n'
+            '  action: "true"\n',
+        )
+    )
+    leaf, status, detail = execute_plan(build_plan(root, []))[0]
+    assert status == "refused"
+    assert "unsupported" in detail.lower()
+    assert "no-vcs" not in detail
+
+
+def test_an_unknown_rule_name_refuses(tmp_path):
+    root = load_tree(
+        _leaf_yaml(
+            tmp_path,
+            f'  artifact: "{tmp_path}/anything.tar.gz"\n'
+            '  preflight: [no-such-rule]\n'
+            '  action: "true"\n',
+        )
+    )
+    leaf, status, detail = execute_plan(build_plan(root, []))[0]
+    assert status == "refused"
+    assert "no-such-rule" in detail
+
+
+def test_a_refused_leaf_does_not_stop_the_next_one(tmp_path):
+    import tarfile
+
+    blank = tmp_path / "blank"
+    blank.write_text("")
+    with tarfile.open(tmp_path / "src.tar.gz", "w:gz") as tf:
+        tf.add(blank, arcname="pkg/.git/config")
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        f'a: {{ artifact: "{tmp_path}/src.tar.gz", preflight: [no-vcs], action: "true" }}\n'
+        'b: { action: "true" }\n',
+    )
+    results = execute_plan(build_plan(load_tree(path), []))
+    assert {leaf.dotted_path: s for leaf, s, _ in results} == {"a": "refused", "b": "success"}
+
+
+def test_main_exits_non_zero_on_a_refusal(tmp_path):
+    import tarfile
+
+    blank = tmp_path / "blank"
+    blank.write_text("")
+    with tarfile.open(tmp_path / "src.tar.gz", "w:gz") as tf:
+        tf.add(blank, arcname="pkg/.git/config")
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        f'a: {{ artifact: "{tmp_path}/src.tar.gz", preflight: [no-vcs], action: "true" }}\n',
+    )
+    assert main(["--channels", path]) == 1
+
+
+def test_the_override_publishes_anyway_and_still_reports(tmp_path, capsys):
+    import tarfile
+
+    blank = tmp_path / "blank"
+    blank.write_text("")
+    with tarfile.open(tmp_path / "src.tar.gz", "w:gz") as tf:
+        tf.add(blank, arcname="pkg/.git/config")
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        f'a: {{ artifact: "{tmp_path}/src.tar.gz", preflight: [no-vcs], '
+        f'action: "touch {tmp_path}/published" }}\n',
+    )
+    assert main(["--channels", path, "--allow-preflight-failure"]) == 0
+    assert (tmp_path / "published").exists()
+    assert "no-vcs" in capsys.readouterr().out
+
+
+def test_expand_path_runs_command_substitution(tmp_path):
+    assert expand_path("$(echo hello).tar.xz", 10) == "hello.tar.xz"
