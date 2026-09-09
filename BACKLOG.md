@@ -1606,3 +1606,31 @@ accident nobody noticed.
 **Scope boundary:** this entry records the incident and what it disproves about #22's framing. It
 does not propose the mechanism - that belongs in #22, whose design needs an "announce intent to
 start" step that its current one-lock-around-allocation shape does not have.
+
+**Correction, 2026-09-08, same day - the paragraph above claiming #22's lock "would not have fired
+once" is wrong, and the error is worth more than the claim was.** It asserted that the two sessions
+never contended for a shared resource. They did, twice. **Both allocated `VERIFICATION.md` Scenario
+45** - the surviving one is from the `main` session's `5684150`, and the worktree session's Task 7
+independently resolved the same number from the same "scenarios run to 44" scan. **Both also took
+BACKLOG `#23` and `#24`** from the same `#22` high-water mark, with different content. That is
+precisely the collision #22 describes, on precisely the two resources it names. An allocator asked
+for a scenario number twice returns 45 and 46; asked for a backlog number twice returns 23 and 24.
+It would have fired four times and prevented all four collisions.
+
+**How the wrong conclusion was reached, since the reasoning error is the reusable part:** the
+duplicate *implementation* and the numbered-resource *collision* were treated as one event. They are
+not. #22 has never claimed to prevent two agents building the same feature - its scope is numbered
+resources, and on that scope it was exactly right. Judging it by whether it would have prevented the
+duplicate build measured it against a promise it never made, then generalised that to "the design is
+wrong."
+
+**The second error compounds the first:** an unbuilt mechanism was declared disproven by a run that
+did not have it. The sessions allocated numbers by scanning a file for the maximum, because that is
+what `backlog-discipline` says to do and no allocator exists. Observing that no lock was taken in a
+run containing no lock is not evidence about the lock. It is evidence about the absence.
+
+**What survives from this incident as real input to #22's design:** the collision rate is no longer
+zero, so #22's own "do not build ahead of a real concurrent run" trigger has genuinely fired. And
+one detail worth carrying in - neither session pushed until the end, so the canonical-file question
+#22 already flags (the main checkout, or a path outside every worktree) is load-bearing rather than
+incidental. A lock on a file inside each worktree would have protected nothing here.
