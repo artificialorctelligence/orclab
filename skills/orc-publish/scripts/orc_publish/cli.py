@@ -26,11 +26,6 @@ NOT_ACTIONABLE = "known channel, not yet actionable"
 DEFAULT_TIMEOUT_SECONDS = 600
 
 
-def render_filename(template, version):
-    """Render a leaf's filename_template for a given version string, or None if unset."""
-    return template.replace("<version>", version) if template else None
-
-
 def build_plan(channel_root, tokens):
     """Resolve CLI selection tokens against the channel tree to a list of leaf Nodes."""
     return resolve_selection(channel_root, tokens)

@@ -176,3 +176,34 @@ def test_a_node_holding_only_a_timeout_is_still_a_leaf():
 def test_branch_reports_no_timeout():
     node = Node(path=(), data={"desktop": {"action": "echo hi"}})
     assert node.timeout is None
+
+
+def test_leaf_exposes_prepare_artifact_and_preflight():
+    node = Node(
+        path=("a",),
+        data={
+            "action": "echo publish",
+            "prepare": "echo build",
+            "artifact": "../thing.tar.xz",
+            "preflight": ["no-vcs"],
+        },
+    )
+    assert node.prepare == "echo build"
+    assert node.artifact == "../thing.tar.xz"
+    assert node.preflight == ["no-vcs"]
+
+
+def test_the_new_fields_default_to_none_and_empty():
+    node = Node(path=("a",), data={"action": "echo publish"})
+    assert node.prepare is None
+    assert node.artifact is None
+    assert node.preflight == []
+
+
+def test_a_node_holding_only_the_new_fields_is_still_a_leaf():
+    assert Node(path=("a",), data={"artifact": "x.tar", "preflight": ["no-vcs"]}).is_leaf
+
+
+def test_filename_template_is_gone():
+    node = Node(path=("a",), data={"action": "echo hi"})
+    assert not hasattr(node, "filename_template")

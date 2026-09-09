@@ -8,7 +8,10 @@ schema beyond that distinction - depth follows whatever a real project actually 
 import yaml
 
 LEAF_KEYS = frozenset(
-    {"action", "filename_template", "channel", "requirements", "issues", "timeout"}
+    {
+        "action", "channel", "requirements", "issues", "timeout",
+        "prepare", "artifact", "preflight",
+    }
 )
 
 
@@ -35,10 +38,6 @@ class Node:
         return self._data.get("action") if self.is_leaf else None
 
     @property
-    def filename_template(self):
-        return self._data.get("filename_template") if self.is_leaf else None
-
-    @property
     def channel(self):
         return self._data.get("channel") if self.is_leaf else None
 
@@ -46,6 +45,21 @@ class Node:
     def timeout(self):
         """The leaf's own timeout in seconds, or None when unset. Not validated here."""
         return self._data.get("timeout") if self.is_leaf else None
+
+    @property
+    def prepare(self):
+        """A command run before the preflight gate - local, reversible work. None when unset."""
+        return self._data.get("prepare") if self.is_leaf else None
+
+    @property
+    def artifact(self):
+        """The archive path to inspect. Shell-expanded at execution, like `action`."""
+        return self._data.get("artifact") if self.is_leaf else None
+
+    @property
+    def preflight(self):
+        """Names of the rule sets that apply. Empty when unset - preflight is opt-in."""
+        return list(self._data.get("preflight", [])) if self.is_leaf else []
 
     @property
     def requirements(self):

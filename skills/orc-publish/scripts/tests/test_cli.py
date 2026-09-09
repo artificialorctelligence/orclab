@@ -16,7 +16,6 @@ from orc_publish.cli import (
     format_plan,
     format_summary,
     main,
-    render_filename,
     run_for,
     timeout_error,
 )
@@ -26,14 +25,6 @@ def write_yaml(tmp_path, name, content):
     path = tmp_path / name
     path.write_text(textwrap.dedent(content))
     return str(path)
-
-
-def test_render_filename_substitutes_version():
-    assert render_filename("orcshot_<version>.zip", "1.2.3") == "orcshot_1.2.3.zip"
-
-
-def test_render_filename_handles_missing_template():
-    assert render_filename(None, "1.2.3") is None
 
 
 def test_format_plan_lists_each_leaf_and_its_action(tmp_path):
