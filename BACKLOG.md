@@ -1499,3 +1499,94 @@ since that decision is what makes the lock meaningful or useless.
 **Do not build ahead of a real concurrent run.** The honest state is that this is a well-understood
 hazard with a zero incident rate under concurrency, because concurrency has not been used yet. The
 right trigger is the first time two lanes are actually launched.
+
+## #23: the action-shape warning misses a repeated publish verb
+
+Found by a code review of v12's action-shape check (2026-09-08), verified live against the real
+implementation.
+
+`cli.action_shape_warning()` warns when a leaf's single `action:` both builds and irreversibly
+publishes, because no gate can run between the two. It compares only the **leftmost** occurrence
+of each verb - `action.find(publish)` against `action.find(build)` - rather than every pair. So an
+action that publishes, builds, then publishes again:
+
+```
+dput ppa:x a.changes && dpkg-buildpackage -S && dput ppa:x b.changes
+```
+
+genuinely has the build-then-irreversible-publish shape the check exists to catch, and produces no
+warning at all: the first `dput` precedes the build, so the ordering test fails and the second
+`dput` is never considered.
+
+**Scope boundary, and the reason this is small:** the check warns and never refuses. A miss costs
+a warning, not a bad publish - the real gate is `preflight:`, which inspects the artifact itself
+and is not a heuristic over a shell string. This is a gap in an advisory hint, not in the safety
+mechanism.
+
+**The fix, if it is ever worth taking:** compare every `build` occurrence against every `publish`
+occurrence rather than only the first of each. Worth weighing against the opposite risk - the
+check already has false positives by design (any substring match counts, so
+`cargo build-tools-checked && dput ...` warns today), and widening the search widens those too.
+
+## #24: `--dry-run`'s exit code doesn't distinguish a resolvable plan from one already known broken
+
+Raised by the final review of v12 artifact preflight (2026-09-08) and deliberately scoped out of
+that work's own fix wave rather than smuggled into it.
+
+`/orc-publish --dry-run` exits 0 whenever it manages to resolve a selection, even when the plan it
+prints already names a problem the tool has diagnosed with certainty. Confirmed live: a leaf with
+a typo'd rule name (`preflight: ["no-vcss"]`) prints
+`preflight result: unknown preflight rule(s): no-vcss` and exits 0.
+
+**The concrete consequence** is not a bad publish - at execution that leaf is `refused`, nothing
+is published, and `main` exits non-zero. It is that `--dry-run` is the gate `orc-publish`'s own
+`SKILL.md` Step 2 asks a human to read and approve, and anything scripting around that step - a CI
+preflight, a `RELEASING.md` check - cannot tell "this plan is fine" from "this plan is already
+broken and I am saying so in the output you are about to approve."
+
+**Why this is a design decision rather than a one-line fix.** The typo is not the only dry-run
+condition that reports a problem and exits 0: `preflight is declared but no artifact: is set`,
+`artifact not found:`, `unsupported archive format`, and `artifact path expansion timed out` all
+behave the same way. Making only the statically-detectable ones non-zero draws an arbitrary line
+through the middle of one category; making all of them non-zero changes what `--dry-run`'s exit
+code means to every existing caller. The real question is what the dry-run contract is - a report
+that succeeded in being produced, or a verdict on the plan - and it should be answered in one
+deliberate pass.
+
+**Scope boundary:** this is about the exit code only. The messages are already printed and already
+correct.
+
+## #25: BACKLOG #22's collision happened - two agents built the same feature, neither could see the other
+
+Not a prediction any more. On 2026-09-08 two concurrent sessions each implemented the whole of the
+v12 artifact-preflight plan, in full, independently. One worked on `main` directly; the other in a
+worktree branched from `origin/main` at `092a327`. Both produced a complete feature with a passing
+suite (120 tests and 119 tests), both wrote their own `VERIFICATION.md` Scenario 45, both resolved
+BACKLOG #21, and both allocated new BACKLOG numbers from the same `#22` high-water mark. The
+duplication surfaced only at `git merge`, as an add/add conflict on `tests/test_inspect.py`.
+
+**What made it invisible for the entire run, and this is the part worth keeping.** #22 frames the
+hazard as two agents *taking the same number*. That happened here, but it was the cheap part - a
+renumber. The expensive part was that the two agents never contended for any shared resource at
+all until the very end: the worktree session branched from `origin/main` and pushed nothing, and
+the `main` session committed locally and pushed nothing, so for the whole of both runs there was
+no observable state either could have polled to discover the other. A lock around number
+allocation - #22's proposed remedy - would not have fired once. Every guard in #22's design
+protects a *write*; nothing announces an *intent to start*.
+
+**The concrete cost:** roughly a full implementation's worth of agent time and tokens, spent
+twice, plus the review passes on both. Not recoverable, and not detectable until the end.
+
+**One real consolation worth recording**, because it argues against treating duplication as pure
+waste: the two implementations were not identical, and each caught something the other missed.
+`main`'s routed `expand_path` through `_run` (closing a process-group hole the worktree's version
+left open and had filed as a backlog entry); the worktree's fixed a scalar `preflight:` being read
+one character per rule, and a non-string one raising `TypeError` out of the property ahead of
+every caller's containment - both of which `main`'s had. The surviving branch was `main`'s, with
+the worktree's two fixes ported onto it as `596d970`. That is a real argument for deliberate
+N-version work on a genuinely risky component - but as a decision someone makes, not as an
+accident nobody noticed.
+
+**Scope boundary:** this entry records the incident and what it disproves about #22's framing. It
+does not propose the mechanism - that belongs in #22, whose design needs an "announce intent to
+start" step that its current one-lock-around-allocation shape does not have.
