@@ -104,6 +104,38 @@ def test_remove_deletes_the_section_and_renumbers_nothing(tmp_path, capsys):
     assert "## #12:" in text and "## #22:" in text, "no other entry may be renumbered"
 
 
+def test_remove_keeps_a_header_whose_own_prose_contains_a_heading_shape(tmp_path, capsys):
+    """Rebuilding the file from parsed pieces truncated the header at the first literal
+    "## #" anywhere in it, silently, with a zero exit."""
+    repo = make_repo(tmp_path)
+    (repo / "BACKLOG.md").write_text(
+        '# Backlog\n\nEntries look like `## #N: Title` followed by prose.\n\n'
+        + BACKLOG.split("\n", 2)[2])
+    assert run(["remove", "7"], repo, capsys)[0] == 0
+    assert "followed by prose." in (repo / "BACKLOG.md").read_text()
+
+
+def test_remove_keeps_a_trailing_section_after_the_last_entry(tmp_path, capsys):
+    """The last entry's body ran to EOF, so removing it took any closing section with it."""
+    repo = make_repo(tmp_path)
+    (repo / "BACKLOG.md").write_text(BACKLOG + "\n## How to read this\n\nclosing note\n")
+    assert run(["remove", "22"], repo, capsys)[0] == 0
+    text = (repo / "BACKLOG.md").read_text()
+    assert "## #22:" not in text
+    assert "## How to read this" in text and "closing note" in text
+
+
+def test_remove_keeps_every_other_entry_byte_for_byte(tmp_path, capsys):
+    """Nothing outside the removed span may be reflowed, respaced or reformatted."""
+    repo = make_repo(tmp_path)
+    before = (repo / "BACKLOG.md").read_text()
+    assert run(["remove", "12"], repo, capsys)[0] == 0
+    after = (repo / "BACKLOG.md").read_text()
+    for fragment in ("## #7: an open one\n\nprose about it", "## #22: another open one\n\nmore prose"):
+        assert fragment in after, fragment
+    assert "## #12" not in after and "## #12" in before
+
+
 def test_lane_create_and_list(tmp_path, capsys):
     repo = make_repo(tmp_path)
     assert run(["lane", "create", "B", "v13,v14"], repo, capsys)[0] == 0

@@ -16,6 +16,8 @@ from .resources import RESOURCES
 
 RESOLVED = re.compile(r"\(RESOLVED\b")
 PARTIAL = re.compile(r"\(PARTIALLY ADDRESSED\b")
+_HEADING = re.compile(r"^## #(\d+): ", re.MULTILINE)
+_NEXT_SECTION = re.compile(r"^## ", re.MULTILINE)
 
 
 def _backlog_path(cwd):
@@ -83,22 +85,31 @@ def cmd_add(args):
 
 def cmd_remove(args):
     """Delete an entry. Numbers are permanent: nothing is renumbered and the number is never
-    reissued, which the counter guarantees by never going backwards."""
+    reissued, which the counter guarantees by never going backwards.
+
+    The entry is cut out of the real text rather than the file being rebuilt from parsed
+    pieces. Rebuilding loses whatever the parser did not model - a header whose own prose
+    happens to contain "## #", a note sitting between two entries, a closing section after the
+    last one - and it loses it silently, with a zero exit. This is the file the whole mechanism
+    exists to protect; it does not get to be lossy.
+
+    An entry ends at the next "## " heading of any kind, not the next "## #N:". That is what
+    lets a trailing section such as VERIFICATION.md's "## Recording the result" survive the
+    removal of the entry above it.
+    """
     path = _backlog_path(args.cwd)
     text = _read_backlog(args.cwd)
-    kept, removed = [], False
-    for n, title, body in _sections(text):
-        if n == args.number:
-            removed = True
+    starts = [(int(m.group(1)), m.start()) for m in _HEADING.finditer(text)]
+    for i, (number, start) in enumerate(starts):
+        if number != args.number:
             continue
-        kept.append(f"## #{n}: {title}\n{body.rstrip(chr(10))}\n")
-    if not removed:
-        print(f"error: no entry #{args.number}", file=sys.stderr)
-        return 1
-    header = text[: text.index("## #")] if "## #" in text else text
-    path.write_text(header.rstrip("\n") + "\n\n" + "\n".join(kept))
-    print(f"removed #{args.number}; nothing renumbered, and #{args.number} is never reissued")
-    return 0
+        after = _NEXT_SECTION.search(text, start + 1)
+        end = after.start() if after else len(text)
+        state.atomic_write(path, (text[:start].rstrip("\n") + "\n\n" + text[end:]).rstrip("\n") + "\n")
+        print(f"removed #{args.number}; nothing renumbered, and #{args.number} is never reissued")
+        return 0
+    print(f"error: no entry #{args.number}", file=sys.stderr)
+    return 1
 
 
 def cmd_lane(args):
