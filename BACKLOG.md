@@ -1051,7 +1051,7 @@ Also worth recording from that release: `dput` printing `Successfully uploaded p
 nothing about whether the package *built*. The build farm's result is a separate gate from the
 upload's success, which is this entry's whole point stated in the most concrete possible form.
 
-## #19: `/orc-release`'s `**Run:**` marker silently drops its arguments
+## #19: `/orc-release`'s `**Run:**` marker silently drops its arguments (RESOLVED 2026-09-08)
 
 Found 2026-09-07 while considering whether Orcshot's `RELEASING.md` step 11 should delegate the
 GitHub Release to a command. The delegation marker is parsed by
@@ -1095,6 +1095,34 @@ anything consumes `delegates_to` expecting a bare name before widening it.
 **Blocks nothing outright, but see #20** — that entry's proposed step 11 delegation
 (`**Run:** /orc-git release`) is the case where the dropped word is most misleading, so fixing
 this first makes that change clean.
+
+**Resolved 2026-09-08.** The capture is widened to the rest of the line and stripped:
+
+```python
+_DELEGATES = re.compile(r"\*\*Run:\*\*\s*(/[\w-]+.*)", re.IGNORECASE)
+```
+
+`.` does not match a newline without `re.DOTALL`, so this stays single-line by construction — which
+matters, because `**Preconditions:**` deliberately spans lines and this marker must not start
+behaving like it. Verified directly rather than assumed, against the three cases this entry named
+plus two it did not:
+
+```
+bare         -> '/orc-publish'
+one arg      -> '/orc-publish desktop.python.linux.ppa.resolute'
+two args     -> '/orc-version release v0.3.0'
+trailing ws  -> '/orc-git release'
+prose on following lines -> not captured; the next step's own field stays None
+```
+
+**The pre-existing bare-command test passed unchanged**, which is the real regression check: it
+proves the widening did not over-capture. Confirmed before changing the field's meaning that nothing
+branches on `delegates_to` — it is declared on the `Step` dataclass, set once in the parser, and
+otherwise only asserted in tests.
+
+`skills/orc-release/SKILL.md` needed no change: its instruction is "Marked **Run: /some-command** →
+invoke that command," which was already correct and is now actually served by the parsed field.
+Suites green at 102 / 62 / 48.
 
 ## #20: where release-adjacent responsibilities live — `/orc-version release` is misplaced
 
