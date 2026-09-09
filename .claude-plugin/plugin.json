@@ -1,7 +1,7 @@
 {
   "name": "orclab",
   "description": "Project-discipline skills distilled from real practice: backlog tracking, release checklists, live-environment registries, currency, verification, and secret-hygiene discipline, a deterministic /orc-code entry point for new-project, existing-project, and refactor work, /orc-version for versioning the current project, and /orc-git for common git/GitHub shortcuts. Every component ships as a skill, so /orc-* works identically in the CLI and Claude Desktop. /orc-publish pushes a project's built artifacts to its own configured distribution channels. /orc-release drives a project's own RELEASING.md end to end. /orc-reload reinstalls the plugin you're developing so a fresh session picks up your changes.",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "author": {
     "name": "orclab",
     "email": "orc.shot@yahoo.com"

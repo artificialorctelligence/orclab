@@ -2,6 +2,48 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.13.0] - 2026-09-08
+
+### Added
+- Artifact preflight for `/orc-publish`. A channel leaf may now declare three optional fields:
+  `prepare:` (a local, reversible command run before the gate — building the artifact),
+  `artifact:` (the archive path to inspect, shell-expanded like `action:` already is, so a
+  project can derive a version the way it already does, e.g.
+  `../orcshot_$(dpkg-parsechangelog --show-field Version).tar.xz`), and `preflight:` (which
+  named rule sets apply: `no-vcs`, `no-tool-state`, `no-prebuilt-binaries`). `/orc-publish` then
+  runs **prepare → inspect → act** for a leaf declaring these.
+- A new `refused` status, distinct from `failed` for the same reason `timed out` is: a tripped
+  preflight rule means nothing was published, because what was about to go out was wrong — not
+  that the publish attempt itself broke. Exits non-zero; sibling leaves still run. Offending
+  entries in a report are capped at five with the real total shown (one motivating archive had
+  3,061 of them).
+- `orc_publish/inspect.py`, a new stdlib-only module that reads tar and zip archives for the
+  preflight rules above. An archive in a format it can't read is refused, never silently passed.
+- `--allow-preflight-failure`, which downgrades refusals to warnings for one run and still
+  prints every finding. Deliberately has no config-level equivalent — an irreversible publish
+  over a known-bad artifact should cost a deliberate keystroke every time.
+- The `--dry-run` plan now reports everything the real run will refuse that it can already know
+  at plan time: an unknown rule name, a missing `artifact:`, an artifact that will never exist.
+  The plan is the list an operator consents to, so it must not approve a configuration that can
+  only refuse.
+- A warning — never a refusal, since it's a regex over a shell string — when one leaf's
+  `action:` both builds and irreversibly publishes in a single command, since no gate can run
+  between the two.
+- `release-checklist` gained a rule: lint the artifact you are actually shipping, not a sibling
+  of it. The motivating project linted its binary `.deb` clean every release while the *source*
+  package it uploaded carried 1,415 then 1,882 `.git` entries into a public archive.
+
+### Changed
+- All subprocess spawning in `orc-publish` now goes through one `_run` helper carrying the
+  process-group kill, so a compound command's grandchild can't be orphaned. The `--metrics`
+  path added in 0.12.0 now shares it too.
+
+### Removed
+- `filename_template` and `render_filename`, shipped dead since v7 and superseded by
+  `artifact:`.
+
+Closes BACKLOG #21.
+
 ## [0.12.0] - 2026-09-08
 
 ### Added
