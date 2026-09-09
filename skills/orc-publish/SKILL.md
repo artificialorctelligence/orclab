@@ -95,8 +95,9 @@ failure away, and never claim success for a leaf the summary doesn't confirm suc
   publish mechanism for yet — not a misconfiguration to fix.
 - A leaf may declare `prepare:` (a command run first), `artifact:` (the archive to inspect) and
   `preflight:` (which named rule sets apply). When it does, the order is **prepare → inspect →
-  act**, and a tripped rule reports as `timed out`'s sibling status **`refused`**: nothing ran,
-  because what was about to be published is wrong. That is a different thing from `failed`, which
+  act**, and a tripped rule reports as `timed out`'s sibling status **`refused`**: the act never
+  ran, because what was about to be published is wrong — though a declared `prepare:` already may
+  have, real side effects a refusal doesn't undo. That is a different thing from `failed`, which
   means a command you ran returned non-zero — relay the distinction rather than flattening it.
 - `artifact:` must name the **archive itself**, not a manifest that references it. Inspecting a
   `.changes` file instead of the `.tar.xz` it lists would check the wrong thing while reporting
