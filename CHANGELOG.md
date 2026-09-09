@@ -2,6 +2,33 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.12.0] - 2026-09-08
+
+### Added
+- `--metrics` on `/orc-publish`, and a `metrics:` key on a channel leaf: a read-only report of
+  the download/install numbers a distribution channel already publishes about itself. It runs
+  the leaf's `metrics:` command instead of its `action:`, sharing the whole execution path —
+  selection, timeout, process-group kill, output capture — so the only thing that differs is
+  which key holds the command. Explicitly not telemetry: nothing is added to a project, and a
+  channel with no public counter honestly reports having none, as
+  `(known channel, no metrics source)`. Closes the researched half of BACKLOG #7.
+- `metrics/launchpad_ppa.py`, the one channel needing real code. Launchpad counts per
+  (package, version, series, architecture) publication and offers no archive-wide total, so
+  reading one number means ~75 concurrent HTTP round trips. Anonymous and read-only.
+  `--series` restricts it to one Ubuntu series, which is what stops two leaves of the same PPA
+  from each reporting the same total. Confirmed live against a real PPA.
+- `$ORC_PUBLISH_SCRIPTS`, exported to every leaf command, so a project's `channels.yaml` can
+  call Orclab's bundled readers without knowing where the plugin is installed.
+  `$CLAUDE_SKILL_DIR` was confirmed unset in contexts where those commands really run, so it
+  cannot be relied on from a project's own config.
+
+### Fixed
+- `/orc-release`'s `**Run:**` marker kept only the command name and discarded the rest of the
+  line, so a step reading `**Run:** /orc-version release` recorded `delegates_to` as
+  `/orc-version` — a field naming a materially different action, since one sets a version and
+  the other cuts a public GitHub Release. Closes BACKLOG #19.
+
+
 ## [0.11.0] - 2026-09-07
 
 ### Added
