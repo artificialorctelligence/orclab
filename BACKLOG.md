@@ -1194,7 +1194,7 @@ across three shipped commands and touches naming, so it is not an inline edit. F
 or alongside. Nothing here is urgent: `/orc-version release` works today, and the only real cost
 of the status quo is that nobody can tell the two commands apart from their names.
 
-## #21: nothing inspects an artifact before it is irreversibly published
+## #21: nothing inspects an artifact before it is irreversibly published (RESOLVED 2026-09-08)
 
 Raised 2026-09-07 from a handover written by the session that drove Orcshot's `0.3.0` release end
 to end. Everything below was measured from real tarballs during that release, not reasoned about
@@ -1261,6 +1261,28 @@ format-specific: a `.tar.xz`, a `.snap` and a `.flatpak` are not inspected the s
 `release-checklist` convention that a build step must be followed by a check *of that artifact*.
 Probably the last one plus one of the first two. Related: **#18** (a publish accepted but not
 landed) and **#20** (where release-adjacent responsibilities live).
+
+**Resolved 2026-09-08 (Orclab v12).** A leaf may declare `prepare:`, `artifact:` and `preflight:`;
+`/orc-publish` runs prepare, inspects the artifact against the named rules, and reports `refused`
+without running the action when a rule trips. Non-zero exit, siblings continue, offending entries
+capped at five with the real total. `--allow-preflight-failure` downgrades a refusal for one run and
+still prints every finding.
+
+**The framing this entry started with was wrong, and the correction is the design.** The first pass
+claimed a leaf whose action builds what it publishes could not be inspected at all. It can: the
+tarball exists after the build, `debsign` is local and reversible, and only `dput` is irreversible.
+The real constraint was narrower — one opaque shell string admits no gate between two of its
+commands — which `prepare:` fixes without anyone restructuring a release. That also answers #12's
+standing complaint that a publish action had to smuggle a build into itself.
+
+The size-anomaly rule was cut deliberately: it needs persistent state Orclab does not keep and is
+the most false-positive-prone of the four, and all three real incidents trip a content rule.
+`filename_template` and `render_filename` were removed as part of this — shipped dead in v7 and
+superseded by `artifact:`.
+
+The structural half lives in `release-checklist` as **"lint the thing you are shipping, not its
+sibling,"** which generalises past this design: a checklist that verifies one artifact and ships a
+different one has a blind spot however good either check is.
 
 ## #22: concurrent Orclab agents can collide on numbered resources — a lock, an allocator, and ordered queues
 

@@ -558,6 +558,40 @@ real rendered output caught it, which is what this scenario is for.
 4. **Expected**, for `test.silent`: `no output captured, the action may be waiting on stdin`. That
    is honest here and is its own distinct signal — the action hung before printing anything.
 
+## Scenario 45: preflight refuses a dirty artifact before it can be published
+
+Unit tests assert the refusal is produced. This checks the thing they cannot: that an operator
+reading the summary understands what happened and why nothing was published.
+
+1. In a throwaway scratch directory, build a deliberately dirty source archive:
+
+   ```bash
+   mkdir -p pkg/.git && touch pkg/main.py pkg/.git/config pkg/.git/HEAD
+   tar czf dirty.tar.gz pkg
+   ```
+2. Create `.orclab/publish/channels.yaml`:
+
+   ```yaml
+   test:
+     dirty:
+       artifact: "dirty.tar.gz"
+       preflight: [no-vcs]
+       action: "touch PUBLISHED"
+   ```
+3. Run `/orc-publish` and read the dry-run list.
+4. **Expected:** `test.dirty` shows its action, its `preflight: no-vcs` line, and a
+   `preflight result:` naming `no-vcs`, the real entry count, and the first few offending paths —
+   not a wall of every entry.
+5. Confirm, and let it run for real.
+6. **Expected:** the leaf reports **`refused`**, not `failed`. `PUBLISHED` does **not** exist — the
+   action never ran. The run's exit code is non-zero.
+7. Re-run with `--allow-preflight-failure`.
+8. **Expected:** `PUBLISHED` now exists, the finding is still printed in full, and the exit code is
+   zero. The override is loud, not silent.
+9. Rebuild the archive without the `.git` directory (`rm -rf pkg/.git && tar czf dirty.tar.gz pkg`)
+   and run again without the override.
+10. **Expected:** the leaf publishes normally and the dry-run reports `preflight result: clean`.
+
 ## Recording the result
 
 Note the outcome of each scenario (pass/fail, with specifics) either back in this conversation or
