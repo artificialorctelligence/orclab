@@ -1347,6 +1347,38 @@ def test_remove_deletes_the_section_and_renumbers_nothing(tmp_path, capsys):
     assert "## #12:" in text and "## #22:" in text, "no other entry may be renumbered"
 
 
+def test_remove_keeps_a_header_whose_own_prose_contains_a_heading_shape(tmp_path, capsys):
+    """Rebuilding the file from parsed pieces truncated the header at the first literal
+    "## #" anywhere in it, silently, with a zero exit."""
+    repo = make_repo(tmp_path)
+    (repo / "BACKLOG.md").write_text(
+        '# Backlog\n\nEntries look like `## #N: Title` followed by prose.\n\n'
+        + BACKLOG.split("\n", 2)[2])
+    assert run(["remove", "7"], repo, capsys)[0] == 0
+    assert "followed by prose." in (repo / "BACKLOG.md").read_text()
+
+
+def test_remove_keeps_a_trailing_section_after_the_last_entry(tmp_path, capsys):
+    """The last entry's body ran to EOF, so removing it took any closing section with it."""
+    repo = make_repo(tmp_path)
+    (repo / "BACKLOG.md").write_text(BACKLOG + "\n## How to read this\n\nclosing note\n")
+    assert run(["remove", "22"], repo, capsys)[0] == 0
+    text = (repo / "BACKLOG.md").read_text()
+    assert "## #22:" not in text
+    assert "## How to read this" in text and "closing note" in text
+
+
+def test_remove_keeps_every_other_entry_byte_for_byte(tmp_path, capsys):
+    """Nothing outside the removed span may be reflowed, respaced or reformatted."""
+    repo = make_repo(tmp_path)
+    before = (repo / "BACKLOG.md").read_text()
+    assert run(["remove", "12"], repo, capsys)[0] == 0
+    after = (repo / "BACKLOG.md").read_text()
+    for fragment in ("## #7: an open one\n\nprose about it", "## #22: another open one\n\nmore prose"):
+        assert fragment in after, fragment
+    assert "## #12" not in after and "## #12" in before
+
+
 def test_lane_create_and_list(tmp_path, capsys):
     repo = make_repo(tmp_path)
     assert run(["lane", "create", "B", "v13,v14"], repo, capsys)[0] == 0
@@ -1426,6 +1458,8 @@ from .resources import RESOURCES
 
 RESOLVED = re.compile(r"\(RESOLVED\b")
 PARTIAL = re.compile(r"\(PARTIALLY ADDRESSED\b")
+_HEADING = re.compile(r"^## #(\d+): ", re.MULTILINE)
+_NEXT_SECTION = re.compile(r"^## ", re.MULTILINE)
 
 
 def _backlog_path(cwd):
@@ -1493,22 +1527,31 @@ def cmd_add(args):
 
 def cmd_remove(args):
     """Delete an entry. Numbers are permanent: nothing is renumbered and the number is never
-    reissued, which the counter guarantees by never going backwards."""
+    reissued, which the counter guarantees by never going backwards.
+
+    The entry is cut out of the real text rather than the file being rebuilt from parsed
+    pieces. Rebuilding loses whatever the parser did not model - a header whose own prose
+    happens to contain "## #", a note sitting between two entries, a closing section after the
+    last one - and it loses it silently, with a zero exit. This is the file the whole mechanism
+    exists to protect; it does not get to be lossy.
+
+    An entry ends at the next "## " heading of any kind, not the next "## #N:". That is what
+    lets a trailing section such as VERIFICATION.md's "## Recording the result" survive the
+    removal of the entry above it.
+    """
     path = _backlog_path(args.cwd)
     text = _read_backlog(args.cwd)
-    kept, removed = [], False
-    for n, title, body in _sections(text):
-        if n == args.number:
-            removed = True
+    starts = [(int(m.group(1)), m.start()) for m in _HEADING.finditer(text)]
+    for i, (number, start) in enumerate(starts):
+        if number != args.number:
             continue
-        kept.append(f"## #{n}: {title}\n{body.rstrip(chr(10))}\n")
-    if not removed:
-        print(f"error: no entry #{args.number}", file=sys.stderr)
-        return 1
-    header = text[: text.index("## #")] if "## #" in text else text
-    path.write_text(header.rstrip("\n") + "\n\n" + "\n".join(kept))
-    print(f"removed #{args.number}; nothing renumbered, and #{args.number} is never reissued")
-    return 0
+        after = _NEXT_SECTION.search(text, start + 1)
+        end = after.start() if after else len(text)
+        state.atomic_write(path, (text[:start].rstrip("\n") + "\n\n" + text[end:]).rstrip("\n") + "\n")
+        print(f"removed #{args.number}; nothing renumbered, and #{args.number} is never reissued")
+        return 0
+    print(f"error: no entry #{args.number}", file=sys.stderr)
+    return 1
 
 
 def cmd_lane(args):
@@ -1630,7 +1673,7 @@ if __name__ == "__main__":
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cd skills/orc-todo/scripts && python3 -m pytest tests/ -v`
-Expected: PASS — all 58 tests (11 + 11 + 11 + 11 + 14).
+Expected: PASS — all 61 tests (11 + 11 + 11 + 11 + 17).
 
 - [ ] **Step 5: Write SKILL.md**
 
