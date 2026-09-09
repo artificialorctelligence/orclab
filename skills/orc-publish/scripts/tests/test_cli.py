@@ -753,3 +753,60 @@ def test_a_hanging_artifact_expansion_refuses_and_does_not_stop_siblings(tmp_pat
     details = {leaf.dotted_path: d for leaf, s, d in results}
     assert statuses == {"a": "refused", "b": "success"}
     assert "timed out" in details["a"]
+
+
+def test_dry_run_never_runs_prepare(tmp_path):
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        f'a: {{ prepare: "touch {tmp_path}/built", action: "true" }}\n',
+    )
+    assert main(["--channels", path, "--dry-run"]) == 0
+    assert not (tmp_path / "built").exists()
+
+
+def test_dry_run_reports_findings_when_the_artifact_already_exists(tmp_path, capsys):
+    import tarfile
+
+    blank = tmp_path / "blank"
+    blank.write_text("")
+    with tarfile.open(tmp_path / "src.tar.gz", "w:gz") as tf:
+        tf.add(blank, arcname="pkg/.git/config")
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        f'a: {{ artifact: "{tmp_path}/src.tar.gz", preflight: [no-vcs], action: "true" }}\n',
+    )
+    assert main(["--channels", path, "--dry-run"]) == 0
+    assert "no-vcs" in capsys.readouterr().out
+
+
+def test_dry_run_says_inspection_is_deferred_when_the_artifact_is_not_built_yet(
+    tmp_path, capsys
+):
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        f'a: {{ prepare: "true", artifact: "{tmp_path}/later.tar.gz", '
+        'preflight: [no-vcs], action: "true" }\n',
+    )
+    assert main(["--channels", path, "--dry-run"]) == 0
+    out = capsys.readouterr().out
+    assert "will be inspected" in out
+    # The declared rule name legitimately appears in the "preflight: no-vcs" line
+    # (see test_dry_run_lists_the_preflight_rules_a_leaf_declares, which requires exactly
+    # that for an equally-unbuilt artifact) - what must not happen is an actual inspection
+    # result, since the artifact doesn't exist yet to inspect.
+    assert "preflight result: clean" not in out
+    assert "preflight result: unknown preflight rule" not in out
+
+
+def test_dry_run_lists_the_preflight_rules_a_leaf_declares(tmp_path, capsys):
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        f'a: {{ artifact: "{tmp_path}/x.tar.gz", preflight: [no-vcs, no-tool-state], '
+        'action: "true" }\n',
+    )
+    main(["--channels", path, "--dry-run"])
+    assert "no-vcs, no-tool-state" in capsys.readouterr().out

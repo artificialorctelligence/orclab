@@ -41,6 +41,21 @@ def format_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
         if leaf.action:
             lines.append(f"{leaf.dotted_path}: {leaf.action}")
             lines.append(f"  timeout: {effective_timeout(leaf, default_timeout)}s")
+            if leaf.preflight:
+                lines.append(f"  preflight: {', '.join(leaf.preflight)}")
+                if leaf.artifact:
+                    path = expand_path(leaf.artifact, effective_timeout(leaf, default_timeout))
+                    if path and pathlib.Path(path).is_file():
+                        refusal = preflight_refusal(leaf, default_timeout)
+                        lines.append(
+                            f"  preflight result: {refusal}" if refusal
+                            else "  preflight result: clean"
+                        )
+                    else:
+                        lines.append(
+                            "  preflight result: artifact not built yet - "
+                            "will be inspected after prepare, at execution time"
+                        )
         else:
             lines.append(f"{leaf.dotted_path}: ({NOT_ACTIONABLE})")
         for req in leaf.requirements:
