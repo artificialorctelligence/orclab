@@ -41,7 +41,7 @@ rules, not a way around them: an entry that would not pass the skill does not pa
 
 ## Architecture
 
-Four components, deliberately separable.
+Five components, deliberately separable.
 
 ### 1. The lock
 
@@ -62,9 +62,10 @@ numbers at once, which v12's own plan did (a backlog entry *and* a verification 
 
 ### 2. The allocator
 
-Owns the write end to end — it allocates the number *and* writes the entry *and* commits, inside
-one lock hold. Chosen over "hand out a number and trust the caller to write" because there is then
-nothing to bypass: an agent cannot take a number and forget to use it, or write without taking one.
+Owns the write — it allocates the number *and* writes the entry, inside one lock hold. Chosen over
+"hand out a number and trust the caller to write" because there is then nothing to bypass: an agent
+cannot take a number and forget to use it, or write without taking one. It stops short of
+committing; see below.
 
 Sequence, entirely inside the lock:
 
@@ -73,9 +74,17 @@ Sequence, entirely inside the lock:
    loses the counter, and the file is still there to recover from.
 2. Render the entry from the caller's text into the file's house format.
 3. Insert it at the file's anchor.
-4. Commit **that one file by path**. Never `git add -A` — the canonical checkout may hold unrelated
-   work.
-5. Update the stored counter, release the lock.
+4. Update the stored counter, release the lock.
+
+**The allocator never commits.** It appends and stops. Correctness does not need a commit — every
+agent reads the same canonical file, so the entry is visible the instant it is written. Committing
+would mean running `git commit` in a checkout the agent does not own, sweeping up whatever
+uncommitted work happens to be in that file. The entry is committed by whoever owns that checkout,
+alongside their own work.
+
+The cost is that an entry is only as durable as that working tree until someone commits it, and a
+`git checkout`, `git reset --hard`, `git stash` or `git clean` could discard it. That cost is paid
+by the uncommitted-entry guard below, not by refusing to write.
 
 **One mechanism, two files, via a per-file descriptor** — not two implementations. A descriptor
 carries: the heading pattern (`## #{n}: {title}` vs `## Scenario {n}: {title}`), the number-extraction
@@ -133,10 +142,29 @@ Two consequences, both accepted:
 - **An entry lands on the main checkout's branch, not the agent's feature branch.** Branches then
   never touch `BACKLOG.md` and cannot conflict on merge — a real benefit — but an entry survives
   even if the work that motivated it is abandoned. Acceptable for a findings ledger.
-- **The allocator refuses when the canonical file has uncommitted changes**, naming the file and
-  saying to commit or stash. It cannot commit "just its own addition" to a file someone is
-  mid-edit in, and committing their work for them is worse than a legible refusal. The lock is held
-  for well under a second, so this is rare and never a wait.
+- **Entries are written but not committed**, so the canonical checkout accumulates uncommitted
+  backlog entries until its owner commits them. This is deliberate — see the allocator above — and
+  is what the uncommitted-entry guard exists to make safe.
+
+### 5. The uncommitted-entry guard
+
+The allocator's decision not to commit leaves real findings sitting uncommitted in the canonical
+working tree. Several ordinary git commands discard exactly that: `git checkout -- <path>`,
+`git checkout <branch>` when it would overwrite the change, `git reset --hard`, `git stash`, and
+`git clean`.
+
+A `PreToolUse` hook on `Bash` — the same wiring Orclab already uses for `secret_guard.py` — inspects
+commands of that shape. It fires **only** when both are true:
+
+1. the command can discard uncommitted work, and
+2. the canonical `BACKLOG.md` or `VERIFICATION.md` actually has uncommitted changes right now.
+
+When it fires it names the file, shows which entries would be lost by number and title, and asks for
+consent before the command runs. It does not block otherwise, and a `git checkout` in a repo with a
+clean backlog is never interrupted — a guard that fires on every checkout is noise, and noise gets
+waved through, which is the failure mode it exists to prevent.
+
+This guard applies to any session, including one that did no allocating itself.
 
 ## The SessionStart hook
 
@@ -149,6 +177,8 @@ the shared state and injects context when, and only when, there is something to 
 
 - any lane with an item in progress, with its name and how long it has been running
 - any lock that exists, with its holder and age
+- any uncommitted backlog or verification entries sitting in the canonical checkout, by number —
+  so a session inherits knowledge of findings that exist but are not yet safe
 
 Silent otherwise. A session that starts when nothing is running sees nothing.
 
@@ -196,7 +226,8 @@ rather than erroring.
 - **`orc-release`**: gains the cross-reference check in `steps.py`, surfaced the way
   `numbering_warning` already is.
 - **`release-checklist`**: its "nothing warns about those" note gains a pointer to the new check.
-- **`hooks/hooks.json`**: gains the `SessionStart` entry.
+- **`hooks/hooks.json`**: gains the `SessionStart` entry, and a second `PreToolUse` `Bash` matcher
+  for the uncommitted-entry guard alongside the existing `secret_guard.py` one.
 
 ## Error handling
 
@@ -205,7 +236,8 @@ rather than erroring.
 | Lock held by a live process | Retry for a bounded period, then fail naming PID, age, holder |
 | Lock held by a dead process | Fail immediately, name it as apparently stale, point at `lock clear` |
 | Counter missing or behind the file | Silently self-heal by taking the file scan's maximum |
-| Canonical file has uncommitted changes | Refuse before taking the lock; name the file; say commit or stash |
+| Canonical file has uncommitted changes | Append anyway; the allocator never commits and never refuses on this |
+| A command would discard uncommitted entries | Guard names the file and the entries at risk, and asks for consent first |
 | Not a git repository | Every shared-state feature reports unavailable; nothing pretends to work |
 | No `BACKLOG.md` in this project | `/orc-todo` says so; it never creates one silently |
 | Lane item has no spec | Refused, with an offer to spec it now |
@@ -223,7 +255,10 @@ The tests that matter most, because they cover what unit tests usually miss here
   both entries land. Not two sequential calls — the race is the thing being tested.
 - **Atomicity of acquisition**: the `O_CREAT | O_EXCL` path, asserted to fail on an existing lock.
 - **Counter self-heal**: delete `counters.json`, assert the next number still follows the file.
-- **Refusal on a dirty canonical file**, asserted to happen *before* the lock is taken.
+- **Allocation into a dirty canonical file succeeds** — the entry lands, nothing is committed, and
+  the pre-existing uncommitted changes are untouched.
+- **The guard fires on a discarding command with entries at risk, and stays silent otherwise** —
+  both halves, since a guard that always fires is one that gets ignored.
 - **A stale lock is reported, never cleared** — the test fails if the lock file disappears.
 - Per-file descriptor round-trips for both `BACKLOG.md` and `VERIFICATION.md`, including
   `VERIFICATION.md`'s insertion before `## Recording the result` rather than at end of file.
@@ -258,5 +293,7 @@ Recorded so a later reader does not relitigate them.
 | Unspecced items refused from lanes | An unspecced entry is genuinely ambiguous — `#17` could become v14 or v15 |
 | `RELEASING.md` gets a checker, not the allocator | Its numbers are positional and deliberately renumbered |
 | Command named `/orc-todo` | The name direflail will type; the skill line it appeared to contradict was itself wrong |
+| Allocator appends but never commits | Committing means running git in a checkout the agent does not own, sweeping up its owner's uncommitted work |
+| A guard, not a refusal, pays for not committing | A refusal blocks an agent from recording a finding until a human intervenes; the guard protects the entry instead |
 | Never auto-clear a stale lock | direflail's note: an unexpected lock is a signal, not litter |
 | `SessionStart` hook, not prose | Yesterday's failure was not a forgotten rule; it was no rule at all |
