@@ -2364,6 +2364,14 @@ EOF
 
 ### Task 9: Verification, backlog, version
 
+**Run this task from the main checkout, after Tasks 1-8 have merged — not from a worktree.**
+Two things force it. Step 2 allocates through the allocator, which writes to the *canonical*
+checkout by design (`state.canonical_root`), so run from a worktree it would put the scenario in
+the main checkout's file while the commit happened in the worktree — the change split across two
+trees. And Step 4 tags the release, which must tag the merged commit, not an unmerged branch.
+Tasks 1-8 are ordinary code and belong in a worktree; this one is close-out and belongs where the
+release lands.
+
 **Files:**
 - Modify: `VERIFICATION.md`, `BACKLOG.md`
 - Modify: `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` — **via `/orc-version`, never by hand**
