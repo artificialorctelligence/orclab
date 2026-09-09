@@ -1251,10 +1251,16 @@ worktrees already fix that**, and `subagent-driven-development` already creates 
 is exactly why all of that day's Orclab work had zero contention while the Orcshot work had all of
 it. Nothing to build.
 
-*Semantic collision* is what survives worktrees. Two agents in separate checkouts both read the same
-committed file, both derive the same "next number," and both are correct given what they can see. No
-lock on the filesystem helps, because they are not contending for a resource — they are independently
-computing the same answer.
+*Semantic collision* is what survives worktrees **if each agent reads its own checked-out copy of the
+file**. Two agents in separate checkouts derive the same "next number," and both are correct given
+what they can see; no lock helps, because they are not contending for a resource at all.
+
+**That framing is avoidable, and direflail's design avoids it — recorded because an earlier draft of
+this entry assumed otherwise.** If every agent instead reaches out to **one canonical `BACKLOG.md`**,
+rather than to its own worktree's copy, there are no divergent copies and the collision is an
+ordinary shared-resource contention that a lock handles exactly as locks are meant to. The choice of
+*which file agents write* is therefore the load-bearing decision here, not the locking primitive —
+get that wrong and no amount of locking helps; get it right and the locking is textbook.
 
 **Why detection alone is not enough, which is a correction to this entry's own first framing.** The
 initial argument here was that a duplicate costs five minutes to renumber, so a one-line
@@ -1290,6 +1296,29 @@ it is locked, then set the lock" is a time-of-check-to-time-of-use race — two 
 observe it free and both proceed. The check and the set must be a single atomic operation:
 `os.open(path, os.O_CREAT | os.O_EXCL)`, or `mkdir`, both atomic on POSIX. Everything else in the
 description is right as stated.
+
+**One lock, not one per resource, and lane-agnostic** — confirmed with direflail 2026-09-08. Every
+process queues the same way regardless of which lane it belongs to. The reason is stronger than
+simplicity: per-resource locks would reintroduce deadlock, since a work item can legitimately need
+two numbers at once (v12's own plan adds both a `BACKLOG.md` entry and a `VERIFICATION.md`
+scenario), and two agents acquiring them in opposite orders is textbook AB-BA. With a single lock
+that is structurally impossible. The parallelism forgone is worthless anyway at millisecond hold
+times.
+
+**The critical section is take-a-number, not do-the-work** — otherwise lanes fully serialize and the
+concurrency is pointless. But it should extend through the **commit**, not stop at the file write:
+if the shared file lives in a worktree, two agents committing it concurrently are back to
+`.git/index.lock` contention, which is the thing worktrees were supposed to have solved. Read,
+append, commit, release — still sub-second.
+
+**A consequence to know rather than fix:** writing to a shared ledger means the entry is not part of
+the agent's own branch commit. Branches then never touch `BACKLOG.md` and cannot conflict on merge,
+which is a real benefit — but an entry survives even if the work that motivated it is abandoned.
+Acceptable for a findings ledger; surprising if unexpected.
+
+**On wait times:** a queue of lanes contending for a sub-second append is not time-critical. Even
+unlucky timing across several lanes costs seconds, which is the correct trade for eliminating a
+class of collision that cannot be cleaned up afterwards.
 
 **The real cost is not the lock.** A lock protects a resource only if *every* writer takes it. Today
 "add a backlog entry" is `backlog-discipline` prose instructing Claude to scan the file for the
@@ -1353,7 +1382,9 @@ A `superpowers:brainstorming` pass. It needs to settle: whether one mechanism co
 bundled script or a hook; how `backlog-discipline` changes from "scan for the maximum" to "ask the
 allocator," and what happens when an agent ignores it; and what a lane definition actually looks
 like given that `subagent-driven-development` already owns per-plan execution and may be the natural
-home rather than a new component.
+home rather than a new component. Add to that list, from the 2026-09-08 refinement: **where the
+canonical file actually lives** — the main worktree's checkout, or a path outside every worktree —
+since that decision is what makes the lock meaningful or useless.
 
 **Do not build ahead of a real concurrent run.** The honest state is that this is a well-understood
 hazard with a zero incident rate under concurrency, because concurrency has not been used yet. The
