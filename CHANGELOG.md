@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.13.1] - 2026-09-08
+
+### Fixed
+- A scalar `preflight:` on a `/orc-publish` channel leaf is now read as one rule rather than one
+  rule per character. `preflight: no-vcs` instead of `preflight: [no-vcs]` is an easy YAML slip,
+  and it used to report `unknown preflight rule(s): n, o, -, v, c, s` — naming neither the real
+  mistake nor anything actionable. A non-string scalar (`preflight: 5`) was worse: it raised
+  `TypeError` out of the property itself, ahead of every caller's own containment, so one
+  malformed leaf aborted the whole run and its healthy siblings never executed. It now refuses
+  just that leaf.
+
 ## [0.13.0] - 2026-09-08
 
 ### Added
