@@ -76,13 +76,19 @@ class Node:
         raised TypeError out of this property, ahead of every caller's own containment, so one
         malformed leaf aborted the whole run and its healthy siblings never executed. Refusing
         such a leaf is the caller's job; getting there without crashing is this property's.
+
+        The same applies one level down: a list can itself hold a non-string item
+        (`preflight: [no-vcs, 5]`) - every element is coerced to str for the same reason a bare
+        scalar is, since a caller that does `", ".join(leaf.preflight)` (both the dry-run plan
+        and a real refusal message) raises TypeError on the first non-string item, and that
+        raise happens ahead of the caller's own per-leaf containment too.
         """
         value = self._data.get("preflight", []) if self.is_leaf else []
         if value is None:
             return []
         if isinstance(value, (str, bytes)) or not isinstance(value, (list, tuple, set)):
             return [str(value)]
-        return list(value)
+        return [str(item) for item in value]
 
     @property
     def requirements(self):

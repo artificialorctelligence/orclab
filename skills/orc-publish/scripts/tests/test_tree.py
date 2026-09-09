@@ -224,3 +224,13 @@ def test_a_preflight_that_is_neither_string_nor_list_does_not_raise():
     its healthy siblings never executed. Refusing that leaf is the caller's job; not crashing
     on the way there is this property's."""
     assert Node(path=("a",), data={"action": "echo x", "preflight": 5}).preflight == ["5"]
+
+
+def test_a_preflight_list_containing_a_non_string_item_does_not_raise():
+    """`preflight: [no-vcs, 5]` is a valid list, so it skipped the scalar-coercion branch
+    above and returned list(value) verbatim - keeping the 5 as an int. Every caller that does
+    ", ".join(leaf.preflight) (the dry-run plan line and a real refusal message alike) then
+    raised TypeError on the first non-string item, ahead of its own per-leaf containment,
+    aborting the whole run exactly like the bare-scalar case this property already guards."""
+    node = Node(path=("a",), data={"action": "echo x", "preflight": ["no-vcs", 5]})
+    assert node.preflight == ["no-vcs", "5"]

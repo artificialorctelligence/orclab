@@ -771,6 +771,48 @@ def test_main_does_not_crash_on_a_corrupt_artifact(tmp_path):
     assert main(["--channels", path]) == 1
 
 
+def test_a_malformed_preflight_list_refuses_and_does_not_stop_siblings(tmp_path):
+    """`preflight: [no-vcs, 5]` used to raise TypeError out of `", ".join(leaf.preflight)` in
+    format_plan - reached by both --dry-run and a real run, ahead of execute_plan's own
+    per-leaf containment, so the whole process aborted with a traceback and `b` never ran."""
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        'a: { artifact: "nope.tar.gz", preflight: [no-vcs, 5], action: "true" }\n'
+        'b: { action: "true" }\n',
+    )
+    results = execute_plan(build_plan(load_tree(path), []))
+    statuses = {leaf.dotted_path: s for leaf, s, _ in results}
+    details = {leaf.dotted_path: d for leaf, s, d in results}
+    assert statuses == {"a": "refused", "b": "success"}
+    assert details["a"] == "unknown preflight rule(s): 5"
+
+
+def test_main_does_not_crash_on_a_malformed_preflight_list(tmp_path):
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        'a: { artifact: "nope.tar.gz", preflight: [no-vcs, 5], action: "true" }\n'
+        'b: { action: "true" }\n',
+    )
+    assert main(["--channels", path]) == 1
+
+
+def test_dry_run_does_not_crash_on_a_malformed_preflight_list(tmp_path, capsys):
+    """The dry-run plan must survive the same malformed shape the real run does - it reports
+    what the real run will do, so a crash here would hide the refusal instead of previewing
+    it."""
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        'a: { artifact: "nope.tar.gz", preflight: [no-vcs, 5], action: "true" }\n'
+        'b: { action: "true" }\n',
+    )
+    assert main(["--channels", path, "--dry-run"]) == 0
+    out = capsys.readouterr().out
+    assert "preflight result: unknown preflight rule(s): 5" in out
+
+
 def test_a_hanging_artifact_expansion_refuses_and_does_not_stop_siblings(tmp_path):
     path = write_yaml(
         tmp_path,
