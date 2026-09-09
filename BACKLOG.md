@@ -1528,6 +1528,14 @@ occurrence rather than only the first of each. Worth weighing against the opposi
 check already has false positives by design (any substring match counts, so
 `cargo build-tools-checked && dput ...` warns today), and widening the search widens those too.
 
+**Provenance, added after the fact.** Two sessions independently executed the whole of the v12
+artifact-preflight plan in parallel on separate branches, neither aware of the other (see #25).
+This branch's own final review of the action-shape check noticed the same repeated-verb gap and
+set it aside as minor without formally filing it; it was the parallel session's own, independent
+review that actually filed this entry's finding. Worth recording for what it says about the
+review process, not just about the code: the same diff got two genuinely separate passes, and
+only one of them turned an observation into a tracked entry.
+
 ## #24: `--dry-run`'s exit code doesn't distinguish a resolvable plan from one already known broken
 
 Raised by the final review of v12 artifact preflight (2026-09-08) and deliberately scoped out of
@@ -1555,6 +1563,14 @@ deliberate pass.
 
 **Scope boundary:** this is about the exit code only. The messages are already printed and already
 correct.
+
+**Provenance, added after the fact.** This finding came from the parallel session's own,
+independent review of the same v12 artifact-preflight plan (see #25) - a second, genuinely
+separate pass over the same diff this branch had already reviewed and shipped. It is deferred
+here, not decided, deliberately: whether exit 0 is defensible (the dry run's job is to resolve
+and print, and it did) or a real gap (a wrapper doing `orc-publish --dry-run && orc-publish`
+proceeds anyway) is a design question for whoever picks this up, not something to settle in the
+act of filing it.
 
 ## #25: BACKLOG #22's collision happened - two agents built the same feature, neither could see the other
 
