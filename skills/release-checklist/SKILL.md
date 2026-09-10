@@ -56,6 +56,22 @@ Each step is a `## N. <short imperative title>` heading, followed by:
 - **What "done" looks like** for anything requiring judgment (e.g. "must be fully green," "zero
   errors, warnings reviewed individually").
 
+### A step that waits on external state must be two steps
+
+A step whose completion has two halves — a local action, and a remote result that hasn't happened
+yet — cannot honestly be represented as one step. `/orc-release` has exactly one completion state
+per step, `complete`; recording that claims the whole thing happened, and "the first half is done,
+the second half cannot even start yet" is not that. The local action is one step; whatever depends
+on the remote result is another, with a `**Preconditions:**` on the second naming what it's
+waiting for.
+
+This is a real incident, not a hypothetical, 2026-09-07: Orcshot's `0.3.0` release had
+`dpkg-buildpackage`/`debsign`/`dput` (local, seconds), Launchpad's build farm building the upload
+(remote, ~28 minutes on that release), and the series copy — valid only once the build actually
+succeeded — all three folded into one step 6. `complete 6` was recorded while the copy was still
+half an hour away, and the release was recorded as further along than it actually was. See
+BACKLOG #18.
+
 ### Optional markers a step can carry
 
 Five optional prose markers. They are read by `/orc-release` when it drives the checklist, but
@@ -65,7 +81,18 @@ using none of them is still complete and still driveable.**
 
 - **Preconditions** — what must be true before the step starts, written as
   `**Preconditions:** <what must be true>`. Prefer the specific and checkable ("this version is
-  not already published to the PPA") over the generic ("everything is ready").
+  not already published to the PPA") over the generic ("everything is ready"). When a real check
+  exists, prefer a precondition that names the command over one that only describes the
+  condition in prose — "this version is not already published to the PPA" is good prose, but a
+  command that answers it is a gate a human (or `/orc-release`) can actually run, not just read.
+  For example:
+
+  ```markdown
+  ## 7. Copy the built package to 26.04
+
+  **Preconditions:** the `noble` build has succeeded on Launchpad — not merely been accepted.
+  Check with `/orc-publish --confirm desktop.python.linux.ppa.noble`.
+  ```
 - **Performed by hand** — `**Performed by hand.**` for a step (or part of one) a person carries
   out rather than a command: a click in a web UI, a manual install-test on real hardware, a
   visual confirmation. A step may be partly manual; say so where the manual part begins.

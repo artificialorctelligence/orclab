@@ -30,12 +30,15 @@ from .tree import load_tree
 
 NOT_ACTIONABLE = "known channel, not yet actionable"
 NO_METRICS = "known channel, no metrics source"
+NO_CONFIRM = "synchronous channel - its publish settles when the action exits"
 
 # Every leaf command key. "action" publishes (writes, needs the SKILL.md confirmation gate);
 # "metrics" reads back numbers a channel already publishes about itself (safe, no gate). They
 # share the whole execution path - selection, timeout, process-group kill, output capture -
-# because the only thing that differs is which key holds the command. BACKLOG #18's proposed
-# `status:` is the same shape again: add it to tree.LEAF_KEYS and to NOT_SET below.
+# because the only thing that differs is which key holds the command. BACKLOG #18 shipped as
+# `confirm:` and is deliberately NOT this shape - it is a mapping of two optional sub-fields,
+# not a bare command, and it reports four statuses of its own. It has its own small path
+# (confirm_plan) rather than a fourth entry here.
 NOT_SET = {"action": NOT_ACTIONABLE, "metrics": NO_METRICS}
 
 # `prepare:` and `preflight:` gate the *action* path only. A metrics query publishes nothing,
@@ -115,6 +118,8 @@ def _preflight_plan_lines(leaf, default_timeout):
     warning = action_shape_warning(leaf)
     if warning:
         lines.append(f"  warning: {warning}")
+    if leaf.confirm:
+        lines.append("  asynchronous: declares confirm - check separately with --confirm")
     return lines
 
 
@@ -159,6 +164,31 @@ def timeout_error(leaves):
                 f"{leaf.dotted_path}: timeout must be a positive whole number of seconds, "
                 f"got {value!r}"
             )
+    return None
+
+
+def confirm_error(leaves):
+    """The first unusable `confirm:` block, as a message - or None.
+
+    Same treatment as a bad `timeout:`, and for the same reason: the value is a declaration
+    the operator made, it cannot do what it claims, and guessing a default would be inventing
+    an answer to "did this land" that nobody supplied.
+    """
+    for leaf in leaves:
+        value = leaf.confirm
+        if value is None:
+            continue
+        if not isinstance(value, dict):
+            return (
+                f"{leaf.dotted_path}: confirm must be a mapping with `command` and/or `url`, "
+                f"got {value!r}"
+            )
+        if not leaf.confirm_command and not leaf.confirm_url:
+            return f"{leaf.dotted_path}: confirm must declare `command`, `url`, or both"
+        for key in ("command", "url"):
+            sub = value.get(key)
+            if sub is not None and not isinstance(sub, str):
+                return f"{leaf.dotted_path}: confirm.{key} must be a string, got {sub!r}"
     return None
 
 
@@ -297,6 +327,22 @@ def preflight_refusal(leaf, default_timeout=DEFAULT_TIMEOUT_SECONDS, resolved=No
     return None
 
 
+def _accepted_detail(leaf, output):
+    """The `accepted` line's detail: what happened, what has not, and how to find out.
+
+    The action's own output goes last, not first. A real publish's capture is a wall of log,
+    and the sentence that tells an operator this is not finished has to survive being read
+    above it - see BACKLOG #15, where a correct message was unreadable in exactly this way.
+    """
+    how = "run --confirm" if leaf.confirm_command else "no confirm command declared"
+    if leaf.confirm_url:
+        how += f", or see {leaf.confirm_url}"
+    parts = [f"upload accepted; not yet confirmed - {how}"]
+    if output:
+        parts.append(output)
+    return "\n".join(parts)
+
+
 def execute_plan(
     leaves,
     default_timeout=DEFAULT_TIMEOUT_SECONDS,
@@ -305,11 +351,13 @@ def execute_plan(
 ):
     """Run each leaf's command under `command_key`. One failure doesn't stop the others.
 
-    Returns a list of (leaf, status, detail) - status is "success", "failed", "timed out",
-    "refused", or "not attempted". detail is the command's real stdout on success, the real
-    error text on failure, and the per-key "not set" wording when not attempted - never
-    silently empty on success, since this is the only evidence an operator gets that a real
-    publish actually happened.
+    Returns a list of (leaf, status, detail) - status is "success", "accepted", "failed",
+    "timed out", "refused", or "not attempted". A leaf that declares `confirm` reports
+    "accepted" rather than "success" on a zero-exit action: the upload genuinely succeeded
+    and nothing went wrong, so the exit code stays 0, but it has not landed yet. detail is
+    the command's real stdout on success, the real error text on failure, and the per-key
+    "not set" wording when not attempted - never silently empty on success, since this is
+    the only evidence an operator gets that a real publish actually happened.
 
     On the *action* path the order is **prepare -> inspect -> act**, and a tripped preflight
     rule reports "refused" without the action ever running. `--metrics` skips both gates
@@ -354,7 +402,10 @@ def execute_plan(
                     returncode, command, output=stdout, stderr=stderr
                 )
             detail = (stdout or "").strip()
-            results.append((leaf, "success", detail))
+            if command_key == GATED_COMMAND_KEY and leaf.confirm:
+                results.append((leaf, "accepted", _accepted_detail(leaf, detail)))
+            else:
+                results.append((leaf, "success", detail))
         except subprocess.TimeoutExpired as e:
             # TimeoutExpired does carry whatever was captured before the timeout - but as
             # undecoded bytes despite text=True, because the exception is built from the raw
@@ -392,6 +443,75 @@ def format_summary(results):
     return "\n".join(lines)
 
 
+def format_confirm_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
+    """What `--confirm` will check, printed before it runs.
+
+    Deliberately not `format_plan` with a third command key: `--confirm` publishes nothing, so
+    there is no preflight or action-shape line to print, and half of what it reports is a URL
+    rather than a command.
+    """
+    if not leaves:
+        return "(no leaves selected)"
+    lines = []
+    for leaf in leaves:
+        if leaf.confirm_command:
+            lines.append(f"{leaf.dotted_path}: {leaf.confirm_command}")
+            lines.append(f"  timeout: {effective_timeout(leaf, default_timeout)}s")
+        elif leaf.confirm_url:
+            lines.append(f"{leaf.dotted_path}: (needs a human) {leaf.confirm_url}")
+        else:
+            lines.append(f"{leaf.dotted_path}: ({NO_CONFIRM})")
+    return "\n".join(lines)
+
+
+def confirm_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
+    """Check whether each selected leaf's accepted publish has actually landed.
+
+    Publishes nothing. Returns (leaf, status, detail) with status "confirmed",
+    "not confirmed", "needs a human", or "no confirm declared".
+
+    Exit 0 from the command means confirmed and anything else means not confirmed - two
+    states, not three. A three-state protocol distinguishing "not yet" from "the check itself
+    broke" would have to be honoured by every project implementing `confirm`, and for gating
+    purposes both answers mean do not advance. Which one it was belongs in the command's own
+    output, which a human reads.
+
+    A timeout is "not confirmed" for the same reason: it is not a positive answer, and this
+    never waits on a remote publish by design.
+    """
+    results = []
+    for leaf in leaves:
+        command = leaf.confirm_command
+        if not command:
+            if leaf.confirm_url:
+                results.append((leaf, "needs a human", leaf.confirm_url))
+            else:
+                results.append((leaf, "no confirm declared", NO_CONFIRM))
+            continue
+
+        # Built once and applied on every path below, timeout included - a hung check is
+        # exactly when a human needs the declared page to look at, and this used to only
+        # reach the success/non-zero paths.
+        see_url = f"see {leaf.confirm_url}" if leaf.confirm_url else None
+
+        limit = effective_timeout(leaf, default_timeout)
+        try:
+            returncode, stdout, stderr = _run(command, limit)
+        except subprocess.TimeoutExpired as e:
+            captured = "\n".join(filter(None, [_decode(e.stdout), _decode(e.stderr)]))
+            detail = f"confirm timed out after {limit}s"
+            if captured:
+                detail += f"\n{captured}"
+            detail = "\n".join(filter(None, [detail, see_url]))
+            results.append((leaf, "not confirmed", detail))
+            continue
+
+        detail = "\n".join(filter(None, [(stdout or "").strip(), (stderr or "").strip()]))
+        detail = "\n".join(filter(None, [detail, see_url]))
+        results.append((leaf, "confirmed" if returncode == 0 else "not confirmed", detail))
+    return results
+
+
 def scripts_dir():
     """This script bundle's own directory, as an absolute path.
 
@@ -415,6 +535,12 @@ def main(argv=None):
         help="run each selected leaf's `metrics:` command instead of its `action:` - a "
         "read-only report of the numbers that channel already publishes about itself",
     )
+    parser.add_argument(
+        "--confirm",
+        action="store_true",
+        help="check whether each selected leaf's already-accepted publish has actually "
+        "landed, by running its `confirm.command` - publishes nothing",
+    )
     parser.add_argument("--channels", default=".orclab/publish/channels.yaml")
     parser.add_argument("--distro", default=".orclab/publish/distro.yaml")
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_SECONDS)
@@ -425,6 +551,16 @@ def main(argv=None):
         print(
             "error: --timeout must be a positive whole number of seconds, "
             f"got {args.timeout!r}",
+            file=sys.stderr,
+            flush=True,
+        )
+        return 1
+
+    if args.confirm and (args.dry_run or args.metrics):
+        other = "--dry-run" if args.dry_run else "--metrics"
+        print(
+            f"error: --confirm cannot be combined with {other} - --confirm is its own mode "
+            "and publishes nothing. Run them separately.",
             file=sys.stderr,
             flush=True,
         )
@@ -465,6 +601,17 @@ def main(argv=None):
     if bad_timeout:
         print(f"error: {bad_timeout}", file=sys.stderr, flush=True)
         return 1
+
+    bad_confirm = confirm_error(leaves)
+    if bad_confirm:
+        print(f"error: {bad_confirm}", file=sys.stderr, flush=True)
+        return 1
+
+    if args.confirm:
+        print(format_confirm_plan(leaves, default_timeout=args.timeout), flush=True)
+        results = confirm_plan(leaves, default_timeout=args.timeout)
+        print(format_summary(results), flush=True)
+        return 0 if all(status != "not confirmed" for _, status, _ in results) else 1
 
     command_key = "metrics" if args.metrics else "action"
     print(format_plan(leaves, default_timeout=args.timeout, command_key=command_key), flush=True)

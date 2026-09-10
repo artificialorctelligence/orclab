@@ -234,3 +234,93 @@ def test_a_preflight_list_containing_a_non_string_item_does_not_raise():
     aborting the whole run exactly like the bare-scalar case this property already guards."""
     node = Node(path=("a",), data={"action": "echo x", "preflight": ["no-vcs", 5]})
     assert node.preflight == ["no-vcs", "5"]
+
+
+def test_a_leaf_declaring_confirm_is_still_a_leaf(tmp_path):
+    # is_leaf is a subset test against LEAF_KEYS: an unknown key turns the leaf into a branch
+    # and the tree silently changes shape, so this is the load-bearing assertion of the field.
+    p = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        """
+        ppa:
+          noble:
+            action: dput ppa:x a.changes
+            confirm:
+              command: python3 scripts/ppa-published.py
+              url: https://launchpad.net/~x/+archive/ubuntu/y/+packages
+        """,
+    )
+    leaf = load_tree(p).find(("ppa", "noble"))
+    assert leaf.is_leaf
+    assert leaf.confirm_command == "python3 scripts/ppa-published.py"
+    assert leaf.confirm_url == "https://launchpad.net/~x/+archive/ubuntu/y/+packages"
+
+
+def test_confirm_may_declare_command_only(tmp_path):
+    p = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        """
+        ppa:
+          noble:
+            action: dput x
+            confirm:
+              command: check.sh
+        """,
+    )
+    leaf = load_tree(p).find(("ppa", "noble"))
+    assert leaf.confirm_command == "check.sh"
+    assert leaf.confirm_url is None
+
+
+def test_confirm_may_declare_url_only(tmp_path):
+    p = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        """
+        ppa:
+          noble:
+            action: dput x
+            confirm:
+              url: https://example.test/q
+        """,
+    )
+    leaf = load_tree(p).find(("ppa", "noble"))
+    assert leaf.confirm_command is None
+    assert leaf.confirm_url == "https://example.test/q"
+
+
+def test_a_leaf_without_confirm_reports_none(tmp_path):
+    p = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        """
+        ppa:
+          noble:
+            action: dput x
+        """,
+    )
+    leaf = load_tree(p).find(("ppa", "noble"))
+    assert leaf.confirm is None
+    assert leaf.confirm_command is None
+    assert leaf.confirm_url is None
+
+
+def test_a_malformed_confirm_scalar_does_not_raise(tmp_path):
+    # Same reasoning as `preflight`: refusing a malformed leaf is the caller's job. Raising in
+    # the property aborts the whole run over one bad leaf, and its healthy siblings never run.
+    p = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        """
+        ppa:
+          noble:
+            action: dput x
+            confirm: true
+        """,
+    )
+    leaf = load_tree(p).find(("ppa", "noble"))
+    assert leaf.confirm is True
+    assert leaf.confirm_command is None
+    assert leaf.confirm_url is None

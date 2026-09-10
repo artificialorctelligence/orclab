@@ -629,6 +629,23 @@ subprocess harness.
 12. **Expected:** silent. That command cannot reach the canonical file, and denying it would
     advise committing something the tree does not contain.
 
+## Scenario 47: an accepted publish reads as not-done to an operator
+
+Covers what unit tests cannot: that an `accepted` summary line reads to a human as "this is not
+finished," not as a synonym for success. #15 established that substring assertions pass on output
+nobody can actually read - the same risk applies here, since a test can assert `"accepted" in out`
+and still pass on a line an operator would misread as done.
+
+1. In a throwaway scratch directory, create `.orclab/publish/channels.yaml` with a leaf declaring
+   `confirm`, and an action that prints a wall of build output before exiting 0 (model a real
+   `dpkg-buildpackage && debsign && dput`, not a bare `echo`).
+2. Run `/orc-publish`, confirm the dry-run plan, and let it publish for real.
+3. Read the real `accepted` line as an operator would - action output included, since a real one
+   carries a wall of build log above the sentence that matters - and say what you would do next.
+4. Expected: the operator reads it as "this is not finished yet," names what the leaf's `confirm`
+   block says to do next (run `--confirm`, or check the URL), and does not mistake it for
+   `success`.
+
 ## Recording the result
 
 Note the outcome of each scenario (pass/fail, with specifics) either back in this conversation or
