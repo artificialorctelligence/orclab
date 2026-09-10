@@ -1910,3 +1910,44 @@ mentioning "a fresh clone or a cleaned `.git`" but asserts only counter behaviou
 note, which is the one place this resolution departs from `backlog-discipline`'s "never rewrite the
 original diagnostic text" - a miscount is not reasoning worth preserving, and the original wording
 is recorded here.
+
+## #28: should /orc-git land a branch, or is finishing-a-development-branch the answer
+
+Raised by direflail 2026-09-09, immediately after a session said "merge and push" as though
+`/orc-git` covered it. It does not: its subcommands are `repo`, `commit`, `push`,
+`commit-push`/`cp`, `branch`/`switch`, and `pr`. Every one of those either prepares work or
+publishes a commit; none of them lands a branch.
+
+**The concrete consequence** is small but real and already happened twice in one session. A branch
+finished under Orclab's own workflow has to leave it to be landed - either through
+`superpowers:finishing-a-development-branch` or through raw `git merge`/`gh pr create`. The memory
+rule "use the shipped command, not the raw mechanism" says to flag the fallback when it is needed;
+here the fallback is needed every single time a branch finishes, which is the shape of a missing
+command rather than an occasional exception.
+
+**What should already have covered it, and mostly does.**
+`superpowers:finishing-a-development-branch` exists precisely for this decision - merge directly,
+open a PR, or rebase first - and Orclab's own standing rule is to wrap real existing skills rather
+than rebuild them. So this is explicitly *not* a proposal to implement merging. If anything is
+built it is a thin `/orc-git merge` that delegates, with the availability guard `orc-code`'s flows
+already use for `feature-dev`.
+
+**The argument on each side, neither settled.** For: `branch` and `pr` are already in `/orc-git`,
+and a user who has just run `/orc-git cp` has no reason to know the next step lives in a different
+plugin's vocabulary. Against: `finishing-a-development-branch` asks real questions about how to
+land work, and a `/orc-git merge` that answers them by defaulting would be worse than not having
+it - `/orc-git`'s existing subcommands are all deliberately unsurprising, and this one is not.
+
+**Where this should be decided: inside v14, not beside it.** The v14 spec
+(`docs/superpowers/specs/2026-09-08-orclab-v14-forge-boundary-design.md`, closing #20) is already
+about `/orc-git`'s scope and where host-specific release work lives. Deciding "does `/orc-git` land
+branches" in a separate pass would split one scope question across two designs. This entry exists
+so the question is tracked if v14 ships without addressing it - not to schedule its own work.
+
+**Scope boundary:** this is about who owns the *command surface*, not about merge strategy,
+conflict handling, or branch protection. None of those change whichever way it goes.
+
+**Searched before filing**, per CLAUDE.md: every shipped `skills/*/SKILL.md`, `CLAUDE.md`,
+`BACKLOG.md`, and the bundled scripts under `hooks/scripts/` and `skills/*/scripts/`. Nothing in
+Orclab lands a branch; the only hits for merging are `orc-git`'s `pr` subcommand, which checks a
+pull request out rather than landing it.
