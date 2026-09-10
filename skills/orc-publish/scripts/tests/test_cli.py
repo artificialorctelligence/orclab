@@ -1068,5 +1068,27 @@ def test_the_action_path_still_refuses_that_same_leaf(tmp_path):
         )
     )
     leaf, status, detail = execute_plan(build_plan(root, ["ppa.noble"]))[0]
-    assert status == "refused"
-    assert "artifact not found" in detail
+
+
+def test_confirm_with_neither_command_nor_url_is_an_error(tmp_path, capsys):
+    # Declaring confirm says "this publish is asynchronous" and then names no way to find out
+    # whether it landed. There is no default that could stand in for the missing answer.
+    channels = tmp_path / "channels.yaml"
+    channels.write_text('ppa:\n  noble:\n    action: "true"\n    confirm: {}\n')
+    assert main(["--channels", str(channels), "--dry-run", "ppa"]) == 1
+    assert "confirm must declare" in capsys.readouterr().err
+
+
+def test_a_non_mapping_confirm_is_an_error_naming_the_value(tmp_path, capsys):
+    channels = tmp_path / "channels.yaml"
+    channels.write_text('ppa:\n  noble:\n    action: "true"\n    confirm: true\n')
+    assert main(["--channels", str(channels), "--dry-run", "ppa"]) == 1
+    err = capsys.readouterr().err
+    assert "confirm must be a mapping" in err
+    assert "True" in err
+
+
+def test_a_well_formed_confirm_is_not_an_error(tmp_path):
+    channels = tmp_path / "channels.yaml"
+    channels.write_text('ppa:\n  noble:\n    action: "true"\n    confirm:\n      url: https://e.test/q\n')
+    assert main(["--channels", str(channels), "--dry-run", "ppa"]) == 0

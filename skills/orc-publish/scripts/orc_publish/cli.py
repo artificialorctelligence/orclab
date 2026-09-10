@@ -162,6 +162,27 @@ def timeout_error(leaves):
     return None
 
 
+def confirm_error(leaves):
+    """The first unusable `confirm:` block, as a message - or None.
+
+    Same treatment as a bad `timeout:`, and for the same reason: the value is a declaration
+    the operator made, it cannot do what it claims, and guessing a default would be inventing
+    an answer to "did this land" that nobody supplied.
+    """
+    for leaf in leaves:
+        value = leaf.confirm
+        if value is None:
+            continue
+        if not isinstance(value, dict):
+            return (
+                f"{leaf.dotted_path}: confirm must be a mapping with `command` and/or `url`, "
+                f"got {value!r}"
+            )
+        if not leaf.confirm_command and not leaf.confirm_url:
+            return f"{leaf.dotted_path}: confirm must declare `command`, `url`, or both"
+    return None
+
+
 def run_for(distro_root, distro_path):
     """--for: report which channel path a distro leaf points at, or that none is set."""
     node = resolve_token(distro_root, distro_path)
@@ -464,6 +485,11 @@ def main(argv=None):
     bad_timeout = timeout_error(leaves)
     if bad_timeout:
         print(f"error: {bad_timeout}", file=sys.stderr, flush=True)
+        return 1
+
+    bad_confirm = confirm_error(leaves)
+    if bad_confirm:
+        print(f"error: {bad_confirm}", file=sys.stderr, flush=True)
         return 1
 
     command_key = "metrics" if args.metrics else "action"
