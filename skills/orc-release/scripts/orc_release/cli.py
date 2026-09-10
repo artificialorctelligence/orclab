@@ -16,7 +16,7 @@ import sys
 
 from . import state as st
 from . import versionfiles as vf
-from .steps import doc_hash, numbering_warning, parse_steps, unclosed_fence_warning
+from .steps import crossref_warning, doc_hash, numbering_warning, parse_steps, unclosed_fence_warning
 
 DOC_NAME = "RELEASING.md"
 
@@ -60,7 +60,7 @@ def _load_doc(root):
         )
         return None, None
     steps = parse_steps(text)
-    for warning in (unclosed_fence_warning(text), numbering_warning(steps)):
+    for warning in (unclosed_fence_warning(text), numbering_warning(steps), crossref_warning(steps)):
         if warning:
             print(warning, file=sys.stderr)
     return text, steps

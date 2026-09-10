@@ -2,6 +2,7 @@ import textwrap
 
 from orc_release.steps import (
     Step,
+    crossref_warning,
     doc_hash,
     numbering_warning,
     parse_steps,
@@ -304,3 +305,40 @@ def test_non_contiguous_numbering_is_named_in_the_warning():
     warning = numbering_warning(steps)
     assert "1, 2, 5" in warning
     assert "contiguous" in warning
+
+
+def test_crossref_warning_is_none_when_every_reference_resolves():
+    text = ("## 1. First\n\nDo a thing.\n\n"
+            "## 2. Second\n\nSee step 1 above.\n")
+    assert crossref_warning(parse_steps(text)) is None
+
+
+def test_crossref_warning_catches_a_reference_past_the_end():
+    """The renumber hazard release-checklist documents: headings shift, prose does not, and
+    nothing warned about it."""
+    text = ("## 1. First\n\nSee step 9 below.\n\n"
+            "## 2. Second\n\nDone.\n")
+    warning = crossref_warning(parse_steps(text))
+    assert warning is not None
+    assert "9" in warning and "step 1" in warning
+
+
+def test_crossref_warning_reports_every_bad_reference_not_just_the_first():
+    text = ("## 1. First\n\nSee step 7 and step 8.\n\n"
+            "## 2. Second\n\nAlso step 9.\n")
+    warning = crossref_warning(parse_steps(text))
+    for n in ("7", "8", "9"):
+        assert n in warning
+
+
+def test_crossref_warning_ignores_a_self_reference():
+    text = "## 1. First\n\nThis is step 1.\n\n## 2. Second\n\nDone.\n"
+    assert crossref_warning(parse_steps(text)) is None
+
+
+def test_crossref_warning_ignores_step_numbers_inside_fenced_code():
+    """parse_steps already excludes fenced regions from heading detection; a shell comment
+    saying 'step 12' must not become a false positive either."""
+    text = ("## 1. First\n\n```bash\n# step 12 of the upstream guide\necho hi\n```\n\n"
+            "## 2. Second\n\nDone.\n")
+    assert crossref_warning(parse_steps(text)) is None

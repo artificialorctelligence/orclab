@@ -103,6 +103,56 @@ def numbering_warning(steps):
     )
 
 
+_CROSSREF = re.compile(r"\bstep\s+(\d+)\b", re.IGNORECASE)
+
+
+def _strip_fenced(text):
+    """Remove fenced code block content from `text`, so scans over it skip fenced regions."""
+    regions = _get_fenced_regions(text)
+    if not regions:
+        return text
+    parts = []
+    prev = 0
+    for start, end in regions:
+        parts.append(text[prev:start])
+        prev = end
+    parts.append(text[prev:])
+    return "".join(parts)
+
+
+def crossref_warning(steps):
+    """Warn when a step's prose references a step number that does not exist.
+
+    release-checklist requires renumbering when a step is inserted mid-document, and says
+    outright that prose references like "see step 9 below" shift too and nothing warns about
+    them. In the real 2026-09-07 incident three references had to move and five correctly
+    stayed put, all by hand. This is that missing check.
+
+    It catches only references past the end of the document - a reference that still resolves
+    but now points at the wrong step is indistinguishable from a correct one without reading
+    the prose, and a checker that guesses at meaning would cry wolf. Narrow and reliable beats
+    broad and ignored.
+    """
+    if not steps:
+        return None
+    numbers = {s.number for s in steps}
+    highest = max(numbers)
+    bad = []
+    for step in steps:
+        body = _strip_fenced(step.body)
+        for match in _CROSSREF.finditer(body):
+            target = int(match.group(1))
+            if target != step.number and target > highest:
+                bad.append((step.number, target))
+    if not bad:
+        return None
+    detail = ", ".join(f"step {s} references step {t}" for s, t in bad)
+    return (
+        f"warning: {detail} - no such step (the document ends at {highest}). "
+        "A renumber shifts headings but not prose; see release-checklist."
+    )
+
+
 def _is_in_fenced_block(pos, fenced_regions):
     """Check if a position is inside any fenced block."""
     for start, end in fenced_regions:

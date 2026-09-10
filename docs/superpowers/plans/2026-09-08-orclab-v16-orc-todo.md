@@ -368,6 +368,23 @@ def clear_lock(cwd=None):
     return True
 
 
+def atomic_write(path, text):
+    """Replace a file's contents in one step, never leaving it half-written.
+
+    Path.write_text() truncates and then writes, so a crash or a concurrent read in that window
+    sees an empty file. Everything this module guards is shared state that is deliberately never
+    committed, so there is no committed copy to fall back on - and a torn read of lanes.json in
+    particular reports "nothing in progress", which is the exact 2026-09-08 failure the lane
+    record exists to prevent.
+
+    The temp file sits in the same directory on purpose. os.replace is only atomic within one
+    filesystem, and /tmp is routinely a different one.
+    """
+    tmp = path.with_name(f".{path.name}.tmp{os.getpid()}")
+    tmp.write_text(text)
+    os.replace(tmp, path)
+
+
 def read_counters(cwd=None):
     path = _counters_path(cwd)
     if not path.exists():
@@ -379,7 +396,7 @@ def read_counters(cwd=None):
 
 
 def write_counters(mapping, cwd=None):
-    _counters_path(cwd).write_text(json.dumps(mapping, indent=2, sort_keys=True) + "\n")
+    atomic_write(_counters_path(cwd), json.dumps(mapping, indent=2, sort_keys=True) + "\n")
 ```
 
 - [ ] **Step 4: Run the tests to verify they pass**
@@ -743,6 +760,28 @@ def test_two_real_concurrent_processes_get_different_numbers(tmp_path):
     assert results == [23, 24], f"got {results}"
     text = (repo / "BACKLOG.md").read_text()
     assert "## #23:" in text and "## #24:" in text, "both entries must land"
+
+
+def test_a_completed_allocation_leaves_no_temp_file_behind(tmp_path):
+    repo = make_repo(tmp_path)
+    alloc.allocate("backlog", "t", "b", cwd=repo)
+    assert not list(repo.glob(".BACKLOG.md.tmp*")), "the temp file must be renamed, not left"
+
+
+def test_a_failed_write_leaves_the_original_file_intact(tmp_path, monkeypatch):
+    """The reason this is atomic at all: write_text() truncates first, so a crash mid-write
+    destroys the one file the allocator deliberately never commits - there is no committed copy
+    to recover from."""
+    repo = make_repo(tmp_path)
+    before = (repo / "BACKLOG.md").read_text()
+
+    def boom(src, dst):
+        raise OSError("simulated failure at the replace step")
+
+    monkeypatch.setattr(state.os, "replace", boom)
+    with pytest.raises(OSError):
+        alloc.allocate("backlog", "t", "b", cwd=repo)
+    assert (repo / "BACKLOG.md").read_text() == before, "the original must survive intact"
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -783,6 +822,7 @@ def canonical_file(resource, cwd=None):
     return state.canonical_root(cwd) / resource.filename
 
 
+
 def next_number(resource, cwd=None):
     """max(stored counter, file scan) + 1. Call only inside a held lock.
 
@@ -806,7 +846,7 @@ def allocate(resource_key, title, body, cwd=None, timeout=10.0):
         raise ResourceMissing(f"{resource.filename} not found at {path}")
     with state.held(f"allocating a {resource.key} number", cwd=cwd, timeout=timeout):
         number = next_number(resource, cwd)
-        path.write_text(insert(path.read_text(), resource, render(resource, number, title, body)))
+        state.atomic_write(path, insert(path.read_text(), resource, render(resource, number, title, body)))
         counters = state.read_counters(cwd)
         counters[resource.key] = number
         state.write_counters(counters, cwd)
@@ -816,7 +856,7 @@ def allocate(resource_key, title, body, cwd=None, timeout=10.0):
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cd skills/orc-todo/scripts && python3 -m pytest tests/test_allocate.py -v`
-Expected: PASS, 9 tests. The concurrency test is the slowest; it should still finish in seconds.
+Expected: PASS, 11 tests. The concurrency test is the slowest; it should still finish in seconds.
 
 - [ ] **Step 5: Commit**
 
@@ -881,7 +921,7 @@ import subprocess
 
 import pytest
 
-from orc_todo import lanes
+from orc_todo import lanes, state
 
 
 def make_repo(tmp_path, specs=("v13", "v14", "v15")):
@@ -965,6 +1005,16 @@ def test_setting_current_to_an_item_not_in_the_lane_raises(tmp_path):
 def test_read_lanes_is_empty_rather_than_failing_when_nothing_exists(tmp_path):
     repo = make_repo(tmp_path)
     assert lanes.read_lanes(repo) == {}
+
+
+def test_a_corrupt_lane_file_raises_rather_than_reading_as_no_lanes(tmp_path):
+    """Absent and unreadable must not collapse into one answer. Reading a corrupt file as "no
+    lanes" would let the next lane command write a single lane back over every other one."""
+    repo = make_repo(tmp_path)
+    lanes.create_lane("A", ["v13"], cwd=repo)
+    (state.shared_dir(repo) / "lanes.json").write_text("{not json")
+    with pytest.raises(lanes.LaneStateCorrupt):
+        lanes.read_lanes(repo)
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -1009,6 +1059,14 @@ class LaneMissing(Exception):
     """No such lane, or no such item within it."""
 
 
+class LaneExists(Exception):
+    """A lane by that name is already there. Recreating it would erase what it was doing."""
+
+
+class LaneStateCorrupt(Exception):
+    """lanes.json exists but cannot be parsed."""
+
+
 def _lanes_path(cwd=None):
     return state.shared_dir(cwd) / "lanes.json"
 
@@ -1036,23 +1094,45 @@ def _require_specced(items, cwd=None):
 
 
 def read_lanes(cwd=None):
+    """Every lane. Empty when the file has never been written; raises when it is unreadable.
+
+    Those two cases must not collapse into one. Reading a corrupt file as "no lanes" would let
+    the very next create/modify/delete write a single lane back over every other one, losing
+    them all with nothing reported. Absent is normal; unreadable is a fault.
+    """
     path = _lanes_path(cwd)
     if not path.exists():
         return {}
     try:
         return json.loads(path.read_text())
-    except (ValueError, OSError):
-        return {}
+    except (ValueError, OSError) as e:
+        raise LaneStateCorrupt(
+            f"{path} exists but cannot be read: {e}. Nothing has been changed. "
+            "Inspect it before any lane command writes over it."
+        ) from e
 
 
 def _write_lanes(data, cwd=None):
-    _lanes_path(cwd).write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
+    state.atomic_write(_lanes_path(cwd), json.dumps(data, indent=2, sort_keys=True) + "\n")
 
 
 def create_lane(name, items, cwd=None):
+    """Create a lane. Refuses to overwrite one that already exists.
+
+    Recreating a lane resets `current` to None, and that marker is the single record stopping a
+    second agent from rebuilding what a first is already building. A create where modify was
+    meant is an ordinary typo; erasing the in-progress marker on it, silently and with a zero
+    exit, is the 2026-09-08 failure handed back.
+    """
     _require_specced(items, cwd)   # validate before taking the lock, and before any write
     with state.held(f"creating lane {name}", cwd=cwd):
         data = read_lanes(cwd)
+        if name in data:
+            raise LaneExists(
+                f"lane '{name}' already exists (items: {', '.join(data[name]['items']) or 'none'}). "
+                "Use `lane modify` to change its items - creating it again would clear what it "
+                "is working on."
+            )
         data[name] = {"items": list(items), "current": None, "started": None}
         _write_lanes(data, cwd)
     return data[name]
@@ -1114,7 +1194,7 @@ def in_progress(cwd=None):
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cd skills/orc-todo/scripts && python3 -m pytest tests/test_lanes.py -v`
-Expected: PASS, 10 tests.
+Expected: PASS, 11 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -1215,7 +1295,11 @@ def run(args, repo, capsys, stdin=None, monkeypatch=None):
     # --cwd is a top-level option, so it MUST precede the subcommand. argparse assigns
     # options after a subcommand to that subparser, and this one is not defined there.
     code = main(["--cwd", str(repo), *args])
-    return code, capsys.readouterr().out
+    captured = capsys.readouterr()
+    # Both streams. main() prints errors to stderr, which is correct and stays that way; what
+    # these assertions care about is what the operator actually sees, and in a terminal that is
+    # the two interleaved.
+    return code, captured.out + captured.err
 
 
 def test_list_shows_open_entries_one_line_each_and_marks_resolved_ones_absent(tmp_path, capsys):
@@ -1278,6 +1362,38 @@ def test_remove_deletes_the_section_and_renumbers_nothing(tmp_path, capsys):
     text = (repo / "BACKLOG.md").read_text()
     assert "## #7:" not in text
     assert "## #12:" in text and "## #22:" in text, "no other entry may be renumbered"
+
+
+def test_remove_keeps_a_header_whose_own_prose_contains_a_heading_shape(tmp_path, capsys):
+    """Rebuilding the file from parsed pieces truncated the header at the first literal
+    "## #" anywhere in it, silently, with a zero exit."""
+    repo = make_repo(tmp_path)
+    (repo / "BACKLOG.md").write_text(
+        '# Backlog\n\nEntries look like `## #N: Title` followed by prose.\n\n'
+        + BACKLOG.split("\n", 2)[2])
+    assert run(["remove", "7"], repo, capsys)[0] == 0
+    assert "followed by prose." in (repo / "BACKLOG.md").read_text()
+
+
+def test_remove_keeps_a_trailing_section_after_the_last_entry(tmp_path, capsys):
+    """The last entry's body ran to EOF, so removing it took any closing section with it."""
+    repo = make_repo(tmp_path)
+    (repo / "BACKLOG.md").write_text(BACKLOG + "\n## How to read this\n\nclosing note\n")
+    assert run(["remove", "22"], repo, capsys)[0] == 0
+    text = (repo / "BACKLOG.md").read_text()
+    assert "## #22:" not in text
+    assert "## How to read this" in text and "closing note" in text
+
+
+def test_remove_keeps_every_other_entry_byte_for_byte(tmp_path, capsys):
+    """Nothing outside the removed span may be reflowed, respaced or reformatted."""
+    repo = make_repo(tmp_path)
+    before = (repo / "BACKLOG.md").read_text()
+    assert run(["remove", "12"], repo, capsys)[0] == 0
+    after = (repo / "BACKLOG.md").read_text()
+    for fragment in ("## #7: an open one\n\nprose about it", "## #22: another open one\n\nmore prose"):
+        assert fragment in after, fragment
+    assert "## #12" not in after and "## #12" in before
 
 
 def test_lane_create_and_list(tmp_path, capsys):
@@ -1359,6 +1475,8 @@ from .resources import RESOURCES
 
 RESOLVED = re.compile(r"\(RESOLVED\b")
 PARTIAL = re.compile(r"\(PARTIALLY ADDRESSED\b")
+_HEADING = re.compile(r"^## #(\d+): ", re.MULTILINE)
+_NEXT_SECTION = re.compile(r"^## ", re.MULTILINE)
 
 
 def _backlog_path(cwd):
@@ -1426,22 +1544,39 @@ def cmd_add(args):
 
 def cmd_remove(args):
     """Delete an entry. Numbers are permanent: nothing is renumbered and the number is never
-    reissued, which the counter guarantees by never going backwards."""
+    reissued, which the counter guarantees by never going backwards.
+
+    The entry is cut out of the real text rather than the file being rebuilt from parsed
+    pieces. Rebuilding loses whatever the parser did not model - a header whose own prose
+    happens to contain "## #", a note sitting between two entries, a closing section after the
+    last one - and it loses it silently, with a zero exit. This is the file the whole mechanism
+    exists to protect; it does not get to be lossy.
+
+    An entry ends at the next "## " heading of any kind, not the next "## #N:". That is what
+    lets a trailing section such as VERIFICATION.md's "## Recording the result" survive the
+    removal of the entry above it.
+
+    Under the lock, and reading inside it. This is a read-modify-write on the one file the whole
+    mechanism exists to serialize, so it needs the same lock the allocator takes - otherwise a
+    concurrent add landing between the read and the write is erased, while the allocator reports
+    success and advances its counter. atomic_write prevents a torn file, not a lost update; only
+    the lock does that.
+    """
     path = _backlog_path(args.cwd)
-    text = _read_backlog(args.cwd)
-    kept, removed = [], False
-    for n, title, body in _sections(text):
-        if n == args.number:
-            removed = True
-            continue
-        kept.append(f"## #{n}: {title}\n{body.rstrip(chr(10))}\n")
-    if not removed:
-        print(f"error: no entry #{args.number}", file=sys.stderr)
-        return 1
-    header = text[: text.index("## #")] if "## #" in text else text
-    path.write_text(header.rstrip("\n") + "\n\n" + "\n".join(kept))
-    print(f"removed #{args.number}; nothing renumbered, and #{args.number} is never reissued")
-    return 0
+    with state.held(f"removing #{args.number}", cwd=args.cwd):
+        text = _read_backlog(args.cwd)
+        for m in _HEADING.finditer(text):
+            if int(m.group(1)) != args.number:
+                continue
+            start = m.start()
+            after = _NEXT_SECTION.search(text, start + 1)
+            end = after.start() if after else len(text)
+            state.atomic_write(
+                path, (text[:start].rstrip("\n") + "\n\n" + text[end:]).rstrip("\n") + "\n")
+            print(f"removed #{args.number}; nothing renumbered, and #{args.number} is never reissued")
+            return 0
+    print(f"error: no entry #{args.number}", file=sys.stderr)
+    return 1
 
 
 def cmd_lane(args):
@@ -1531,7 +1666,8 @@ def main(argv=None):
     except state.NotAGitRepo as e:
         print(f"error: {e} - /orc-todo needs a git repository", file=sys.stderr)
         return 1
-    except (ResourceMissing, lanemod.UnspeccedItem, lanemod.LaneMissing) as e:
+    except (ResourceMissing, lanemod.UnspeccedItem, lanemod.LaneMissing,
+            lanemod.LaneExists, lanemod.LaneStateCorrupt) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
     except state.LockUnavailable as e:
@@ -1563,7 +1699,7 @@ if __name__ == "__main__":
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cd skills/orc-todo/scripts && python3 -m pytest tests/ -v`
-Expected: PASS — all 55 tests (11 + 11 + 9 + 10 + 14).
+Expected: PASS — all 61 tests (11 + 11 + 11 + 11 + 17).
 
 - [ ] **Step 5: Write SKILL.md**
 
@@ -1660,6 +1796,7 @@ GUARD = str(pathlib.Path(__file__).resolve().parent.parent / "backlog_guard.py")
 
 
 def make_repo(tmp_path, dirty):
+    tmp_path.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     (tmp_path / "BACKLOG.md").write_text("# Backlog\n\n## #7: committed one\n\nprose\n")
     subprocess.run(["git", "-C", str(tmp_path), "add", "BACKLOG.md"], check=True)
@@ -1693,8 +1830,11 @@ def test_it_is_silent_on_a_discarding_command_when_nothing_is_at_risk(tmp_path):
 
 
 def test_it_is_silent_on_a_harmless_command_even_with_entries_at_risk(tmp_path):
-    assert guard("git status", make_repo(tmp_path, dirty=True)) is None
-    assert guard("ls -la", make_repo(tmp_path, dirty=True)) is None
+    # One repo, both commands. make_repo commits, so calling it twice on the same tmp_path
+    # leaves the second commit with nothing to commit and fails inside the helper.
+    repo = make_repo(tmp_path, dirty=True)
+    assert guard("git status", repo) is None
+    assert guard("ls -la", repo) is None
 
 
 def test_it_covers_every_form_that_really_discards(tmp_path):
@@ -1711,8 +1851,55 @@ def test_it_stays_silent_on_commands_that_only_look_dangerous(tmp_path):
     common git command there is - firing on it would make this guard noise within a day."""
     repo = make_repo(tmp_path, dirty=True)
     for cmd in ["git clean -fdx", "git clean -fd", "git checkout main", "git switch main",
-                "git restore --staged BACKLOG.md", "git stash list", "git stash pop"]:
+                "git restore --staged BACKLOG.md", "git stash list", "git stash pop",
+                # A later command's own -f is not this one's. The forced-discard alternative
+                # must not read across a shell separator to find it.
+                "git checkout main && rm -f tmpfile", "git checkout main; make -f Makefile.dev",
+                "git push --force", "git checkout -b feature"]:
         assert guard(cmd, repo) is None, cmd
+
+
+def test_a_forced_switch_or_checkout_fires(tmp_path):
+    """git refuses an unforced branch switch rather than overwriting, which is why the guard
+    ignores it - and exactly why someone reaches for -f next. Verified 2026-09-09: the forced
+    forms really do destroy the edit."""
+    repo = make_repo(tmp_path, dirty=True)
+    for cmd in ["git checkout -f other", "git switch --discard-changes main",
+                "git switch -f main", "git checkout --force other"]:
+        assert guard(cmd, repo) is not None, cmd
+
+
+def test_restore_staged_worktree_fires_but_staged_alone_does_not(tmp_path):
+    """--staged alone only unstages; --staged --worktree discards the working copy too."""
+    repo = make_repo(tmp_path, dirty=True)
+    assert guard("git restore --staged BACKLOG.md", repo) is None
+    assert guard("git restore --staged --worktree BACKLOG.md", repo) is not None
+
+
+def test_a_path_scoped_discard_naming_an_unrelated_file_is_silent(tmp_path):
+    """Denying `git restore README.md` is the same noise as denying `git checkout main` - the
+    command cannot reach BACKLOG.md, so there is nothing to warn about."""
+    repo = make_repo(tmp_path, dirty=True)
+    (repo / "README.md").write_text("unrelated\n")
+    for cmd in ["git restore README.md", "git checkout -- README.md",
+                "git checkout README.md", "git restore src/thing.py"]:
+        assert guard(cmd, repo) is None, cmd
+
+
+def test_a_path_scoped_discard_that_sweeps_the_tree_still_fires(tmp_path):
+    repo = make_repo(tmp_path, dirty=True)
+    for cmd in ["git restore .", "git checkout -- .", "git checkout ."]:
+        assert guard(cmd, repo) is not None, cmd
+
+
+def test_a_staged_entry_is_still_uncommitted_and_still_guarded(tmp_path):
+    """git diff compares against the index, so an entry that was `git add`ed reads as no change
+    at all - and reset --hard then destroys it with nothing said."""
+    repo = make_repo(tmp_path, dirty=True)
+    subprocess.run(["git", "-C", str(repo), "add", "BACKLOG.md"], check=True)
+    decision = guard("git reset --hard", repo)
+    assert decision is not None, "a staged entry is uncommitted work too"
+    assert "#8" in decision["hookSpecificOutput"]["permissionDecisionReason"]
 
 
 def test_the_escape_marker_lets_a_deliberate_discard_through(tmp_path):
@@ -1734,6 +1921,19 @@ def test_a_non_bash_tool_is_ignored(tmp_path):
     out = subprocess.run([sys.executable, GUARD], input=payload, capture_output=True,
                          text=True, cwd=str(repo))
     assert out.returncode == 0 and not out.stdout.strip()
+
+
+def test_a_worktree_is_not_denied_for_the_main_checkouts_uncommitted_entry(tmp_path):
+    """A discard reaches only the tree it runs in. Denying a worktree's reset because the main
+    checkout has an uncommitted entry tells the user to commit something their tree does not
+    contain - and an allocated entry is meant to sit uncommitted, so that would deny every
+    whole-tree discard in every worktree for as long as it sits there."""
+    repo = make_repo(tmp_path / "main", dirty=True)
+    wt = tmp_path / "wt"
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", str(wt), "-b", "b"],
+                   check=True)
+    assert guard("git reset --hard", wt) is None
+    assert guard("git reset --hard", repo) is not None, "the canonical tree is still guarded"
 
 
 def test_outside_a_git_repo_it_fails_open(tmp_path):
@@ -1807,6 +2007,16 @@ def test_it_reports_uncommitted_entries(tmp_path):
     assert "#8" in out
 
 
+def test_a_corrupt_lane_file_speaks_up_rather_than_going_silent(tmp_path):
+    """Silence is this hook's "nothing in progress" signal, so an unreadable lane record must
+    not produce it - that fails into exactly the state the lane record exists to prevent."""
+    repo = make_repo(tmp_path)
+    shared = repo / ".git" / "orclab"
+    shared.mkdir(parents=True)
+    (shared / "lanes.json").write_text("{not json")
+    assert "unreadable" in notice(repo)
+
+
 def test_outside_a_git_repo_it_says_nothing_and_exits_clean(tmp_path):
     out = subprocess.run([sys.executable, NOTICE], input="{}", capture_output=True,
                          text=True, cwd=str(tmp_path))
@@ -1865,11 +2075,33 @@ def canonical_root(cwd=None):
     return d.parent.parent if d else None
 
 
+def in_canonical_checkout(cwd=None):
+    """Whether the caller's own working tree IS the canonical checkout.
+
+    A discard command reaches only the tree it runs in. The allocator writes canonically, so an
+    uncommitted entry normally lives there - and denying a worktree's `git reset --hard` because
+    the main checkout has one tells the user to commit something their tree does not contain.
+    Since an allocated entry is meant to sit uncommitted until someone deliberately commits it,
+    that would deny every whole-tree discard in every worktree for as long as it sits there, in
+    a project whose own workflow is worktree-based.
+    """
+    top = git(["rev-parse", "--show-toplevel"], cwd)
+    root = canonical_root(cwd)
+    if not top or root is None:
+        return False
+    return pathlib.Path(top.strip()).resolve() == root.resolve()
+
+
 def uncommitted_entries(cwd=None):
     """Entry headings added but not committed, as [(filename, heading)].
 
     Read from the diff rather than by parsing the file, because only the diff distinguishes an
     entry that was just added from the hundreds already committed.
+
+    Diffed against HEAD, not against the index. A bare `git diff` compares the working tree to
+    what is staged, so an entry that has been `git add`ed reads as no change at all - and then
+    `git reset --hard` destroys it with nothing said. Staged is still uncommitted, which is the
+    only thing this function is being asked.
     """
     root = canonical_root(cwd)
     if root is None:
@@ -1878,7 +2110,7 @@ def uncommitted_entries(cwd=None):
     for name in TRACKED:
         if not (root / name).exists():
             continue
-        diff = git(["-C", str(root), "diff", "--", name], cwd)
+        diff = git(["-C", str(root), "diff", "HEAD", "--", name], cwd)
         if not diff:
             continue
         found.extend((name, m.group(1)) for m in ENTRY_RE.finditer(diff))
@@ -1917,7 +2149,7 @@ import json
 import re
 import sys
 
-from orclab_shared import uncommitted_entries
+from orclab_shared import in_canonical_checkout, uncommitted_entries
 
 ALLOW_MARKER = "orclab:discard-entries"
 
@@ -1925,22 +2157,52 @@ ALLOW_MARKER = "orclab:discard-entries"
 # `git clean` touches only untracked files, and `git checkout <branch>` carries the edit over
 # (git refuses rather than overwriting), so neither belongs here. A guard that fires on
 # `git checkout main` is noise, and noise gets waved through.
-DISCARDS = re.compile(
+#
+# Two shapes, because they need different tests. A whole-tree discard takes no pathspec and
+# always reaches every tracked file. A path-scoped one reaches only what it names, so naming
+# something else is not a risk - and denying `git restore README.md` is the same noise as
+# denying `git checkout main`, just rarer and therefore more annoying when it lands.
+# The forced forms belong with the whole-tree ones. The docstring above is right that git
+# REFUSES an unforced branch switch rather than overwriting - which is exactly why someone
+# reaches for -f next, and that one really does destroy the edit. Verified 2026-09-09.
+WHOLE_TREE = re.compile(
     r"\bgit\s+(?:"
     r"reset\s+(?:--hard|--merge|--keep)\b"
     r"|stash\b(?!\s+(?:list|show|apply|pop))"
-    r"|restore\b(?!\s+--staged\b)"
-    r"|checkout\s+(?:--\s|\.(?:\s|$)|\S*(?:BACKLOG|VERIFICATION)\.md\b)"
+    # The gap excludes shell separators. \S+ swallowed them, so the -f of an unrelated later
+    # command - `git checkout main && rm -f tmp` - satisfied this alternative and got denied.
+    r"|(?:checkout|switch)\s+(?:[^\s;&|]+\s+)*(?:-f\b|--force\b|--discard-changes\b)"
     r")"
 )
+# --staged alone only unstages, so it is excluded; --staged --worktree discards both and is not.
+PATH_SCOPED = re.compile(
+    r"\bgit\s+(?:restore\b(?!\s+--staged\b(?!\s+--worktree\b))|checkout\s+)")
+# A pathspec that could contain a tracked file: one of them by name, or a whole-tree sweep.
+REACHES_TRACKED = re.compile(r"(?:BACKLOG|VERIFICATION)\.md\b|(?<![\w./-])[.*](?:\s|$)")
+
+
+def _discards(command):
+    """Whether this command can really destroy an uncommitted entry.
+
+    A whole-tree discard always can. A path-scoped one can only reach what its pathspec names,
+    so it counts only when that pathspec is a tracked file or a whole-tree sweep. Firing on
+    `git restore README.md` would be the same noise as firing on `git checkout main`, and the
+    brief settled that one empirically: noise gets waved through, which is the failure this
+    guard exists to prevent.
+    """
+    if WHOLE_TREE.search(command):
+        return True
+    return bool(PATH_SCOPED.search(command) and REACHES_TRACKED.search(command))
 
 
 def evaluate(command):
     """The refusal reason, or None when this command is not a risk right now."""
     if ALLOW_MARKER in command:
         return None
-    if not DISCARDS.search(command):
+    if not _discards(command):
         return None
+    if not in_canonical_checkout():
+        return None  # this tree cannot reach the canonical file; nothing here is at risk
     at_risk = uncommitted_entries()
     if not at_risk:
         return None
@@ -2003,10 +2265,19 @@ from orclab_shared import shared_dir, uncommitted_entries
 
 
 def _load(path):
-    try:
-        return json.loads(pathlib.Path(path).read_text())
-    except (OSError, ValueError):
+    """The file's contents, or None when it exists but cannot be read.
+
+    Missing and unreadable are different answers and the caller needs both. Silence is this
+    hook's way of saying "nothing in progress", so a corrupt lane record must not produce it -
+    that would fail into precisely the state the lane record exists to prevent.
+    """
+    path = pathlib.Path(path)
+    if not path.exists():
         return {}
+    try:
+        return json.loads(path.read_text())
+    except (OSError, ValueError):
+        return None
 
 
 def notice():
@@ -2014,12 +2285,16 @@ def notice():
     if d is None:
         return ""
     lines = []
-    for name, lane in sorted(_load(d / "lanes.json").items()):
+    lanes = _load(d / "lanes.json")
+    if lanes is None:
+        return ("Orclab shared state:\n  lanes.json is unreadable - what is in progress cannot "
+                "be determined. Inspect it before starting work: /orc-todo lane list")
+    for name, lane in sorted(lanes.items()):
         if lane.get("current"):
             since = f" since {lane['started']}" if lane.get("started") else ""
             lines.append(f"  lane {name}: {lane['current']} in progress{since}")
-    lock = _load(d / "lock")
     if (d / "lock").exists():
+        lock = _load(d / "lock") or {}
         lines.append(f"  lock held: {lock.get('description', 'unknown')} (pid {lock.get('pid')})")
     for filename, heading in uncommitted_entries():
         lines.append(f"  uncommitted in {filename}: {heading}")
@@ -2089,7 +2364,7 @@ The existing `secret_guard.py` entry must be left exactly as it is:
 - [ ] **Step 6: Run the whole hooks suite**
 
 Run: `cd hooks/scripts && python3 -m pytest tests/ -v`
-Expected: PASS — the existing `secret_guard` tests plus 15 new ones.
+Expected: PASS — the existing `secret_guard` tests plus 23 new ones.
 
 - [ ] **Step 7: Commit**
 
@@ -2293,12 +2568,19 @@ with the body on stdin, which prints the allocated number. The new text must say
 agents scanning the same file both find the same maximum and both write it, which happened for
 real on 2026-09-08 — both took `#23` and `#24`. Point at BACKLOG #22 and #25.
 
-The `git log -S` exception is **deleted, not moved** — the allocator's counter never goes
-backwards, so a deleted maximum entry can no longer cause a reissue. Say that explicitly, so a
-reader who remembers the old rule knows it was retired rather than lost.
+The `git log -S` exception is **retired from the allocator path** — the allocator's counter never
+goes backwards, so a deleted maximum entry can no longer cause a reissue there. Say that
+explicitly, so a reader who remembers the old rule knows it was retired rather than lost.
 
 If `/orc-todo` is unavailable (no allocator, not a git repo), fall back to the old scan and say
 so — a consuming project without Orclab installed still needs the skill to work.
+
+**The exception belongs in that fallback, and only there.** What made it unnecessary is the
+counter, and the fallback has no counter: it is the old scan, so it has the old hazard. A file
+whose highest-numbered entry was deleted reports a maximum that has already been used, and the
+scan hands it out again — reusing a number this file's whole premise says is permanent. Restate
+the `git log -S'## #' -- BACKLOG.md` check inside the fallback rather than leaving a reader to
+rediscover why it was there.
 
 - [ ] **Step 2: Replace the task-list line**
 
@@ -2364,6 +2646,14 @@ EOF
 
 ### Task 9: Verification, backlog, version
 
+**Run this task from the main checkout, after Tasks 1-8 have merged — not from a worktree.**
+Two things force it. Step 2 allocates through the allocator, which writes to the *canonical*
+checkout by design (`state.canonical_root`), so run from a worktree it would put the scenario in
+the main checkout's file while the commit happened in the worktree — the change split across two
+trees. And Step 4 tags the release, which must tag the merged commit, not an unmerged branch.
+Tasks 1-8 are ordinary code and belong in a worktree; this one is close-out and belongs where the
+release lands.
+
 **Files:**
 - Modify: `VERIFICATION.md`, `BACKLOG.md`
 - Modify: `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` — **via `/orc-version`, never by hand**
@@ -2394,7 +2684,13 @@ would.
 This step is also the first real use of the allocator. If it misbehaves, that is a finding worth
 an entry, not something to work around.
 
-- [ ] **Step 3: Resolve the backlog entries**
+- [ ] **Step 3: Add `/orc-todo` to `README.md`**
+
+`README.md` lists every `/orc-*` command and this one is missing from it. `/orc-help` enumerates
+`skills/orc*/SKILL.md` so the command itself stays discoverable either way, but the README goes
+stale. One bullet, in the existing style of the ones around it.
+
+- [ ] **Step 4: Resolve the backlog entries**
 
 Per `orclab:backlog-discipline`, append resolutions — never rewrite the original text:
 
@@ -2408,7 +2704,7 @@ Per `orclab:backlog-discipline`, append resolutions — never rewrite the origin
 Do **not** resolve #23 or #24 — the action-shape warning and the dry-run exit code are untouched
 by this work.
 
-- [ ] **Step 4: Bump the version through `/orc-version`, not by hand**
+- [ ] **Step 5: Bump the version through `/orc-version`, not by hand**
 
 Invoke `/orc-version 0.14.0` — a minor bump, since this adds a command and two hooks. It updates
 both `.claude-plugin/*.json`, prepends the changelog entry, commits, and tags.
@@ -2417,7 +2713,7 @@ both `.claude-plugin/*.json`, prepends the changelog entry, commits, and tags.
 bypassed `/orc-version`, and that two went untagged as the direct mechanical cost. If it fails or
 misses a file, that is a real finding worth an entry — report it rather than working around it.
 
-- [ ] **Step 5: Validate the plugin**
+- [ ] **Step 6: Validate the plugin**
 
 ```bash
 claude plugin validate .claude-plugin/plugin.json
@@ -2431,7 +2727,7 @@ project context — into an error, and that layout is deliberate.
 Expect `✔ Validation passed with warnings`, with that one warning. A pass says nothing about
 frontmatter; never write a release step that implies otherwise.
 
-- [ ] **Step 6: Run every suite one last time**
+- [ ] **Step 7: Run every suite one last time**
 
 ```bash
 cd skills/orc-todo/scripts && python3 -m pytest tests/ -q
