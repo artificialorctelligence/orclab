@@ -47,7 +47,9 @@ WHOLE_TREE = re.compile(
     r"\bgit\s+(?:"
     r"reset\s+(?:--hard|--merge|--keep)\b"
     r"|stash\b(?!\s+(?:list|show|apply|pop))"
-    r"|(?:checkout|switch)\s+(?:\S+\s+)*(?:-f\b|--force\b|--discard-changes\b)"
+    # The gap excludes shell separators. \S+ swallowed them, so the -f of an unrelated later
+    # command - `git checkout main && rm -f tmp` - satisfied this alternative and got denied.
+    r"|(?:checkout|switch)\s+(?:[^\s;&|]+\s+)*(?:-f\b|--force\b|--discard-changes\b)"
     r")"
 )
 # --staged alone only unstages, so it is excluded; --staged --worktree discards both and is not.

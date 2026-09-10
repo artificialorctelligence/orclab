@@ -62,7 +62,11 @@ def test_it_stays_silent_on_commands_that_only_look_dangerous(tmp_path):
     common git command there is - firing on it would make this guard noise within a day."""
     repo = make_repo(tmp_path, dirty=True)
     for cmd in ["git clean -fdx", "git clean -fd", "git checkout main", "git switch main",
-                "git restore --staged BACKLOG.md", "git stash list", "git stash pop"]:
+                "git restore --staged BACKLOG.md", "git stash list", "git stash pop",
+                # A later command's own -f is not this one's. The forced-discard alternative
+                # must not read across a shell separator to find it.
+                "git checkout main && rm -f tmpfile", "git checkout main; make -f Makefile.dev",
+                "git push --force", "git checkout -b feature"]:
         assert guard(cmd, repo) is None, cmd
 
 
