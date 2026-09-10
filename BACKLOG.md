@@ -1989,3 +1989,99 @@ conflict handling, or branch protection. None of those change whichever way it g
 `BACKLOG.md`, and the bundled scripts under `hooks/scripts/` and `skills/*/scripts/`. Nothing in
 Orclab lands a branch; the only hits for merging are `orc-git`'s `pr` subcommand, which checks a
 pull request out rather than landing it.
+
+## #29: a bare YAML scalar in action: or metrics: aborts the whole run instead of failing one leaf
+
+Found by v13's own final whole-branch review (2026-09-09), with a live reproduction, and
+deliberately scoped out of that branch's fix wave rather than smuggled into it.
+
+`action: true` in a `channels.yaml` leaf is valid YAML and parses as a Python `bool`. Two things
+then happen, neither of them the tool's stated behaviour:
+
+- `cli.action_shape_warning()` does `action = leaf.action or ""`, and `True or ""` is `True`, so
+  the next line calls `.rfind()` on a bool and raises `AttributeError`.
+- `cli._run()` passes it to `subprocess.Popen(command, shell=True, ...)`, which with a non-str,
+  non-bytes argument does `list(args)` and raises `TypeError: 'bool' object is not iterable`.
+
+**The concrete consequence is not a bad publish - it is that one malformed leaf takes the whole
+run down.** `/orc-publish` continues past `failed`, `timed out` and `refused` everywhere else, on
+purpose, so a healthy sibling channel still publishes and still reports. Here the traceback
+escapes `execute_plan` entirely: no summary is printed at all, and a sibling leaf that would have
+succeeded is never even attempted. Verified live on v13's branch against `confirm.command`, which
+shares `_run`.
+
+**This is a known class in this codebase, already fixed once at a different site.** `tree.py`'s
+`preflight` property carries a long docstring about exactly this: a non-string scalar
+(`preflight: 5`) used to raise `TypeError` out of the property "ahead of every caller's own
+containment, so one malformed leaf aborted the whole run and its healthy siblings never executed."
+The fix there was to make the property refuse to crash and leave refusal to the caller. `action:`
+and `metrics:` never got the same treatment.
+
+**Why v13 fixed only its own field.** v13 added `confirm.command`/`confirm.url` and shipped a type
+guard inside `confirm_error`, which already runs before anything executes. Extending that guard
+outward to `action:` and `metrics:` in the same branch would have been a different change with a
+different blast radius - every existing `channels.yaml` in the world is validated by it - and the
+review's own triage said so: file the wider case separately, and fix it at the one place all three
+converge rather than as three guards.
+
+**The candidate fix, not a decision:** a shared "is this a usable command string" check applied
+where the command is read, so a malformed leaf is refused with a real message and its siblings
+still run. The open question is where that belongs - `Node.command()`, a `command_error(leaves)`
+sibling to `timeout_error`/`confirm_error`, or inside `execute_plan`'s per-leaf loop so the refusal
+lands as a normal `(leaf, status, detail)` result rather than a pre-flight error. Only the third
+preserves "one bad leaf, everything else still runs", which is the property this entry is about.
+
+**Scope boundary:** this is about a leaf whose command is not a string. It says nothing about a
+command that is a valid string and simply fails, which is already handled correctly.
+
+**Searched before filing**, per CLAUDE.md: every shipped `skills/*/SKILL.md`, `CLAUDE.md`,
+`BACKLOG.md`, `hooks/scripts/` and `skills/*/scripts/`. `tree.py`'s `preflight` property is the
+only place the class is handled; nothing covers `action:` or `metrics:`.
+
+## #30: /orc-todo's allocator writes to the canonical checkout, which is right for BACKLOG.md and wrong for a feature branch's VERIFICATION.md
+
+Hit for real 2026-09-09 while executing the v13 plan in a git worktree. Task 5 ran
+`/orc-todo add verification ...` from inside the worktree; the allocator resolved to the shared
+canonical checkout and wrote the new scenario into `/home/direflail/projects/orclab/VERIFICATION.md`
+- on `main`, describing a `confirm:` field that existed only on the branch. The implementer noticed,
+reverted the stray edit on main, and replicated the allocator-assigned scenario (#47) into the
+worktree's own copy. Verified afterwards: main was clean, the worktree's file correct, and the
+number genuinely consumed so it can never be reissued.
+
+**This is v16's design working exactly as specified, not a bug in the allocator.** One canonical
+file is the whole answer to #22 and #25 - two agents scanning the same file at the same time both
+found the same highest N and both wrote it. Routing every writer to the canonical checkout is what
+makes the counter authoritative. Nothing here proposes changing that.
+
+**The finding is that the two resources want different things from it.** A `BACKLOG.md` entry is a
+finding about the project, true the moment it is written, and belongs on main immediately - that is
+why writing it uncommitted to the canonical file is right. A `VERIFICATION.md` scenario written
+during feature work describes behaviour that does not exist yet outside the branch. Landing it on
+main early advertises a check nobody can run.
+
+**The number and the text want different homes, which is the shape of the answer.** The allocation
+must stay canonical - that is the anti-collision property, and it worked here. The prose arguably
+belongs on the branch, arriving on main when the feature does. What the workaround did by hand -
+take the number from the shared counter, write the text on the branch - may simply be the correct
+behaviour, in which case the fix is for the command to do it rather than for a person to notice.
+
+**Cost of leaving it:** whoever hits this next has to notice it at all. This session's implementer
+did, and said so; a session that did not would leave main describing an unshipped feature, and the
+error would be invisible because both files are plausible.
+
+**Options, none chosen:** teach `add verification` to write into the invoking worktree while still
+allocating from the canonical counter; or leave the behaviour and document it in `orc-todo`'s
+SKILL.md so it is a known property rather than a surprise; or decide scenarios are canonical too
+and that landing early is acceptable. The third is defensible and would need no code.
+
+**Scope boundary:** `BACKLOG.md` is not in question. Its canonical-write behaviour is correct and
+should not change. This is only about `VERIFICATION.md`, and only about where the text lands.
+
+**Related:** #26 records a session where an allocated entry landing on main's branch rather than a
+feature branch was reported as though it followed obviously, when it only follows if you already
+know a worktree exists per plan. This entry is that same property, met from the other direction.
+
+**Searched before filing**, per CLAUDE.md: `skills/orc-todo/SKILL.md`, `skills/backlog-discipline/
+SKILL.md`, `CLAUDE.md`, `BACKLOG.md`, and the scripts under `skills/orc-todo/scripts/`. The
+canonical-root behaviour is implemented in `orc_todo/state.py` and documented nowhere as a
+worktree-facing consequence.
