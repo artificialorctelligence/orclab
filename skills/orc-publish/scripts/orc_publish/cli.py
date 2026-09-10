@@ -318,6 +318,22 @@ def preflight_refusal(leaf, default_timeout=DEFAULT_TIMEOUT_SECONDS, resolved=No
     return None
 
 
+def _accepted_detail(leaf, output):
+    """The `accepted` line's detail: what happened, what has not, and how to find out.
+
+    The action's own output goes last, not first. A real publish's capture is a wall of log,
+    and the sentence that tells an operator this is not finished has to survive being read
+    above it - see BACKLOG #15, where a correct message was unreadable in exactly this way.
+    """
+    how = "run --confirm" if leaf.confirm_command else "no confirm command declared"
+    if leaf.confirm_url:
+        how += f", or see {leaf.confirm_url}"
+    parts = [f"upload accepted; not yet confirmed - {how}"]
+    if output:
+        parts.append(output)
+    return "\n".join(parts)
+
+
 def execute_plan(
     leaves,
     default_timeout=DEFAULT_TIMEOUT_SECONDS,
@@ -326,11 +342,13 @@ def execute_plan(
 ):
     """Run each leaf's command under `command_key`. One failure doesn't stop the others.
 
-    Returns a list of (leaf, status, detail) - status is "success", "failed", "timed out",
-    "refused", or "not attempted". detail is the command's real stdout on success, the real
-    error text on failure, and the per-key "not set" wording when not attempted - never
-    silently empty on success, since this is the only evidence an operator gets that a real
-    publish actually happened.
+    Returns a list of (leaf, status, detail) - status is "success", "accepted", "failed",
+    "timed out", "refused", or "not attempted". A leaf that declares `confirm` reports
+    "accepted" rather than "success" on a zero-exit action: the upload genuinely succeeded
+    and nothing went wrong, so the exit code stays 0, but it has not landed yet. detail is
+    the command's real stdout on success, the real error text on failure, and the per-key
+    "not set" wording when not attempted - never silently empty on success, since this is
+    the only evidence an operator gets that a real publish actually happened.
 
     On the *action* path the order is **prepare -> inspect -> act**, and a tripped preflight
     rule reports "refused" without the action ever running. `--metrics` skips both gates
@@ -375,7 +393,10 @@ def execute_plan(
                     returncode, command, output=stdout, stderr=stderr
                 )
             detail = (stdout or "").strip()
-            results.append((leaf, "success", detail))
+            if command_key == GATED_COMMAND_KEY and leaf.confirm:
+                results.append((leaf, "accepted", _accepted_detail(leaf, detail)))
+            else:
+                results.append((leaf, "success", detail))
         except subprocess.TimeoutExpired as e:
             # TimeoutExpired does carry whatever was captured before the timeout - but as
             # undecoded bytes despite text=True, because the exception is built from the raw

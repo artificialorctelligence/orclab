@@ -1122,3 +1122,114 @@ def test_a_well_formed_confirm_is_not_an_error(tmp_path):
         """,
     )
     assert main(["--channels", path, "--dry-run", "ppa"]) == 0
+
+
+def test_a_leaf_declaring_confirm_reports_accepted_not_success(tmp_path, capsys):
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        """
+        ppa:
+          noble:
+            action: echo uploaded
+            confirm:
+              command: "true"
+              url: https://e.test/q
+        """,
+    )
+    assert main(["--channels", path, "ppa"]) == 0
+    out = capsys.readouterr().out
+    assert "ppa.noble: accepted" in out
+    assert "ppa.noble: success" not in out
+
+
+def test_the_accepted_detail_says_it_is_not_done_and_how_to_find_out(tmp_path, capsys):
+    # The word is doing the work here. #15 established that a substring assertion can pass on
+    # output no operator can actually read, so assert the whole sentence a human sees.
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        """
+        ppa:
+          noble:
+            action: echo uploaded
+            confirm:
+              command: "true"
+              url: https://e.test/q
+        """,
+    )
+    main(["--channels", path, "ppa"])
+    out = capsys.readouterr().out
+    assert "upload accepted; not yet confirmed - run --confirm, or see https://e.test/q" in out
+    assert "uploaded" in out  # the action's own output is still the evidence it ran
+
+
+def test_a_url_only_confirm_still_reports_accepted(tmp_path, capsys):
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        """
+        ppa:
+          noble:
+            action: echo uploaded
+            confirm:
+              url: https://e.test/q
+        """,
+    )
+    assert main(["--channels", path, "ppa"]) == 0
+    assert "no confirm command declared, or see https://e.test/q" in capsys.readouterr().out
+
+
+def test_a_leaf_without_confirm_still_reports_success(tmp_path, capsys):
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        """
+        ppa:
+          noble:
+            action: echo uploaded
+        """,
+    )
+    assert main(["--channels", path, "ppa"]) == 0
+    assert "ppa.noble: success" in capsys.readouterr().out
+
+
+def test_metrics_on_a_confirm_leaf_is_not_accepted(tmp_path, capsys):
+    # --metrics reads back numbers a channel already publishes. Nothing was submitted, so
+    # there is nothing pending to confirm.
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        """
+        ppa:
+          noble:
+            action: echo uploaded
+            metrics: echo 12 downloads
+            confirm:
+              command: "true"
+        """,
+    )
+    assert main(["--channels", path, "--metrics", "ppa"]) == 0
+    out = capsys.readouterr().out
+    assert "ppa.noble: success" in out
+    assert "accepted" not in out
+
+
+def test_a_refused_leaf_never_reaches_accepted(tmp_path, capsys):
+    # Composition with v12: refusal precedes the action, so no confirmation state can exist.
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        """
+        ppa:
+          noble:
+            action: echo uploaded
+            preflight: no-such-rule
+            confirm:
+              command: "true"
+        """,
+    )
+    assert main(["--channels", path, "ppa"]) == 1
+    out = capsys.readouterr().out
+    assert "ppa.noble: refused" in out
+    assert "accepted" not in out
