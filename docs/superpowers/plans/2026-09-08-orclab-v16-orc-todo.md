@@ -1851,7 +1851,11 @@ def test_it_stays_silent_on_commands_that_only_look_dangerous(tmp_path):
     common git command there is - firing on it would make this guard noise within a day."""
     repo = make_repo(tmp_path, dirty=True)
     for cmd in ["git clean -fdx", "git clean -fd", "git checkout main", "git switch main",
-                "git restore --staged BACKLOG.md", "git stash list", "git stash pop"]:
+                "git restore --staged BACKLOG.md", "git stash list", "git stash pop",
+                # A later command's own -f is not this one's. The forced-discard alternative
+                # must not read across a shell separator to find it.
+                "git checkout main && rm -f tmpfile", "git checkout main; make -f Makefile.dev",
+                "git push --force", "git checkout -b feature"]:
         assert guard(cmd, repo) is None, cmd
 
 
@@ -2165,7 +2169,9 @@ WHOLE_TREE = re.compile(
     r"\bgit\s+(?:"
     r"reset\s+(?:--hard|--merge|--keep)\b"
     r"|stash\b(?!\s+(?:list|show|apply|pop))"
-    r"|(?:checkout|switch)\s+(?:\S+\s+)*(?:-f\b|--force\b|--discard-changes\b)"
+    # The gap excludes shell separators. \S+ swallowed them, so the -f of an unrelated later
+    # command - `git checkout main && rm -f tmp` - satisfied this alternative and got denied.
+    r"|(?:checkout|switch)\s+(?:[^\s;&|]+\s+)*(?:-f\b|--force\b|--discard-changes\b)"
     r")"
 )
 # --staged alone only unstages, so it is excluded; --staged --worktree discards both and is not.
