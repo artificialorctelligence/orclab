@@ -1194,6 +1194,146 @@ def test_a_leaf_without_confirm_still_reports_success(tmp_path, capsys):
     assert "ppa.noble: success" in capsys.readouterr().out
 
 
+def test_confirm_mode_publishes_nothing(tmp_path, capsys):
+    # The sentinel is the whole test: if the action ran, the file exists.
+    sentinel = tmp_path / "published.txt"
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        f"""
+        ppa:
+          noble:
+            action: touch {sentinel}
+            confirm:
+              command: "true"
+        """,
+    )
+    assert main(["--channels", path, "--confirm", "ppa"]) == 0
+    assert not sentinel.exists()
+    assert "ppa.noble: confirmed" in capsys.readouterr().out
+
+
+def test_confirm_maps_a_nonzero_exit_to_not_confirmed_with_the_real_output(tmp_path, capsys):
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        """
+        ppa:
+          noble:
+            action: "true"
+            confirm:
+              command: sh -c 'echo still building >&2; exit 3'
+        """,
+    )
+    assert main(["--channels", path, "--confirm", "ppa"]) == 1
+    out = capsys.readouterr().out
+    assert "ppa.noble: not confirmed" in out
+    assert "still building" in out
+
+
+def test_a_url_only_leaf_needs_a_human_and_prints_the_url(tmp_path, capsys):
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        """
+        ppa:
+          noble:
+            action: "true"
+            confirm:
+              url: https://e.test/packages
+        """,
+    )
+    assert main(["--channels", path, "--confirm", "ppa"]) == 0
+    out = capsys.readouterr().out
+    assert "ppa.noble: needs a human" in out
+    assert "https://e.test/packages" in out
+
+
+def test_a_leaf_with_no_confirm_reports_no_confirm_declared(tmp_path, capsys):
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        """
+        ppa:
+          noble:
+            action: "true"
+        """,
+    )
+    assert main(["--channels", path, "--confirm", "ppa"]) == 0
+    assert "ppa.noble: no confirm declared" in capsys.readouterr().out
+
+
+def test_a_not_confirmed_leaf_does_not_stop_the_next_one(tmp_path, capsys):
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        """
+        ppa:
+          noble:
+            action: "true"
+            confirm:
+              command: "false"
+          jammy:
+            action: "true"
+            confirm:
+              command: "true"
+        """,
+    )
+    assert main(["--channels", path, "--confirm", "ppa"]) == 1
+    out = capsys.readouterr().out
+    assert "ppa.noble: not confirmed" in out
+    assert "ppa.jammy: confirmed" in out
+
+
+def test_confirm_rejects_dry_run_rather_than_ignoring_one_of_them(tmp_path, capsys):
+    # Silently dropping a flag the operator typed is how someone comes to believe a dry run
+    # happened when it did not.
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        """
+        ppa:
+          noble:
+            action: "true"
+        """,
+    )
+    assert main(["--channels", path, "--confirm", "--dry-run", "ppa"]) == 1
+    assert "--confirm cannot be combined with --dry-run" in capsys.readouterr().err
+
+
+def test_confirm_rejects_metrics_for_the_same_reason(tmp_path, capsys):
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        """
+        ppa:
+          noble:
+            action: "true"
+        """,
+    )
+    assert main(["--channels", path, "--confirm", "--metrics", "ppa"]) == 1
+    assert "--confirm cannot be combined with --metrics" in capsys.readouterr().err
+
+
+def test_a_confirm_command_that_hangs_is_not_confirmed_rather_than_hanging(tmp_path, capsys):
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        """
+        ppa:
+          noble:
+            action: "true"
+            timeout: 1
+            confirm:
+              command: sleep 30
+        """,
+    )
+    assert main(["--channels", path, "--confirm", "ppa"]) == 1
+    out = capsys.readouterr().out
+    assert "ppa.noble: not confirmed" in out
+    assert "timed out after 1s" in out
+
+
 def test_metrics_on_a_confirm_leaf_is_not_accepted(tmp_path, capsys):
     # --metrics reads back numbers a channel already publishes. Nothing was submitted, so
     # there is nothing pending to confirm.

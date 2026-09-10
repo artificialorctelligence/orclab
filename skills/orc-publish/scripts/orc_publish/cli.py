@@ -30,12 +30,15 @@ from .tree import load_tree
 
 NOT_ACTIONABLE = "known channel, not yet actionable"
 NO_METRICS = "known channel, no metrics source"
+NO_CONFIRM = "synchronous channel - its publish settles when the action exits"
 
 # Every leaf command key. "action" publishes (writes, needs the SKILL.md confirmation gate);
 # "metrics" reads back numbers a channel already publishes about itself (safe, no gate). They
 # share the whole execution path - selection, timeout, process-group kill, output capture -
-# because the only thing that differs is which key holds the command. BACKLOG #18's proposed
-# `status:` is the same shape again: add it to tree.LEAF_KEYS and to NOT_SET below.
+# because the only thing that differs is which key holds the command. BACKLOG #18 shipped as
+# `confirm:` and is deliberately NOT this shape - it is a mapping of two optional sub-fields,
+# not a bare command, and it reports four statuses of its own. It has its own small path
+# (confirm_plan) rather than a fourth entry here.
 NOT_SET = {"action": NOT_ACTIONABLE, "metrics": NO_METRICS}
 
 # `prepare:` and `preflight:` gate the *action* path only. A metrics query publishes nothing,
@@ -434,6 +437,70 @@ def format_summary(results):
     return "\n".join(lines)
 
 
+def format_confirm_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
+    """What `--confirm` will check, printed before it runs.
+
+    Deliberately not `format_plan` with a third command key: `--confirm` publishes nothing, so
+    there is no preflight or action-shape line to print, and half of what it reports is a URL
+    rather than a command.
+    """
+    if not leaves:
+        return "(no leaves selected)"
+    lines = []
+    for leaf in leaves:
+        if leaf.confirm_command:
+            lines.append(f"{leaf.dotted_path}: {leaf.confirm_command}")
+            lines.append(f"  timeout: {effective_timeout(leaf, default_timeout)}s")
+        elif leaf.confirm_url:
+            lines.append(f"{leaf.dotted_path}: (needs a human) {leaf.confirm_url}")
+        else:
+            lines.append(f"{leaf.dotted_path}: ({NO_CONFIRM})")
+    return "\n".join(lines)
+
+
+def confirm_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
+    """Check whether each selected leaf's accepted publish has actually landed.
+
+    Publishes nothing. Returns (leaf, status, detail) with status "confirmed",
+    "not confirmed", "needs a human", or "no confirm declared".
+
+    Exit 0 from the command means confirmed and anything else means not confirmed - two
+    states, not three. A three-state protocol distinguishing "not yet" from "the check itself
+    broke" would have to be honoured by every project implementing `confirm`, and for gating
+    purposes both answers mean do not advance. Which one it was belongs in the command's own
+    output, which a human reads.
+
+    A timeout is "not confirmed" for the same reason: it is not a positive answer, and this
+    never waits on a remote publish by design.
+    """
+    results = []
+    for leaf in leaves:
+        command = leaf.confirm_command
+        if not command:
+            if leaf.confirm_url:
+                results.append((leaf, "needs a human", leaf.confirm_url))
+            else:
+                results.append((leaf, "no confirm declared", NO_CONFIRM))
+            continue
+
+        limit = effective_timeout(leaf, default_timeout)
+        try:
+            returncode, stdout, stderr = _run(command, limit)
+        except subprocess.TimeoutExpired as e:
+            captured = "\n".join(filter(None, [_decode(e.stdout), _decode(e.stderr)]))
+            detail = f"confirm timed out after {limit}s"
+            if captured:
+                detail += f"\n{captured}"
+            results.append((leaf, "not confirmed", detail))
+            continue
+
+        detail = "\n".join(filter(None, [(stdout or "").strip(), (stderr or "").strip()]))
+        if leaf.confirm_url:
+            detail = "\n".join(filter(None, [detail, f"see {leaf.confirm_url}"]))
+        results.append((leaf, "confirmed" if returncode == 0 else "not confirmed", detail))
+    return results
+
+
 def scripts_dir():
     """This script bundle's own directory, as an absolute path.
 
@@ -457,6 +524,12 @@ def main(argv=None):
         help="run each selected leaf's `metrics:` command instead of its `action:` - a "
         "read-only report of the numbers that channel already publishes about itself",
     )
+    parser.add_argument(
+        "--confirm",
+        action="store_true",
+        help="check whether each selected leaf's already-accepted publish has actually "
+        "landed, by running its `confirm.command` - publishes nothing",
+    )
     parser.add_argument("--channels", default=".orclab/publish/channels.yaml")
     parser.add_argument("--distro", default=".orclab/publish/distro.yaml")
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_SECONDS)
@@ -467,6 +540,16 @@ def main(argv=None):
         print(
             "error: --timeout must be a positive whole number of seconds, "
             f"got {args.timeout!r}",
+            file=sys.stderr,
+            flush=True,
+        )
+        return 1
+
+    if args.confirm and (args.dry_run or args.metrics):
+        other = "--dry-run" if args.dry_run else "--metrics"
+        print(
+            f"error: --confirm cannot be combined with {other} - --confirm is its own mode "
+            "and publishes nothing. Run them separately.",
             file=sys.stderr,
             flush=True,
         )
@@ -512,6 +595,12 @@ def main(argv=None):
     if bad_confirm:
         print(f"error: {bad_confirm}", file=sys.stderr, flush=True)
         return 1
+
+    if args.confirm:
+        print(format_confirm_plan(leaves, default_timeout=args.timeout), flush=True)
+        results = confirm_plan(leaves, default_timeout=args.timeout)
+        print(format_summary(results), flush=True)
+        return 0 if all(status != "not confirmed" for _, status, _ in results) else 1
 
     command_key = "metrics" if args.metrics else "action"
     print(format_plan(leaves, default_timeout=args.timeout, command_key=command_key), flush=True)
