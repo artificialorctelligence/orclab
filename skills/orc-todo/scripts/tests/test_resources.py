@@ -68,3 +68,9 @@ def test_insert_leaves_exactly_one_blank_line_between_sections():
     out = insert(text, BACKLOG, "## #2: second\n\nmore\n")
     assert "prose\n\n## #2: second" in out
     assert "prose\n\n\n" not in out
+
+
+def test_scan_max_ignores_a_heading_quoted_in_a_fenced_example():
+    # A phantom high-water mark never reissues a number - it silently skips to 100.
+    text = "## #7: real\n\n```\n## #99: an example of the format\n```\n"
+    assert scan_max(text, BACKLOG) == 7

@@ -42,14 +42,36 @@ RESOURCES = {
 }
 
 
+def _headings(pattern, text):
+    """Matches of pattern that are real headings - not lines inside a ``` fenced block.
+
+    This is a file about its own format, so it will quote a heading in an example sooner or
+    later, and a quoted one is character-for-character identical to a real one. The fence is
+    the only thing that tells them apart. Indentation is not enough: a fenced example is
+    usually flush left, which is the point of showing it.
+    """
+    fenced, inside, pos = set(), False, 0
+    for line in text.splitlines(keepends=True):
+        if line.startswith("```"):
+            inside = not inside
+        elif inside:
+            fenced.add(pos)
+        pos += len(line)
+    return [m for m in pattern.finditer(text) if m.start() not in fenced]
+
 def scan_max(text, resource):
     """The highest number appearing as a real heading. 0 when there are none.
 
     Anchored at line start on purpose: an entry body citing "#40" must not become the
     high-water mark, and entries are not stored in numerical order - gaps are expected and
     correct, since a deleted entry's number is never reused.
+
+    Fenced examples are excluded for the same reason cli._sections excludes them, but the cost
+    of missing one differs: here a quoted "## #99:" never reissues a number, it silently jumps
+    the next one to 100. A gap is supposed to be the record of a deleted entry - a phantom gap
+    is that record lying.
     """
-    numbers = [int(m) for m in re.findall(resource.number_re, text, flags=re.MULTILINE)]
+    numbers = [int(m.group(1)) for m in _headings(re.compile(resource.number_re, re.MULTILINE), text)]
     return max(numbers) if numbers else 0
 
 

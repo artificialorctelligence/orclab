@@ -1827,7 +1827,7 @@ reframe to `/orc-todo` arrived - all of which was thrown away. That is the same 
 work done twice because two views of the problem never met early enough. A simulated pass during
 design is paid in a paragraph; skipping it is paid in a rewrite.
 
-## #27: three deferred minors from v16's own review, worth tracking rather than losing
+## #27: three deferred minors from v16's own review, worth tracking rather than losing (RESOLVED 2026-09-09)
 
 Raised by v16's own final whole-branch review (2026-09-09), which triaged the deferred minors its
 per-task reviews had accumulated. Most were genuinely fine to leave. These three were not — not
@@ -1844,7 +1844,7 @@ just an opaque one. The fix is `q.get(timeout=30)`, and it is worth taking preci
 is the test that would have caught the 2026-09-08 collision: a test that hangs CI is a test people
 learn to skip.
 
-**2. Three test names in the same file promise setup that `make_repo` does not perform.** It never
+**2. Two test names in the same file promise setup that `make_repo` does not perform.** It never
 commits, so nothing in the fixture is ever tracked. Consequently
 `test_allocate_appends_even_when_the_file_is_dirty` never creates a git-dirty file — it tests that
 existing content survives, which is the behaviour that matters, but not the named condition; and
@@ -1867,3 +1867,46 @@ correctness under concurrency, which the review verified separately and by contr
 review, judged not worth a fix round, and would otherwise live only in a ledger that was deleted
 with the worktree. Splitting them buys nothing, and the shared context — what the reviewer was
 looking at, and why they were deferred rather than fixed — is most of what a future reader needs.
+
+**Resolved for real, not just tracked, 2026-09-09.** All three, plus a fourth found while fixing
+the third. 64 tests passing before the extension, 65 after.
+
+**1.** `test_two_real_concurrent_processes_get_different_numbers` now uses `q.get(timeout=30)` and
+asserts every result is an `int` - naming the offending value in the message - before sorting. A
+child killed by a signal fails the test after 30s instead of blocking the parent forever, and a
+child's `ERROR ...` string is reported verbatim rather than surfacing as an opaque `TypeError`
+from `sorted()`.
+
+**2.** `make_repo` now commits its fixture, so "dirty" and "never commits" are real conditions
+rather than artefacts of everything being untracked. The negative control matters more than the
+fix here: the *old* `test_allocate_never_commits` passes against a deliberately no-op allocator -
+exactly the weakness this entry described - and the new one fails against the same no-op.
+
+**3.** `_sections()` now routes through a `_headings()` helper that drops matches inside fenced
+code blocks. `cmd_remove` routes both its heading scan and its `_NEXT_SECTION` end-boundary scan
+through the same helper, so a fenced `## ` line inside the entry being removed can no longer cut
+its span short. Column-0 was already enforced by `re.MULTILINE`; the fence was the only missing
+discriminator, and indentation would not have served - a fenced example is usually flush left,
+which is the point of showing it.
+
+**4, not in the original entry.** `resources.scan_max()` had the identical blind spot, and the
+first judgment on it was to leave it: it can only ever inflate the next number, never reissue one,
+so it is safe by the allocator's own invariant. That reasoning is correct about *uniqueness* and
+wrong about what the numbering is for. A quoted `## #99:` would silently jump the next entry to
+`#100`, and this file's own rule is that a gap is the record of a deleted entry - a phantom gap is
+that record lying. So `_headings()` moved down into `resources.py` (`cli.py` already imports from
+it, so the direction was already there) and `scan_max` uses it. Negative control run: on the same
+input the old implementation returns 99 and the new one returns 7.
+
+Fixing it here rather than filing it is deliberate. Two functions with the same regex-over-markdown
+blind spot in one package is the case for fixing it once where both route through, and the helper
+the third fix had just written made that a five-line change.
+
+**One correction to this entry's own text, made in place 2026-09-09 at direflail's direction.**
+Item 2 originally read "Three test names" and then named two. There is no third whose *name* claims
+tracked-file setup - the nearest, `test_a_lost_counter_self_heals_from_the_file`, has a docstring
+mentioning "a fresh clone or a cleaned `.git`" but asserts only counter behaviour. Committing in
+`make_repo` covers it either way. The word was corrected to "Two" rather than left standing with a
+note, which is the one place this resolution departs from `backlog-discipline`'s "never rewrite the
+original diagnostic text" - a miscount is not reasoning worth preserving, and the original wording
+is recorded here.

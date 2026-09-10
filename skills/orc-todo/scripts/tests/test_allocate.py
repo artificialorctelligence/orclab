@@ -10,7 +10,19 @@ from orc_todo import state
 def make_repo(tmp_path, backlog="# Backlog\n\n## #22: last one\n\nprose\n"):
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     (tmp_path / "BACKLOG.md").write_text(backlog)
+    # Committed on purpose. An untracked fixture makes "dirty" and "never commits" true before
+    # the allocator runs at all, so those tests would pass on a no-op.
+    git = ["git", "-C", str(tmp_path), "-c", "user.email=t@t", "-c", "user.name=t",
+           "-c", "commit.gpgsign=false"]
+    subprocess.run(git + ["add", "BACKLOG.md"], check=True)
+    subprocess.run(git + ["commit", "-qm", "fixture"], check=True)
     return tmp_path
+
+
+def git_status(repo):
+    return subprocess.run(
+        ["git", "-C", str(repo), "status", "--porcelain", "BACKLOG.md"],
+        capture_output=True, text=True, check=True).stdout.strip()
 
 
 def test_allocate_returns_the_next_number_and_writes_the_entry(tmp_path):
@@ -27,11 +39,9 @@ def test_allocate_never_commits(tmp_path):
     """Committing means running git in a checkout the agent does not own, sweeping up whatever
     uncommitted work is in that file."""
     repo = make_repo(tmp_path)
+    assert not git_status(repo), "the fixture must start clean, or this proves nothing"
     alloc.allocate("backlog", "t", "b", cwd=repo)
-    status = subprocess.run(
-        ["git", "-C", str(repo), "status", "--porcelain", "BACKLOG.md"],
-        capture_output=True, text=True, check=True).stdout
-    assert status.strip(), "the entry must be left uncommitted"
+    assert git_status(repo), "the entry must be left uncommitted"
 
 
 def test_allocate_appends_even_when_the_file_is_dirty(tmp_path):
@@ -39,6 +49,7 @@ def test_allocate_appends_even_when_the_file_is_dirty(tmp_path):
     human intervenes. It appends instead; the guard protects the entry."""
     repo = make_repo(tmp_path)
     (repo / "BACKLOG.md").write_text("# Backlog\n\n## #22: last one\n\nEDITED BY HAND\n")
+    assert git_status(repo), "the file must really be git-dirty before the call"
     alloc.allocate("backlog", "t", "b", cwd=repo)
     text = (repo / "BACKLOG.md").read_text()
     assert "EDITED BY HAND" in text, "the human's uncommitted edit must survive"
@@ -100,7 +111,11 @@ def test_two_real_concurrent_processes_get_different_numbers(tmp_path):
         p.start()
     for p in procs:
         p.join(timeout=60)
-    results = sorted(q.get() for _ in procs)
+    # Both bounded: join() returns without killing a hung child, and a child killed by a signal
+    # never puts anything. A test that hangs CI is a test people learn to skip.
+    results = [q.get(timeout=30) for _ in procs]
+    assert all(isinstance(r, int) for r in results), f"a child failed: {results}"
+    results.sort()
     assert results == [23, 24], f"got {results}"
     text = (repo / "BACKLOG.md").read_text()
     assert "## #23:" in text and "## #24:" in text, "both entries must land"

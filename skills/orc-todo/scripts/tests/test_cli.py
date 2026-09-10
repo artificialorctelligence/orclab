@@ -116,6 +116,21 @@ def test_remove_keeps_a_header_whose_own_prose_contains_a_heading_shape(tmp_path
     assert "followed by prose." in (repo / "BACKLOG.md").read_text()
 
 
+def test_a_heading_quoted_in_a_fenced_example_is_not_an_entry(tmp_path, capsys):
+    """This file documents its own format, so an entry will illustrate a heading sooner or
+    later, flush left inside a fence. Counted as real it becomes a phantom section - listed and
+    shown as an entry, and cutting #7's span short at the example it contains."""
+    repo = make_repo(tmp_path)
+    (repo / "BACKLOG.md").write_text(BACKLOG.replace(
+        "prose about it", "An entry is written like this:\n\n```\n## #99: a phantom\n```\n\nand so on"))
+    code, out = run(["list"], repo, capsys)
+    assert code == 0 and "#99" not in out
+    assert run(["remove", "7"], repo, capsys)[0] == 0
+    text = (repo / "BACKLOG.md").read_text()
+    assert "#99" not in text, "the example is #7's own body and goes with it"
+    assert "## #22: another open one" in text
+
+
 def test_remove_keeps_a_trailing_section_after_the_last_entry(tmp_path, capsys):
     """The last entry's body ran to EOF, so removing it took any closing section with it."""
     repo = make_repo(tmp_path)
