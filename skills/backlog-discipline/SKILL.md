@@ -49,15 +49,23 @@ and `#24` (BACKLOG #22, resolved by #25). The allocator serializes the two write
 letting them race.
 
 The old exception — checking `git log -S'## #' -- BACKLOG.md` for a higher historical maximum in
-case the highest-numbered entry had itself been deleted — is **deleted, not moved here**. The
-allocator's counter only ever moves forward, so a deleted maximum entry can no longer cause a
-number to be reissued; the failure mode that exception existed for is gone, not relocated.
+case the highest-numbered entry had itself been deleted — is **retired from this path, not moved
+here**. The allocator's counter only ever moves forward, so a deleted maximum entry can no longer
+cause a number to be reissued through it; the failure mode that exception existed for is closed
+here. It reappears below, because the fallback has no counter.
 
 **If `/orc-todo` genuinely isn't available** — the project isn't a git repository, Orclab isn't
 installed, or the allocator script itself is missing — fall back to scanning the file for every
 `## #N:` heading and taking the highest `N` seen; the new entry is `N + 1`. Say so plainly when you
 do it, so whoever reads the entry later knows why it didn't go through the allocator. A consuming
 project without Orclab still needs this skill to work.
+
+**This fallback still needs the old exception.** It was the counter that made checking history
+unnecessary above; the fallback has no counter, so it has the old hazard back. If the
+highest-numbered entry was itself deleted, the scan reports a maximum that's already been used
+and hands it out again — reusing a number this file's whole premise says is permanent. Before
+trusting the scanned maximum, check `git log -S'## #' -- BACKLOG.md` for a higher one that was
+deleted, and use that instead.
 
 ## Writing a new entry
 
