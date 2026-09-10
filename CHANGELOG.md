@@ -2,6 +2,37 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.14.0] - 2026-09-09
+
+### Added
+- `/orc-todo` — look at and change the backlog: list what's open, read one entry in full, add or
+  remove one, and set up lanes saying which work runs in what order.
+- A number allocator holding a lock over one canonical file, so two agents working at once can't
+  take the same `BACKLOG.md` or `VERIFICATION.md` number. One mechanism serves both files via a
+  per-file descriptor. It writes the entry and stops — never commits, and never refuses because
+  the file is dirty.
+- A lane record of what work is in progress, and a `SessionStart` hook that tells a new session
+  about it without anyone remembering to ask. This is the half a lock cannot cover: on 2026-09-08
+  two sessions built the same feature for hours because nothing recorded that the first had
+  started.
+- A `PreToolUse` guard asking for consent before a command discards an uncommitted backlog entry —
+  the price of the allocator not committing. It fires only when the command really can discard AND
+  something is actually at risk.
+- `/orc-release` now warns when renumbering a `RELEASING.md` step leaves a prose reference pointing
+  past the end of the document.
+
+### Changed
+- `backlog-discipline` asks the allocator for a number instead of scanning the file for the highest
+  one. That scan was a read-then-write race: on 2026-09-08 two agents both took `#23` and `#24`,
+  following the rule exactly. It was racy, not ignored.
+- `backlog-discipline`'s "don't turn this into a general task list" line is replaced by what it was
+  actually protecting. It was written with no recorded rationale and described a file that doesn't
+  exist — ten of twelve open entries were things that needed doing.
+- `VERIFICATION.md`'s Scenario 1 no longer encodes the race in the verification script itself.
+
+### Fixed
+- `orc-publish`: a `preflight:` list containing a non-string item no longer crashes.
+
 ## [0.13.1] - 2026-09-08
 
 ### Fixed
