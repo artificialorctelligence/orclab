@@ -1865,6 +1865,66 @@ reframe to `/orc-todo` arrived - all of which was thrown away. That is the same 
 work done twice because two views of the problem never met early enough. A simulated pass during
 design is paid in a paragraph; skipping it is paid in a rewrite.
 
+**A first mechanism, 2026-09-10 — recorded as an attempt, not a resolution.** `CLAUDE.md` now
+carries "Before any answer that says what to do next, show what it rests on." The entry stays
+open deliberately: this is the weakest kind of fix by this entry's own argument, and a
+`(RESOLVED)` heading would tell the next reader the problem was solved.
+
+**What changed the diagnosis.** The covering memory
+(`show-the-ground-not-just-the-conclusion`) was already correctly worded, widened the day before
+after its trigger proved too narrow, and sitting in context for the whole of the session that
+then violated it. So this is no longer "the trigger was phrased too narrowly" - that was the
+previous finding and it was fixed. The rule was right, loaded, and not recognised at the moment
+it applied. `CLAUDE.md` removes two of the three failure conditions named in "Why prose is the
+weakest place to put a rule" (always loaded, short enough to read); only recognition survives,
+which is why the new trigger is written to be hard to describe your own work out of rather than
+merely accurate.
+
+**The instance it was written from.** Asked what to work on next, Claude ranked three backlog
+entries and argued the ordering across two turns before direflail decided on it, without ever
+running `ls docs/superpowers/specs`. All three already had written specs; **#17**, described as
+"a brainstorming pass on an undecided taxonomy," is a 260-line design document. The same
+reasoning went wrong twice more in that session and was corrected each time only by reading an
+artifact - the v14 spec's own text on ordering, and `tree.py` showing `confirm` was not yet in
+`LEAF_KEYS`.
+
+**The wording was tested rather than argued into place**, across eight subagent runs on fourteen
+situations, and the record is worth more than the final text:
+
+- An **exemption for small answers became the loophole in every form it took.** Self-assessed
+  importance, then reversibility - both judged by the party who wants to skip, and judged
+  *before* the pass, on exactly the ignorance the pass exists to remove. It was cut entirely.
+  The argument for having one ("a rule that is always on gets ignored") assumed the pass has a
+  fixed cost; it does not, since an answer that turns on nothing has nothing to open.
+- **Patching a loophole moved it four times running** - floor, then reversibility, then a clause
+  defending the rule's own cheapness, then citing a file while having read only its headings.
+- **The clause written to close that last one did not work**, and only a test that exercised the
+  *pass* rather than the trigger revealed it: it catches a response that admits its own
+  shallowness and has no purchase on one that simply does not say. What discriminates is
+  requiring a quote, because a quote is externally checkable and a claim about your own reading
+  is not. Hence "quote the sentence that decided it."
+- The most dangerous candidate response in that test was not the laziest. It name-checked the
+  rule's own required locations, used its vocabulary, and attached a **true but irrelevant**
+  premise to the wrong claim - surviving a checklist while getting the answer wrong.
+- **"Quote the sentence that decided it" was itself wrong**, found by a ninth run on a different
+  question with a different kind of evidence. It excluded a line of code by its literal wording,
+  excluded a grep result, and had no answer at all for evidence that is an *absence* - where the
+  only move left is a self-report the next clause disqualifies. Now "quote the exact text ... and
+  where what decided it is an absence, show the search that establishes it."
+- **And the honest ceiling, worth more than the wording:** the pass tests whether an answer is
+  *checkable*, not whether it is *complete*. A response that shows its grep output satisfies every
+  clause and can still be wrong because the grep missed a caller. No wording inside the pass can
+  fix that; the surface paragraph now asks for callers "found by a search you show rather than one
+  you assume", which is as far as prose reaches.
+
+**What is still open**, and what a next attempt should not do: the next step after a failure is
+not a fourth rewording. It is a mechanism, and the question nobody has answered is what event a
+machine can observe that co-occurs with "about to state a conclusion." A `model` field on a tool
+call is observable, which is why the model floor could be a hook; a property of prose is not.
+`UserPromptSubmit` injecting the check on question-shaped messages is the only shape found so
+far, and a hook that speaks every turn gets tuned out - which `hooks/scripts/lane_notice.py` says
+in its own docstring.
+
 ## #27: three deferred minors from v16's own review, worth tracking rather than losing (RESOLVED 2026-09-09)
 
 Raised by v16's own final whole-branch review (2026-09-09), which triaged the deferred minors its

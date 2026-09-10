@@ -1,10 +1,12 @@
 # Developing Orclab
 
-This is guidance for whoever (human or Claude) designs Orclab's *own* future skills and
-commands — not something Orclab ships to consuming projects. It's "project" category under
-Orclab's own taxonomy: real, verified facts about how Claude Code's command/skill system
-actually works, learned the hard way while building `/orc-code` through `/orc-git`, so the next
-component gets designed right the first time instead of rediscovering the same gaps.
+This is guidance for whoever (human or Claude) designs Orclab's own skills — both the subset it
+ships to consuming projects and the full set it uses to develop itself. The guidance in *this
+file* is what stays behind: Orclab's own workshop notes, not content installed anywhere else.
+It's "project" category under Orclab's own taxonomy: real, verified facts about how Claude Code's
+command/skill system actually works, learned the hard way while building `/orc-code` through
+`/orc-git`, so the next component gets designed right the first time instead of rediscovering the
+same gaps.
 
 Every claim below was actually checked — against the real, current official docs, or against
 live, direct behavior observed in a real session — not assumed from memory. Where something is
@@ -162,6 +164,44 @@ my-skill/
 │   └── helper.py
 ```
 
+## Before any answer that says what to do next, show what it rests on
+
+**The trigger is the situation, not the intent.** You are about to produce something that ranks,
+sequences, chooses between options, names something, judges whether something is ready, or says
+what to work on next — **whether or not anyone asked you a question.**
+
+**Judge the claim, not the container.** A report that ends by proposing an order is covered by
+that ending, even though the rest of it reports. The unit is the claim someone would act on, not
+the document it arrives in — **including one phrased as a question.** A question carrying its own
+answer is the answer.
+
+**Not this:** reporting a fact, explaining why something broke, or carrying out work you were
+asked to do — asked means the action, not the goal it serves: choosing where a new helper lives
+is not "carrying out the refactor."
+
+**There is no exemption for a small answer,** and "this turns on nothing" is a conclusion you may
+only reach after looking. The minimum is the project's own record of the thing: for what to work
+on next, `BACKLOG.md` and `docs/superpowers/`; for a change to code, the file it touches and its
+callers, found by a search you show rather than one you assume; for a name or a setting, whatever
+already reads it, or the nearest existing one of its
+kind. Where none of those fits, it is whatever you would cite if challenged. This list is
+Orclab's own, written against its current layout; if that layout changes the list should read as
+obviously stale rather than quietly wrong.
+
+**The pass.** Open what the answer turns on and **quote the exact text that decided it** — if your
+answer would be different had that text read otherwise, that is what to quote; where what decided
+it is an absence, show the search that establishes it. A description of what you read is a claim
+about yourself, not evidence about the project. State the premises the answer rests on, and attach
+each to the claim it supports.
+
+**What it looks like when skipped.** 2026-09-09: asked what to work on next, Claude ranked three
+backlog entries and argued the ordering across two turns before direflail decided on it — without
+ever running `ls docs/superpowers/specs`. All three already had finished specs; the one called "a
+brainstorming pass on an undecided taxonomy" was a 260-line written one. One command, never run.
+
+Full record, five more worked examples, and why this is a section rather than a fixed defect:
+**#26**.
+
 ## Before building anything, name what should already have covered it
 
 **Before proposing to build anything — a component, a script, a hook, a lint, a check — name the
@@ -172,8 +212,8 @@ places to keep in sync.
 
 **This governs every build, not just new `/orc-*` components.** It is deliberately a section of
 its own rather than an item in the design checklist below, because that checklist's heading —
-"designing a new `/orc-*` thing" — is a category a builder can classify themselves out of. That is
-exactly how this rule gets missed.
+"designing a new `/orc-*` thing" — is a category a builder can describe their own work out of.
+That is exactly how this rule gets missed.
 
 **Ask the backward question, not the forward one.** "What would catch this?" invents a mechanism
 without ever passing through what already exists. "What was supposed to catch this, and why
@@ -215,8 +255,8 @@ only of deflections is friction, not guidance:
 
 **Why prose is the weakest place to put a rule — and what to do about it.** Per the determinism
 spectrum above, a rule inside a skill's body fires only if the skill was invoked, *and* the right
-section was read, *and* the reader classified themselves into its trigger. Three conditions, each
-able to fail silently. Every guidance miss recorded here so far has been the third: a trigger
+section was read, *and* the reader recognised their own work in it. Three conditions, each able
+to fail silently. Every guidance miss recorded here so far has been the third: a trigger
 phrased as an *intent* ("when you resolve an entry", "when designing a new component") that the
 reader described their own work out of. **Phrase a trigger by the situation it applies to, not by
 the intent someone brings to it** — and when one is missed, widen that trigger rather than adding
