@@ -27,7 +27,7 @@ import json
 import re
 import sys
 
-from orclab_shared import uncommitted_entries
+from orclab_shared import in_canonical_checkout, uncommitted_entries
 
 ALLOW_MARKER = "orclab:discard-entries"
 
@@ -40,13 +40,19 @@ ALLOW_MARKER = "orclab:discard-entries"
 # always reaches every tracked file. A path-scoped one reaches only what it names, so naming
 # something else is not a risk - and denying `git restore README.md` is the same noise as
 # denying `git checkout main`, just rarer and therefore more annoying when it lands.
+# The forced forms belong with the whole-tree ones. The docstring above is right that git
+# REFUSES an unforced branch switch rather than overwriting - which is exactly why someone
+# reaches for -f next, and that one really does destroy the edit. Verified 2026-09-09.
 WHOLE_TREE = re.compile(
     r"\bgit\s+(?:"
     r"reset\s+(?:--hard|--merge|--keep)\b"
     r"|stash\b(?!\s+(?:list|show|apply|pop))"
+    r"|(?:checkout|switch)\s+(?:\S+\s+)*(?:-f\b|--force\b|--discard-changes\b)"
     r")"
 )
-PATH_SCOPED = re.compile(r"\bgit\s+(?:restore\b(?!\s+--staged\b)|checkout\s+--\s|checkout\s+)")
+# --staged alone only unstages, so it is excluded; --staged --worktree discards both and is not.
+PATH_SCOPED = re.compile(
+    r"\bgit\s+(?:restore\b(?!\s+--staged\b(?!\s+--worktree\b))|checkout\s+)")
 # A pathspec that could contain a tracked file: one of them by name, or a whole-tree sweep.
 REACHES_TRACKED = re.compile(r"(?:BACKLOG|VERIFICATION)\.md\b|(?<![\w./-])[.*](?:\s|$)")
 
@@ -71,6 +77,8 @@ def evaluate(command):
         return None
     if not _discards(command):
         return None
+    if not in_canonical_checkout():
+        return None  # this tree cannot reach the canonical file; nothing here is at risk
     at_risk = uncommitted_entries()
     if not at_risk:
         return None

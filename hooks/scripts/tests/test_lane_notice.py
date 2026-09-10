@@ -53,6 +53,16 @@ def test_it_reports_uncommitted_entries(tmp_path):
     assert "#8" in out
 
 
+def test_a_corrupt_lane_file_speaks_up_rather_than_going_silent(tmp_path):
+    """Silence is this hook's "nothing in progress" signal, so an unreadable lane record must
+    not produce it - that fails into exactly the state the lane record exists to prevent."""
+    repo = make_repo(tmp_path)
+    shared = repo / ".git" / "orclab"
+    shared.mkdir(parents=True)
+    (shared / "lanes.json").write_text("{not json")
+    assert "unreadable" in notice(repo)
+
+
 def test_outside_a_git_repo_it_says_nothing_and_exits_clean(tmp_path):
     out = subprocess.run([sys.executable, NOTICE], input="{}", capture_output=True,
                          text=True, cwd=str(tmp_path))

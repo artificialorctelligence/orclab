@@ -30,6 +30,10 @@ class LaneMissing(Exception):
     """No such lane, or no such item within it."""
 
 
+class LaneExists(Exception):
+    """A lane by that name is already there. Recreating it would erase what it was doing."""
+
+
 class LaneStateCorrupt(Exception):
     """lanes.json exists but cannot be parsed."""
 
@@ -84,9 +88,22 @@ def _write_lanes(data, cwd=None):
 
 
 def create_lane(name, items, cwd=None):
+    """Create a lane. Refuses to overwrite one that already exists.
+
+    Recreating a lane resets `current` to None, and that marker is the single record stopping a
+    second agent from rebuilding what a first is already building. A create where modify was
+    meant is an ordinary typo; erasing the in-progress marker on it, silently and with a zero
+    exit, is the 2026-09-08 failure handed back.
+    """
     _require_specced(items, cwd)   # validate before taking the lock, and before any write
     with state.held(f"creating lane {name}", cwd=cwd):
         data = read_lanes(cwd)
+        if name in data:
+            raise LaneExists(
+                f"lane '{name}' already exists (items: {', '.join(data[name]['items']) or 'none'}). "
+                "Use `lane modify` to change its items - creating it again would clear what it "
+                "is working on."
+            )
         data[name] = {"items": list(items), "current": None, "started": None}
         _write_lanes(data, cwd)
     return data[name]

@@ -7,6 +7,7 @@ GUARD = str(pathlib.Path(__file__).resolve().parent.parent / "backlog_guard.py")
 
 
 def make_repo(tmp_path, dirty):
+    tmp_path.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     (tmp_path / "BACKLOG.md").write_text("# Backlog\n\n## #7: committed one\n\nprose\n")
     subprocess.run(["git", "-C", str(tmp_path), "add", "BACKLOG.md"], check=True)
@@ -65,6 +66,23 @@ def test_it_stays_silent_on_commands_that_only_look_dangerous(tmp_path):
         assert guard(cmd, repo) is None, cmd
 
 
+def test_a_forced_switch_or_checkout_fires(tmp_path):
+    """git refuses an unforced branch switch rather than overwriting, which is why the guard
+    ignores it - and exactly why someone reaches for -f next. Verified 2026-09-09: the forced
+    forms really do destroy the edit."""
+    repo = make_repo(tmp_path, dirty=True)
+    for cmd in ["git checkout -f other", "git switch --discard-changes main",
+                "git switch -f main", "git checkout --force other"]:
+        assert guard(cmd, repo) is not None, cmd
+
+
+def test_restore_staged_worktree_fires_but_staged_alone_does_not(tmp_path):
+    """--staged alone only unstages; --staged --worktree discards the working copy too."""
+    repo = make_repo(tmp_path, dirty=True)
+    assert guard("git restore --staged BACKLOG.md", repo) is None
+    assert guard("git restore --staged --worktree BACKLOG.md", repo) is not None
+
+
 def test_a_path_scoped_discard_naming_an_unrelated_file_is_silent(tmp_path):
     """Denying `git restore README.md` is the same noise as denying `git checkout main` - the
     command cannot reach BACKLOG.md, so there is nothing to warn about."""
@@ -110,6 +128,19 @@ def test_a_non_bash_tool_is_ignored(tmp_path):
     out = subprocess.run([sys.executable, GUARD], input=payload, capture_output=True,
                          text=True, cwd=str(repo))
     assert out.returncode == 0 and not out.stdout.strip()
+
+
+def test_a_worktree_is_not_denied_for_the_main_checkouts_uncommitted_entry(tmp_path):
+    """A discard reaches only the tree it runs in. Denying a worktree's reset because the main
+    checkout has an uncommitted entry tells the user to commit something their tree does not
+    contain - and an allocated entry is meant to sit uncommitted, so that would deny every
+    whole-tree discard in every worktree for as long as it sits there."""
+    repo = make_repo(tmp_path / "main", dirty=True)
+    wt = tmp_path / "wt"
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", str(wt), "-b", "b"],
+                   check=True)
+    assert guard("git reset --hard", wt) is None
+    assert guard("git reset --hard", repo) is not None, "the canonical tree is still guarded"
 
 
 def test_outside_a_git_repo_it_fails_open(tmp_path):

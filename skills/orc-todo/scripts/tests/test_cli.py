@@ -1,3 +1,4 @@
+import functools
 import subprocess
 
 from orc_todo import lanes, state
@@ -134,6 +135,19 @@ def test_remove_keeps_every_other_entry_byte_for_byte(tmp_path, capsys):
     for fragment in ("## #7: an open one\n\nprose about it", "## #22: another open one\n\nmore prose"):
         assert fragment in after, fragment
     assert "## #12" not in after and "## #12" in before
+
+
+def test_remove_fails_cleanly_when_the_lock_is_held(tmp_path, capsys, monkeypatch):
+    """remove is a read-modify-write on the one file the whole mechanism serializes, so it must
+    take the same lock the allocator does, and back off the same way when someone else holds
+    it - never a silent read-modify-write that erases a concurrent add."""
+    repo = make_repo(tmp_path)
+    monkeypatch.setattr(state, "held", functools.partial(state.held, timeout=0.4, poll=0.1))
+    with state.held("someone else", cwd=repo):
+        code, out = run(["remove", "7"], repo, capsys)
+    assert code == 1
+    assert "lock" in out.lower()
+    assert "## #7:" in (repo / "BACKLOG.md").read_text(), "an unheld lock must leave the file untouched"
 
 
 def test_lane_create_and_list(tmp_path, capsys):

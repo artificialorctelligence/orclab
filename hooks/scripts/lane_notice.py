@@ -16,10 +16,19 @@ from orclab_shared import shared_dir, uncommitted_entries
 
 
 def _load(path):
-    try:
-        return json.loads(pathlib.Path(path).read_text())
-    except (OSError, ValueError):
+    """The file's contents, or None when it exists but cannot be read.
+
+    Missing and unreadable are different answers and the caller needs both. Silence is this
+    hook's way of saying "nothing in progress", so a corrupt lane record must not produce it -
+    that would fail into precisely the state the lane record exists to prevent.
+    """
+    path = pathlib.Path(path)
+    if not path.exists():
         return {}
+    try:
+        return json.loads(path.read_text())
+    except (OSError, ValueError):
+        return None
 
 
 def notice():
@@ -27,12 +36,16 @@ def notice():
     if d is None:
         return ""
     lines = []
-    for name, lane in sorted(_load(d / "lanes.json").items()):
+    lanes = _load(d / "lanes.json")
+    if lanes is None:
+        return ("Orclab shared state:\n  lanes.json is unreadable - what is in progress cannot "
+                "be determined. Inspect it before starting work: /orc-todo lane list")
+    for name, lane in sorted(lanes.items()):
         if lane.get("current"):
             since = f" since {lane['started']}" if lane.get("started") else ""
             lines.append(f"  lane {name}: {lane['current']} in progress{since}")
-    lock = _load(d / "lock")
     if (d / "lock").exists():
+        lock = _load(d / "lock") or {}
         lines.append(f"  lock held: {lock.get('description', 'unknown')} (pid {lock.get('pid')})")
     for filename, heading in uncommitted_entries():
         lines.append(f"  uncommitted in {filename}: {heading}")

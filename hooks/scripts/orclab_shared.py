@@ -39,6 +39,23 @@ def canonical_root(cwd=None):
     return d.parent.parent if d else None
 
 
+def in_canonical_checkout(cwd=None):
+    """Whether the caller's own working tree IS the canonical checkout.
+
+    A discard command reaches only the tree it runs in. The allocator writes canonically, so an
+    uncommitted entry normally lives there - and denying a worktree's `git reset --hard` because
+    the main checkout has one tells the user to commit something their tree does not contain.
+    Since an allocated entry is meant to sit uncommitted until someone deliberately commits it,
+    that would deny every whole-tree discard in every worktree for as long as it sits there, in
+    a project whose own workflow is worktree-based.
+    """
+    top = git(["rev-parse", "--show-toplevel"], cwd)
+    root = canonical_root(cwd)
+    if not top or root is None:
+        return False
+    return pathlib.Path(top.strip()).resolve() == root.resolve()
+
+
 def uncommitted_entries(cwd=None):
     """Entry headings added but not committed, as [(filename, heading)].
 

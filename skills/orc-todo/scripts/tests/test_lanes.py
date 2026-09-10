@@ -39,6 +39,18 @@ def test_a_plan_counts_as_a_spec_for_lane_membership(tmp_path):
     assert lanes.create_lane("A", ["v12"], cwd=repo)["items"] == ["v12"]
 
 
+def test_create_on_an_existing_name_raises_and_leaves_current_untouched(tmp_path):
+    """A create where modify was meant is an ordinary typo. Recreating the lane would reset
+    `current` to None - the single record stopping a second agent from rebuilding what a first
+    is already building - so it must refuse rather than silently clear it."""
+    repo = make_repo(tmp_path)
+    lanes.create_lane("B", ["v14", "v15"], cwd=repo)
+    lanes.set_current("B", "v14", cwd=repo)
+    with pytest.raises(lanes.LaneExists):
+        lanes.create_lane("B", ["v13"], cwd=repo)
+    assert lanes.read_lanes(repo)["B"]["current"] == "v14", "the refusal must not touch the existing lane"
+
+
 def test_modify_replaces_the_item_list_so_it_can_reorder_add_and_drop(tmp_path):
     repo = make_repo(tmp_path)
     lanes.create_lane("B", ["v14", "v15"], cwd=repo)

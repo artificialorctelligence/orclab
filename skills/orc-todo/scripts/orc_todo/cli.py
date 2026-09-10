@@ -96,18 +96,26 @@ def cmd_remove(args):
     An entry ends at the next "## " heading of any kind, not the next "## #N:". That is what
     lets a trailing section such as VERIFICATION.md's "## Recording the result" survive the
     removal of the entry above it.
+
+    Under the lock, and reading inside it. This is a read-modify-write on the one file the whole
+    mechanism exists to serialize, so it needs the same lock the allocator takes - otherwise a
+    concurrent add landing between the read and the write is erased, while the allocator reports
+    success and advances its counter. atomic_write prevents a torn file, not a lost update; only
+    the lock does that.
     """
     path = _backlog_path(args.cwd)
-    text = _read_backlog(args.cwd)
-    starts = [(int(m.group(1)), m.start()) for m in _HEADING.finditer(text)]
-    for i, (number, start) in enumerate(starts):
-        if number != args.number:
-            continue
-        after = _NEXT_SECTION.search(text, start + 1)
-        end = after.start() if after else len(text)
-        state.atomic_write(path, (text[:start].rstrip("\n") + "\n\n" + text[end:]).rstrip("\n") + "\n")
-        print(f"removed #{args.number}; nothing renumbered, and #{args.number} is never reissued")
-        return 0
+    with state.held(f"removing #{args.number}", cwd=args.cwd):
+        text = _read_backlog(args.cwd)
+        for m in _HEADING.finditer(text):
+            if int(m.group(1)) != args.number:
+                continue
+            start = m.start()
+            after = _NEXT_SECTION.search(text, start + 1)
+            end = after.start() if after else len(text)
+            state.atomic_write(
+                path, (text[:start].rstrip("\n") + "\n\n" + text[end:]).rstrip("\n") + "\n")
+            print(f"removed #{args.number}; nothing renumbered, and #{args.number} is never reissued")
+            return 0
     print(f"error: no entry #{args.number}", file=sys.stderr)
     return 1
 
@@ -199,7 +207,8 @@ def main(argv=None):
     except state.NotAGitRepo as e:
         print(f"error: {e} - /orc-todo needs a git repository", file=sys.stderr)
         return 1
-    except (ResourceMissing, lanemod.UnspeccedItem, lanemod.LaneMissing, lanemod.LaneStateCorrupt) as e:
+    except (ResourceMissing, lanemod.UnspeccedItem, lanemod.LaneMissing,
+            lanemod.LaneExists, lanemod.LaneStateCorrupt) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
     except state.LockUnavailable as e:
