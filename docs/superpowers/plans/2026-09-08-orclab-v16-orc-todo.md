@@ -1828,6 +1828,32 @@ def test_it_stays_silent_on_commands_that_only_look_dangerous(tmp_path):
         assert guard(cmd, repo) is None, cmd
 
 
+def test_a_path_scoped_discard_naming_an_unrelated_file_is_silent(tmp_path):
+    """Denying `git restore README.md` is the same noise as denying `git checkout main` - the
+    command cannot reach BACKLOG.md, so there is nothing to warn about."""
+    repo = make_repo(tmp_path, dirty=True)
+    (repo / "README.md").write_text("unrelated\n")
+    for cmd in ["git restore README.md", "git checkout -- README.md",
+                "git checkout README.md", "git restore src/thing.py"]:
+        assert guard(cmd, repo) is None, cmd
+
+
+def test_a_path_scoped_discard_that_sweeps_the_tree_still_fires(tmp_path):
+    repo = make_repo(tmp_path, dirty=True)
+    for cmd in ["git restore .", "git checkout -- .", "git checkout ."]:
+        assert guard(cmd, repo) is not None, cmd
+
+
+def test_a_staged_entry_is_still_uncommitted_and_still_guarded(tmp_path):
+    """git diff compares against the index, so an entry that was `git add`ed reads as no change
+    at all - and reset --hard then destroys it with nothing said."""
+    repo = make_repo(tmp_path, dirty=True)
+    subprocess.run(["git", "-C", str(repo), "add", "BACKLOG.md"], check=True)
+    decision = guard("git reset --hard", repo)
+    assert decision is not None, "a staged entry is uncommitted work too"
+    assert "#8" in decision["hookSpecificOutput"]["permissionDecisionReason"]
+
+
 def test_the_escape_marker_lets_a_deliberate_discard_through(tmp_path):
     """Same convention secret_guard.py already uses for orclab:allow-secret, so the codebase
     has one escape idiom rather than two."""
@@ -1983,6 +2009,11 @@ def uncommitted_entries(cwd=None):
 
     Read from the diff rather than by parsing the file, because only the diff distinguishes an
     entry that was just added from the hundreds already committed.
+
+    Diffed against HEAD, not against the index. A bare `git diff` compares the working tree to
+    what is staged, so an entry that has been `git add`ed reads as no change at all - and then
+    `git reset --hard` destroys it with nothing said. Staged is still uncommitted, which is the
+    only thing this function is being asked.
     """
     root = canonical_root(cwd)
     if root is None:
@@ -1991,7 +2022,7 @@ def uncommitted_entries(cwd=None):
     for name in TRACKED:
         if not (root / name).exists():
             continue
-        diff = git(["-C", str(root), "diff", "--", name], cwd)
+        diff = git(["-C", str(root), "diff", "HEAD", "--", name], cwd)
         if not diff:
             continue
         found.extend((name, m.group(1)) for m in ENTRY_RE.finditer(diff))
@@ -2038,21 +2069,41 @@ ALLOW_MARKER = "orclab:discard-entries"
 # `git clean` touches only untracked files, and `git checkout <branch>` carries the edit over
 # (git refuses rather than overwriting), so neither belongs here. A guard that fires on
 # `git checkout main` is noise, and noise gets waved through.
-DISCARDS = re.compile(
+#
+# Two shapes, because they need different tests. A whole-tree discard takes no pathspec and
+# always reaches every tracked file. A path-scoped one reaches only what it names, so naming
+# something else is not a risk - and denying `git restore README.md` is the same noise as
+# denying `git checkout main`, just rarer and therefore more annoying when it lands.
+WHOLE_TREE = re.compile(
     r"\bgit\s+(?:"
     r"reset\s+(?:--hard|--merge|--keep)\b"
     r"|stash\b(?!\s+(?:list|show|apply|pop))"
-    r"|restore\b(?!\s+--staged\b)"
-    r"|checkout\s+(?:--\s|\.(?:\s|$)|\S*(?:BACKLOG|VERIFICATION)\.md\b)"
     r")"
 )
+PATH_SCOPED = re.compile(r"\bgit\s+(?:restore\b(?!\s+--staged\b)|checkout\s+--\s|checkout\s+)")
+# A pathspec that could contain a tracked file: one of them by name, or a whole-tree sweep.
+REACHES_TRACKED = re.compile(r"(?:BACKLOG|VERIFICATION)\.md\b|(?<![\w./-])[.*](?:\s|$)")
+
+
+def _discards(command):
+    """Whether this command can really destroy an uncommitted entry.
+
+    A whole-tree discard always can. A path-scoped one can only reach what its pathspec names,
+    so it counts only when that pathspec is a tracked file or a whole-tree sweep. Firing on
+    `git restore README.md` would be the same noise as firing on `git checkout main`, and the
+    brief settled that one empirically: noise gets waved through, which is the failure this
+    guard exists to prevent.
+    """
+    if WHOLE_TREE.search(command):
+        return True
+    return bool(PATH_SCOPED.search(command) and REACHES_TRACKED.search(command))
 
 
 def evaluate(command):
     """The refusal reason, or None when this command is not a risk right now."""
     if ALLOW_MARKER in command:
         return None
-    if not DISCARDS.search(command):
+    if not _discards(command):
         return None
     at_risk = uncommitted_entries()
     if not at_risk:
@@ -2202,7 +2253,7 @@ The existing `secret_guard.py` entry must be left exactly as it is:
 - [ ] **Step 6: Run the whole hooks suite**
 
 Run: `cd hooks/scripts && python3 -m pytest tests/ -v`
-Expected: PASS — the existing `secret_guard` tests plus 15 new ones.
+Expected: PASS — the existing `secret_guard` tests plus 18 new ones.
 
 - [ ] **Step 7: Commit**
 
