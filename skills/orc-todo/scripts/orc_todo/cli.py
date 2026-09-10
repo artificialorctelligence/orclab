@@ -12,11 +12,11 @@ import sys
 from . import lanes as lanemod
 from . import state
 from .allocate import ResourceMissing, allocate
-from .resources import RESOURCES
+from .resources import RESOURCES, _headings
 
 RESOLVED = re.compile(r"\(RESOLVED\b")
 PARTIAL = re.compile(r"\(PARTIALLY ADDRESSED\b")
-_HEADING = re.compile(r"^## #(\d+): ", re.MULTILINE)
+_HEADING = re.compile(r"^## #(\d+): (.*)$", re.MULTILINE)
 _NEXT_SECTION = re.compile(r"^## ", re.MULTILINE)
 
 
@@ -24,14 +24,14 @@ def _backlog_path(cwd):
     return state.canonical_root(cwd) / "BACKLOG.md"
 
 
+
+
 def _sections(text):
     """(number, title, body) for every backlog entry, in file order."""
-    parts = re.split(r"^(## #(\d+): .*)$", text, flags=re.MULTILINE)
-    out = []
-    for i in range(1, len(parts), 3):
-        heading, number, body = parts[i], int(parts[i + 1]), parts[i + 2]
-        out.append((number, heading[len(f"## #{number}: "):].strip(), body))
-    return out
+    found = _headings(_HEADING, text)
+    ends = [m.start() for m in found[1:]] + [len(text)]
+    return [(int(m.group(1)), m.group(2).strip(), text[m.end():end])
+            for m, end in zip(found, ends)]
 
 
 def _read_backlog(cwd):
@@ -106,11 +106,11 @@ def cmd_remove(args):
     path = _backlog_path(args.cwd)
     with state.held(f"removing #{args.number}", cwd=args.cwd):
         text = _read_backlog(args.cwd)
-        for m in _HEADING.finditer(text):
+        for m in _headings(_HEADING, text):
             if int(m.group(1)) != args.number:
                 continue
             start = m.start()
-            after = _NEXT_SECTION.search(text, start + 1)
+            after = next((x for x in _headings(_NEXT_SECTION, text) if x.start() > start), None)
             end = after.start() if after else len(text)
             state.atomic_write(
                 path, (text[:start].rstrip("\n") + "\n\n" + text[end:]).rstrip("\n") + "\n")

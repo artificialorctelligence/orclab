@@ -1537,7 +1537,7 @@ and names the first launch of two lanes as the right moment. That is exactly wha
 here announces an *intent to start*, which is the half that cost the real money. The lane record
 and the SessionStart hook exist because of #25, not because of this entry.
 
-## #23: the action-shape warning misses a repeated publish verb
+## #23: the action-shape warning misses a repeated publish verb (RESOLVED 2026-09-09)
 
 Found by a code review of v12's action-shape check (2026-09-08), verified live against the real
 implementation.
@@ -1572,6 +1572,25 @@ set it aside as minor without formally filing it; it was the parallel session's 
 review that actually filed this entry's finding. Worth recording for what it says about the
 review process, not just about the code: the same diff got two genuinely separate passes, and
 only one of them turned an observation into a tracked entry.
+
+**Resolved for real, not just tracked, 2026-09-09.** `action_shape_warning()` now uses
+`action.rfind(publish)` against `action.find(build)` - one word changed. That is exactly
+equivalent to the every-pair comparison this entry asks for, and the equivalence is worth stating
+because the fix looks too small otherwise: if any build precedes any publish, then
+`first_build < last_publish`; and if `first_build < last_publish`, that pair is itself a
+build-then-publish. No loop, no helper.
+
+Taking it this way answers the entry's own objection - that widening the search widens the
+existing false positives. It doesn't. The substring looseness the entry names
+(`cargo build-tools-checked && dput ...` warns today) is untouched, deliberately, because it is
+not this entry.
+
+Verified against the entry's own three-command example, now a test:
+`dput ppa:x a.changes && dpkg-buildpackage -S && dput ppa:x b.changes` warns. Confirmed it fails
+without the fix, not just that it passes with it. The one existing case that could have flipped -
+`test_publish_before_build_does_not_warn` - has a single `dput`, so `rfind` and `find` return the
+same index and it still correctly does not warn. 127 passed. The check remains advisory;
+`preflight:` is untouched.
 
 ## #24: `--dry-run`'s exit code doesn't distinguish a resolvable plan from one already known broken
 
@@ -1808,7 +1827,7 @@ reframe to `/orc-todo` arrived - all of which was thrown away. That is the same 
 work done twice because two views of the problem never met early enough. A simulated pass during
 design is paid in a paragraph; skipping it is paid in a rewrite.
 
-## #27: three deferred minors from v16's own review, worth tracking rather than losing
+## #27: three deferred minors from v16's own review, worth tracking rather than losing (RESOLVED 2026-09-09)
 
 Raised by v16's own final whole-branch review (2026-09-09), which triaged the deferred minors its
 per-task reviews had accumulated. Most were genuinely fine to leave. These three were not — not
@@ -1825,7 +1844,7 @@ just an opaque one. The fix is `q.get(timeout=30)`, and it is worth taking preci
 is the test that would have caught the 2026-09-08 collision: a test that hangs CI is a test people
 learn to skip.
 
-**2. Three test names in the same file promise setup that `make_repo` does not perform.** It never
+**2. Two test names in the same file promise setup that `make_repo` does not perform.** It never
 commits, so nothing in the fixture is ever tracked. Consequently
 `test_allocate_appends_even_when_the_file_is_dirty` never creates a git-dirty file — it tests that
 existing content survives, which is the behaviour that matters, but not the named condition; and
@@ -1848,3 +1867,87 @@ correctness under concurrency, which the review verified separately and by contr
 review, judged not worth a fix round, and would otherwise live only in a ledger that was deleted
 with the worktree. Splitting them buys nothing, and the shared context — what the reviewer was
 looking at, and why they were deferred rather than fixed — is most of what a future reader needs.
+
+**Resolved for real, not just tracked, 2026-09-09.** All three, plus a fourth found while fixing
+the third. 64 tests passing before the extension, 65 after.
+
+**1.** `test_two_real_concurrent_processes_get_different_numbers` now uses `q.get(timeout=30)` and
+asserts every result is an `int` - naming the offending value in the message - before sorting. A
+child killed by a signal fails the test after 30s instead of blocking the parent forever, and a
+child's `ERROR ...` string is reported verbatim rather than surfacing as an opaque `TypeError`
+from `sorted()`.
+
+**2.** `make_repo` now commits its fixture, so "dirty" and "never commits" are real conditions
+rather than artefacts of everything being untracked. The negative control matters more than the
+fix here: the *old* `test_allocate_never_commits` passes against a deliberately no-op allocator -
+exactly the weakness this entry described - and the new one fails against the same no-op.
+
+**3.** `_sections()` now routes through a `_headings()` helper that drops matches inside fenced
+code blocks. `cmd_remove` routes both its heading scan and its `_NEXT_SECTION` end-boundary scan
+through the same helper, so a fenced `## ` line inside the entry being removed can no longer cut
+its span short. Column-0 was already enforced by `re.MULTILINE`; the fence was the only missing
+discriminator, and indentation would not have served - a fenced example is usually flush left,
+which is the point of showing it.
+
+**4, not in the original entry.** `resources.scan_max()` had the identical blind spot, and the
+first judgment on it was to leave it: it can only ever inflate the next number, never reissue one,
+so it is safe by the allocator's own invariant. That reasoning is correct about *uniqueness* and
+wrong about what the numbering is for. A quoted `## #99:` would silently jump the next entry to
+`#100`, and this file's own rule is that a gap is the record of a deleted entry - a phantom gap is
+that record lying. So `_headings()` moved down into `resources.py` (`cli.py` already imports from
+it, so the direction was already there) and `scan_max` uses it. Negative control run: on the same
+input the old implementation returns 99 and the new one returns 7.
+
+Fixing it here rather than filing it is deliberate. Two functions with the same regex-over-markdown
+blind spot in one package is the case for fixing it once where both route through, and the helper
+the third fix had just written made that a five-line change.
+
+**One correction to this entry's own text, made in place 2026-09-09 at direflail's direction.**
+Item 2 originally read "Three test names" and then named two. There is no third whose *name* claims
+tracked-file setup - the nearest, `test_a_lost_counter_self_heals_from_the_file`, has a docstring
+mentioning "a fresh clone or a cleaned `.git`" but asserts only counter behaviour. Committing in
+`make_repo` covers it either way. The word was corrected to "Two" rather than left standing with a
+note, which is the one place this resolution departs from `backlog-discipline`'s "never rewrite the
+original diagnostic text" - a miscount is not reasoning worth preserving, and the original wording
+is recorded here.
+
+## #28: should /orc-git land a branch, or is finishing-a-development-branch the answer
+
+Raised by direflail 2026-09-09, immediately after a session said "merge and push" as though
+`/orc-git` covered it. It does not: its subcommands are `repo`, `commit`, `push`,
+`commit-push`/`cp`, `branch`/`switch`, and `pr`. Every one of those either prepares work or
+publishes a commit; none of them lands a branch.
+
+**The concrete consequence** is small but real and already happened twice in one session. A branch
+finished under Orclab's own workflow has to leave it to be landed - either through
+`superpowers:finishing-a-development-branch` or through raw `git merge`/`gh pr create`. The memory
+rule "use the shipped command, not the raw mechanism" says to flag the fallback when it is needed;
+here the fallback is needed every single time a branch finishes, which is the shape of a missing
+command rather than an occasional exception.
+
+**What should already have covered it, and mostly does.**
+`superpowers:finishing-a-development-branch` exists precisely for this decision - merge directly,
+open a PR, or rebase first - and Orclab's own standing rule is to wrap real existing skills rather
+than rebuild them. So this is explicitly *not* a proposal to implement merging. If anything is
+built it is a thin `/orc-git merge` that delegates, with the availability guard `orc-code`'s flows
+already use for `feature-dev`.
+
+**The argument on each side, neither settled.** For: `branch` and `pr` are already in `/orc-git`,
+and a user who has just run `/orc-git cp` has no reason to know the next step lives in a different
+plugin's vocabulary. Against: `finishing-a-development-branch` asks real questions about how to
+land work, and a `/orc-git merge` that answers them by defaulting would be worse than not having
+it - `/orc-git`'s existing subcommands are all deliberately unsurprising, and this one is not.
+
+**Where this should be decided: inside v14, not beside it.** The v14 spec
+(`docs/superpowers/specs/2026-09-08-orclab-v14-forge-boundary-design.md`, closing #20) is already
+about `/orc-git`'s scope and where host-specific release work lives. Deciding "does `/orc-git` land
+branches" in a separate pass would split one scope question across two designs. This entry exists
+so the question is tracked if v14 ships without addressing it - not to schedule its own work.
+
+**Scope boundary:** this is about who owns the *command surface*, not about merge strategy,
+conflict handling, or branch protection. None of those change whichever way it goes.
+
+**Searched before filing**, per CLAUDE.md: every shipped `skills/*/SKILL.md`, `CLAUDE.md`,
+`BACKLOG.md`, and the bundled scripts under `hooks/scripts/` and `skills/*/scripts/`. Nothing in
+Orclab lands a branch; the only hits for merging are `orc-git`'s `pr` subcommand, which checks a
+pull request out rather than landing it.
