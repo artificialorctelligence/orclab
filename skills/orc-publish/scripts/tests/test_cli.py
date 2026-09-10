@@ -1373,3 +1373,132 @@ def test_a_refused_leaf_never_reaches_accepted(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "ppa.noble: refused" in out
     assert "accepted" not in out
+
+
+def test_confirm_command_as_bare_bool_is_refused_not_a_crash(tmp_path, capsys):
+    # confirm: {command: true} used to pass confirm_error (a bare `True` satisfies "declares
+    # neither"), and reach subprocess.Popen(True, shell=True), raising TypeError - the whole
+    # run aborted with a traceback and no summary at all. A sibling healthy leaf never got
+    # reported. confirm_error must refuse this before anything runs.
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        """
+        ppa:
+          noble:
+            action: "true"
+            confirm:
+              command: true
+          jammy:
+            action: "true"
+            confirm:
+              command: "true"
+        """,
+    )
+    assert main(["--channels", path, "--confirm", "ppa"]) == 1
+    err = capsys.readouterr().err
+    assert "ppa.noble: confirm.command must be a string" in err
+    assert "True" in err
+
+
+def test_confirm_url_as_bare_bool_is_refused_naming_the_value(tmp_path, capsys):
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        """
+        ppa:
+          noble:
+            action: "true"
+            confirm:
+              url: true
+        """,
+    )
+    assert main(["--channels", path, "--dry-run", "ppa"]) == 1
+    err = capsys.readouterr().err
+    assert "ppa.noble: confirm.url must be a string" in err
+    assert "True" in err
+
+
+def test_a_hung_confirm_still_reports_the_declared_url(tmp_path, capsys):
+    # The success and non-zero paths in confirm_plan appended "see <url>", but the
+    # TimeoutExpired path returned early and dropped it - exactly when a human needs the page
+    # to look at, since the check itself never answered.
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        """
+        ppa:
+          noble:
+            action: "true"
+            timeout: 1
+            confirm:
+              command: sleep 30
+              url: https://e.test/packages
+        """,
+    )
+    assert main(["--channels", path, "--confirm", "ppa"]) == 1
+    out = capsys.readouterr().out
+    assert "ppa.noble: not confirmed" in out
+    assert "timed out after 1s" in out
+    assert "see https://e.test/packages" in out
+
+
+def test_confirm_with_both_command_and_url_appends_the_url_on_success(tmp_path, capsys):
+    # No test covered a leaf declaring command and url together under --confirm mode itself
+    # (as opposed to the `accepted` reporting path, which is covered elsewhere).
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        """
+        ppa:
+          noble:
+            action: "true"
+            confirm:
+              command: "true"
+              url: https://e.test/packages
+        """,
+    )
+    assert main(["--channels", path, "--confirm", "ppa"]) == 0
+    out = capsys.readouterr().out
+    assert "ppa.noble: confirmed" in out
+    assert "see https://e.test/packages" in out
+
+
+def test_dry_run_plan_flags_a_leaf_declaring_confirm_as_asynchronous(tmp_path, capsys):
+    # The dry-run plan is the safety gate an operator approves, but it used to print only the
+    # action and timeout for a leaf declaring confirm - there was no mode anywhere that showed
+    # a leaf was asynchronous before it mattered (--confirm --dry-run is itself rejected).
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        """
+        ppa:
+          noble:
+            action: "true"
+            confirm:
+              command: "true"
+        """,
+    )
+    assert main(["--channels", path, "--dry-run", "ppa"]) == 0
+    out = capsys.readouterr().out
+    assert "asynchronous" in out
+
+
+def test_metrics_plan_never_shows_the_asynchronous_line(tmp_path, capsys):
+    # Gated on GATED_COMMAND_KEY ("action"): --metrics inspects nothing about the action path,
+    # so it must not grow this line just because the leaf also declares confirm.
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        """
+        ppa:
+          noble:
+            action: "true"
+            metrics: echo 12 downloads
+            confirm:
+              command: "true"
+        """,
+    )
+    assert main(["--channels", path, "--metrics", "--dry-run", "ppa"]) == 0
+    out = capsys.readouterr().out
+    assert "asynchronous" not in out

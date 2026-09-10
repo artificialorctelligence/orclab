@@ -118,6 +118,8 @@ def _preflight_plan_lines(leaf, default_timeout):
     warning = action_shape_warning(leaf)
     if warning:
         lines.append(f"  warning: {warning}")
+    if leaf.confirm:
+        lines.append("  asynchronous: declares confirm - check separately with --confirm")
     return lines
 
 
@@ -183,6 +185,10 @@ def confirm_error(leaves):
             )
         if not leaf.confirm_command and not leaf.confirm_url:
             return f"{leaf.dotted_path}: confirm must declare `command`, `url`, or both"
+        for key in ("command", "url"):
+            sub = value.get(key)
+            if sub is not None and not isinstance(sub, str):
+                return f"{leaf.dotted_path}: confirm.{key} must be a string, got {sub!r}"
     return None
 
 
@@ -483,6 +489,11 @@ def confirm_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
                 results.append((leaf, "no confirm declared", NO_CONFIRM))
             continue
 
+        # Built once and applied on every path below, timeout included - a hung check is
+        # exactly when a human needs the declared page to look at, and this used to only
+        # reach the success/non-zero paths.
+        see_url = f"see {leaf.confirm_url}" if leaf.confirm_url else None
+
         limit = effective_timeout(leaf, default_timeout)
         try:
             returncode, stdout, stderr = _run(command, limit)
@@ -491,12 +502,12 @@ def confirm_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
             detail = f"confirm timed out after {limit}s"
             if captured:
                 detail += f"\n{captured}"
+            detail = "\n".join(filter(None, [detail, see_url]))
             results.append((leaf, "not confirmed", detail))
             continue
 
         detail = "\n".join(filter(None, [(stdout or "").strip(), (stderr or "").strip()]))
-        if leaf.confirm_url:
-            detail = "\n".join(filter(None, [detail, f"see {leaf.confirm_url}"]))
+        detail = "\n".join(filter(None, [detail, see_url]))
         results.append((leaf, "confirmed" if returncode == 0 else "not confirmed", detail))
     return results
 

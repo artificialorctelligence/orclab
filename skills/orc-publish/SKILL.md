@@ -65,9 +65,12 @@ Once confirmed, run the identical command without `--dry-run`:
 python3 ${CLAUDE_SKILL_DIR}/scripts/run.py <same selection tokens>
 ```
 
-Report the exact summary it prints, per leaf: success (with the real output, if any), failed
-(with the real error text), timed out (with the real limit), or not attempted. Never paraphrase a
-failure away, and never claim success for a leaf the summary doesn't confirm succeeded.
+Report the exact summary it prints, per leaf: success (with the real output, if any), accepted
+(an asynchronous publish that exited 0 but hasn't landed yet — see below), refused (a tripped
+preflight rule, the act never ran), failed (with the real error text), timed out (with the real
+limit), or not attempted. Never paraphrase a failure away, and never claim success for a leaf the
+summary doesn't confirm succeeded — `accepted` in particular must never be flattened into "it
+worked".
 
 ## Reading a channel's own download numbers (`--metrics`)
 
@@ -150,6 +153,8 @@ python3 ${CLAUDE_SKILL_DIR}/scripts/run.py <selection tokens> --confirm
 
 `--confirm` is its own mode, not a variant of a normal run. It publishes nothing: it runs each
 selected leaf's `confirm.command` (never its `action:`) and reports one of four statuses.
+Like `--metrics`, **it never needs the dry-run/confirm gate above** — nothing is published, so go
+straight to running it.
 
 | Status | Meaning |
 |---|---|
@@ -158,9 +163,12 @@ selected leaf's `confirm.command` (never its `action:`) and reports one of four 
 | `needs a human` | no `confirm.command` is set, but a `confirm.url` is — relay the URL |
 | `no confirm declared` | the leaf never declared `confirm` — a synchronous channel, nothing to check |
 
-Only `not confirmed` exits the run non-zero; the other three are honest reports, not failures.
+Only `not confirmed` exits the run non-zero; the other three are honest reports, not failures — so
+exit 0 covers both "confirmed" and "nothing was checked" (`no confirm declared`). Anyone wrapping
+`--confirm` in CI should not treat the exit code alone as a gate; read the reported status.
 `--confirm` **rejects `--dry-run` and `--metrics`** outright rather than silently dropping either —
-run them separately.
+run them separately. Each leaf's `confirm.command` runs under that leaf's own `timeout:` (or the
+`--timeout` default), the same as its `action:` does.
 
 Two honest limits, worth relaying rather than assuming away:
 - Orclab cannot enforce that `confirm.command` is read-only. The field is documented as a check,
