@@ -114,6 +114,61 @@ has been onboarded to either, so neither has ever been run against a real publis
 putting one in a real `channels.yaml`, verify it live and correct this table — do not present an
 unverified command as if it worked. `orclab:currency-discipline` covers exactly this.
 
+## Reporting an asynchronous publish (`confirm`, `accepted`)
+
+Some channels don't finish when the action exits 0. A PPA upload is *queued*, not built; a PPA
+series copy is *requested*, not landed; a Flathub first submission opens a pull request someone
+still has to review over days. A leaf declares this with a `confirm:` mapping:
+
+```yaml
+noble:
+  action: "… && dput ppa:artificialorctelligence/orcshot …"
+  confirm:
+    command: "python3 scripts/ppa-published.py --version $(dpkg-parsechangelog --show-field Version)"
+    url: "https://launchpad.net/~artificialorctelligence/+archive/ubuntu/orcshot/+packages"
+```
+
+`confirm` takes two optional sub-fields, `command` and `url`, and **declaring `confirm` at all is
+what marks a publish asynchronous** — deliberately the only signal: there is no separate `async:`
+flag, so nothing can disagree with a leaf's own `confirm:` block about whether it's asynchronous.
+At least one sub-field is required — a `confirm:` that names neither is refused before anything
+runs, the same treatment a bad leaf-level `timeout:` already gets: a declaration that can't do
+what it claims is an error, not something to guess a default for.
+
+A leaf declaring `confirm` reports **`accepted`**, not `success`, when its action exits 0. **Exit
+code stays 0** — the upload genuinely succeeded and nothing went wrong; confirming it actually
+landed is a separate, later act. Relay the whole `accepted` line, not just the status word — it
+names what already happened, that it is not finished, and how to find out (`--confirm`, a URL to
+check by eye, or both), with the action's own real output last — the same ordering `timed out`
+already uses, since a real action leaves a wall of build log above the sentence that matters.
+
+## Checking whether an accepted publish actually landed (`--confirm`)
+
+```
+python3 ${CLAUDE_SKILL_DIR}/scripts/run.py <selection tokens> --confirm
+```
+
+`--confirm` is its own mode, not a variant of a normal run. It publishes nothing: it runs each
+selected leaf's `confirm.command` (never its `action:`) and reports one of four statuses.
+
+| Status | Meaning |
+|---|---|
+| `confirmed` | the confirm command exited 0 |
+| `not confirmed` | the confirm command exited non-zero, or it timed out |
+| `needs a human` | no `confirm.command` is set, but a `confirm.url` is — relay the URL |
+| `no confirm declared` | the leaf never declared `confirm` — a synchronous channel, nothing to check |
+
+Only `not confirmed` exits the run non-zero; the other three are honest reports, not failures.
+`--confirm` **rejects `--dry-run` and `--metrics`** outright rather than silently dropping either —
+run them separately.
+
+Two honest limits, worth relaying rather than assuming away:
+- Orclab cannot enforce that `confirm.command` is read-only. The field is documented as a check,
+  and every real example is a query, but the guarantee is the project's own — read a
+  `channels.yaml`'s `confirm` commands with that in mind before trusting them blindly.
+- A confirmed publish is confirmed *at that moment*. Nothing is cached and nothing is watched.
+  Re-running `--confirm` is how you find out again.
+
 ## Notes
 
 - `--for <distro-path>` reporting "no channel set (known target, not yet actionable)" is normal,

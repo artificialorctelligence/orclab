@@ -1032,7 +1032,7 @@ PPA-only, and whether it writes the config and `RELEASING.md` steps itself or on
 Answer **#18** first or alongside — a channel that isn't finished when the command exits changes
 what "set up a channel" even means.
 
-## #18: a publish can be accepted without being done — nothing models the wait, or how to check
+## #18: a publish can be accepted without being done — nothing models the wait, or how to check (RESOLVED 2026-09-09)
 
 Raised by direflail 2026-09-07, while scoping **#17**: "we're probably waiting for multi-day
 (probably) human review and be able to check status on where those are at (either via api or by
@@ -1110,6 +1110,44 @@ command is even the right answer versus a link a human reads, versus the no-code
 splitting "wait for X, then do Y" into two numbered release steps. The cheap mechanism arriving
 first is a reason to be more careful here, not less — it makes the wrong answer as easy to build
 as the right one. Decide it alongside **#17** as this entry already says.
+
+**Resolved 2026-09-09 (Orclab v13) — two of the three candidate answers shipped, deliberately not
+the third.** This entry's own "next step" named three options: a `status:`-shaped leaf field, a
+`release-checklist` marker for a step that completes later, or the no-code convention of splitting
+"wait for X, then do Y" into two numbered steps. The answer is the field and the convention —
+`confirm:` on a leaf, plus a new `release-checklist` rule generalizing exactly the split Orcshot's
+own `0.3.0` document already made by hand. Neither a new `/orc-release` marker nor a polling loop
+was built; the scope boundary this entry stated ("not about polling or waiting on one") held.
+
+`confirm:` is a mapping of `command` and/or `url` — the same two forms this entry called out as
+both legitimate (a programmatic check; a link a human reads) — and a leaf declaring it reports
+`accepted`, not `success`, on a zero-exit action. `--confirm` is a new, separate mode that runs a
+leaf's `confirm.command` and reports `confirmed` / `not confirmed` / `needs a human` / `no confirm
+declared`; it never runs `action:`. Documented in `skills/orc-publish/SKILL.md`. The
+`release-checklist` addition ("a step that waits on external state must be two steps") and its
+worked example (`**Preconditions:** ... Check with /orc-publish --confirm <path>`) are in
+`skills/release-checklist/SKILL.md`, citing the same `0.3.0` incident this entry already recorded.
+Verified by the existing `orc-publish` unit test suite (149 passing) and a new `VERIFICATION.md`
+scenario (#47) asking an operator to read a real `accepted` line, action output included, and
+confirm it reads as "not finished" rather than as success — exactly the failure mode a substring
+assertion (see #15) cannot catch.
+
+**This entry's own warning about the cheap mechanism is worth confirming held, not just repeating
+it.** `--metrics` arrived first and is the identical shape (a second command key on the same leaf,
+reusing selection/timeout/capture) this entry's "next step" once proposed for `status:` — and
+flagged as a reason to be *more* careful, since the wrong answer had become as easy to build as
+the right one. `confirm:` deliberately does not reuse that shape: it is a mapping with two
+sub-fields and its own refusal (`confirm_error`, for a `confirm:` naming neither `command` nor
+`url`), not a bare command string, and it reports four statuses of its own rather than the
+three-state `success`/`failed`/`not attempted` the `action:`/`metrics:` path shares. The cheap
+shape was available and was not taken.
+
+**#17 is not resolved by this, and is not touched here.** This entry told whoever picked it up to
+decide alongside #17, whose "stand up a channel" design still has two open questions of its own
+(dispatch shape, whether it writes config or only instructs) that this work does not answer. What
+does change is that #17's own ingredient shape no longer depends on a field that doesn't exist yet
+— `confirm:` is now real, built, and documented, so a future `/orc-package` design can assume it
+rather than design around its absence. #17 stays open.
 
 ## #19: `/orc-release`'s `**Run:**` marker silently drops its arguments (RESOLVED 2026-09-08)
 
