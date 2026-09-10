@@ -10,7 +10,7 @@ import yaml
 LEAF_KEYS = frozenset(
     {
         "action", "metrics", "channel", "requirements", "issues", "timeout",
-        "prepare", "artifact", "preflight",
+        "prepare", "artifact", "preflight", "confirm",
     }
 )
 
@@ -89,6 +89,32 @@ class Node:
         if isinstance(value, (str, bytes)) or not isinstance(value, (list, tuple, set)):
             return [str(value)]
         return [str(item) for item in value]
+
+    @property
+    def confirm(self):
+        """How anyone finds out whether this publish actually landed. None when unset.
+
+        A mapping of two optional sub-fields, `command` and `url`. Declaring it is what marks
+        the publish asynchronous - there is deliberately no separate `async:` flag, because one
+        flag could then disagree with the other.
+
+        A non-mapping value (`confirm: true`) is returned as-is rather than coerced or raised
+        on, for the same reason `preflight` tolerates a bad scalar: one malformed leaf must not
+        abort a run whose other leaves are healthy. Refusing it is `confirm_error`'s job.
+        """
+        return self._data.get("confirm") if self.is_leaf else None
+
+    @property
+    def confirm_command(self):
+        """The check to run, or None when unset or when `confirm` is not a mapping."""
+        value = self.confirm
+        return value.get("command") if isinstance(value, dict) else None
+
+    @property
+    def confirm_url(self):
+        """The page a human reads, or None when unset or when `confirm` is not a mapping."""
+        value = self.confirm
+        return value.get("url") if isinstance(value, dict) else None
 
     @property
     def requirements(self):
