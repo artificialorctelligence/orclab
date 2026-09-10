@@ -2457,12 +2457,19 @@ with the body on stdin, which prints the allocated number. The new text must say
 agents scanning the same file both find the same maximum and both write it, which happened for
 real on 2026-09-08 — both took `#23` and `#24`. Point at BACKLOG #22 and #25.
 
-The `git log -S` exception is **deleted, not moved** — the allocator's counter never goes
-backwards, so a deleted maximum entry can no longer cause a reissue. Say that explicitly, so a
-reader who remembers the old rule knows it was retired rather than lost.
+The `git log -S` exception is **retired from the allocator path** — the allocator's counter never
+goes backwards, so a deleted maximum entry can no longer cause a reissue there. Say that
+explicitly, so a reader who remembers the old rule knows it was retired rather than lost.
 
 If `/orc-todo` is unavailable (no allocator, not a git repo), fall back to the old scan and say
 so — a consuming project without Orclab installed still needs the skill to work.
+
+**The exception belongs in that fallback, and only there.** What made it unnecessary is the
+counter, and the fallback has no counter: it is the old scan, so it has the old hazard. A file
+whose highest-numbered entry was deleted reports a maximum that has already been used, and the
+scan hands it out again — reusing a number this file's whole premise says is permanent. Restate
+the `git log -S'## #' -- BACKLOG.md` check inside the fallback rather than leaving a reader to
+rediscover why it was there.
 
 - [ ] **Step 2: Replace the task-list line**
 
