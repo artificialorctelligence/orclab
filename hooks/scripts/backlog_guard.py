@@ -35,21 +35,41 @@ ALLOW_MARKER = "orclab:discard-entries"
 # `git clean` touches only untracked files, and `git checkout <branch>` carries the edit over
 # (git refuses rather than overwriting), so neither belongs here. A guard that fires on
 # `git checkout main` is noise, and noise gets waved through.
-DISCARDS = re.compile(
+#
+# Two shapes, because they need different tests. A whole-tree discard takes no pathspec and
+# always reaches every tracked file. A path-scoped one reaches only what it names, so naming
+# something else is not a risk - and denying `git restore README.md` is the same noise as
+# denying `git checkout main`, just rarer and therefore more annoying when it lands.
+WHOLE_TREE = re.compile(
     r"\bgit\s+(?:"
     r"reset\s+(?:--hard|--merge|--keep)\b"
     r"|stash\b(?!\s+(?:list|show|apply|pop))"
-    r"|restore\b(?!\s+--staged\b)"
-    r"|checkout\s+(?:--\s|\.(?:\s|$)|\S*(?:BACKLOG|VERIFICATION)\.md\b)"
     r")"
 )
+PATH_SCOPED = re.compile(r"\bgit\s+(?:restore\b(?!\s+--staged\b)|checkout\s+--\s|checkout\s+)")
+# A pathspec that could contain a tracked file: one of them by name, or a whole-tree sweep.
+REACHES_TRACKED = re.compile(r"(?:BACKLOG|VERIFICATION)\.md\b|(?<![\w./-])[.*](?:\s|$)")
+
+
+def _discards(command):
+    """Whether this command can really destroy an uncommitted entry.
+
+    A whole-tree discard always can. A path-scoped one can only reach what its pathspec names,
+    so it counts only when that pathspec is a tracked file or a whole-tree sweep. Firing on
+    `git restore README.md` would be the same noise as firing on `git checkout main`, and the
+    brief settled that one empirically: noise gets waved through, which is the failure this
+    guard exists to prevent.
+    """
+    if WHOLE_TREE.search(command):
+        return True
+    return bool(PATH_SCOPED.search(command) and REACHES_TRACKED.search(command))
 
 
 def evaluate(command):
     """The refusal reason, or None when this command is not a risk right now."""
     if ALLOW_MARKER in command:
         return None
-    if not DISCARDS.search(command):
+    if not _discards(command):
         return None
     at_risk = uncommitted_entries()
     if not at_risk:

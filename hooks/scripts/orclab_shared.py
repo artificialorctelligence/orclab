@@ -44,6 +44,11 @@ def uncommitted_entries(cwd=None):
 
     Read from the diff rather than by parsing the file, because only the diff distinguishes an
     entry that was just added from the hundreds already committed.
+
+    Diffed against HEAD, not against the index. A bare `git diff` compares the working tree to
+    what is staged, so an entry that has been `git add`ed reads as no change at all - and then
+    `git reset --hard` destroys it with nothing said. Staged is still uncommitted, which is the
+    only thing this function is being asked.
     """
     root = canonical_root(cwd)
     if root is None:
@@ -52,7 +57,7 @@ def uncommitted_entries(cwd=None):
     for name in TRACKED:
         if not (root / name).exists():
             continue
-        diff = git(["-C", str(root), "diff", "--", name], cwd)
+        diff = git(["-C", str(root), "diff", "HEAD", "--", name], cwd)
         if not diff:
             continue
         found.extend((name, m.group(1)) for m in ENTRY_RE.finditer(diff))

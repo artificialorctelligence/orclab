@@ -65,6 +65,32 @@ def test_it_stays_silent_on_commands_that_only_look_dangerous(tmp_path):
         assert guard(cmd, repo) is None, cmd
 
 
+def test_a_path_scoped_discard_naming_an_unrelated_file_is_silent(tmp_path):
+    """Denying `git restore README.md` is the same noise as denying `git checkout main` - the
+    command cannot reach BACKLOG.md, so there is nothing to warn about."""
+    repo = make_repo(tmp_path, dirty=True)
+    (repo / "README.md").write_text("unrelated\n")
+    for cmd in ["git restore README.md", "git checkout -- README.md",
+                "git checkout README.md", "git restore src/thing.py"]:
+        assert guard(cmd, repo) is None, cmd
+
+
+def test_a_path_scoped_discard_that_sweeps_the_tree_still_fires(tmp_path):
+    repo = make_repo(tmp_path, dirty=True)
+    for cmd in ["git restore .", "git checkout -- .", "git checkout ."]:
+        assert guard(cmd, repo) is not None, cmd
+
+
+def test_a_staged_entry_is_still_uncommitted_and_still_guarded(tmp_path):
+    """git diff compares against the index, so an entry that was `git add`ed reads as no change
+    at all - and reset --hard then destroys it with nothing said."""
+    repo = make_repo(tmp_path, dirty=True)
+    subprocess.run(["git", "-C", str(repo), "add", "BACKLOG.md"], check=True)
+    decision = guard("git reset --hard", repo)
+    assert decision is not None, "a staged entry is uncommitted work too"
+    assert "#8" in decision["hookSpecificOutput"]["permissionDecisionReason"]
+
+
 def test_the_escape_marker_lets_a_deliberate_discard_through(tmp_path):
     """Same convention secret_guard.py already uses for orclab:allow-secret, so the codebase
     has one escape idiom rather than two."""
