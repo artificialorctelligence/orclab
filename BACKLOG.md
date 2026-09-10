@@ -1537,7 +1537,7 @@ and names the first launch of two lanes as the right moment. That is exactly wha
 here announces an *intent to start*, which is the half that cost the real money. The lane record
 and the SessionStart hook exist because of #25, not because of this entry.
 
-## #23: the action-shape warning misses a repeated publish verb
+## #23: the action-shape warning misses a repeated publish verb (RESOLVED 2026-09-09)
 
 Found by a code review of v12's action-shape check (2026-09-08), verified live against the real
 implementation.
@@ -1572,6 +1572,25 @@ set it aside as minor without formally filing it; it was the parallel session's 
 review that actually filed this entry's finding. Worth recording for what it says about the
 review process, not just about the code: the same diff got two genuinely separate passes, and
 only one of them turned an observation into a tracked entry.
+
+**Resolved for real, not just tracked, 2026-09-09.** `action_shape_warning()` now uses
+`action.rfind(publish)` against `action.find(build)` - one word changed. That is exactly
+equivalent to the every-pair comparison this entry asks for, and the equivalence is worth stating
+because the fix looks too small otherwise: if any build precedes any publish, then
+`first_build < last_publish`; and if `first_build < last_publish`, that pair is itself a
+build-then-publish. No loop, no helper.
+
+Taking it this way answers the entry's own objection - that widening the search widens the
+existing false positives. It doesn't. The substring looseness the entry names
+(`cargo build-tools-checked && dput ...` warns today) is untouched, deliberately, because it is
+not this entry.
+
+Verified against the entry's own three-command example, now a test:
+`dput ppa:x a.changes && dpkg-buildpackage -S && dput ppa:x b.changes` warns. Confirmed it fails
+without the fix, not just that it passes with it. The one existing case that could have flipped -
+`test_publish_before_build_does_not_warn` - has a single `dput`, so `rfind` and `find` return the
+same index and it still correctly does not warn. 127 passed. The check remains advisory;
+`preflight:` is untouched.
 
 ## #24: `--dry-run`'s exit code doesn't distinguish a resolvable plan from one already known broken
 

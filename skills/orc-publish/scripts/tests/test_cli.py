@@ -929,6 +929,12 @@ def test_publish_before_build_does_not_warn(tmp_path):
     assert action_shape_warning(_one(tmp_path, "dput ppa:x f.changes && dpkg-buildpackage -S")) is None
 
 
+def test_a_publish_after_a_build_warns_even_when_a_publish_came_first(tmp_path):
+    # A leading publish must not hide the build-then-publish shape that follows it.
+    leaf = _one(tmp_path, "dput ppa:x a.changes && dpkg-buildpackage -S && dput ppa:x b.changes")
+    assert action_shape_warning(leaf) is not None
+
+
 def test_an_action_less_leaf_does_not_warn(tmp_path):
     root = load_tree(write_yaml(tmp_path, "c.yaml", "a: {}"))
     assert action_shape_warning(build_plan(root, [])[0]) is None

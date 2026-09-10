@@ -67,7 +67,10 @@ def action_shape_warning(leaf):
     """Warn when one action both builds and irreversibly publishes, so no gate can run between."""
     action = leaf.action or ""
     for publish in PUBLISH_VERBS:
-        at = action.find(publish)
+        # rfind, not find: an action can publish, build, then publish again. Comparing the
+        # *last* publish against the *first* build tests every pair at once - if any publish
+        # follows any build, the last one follows the first one too. See BACKLOG #23.
+        at = action.rfind(publish)
         if at == -1:
             continue
         for build in BUILD_VERBS:
