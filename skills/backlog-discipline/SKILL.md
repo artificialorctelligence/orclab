@@ -34,14 +34,30 @@ Then add the first entry below it, numbered `#1`.
 
 ## Numbering
 
-Scan the file for every `## #N:` heading and take the highest `N` seen. The new entry is `N + 1`.
+Don't scan the file for the highest `## #N:` heading — ask the allocator for a number instead:
 
-**Exception — the highest-numbered entry itself was deleted:** scanning the file alone then finds
-a lower maximum than history actually reached, which would silently reuse a number that's
-supposed to be permanent (see Deletion below). Before numbering a new entry, check whether a
-higher number ever existed — `git log -S'## #' -- BACKLOG.md` (or equivalent) — and take the true
-historical maximum, not just the current file's. Every other deletion (anywhere but the current
-maximum) leaves the file's own maximum unaffected, so scanning the file alone is sufficient there.
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/orc-todo/scripts/run.py add backlog "<title>"
+```
+
+The body goes on stdin, not as an argument; the command prints the allocated number once it's
+written.
+
+Scanning was a read-then-write race: two agents scanning the same file at the same time both find
+the same highest `N` and both write it. That happened for real on 2026-09-08 — both took `#23`
+and `#24` (BACKLOG #22, resolved by #25). The allocator serializes the two writes instead of
+letting them race.
+
+The old exception — checking `git log -S'## #' -- BACKLOG.md` for a higher historical maximum in
+case the highest-numbered entry had itself been deleted — is **deleted, not moved here**. The
+allocator's counter only ever moves forward, so a deleted maximum entry can no longer cause a
+number to be reissued; the failure mode that exception existed for is gone, not relocated.
+
+**If `/orc-todo` genuinely isn't available** — the project isn't a git repository, Orclab isn't
+installed, or the allocator script itself is missing — fall back to scanning the file for every
+`## #N:` heading and taking the highest `N` seen; the new entry is `N + 1`. Say so plainly when you
+do it, so whoever reads the entry later knows why it didn't go through the allocator. A consuming
+project without Orclab still needs this skill to work.
 
 ## Writing a new entry
 
@@ -131,7 +147,8 @@ everything outside backlog entries themselves, rather than reimplementing it.
 
 ## What NOT to do
 
-- Don't turn this into a general task list — it's for findings, not routine planned work.
+- An entry earns its place by carrying reasoning someone would otherwise have to re-derive —
+  not by being a thing to do. Work you will finish this session isn't an entry, it's work.
 - Don't silently delete an entry because it looks stale to you — surface the judgment call.
 - Don't compress or summarize an old entry's context to save space — the context is the point.
 - Don't leave a dangling forward-reference. If an entry says another entry is needed, create it

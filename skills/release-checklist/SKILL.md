@@ -42,6 +42,11 @@ When you renumber, **fix the cross-references in the prose too**. Text like "see
 "before step 10" shifts with the headings, and nothing warns about those — the parser only checks
 the headings. In that same incident three references had to move and five correctly stayed put.
 
+`/orc-release` now reports a prose reference that points past the end of the document — a step
+number that no longer exists after a renumber. That catches the reference a renumber leaves
+dangling, not the one it leaves wrong: a reference that still resolves to a real step, just not
+the one it meant before the renumber, still checks clean and still needs a human eye on it.
+
 Each step is a `## N. <short imperative title>` heading, followed by:
 - **Why this step exists**, if it's not obvious — especially if it was added because of a real
   past gap (name the gap and when it was found; that context is what stops the step from being
