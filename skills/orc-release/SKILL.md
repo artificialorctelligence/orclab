@@ -143,10 +143,13 @@ be.
 If any `run.py` command — not just `status`; `complete` and `skip` warn on this too — reports
 that `RELEASING.md` has changed, stop and re-read it before continuing.
 
-If a command warns about an **unclosed code fence** or about **non-contiguous step numbers**, stop
-and re-read the document before acting. Both mean the parsed step list may be shorter than the
-real release — an unclosed fence swallows every step below it, so a release that looks finished
-may never have reached its own test gate or its irreversible upload.
+If a command warns about an **unclosed code fence**, about **non-contiguous step numbers**, or
+about a **prose reference to a step that doesn't exist**, stop and re-read the document before
+acting. The first two mean the parsed step list may be shorter than the real release — an
+unclosed fence swallows every step below it, so a release that looks finished may never have
+reached its own test gate or its irreversible upload. The cross-reference warning means a step
+was renumbered without updating a "see step N" mention elsewhere — release-checklist requires
+renumbering when a step is inserted mid-document, and prose references do not shift themselves.
 
 ### Closing the release
 
