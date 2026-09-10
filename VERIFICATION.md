@@ -9,18 +9,23 @@ situations (empty scratch dir, existing project, etc.).
 
 ## Scenario 1: backlog-discipline
 
-1. Note the highest `#N` currently in Orcshot's `BACKLOG.md`.
-2. Ask Claude to investigate something small and genuinely inconclusive (or describe a real,
+1. Ask Claude to investigate something small and genuinely inconclusive (or describe a real,
    deliberately-deferred finding) and confirm it gets logged to the backlog.
-3. **Expected:** a new `## #<N+1>: ...` entry is added, with a real paragraph of context (not a
-   one-line stub), and the file's existing entries are untouched.
+2. **Expected:** Claude asks the allocator for the number rather than scanning the file for the
+   highest one — the number comes back from `/orc-todo add backlog`, which prints it. A new
+   entry appears under that number, with a real paragraph of context (not a one-line stub), and
+   the file's existing entries are untouched.
+3. **Expected:** the entry is left **uncommitted**. The allocator writes and stops; committing
+   would sweep whatever else is uncommitted in that file into a commit claiming to be a backlog
+   entry. Confirm `git status` shows `BACKLOG.md` modified.
 4. Ask Claude to resolve that same entry, describing a plausible fix.
 5. **Expected:** the title gains a `(RESOLVED YYYY-MM-DD)` suffix, a new paragraph is appended
    below the original text, and the original paragraph is still present, word-for-word.
 6. Ask Claude to delete the entry, stating explicitly that it's no longer worth tracking.
-7. **Expected:** the `## #<N+1>: ...` section is removed entirely; no other entry is renumbered;
-   the number `<N+1>` is confirmed as never appearing again in any later entry added during this
-   verification pass.
+7. **Expected:** that entry's section is removed entirely; no other entry is renumbered; and the
+   number is confirmed as never appearing again in any later entry added during this
+   verification pass — the allocator's counter never goes backwards, so a deleted maximum
+   cannot be reissued.
 
 ## Scenario 2: release-checklist
 
@@ -591,6 +596,38 @@ reading the summary understands what happened and why nothing was published.
 9. Rebuild the archive without the `.git` directory (`rm -rf pkg/.git && tar czf dirty.tar.gz pkg`)
    and run again without the override.
 10. **Expected:** the leaf publishes normally and the dry-run reports `preflight result: clean`.
+
+## Scenario 46: concurrent allocation, lanes, and the guard
+
+Unit tests cover the mechanism; this covers what they cannot see — whether a person can read the
+output, and whether the two hooks actually fire in a real session rather than only in a
+subprocess harness.
+
+1. Run `/orc-todo list` in a project with a real `BACKLOG.md`.
+2. **Expected:** open entries, one line each, resolved ones absent, partially-addressed ones
+   marked `[partial]`. Judge it as a person: can you tell at a glance what is open? If lanes
+   exist they follow; if none do, there is no lanes section at all.
+3. Open two terminals in the same project — one in the main checkout, one in a worktree of it.
+   Run `/orc-todo add backlog "<title>"` in both at the same time, piping a real paragraph into
+   each.
+4. **Expected:** two different numbers, two entries, both in the *main checkout's* file. Neither
+   overwrote the other, and neither is committed. This is the 2026-09-08 failure, and it is the
+   only step here that reproduces its real topology — two checkouts, one canonical file.
+5. Create a lane and mark it in progress: `/orc-todo lane create A v13` then
+   `/orc-todo lane current A v13`.
+6. Start a genuinely new session in that project.
+7. **Expected:** the session is told, unprompted, that lane A is working on v13 — plus any
+   uncommitted entries from step 3. Nobody asked; that is the point. A session that has to
+   remember to check is the one that built the same feature twice.
+8. With an uncommitted entry still present, run `git reset --hard`.
+9. **Expected:** refused, naming the entry that would be lost and offering the
+   `# orclab:discard-entries` marker. Then commit the entries and run it again.
+10. **Expected:** silent. A guard that fires when nothing is at risk is noise, and noise gets
+    waved through — which is the failure it exists to prevent.
+11. In the worktree from step 3, with the main checkout still holding an uncommitted entry, run
+    `git reset --hard`.
+12. **Expected:** silent. That command cannot reach the canonical file, and denying it would
+    advise committing something the tree does not contain.
 
 ## Recording the result
 

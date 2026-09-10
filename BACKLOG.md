@@ -1344,7 +1344,7 @@ The structural half lives in `release-checklist` as **"lint the thing you are sh
 sibling,"** which generalises past this design: a checklist that verifies one artifact and ships a
 different one has a blind spot however good either check is.
 
-## #22: concurrent Orclab agents can collide on numbered resources — a lock, an allocator, and ordered queues
+## #22: concurrent Orclab agents can collide on numbered resources — a lock, an allocator, and ordered queues (RESOLVED 2026-09-09)
 
 Raised by direflail 2026-09-08, immediately after asking which of the four then-unimplemented specs
 could run concurrently. The map came back mostly clean on files — v12 and v13 both rewrite
@@ -1500,6 +1500,43 @@ since that decision is what makes the lock meaningful or useless.
 hazard with a zero incident rate under concurrency, because concurrency has not been used yet. The
 right trigger is the first time two lanes are actually launched.
 
+**Resolved 2026-09-09 by v16** (`docs/superpowers/specs/2026-09-08-orclab-v16-orc-todo-design.md`
+and its plan), shipped as `/orc-todo` in v0.14.0.
+
+**What was built, and it is this entry's own design rather than a substitute for it.** The
+load-bearing decision this entry identified — *which* file agents write — was taken the way the
+entry argued: one canonical file, reached through `git rev-parse --git-common-dir`, which resolves
+to the same place from the main checkout and from every worktree. With no divergent copies the
+collision becomes ordinary shared-resource contention, and the lock is textbook: a single atomic
+`os.open(O_CREAT|O_EXCL)`, one lock rather than one per resource (per-resource locks reintroduce
+AB-BA deadlock the moment one work item needs two numbers), and a stale lock reported but never
+auto-cleared. The allocator owns the write as well as the number, so there is nothing to bypass:
+an agent cannot take a number and forget to use it, or write without taking one.
+
+**One mechanism serves both files, via a per-file descriptor.** This entry left open whether
+`BACKLOG.md` and `VERIFICATION.md` needed different treatments. They did not — what differs
+between them is the heading shape, how a number is recognised, and where a new section goes, and
+all three are data. The deferred-numbering alternative this entry raised was rejected for the
+reason the entry itself gave: a commit saying "BACKLOG #NEXT" is not usable.
+
+**And lanes stayed a record, never a runner**, honouring this entry's own boundaries. Nothing
+launches a session, supervises a process, or handles a crash. Exclusion and ordering remained
+separate mechanisms: the lock appears in the lane code only to keep concurrent writes to
+`lanes.json` from losing each other, never to give lanes their ordering.
+
+**Deliberately not built**, all three named as alternatives here and all three declined: pre-assigned
+per-lane ranges (goes stale the moment scope shifts, and does nothing for a global numbering),
+plain serialization (costs wall-clock and was the honest answer only while the collision rate was
+zero), and any DAG or scheduler beyond N linear lanes.
+
+**This entry's own trigger fired first.** It says "do not build ahead of a real concurrent run",
+and names the first launch of two lanes as the right moment. That is exactly what happened — see
+**#25**, the 2026-09-08 incident. The entry was not overridden; its condition was met.
+
+**What it did not anticipate, and #25 did:** every guard proposed here protects a *write*. Nothing
+here announces an *intent to start*, which is the half that cost the real money. The lane record
+and the SessionStart hook exist because of #25, not because of this entry.
+
 ## #23: the action-shape warning misses a repeated publish verb
 
 Found by a code review of v12's action-shape check (2026-09-08), verified live against the real
@@ -1572,7 +1609,7 @@ and print, and it did) or a real gap (a wrapper doing `orc-publish --dry-run && 
 proceeds anyway) is a design question for whoever picks this up, not something to settle in the
 act of filing it.
 
-## #25: BACKLOG #22's collision happened - two agents built the same feature, neither could see the other
+## #25: BACKLOG #22's collision happened - two agents built the same feature, neither could see the other (RESOLVED 2026-09-09)
 
 Not a prediction any more. On 2026-09-08 two concurrent sessions each implemented the whole of the
 v12 artifact-preflight plan, in full, independently. One worked on `main` directly; the other in a
@@ -1634,6 +1671,38 @@ zero, so #22's own "do not build ahead of a real concurrent run" trigger has gen
 one detail worth carrying in - neither session pushed until the end, so the canonical-file question
 #22 already flags (the main checkout, or a path outside every worktree) is load-bearing rather than
 incidental. A lock on a file inside each worktree would have protected nothing here.
+
+**Resolved 2026-09-09 by v16**, shipped as `/orc-todo` in v0.14.0. Both halves this entry
+distinguishes now have a mechanism, and they are different mechanisms — which is this entry's
+central point and the thing #22's design would have missed.
+
+**The cheap half — the numbers — is the allocator.** See #22's resolution. `test_allocate.py`'s
+concurrency test spawns two real processes rather than making two sequential calls, and it is the
+test that would have failed on 2026-09-08. Measured against a lock-free control during review, it
+detects a missing lock in about 90% of runs, so a single green run is not proof.
+
+**The expensive half — two agents doing the same work, unobservably — is the lane record and a
+SessionStart hook.** This entry's sharpest observation is that no lock would have fired once,
+because the two sessions never contended for anything until `git merge`. So the answer is not a
+stronger guard on writes; it is a record of what has *started*, and something that reads it
+without anyone remembering to. `hooks/scripts/lane_notice.py` tells a new session what lane is in
+progress, what lock is held, and what entries are sitting uncommitted. It is silent when there is
+nothing to say, because a hook that speaks every session gets tuned out.
+
+**Its own words are in the code.** `lane_notice.py`'s docstring records why it exists: *"Nobody
+forgot to check - there was nothing to check."*
+
+**One thing this entry argued for that was NOT built, deliberately.** It records that the two
+implementations each caught what the other missed, and calls that "a real argument for deliberate
+N-version work on a genuinely risky component - but as a decision someone makes, not as an
+accident nobody noticed." Nothing in v16 schedules duplicate work. Lanes make deliberate
+concurrency visible; choosing to run the same item in two lanes remains a person's call.
+
+**A postscript worth keeping, because it repeated the pattern in miniature.** v16's own execution
+found eight defects in its plan and eleven review findings, one Critical: `/orc-todo remove` did a
+read-modify-write on the canonical file with no lock while `add` took one — the same class of
+lost update this entry is about, inside the mechanism built to prevent it. Reproduced live before
+it was fixed. A mechanism does not exempt its own code from the failure it models.
 
 ## #26: Claude's designs and explanations are built inside-out — the user has to ask for facts Claude already had
 
@@ -1738,3 +1807,44 @@ the moment. `/orc-lane` was designed, argued for, and had questions built on top
 reframe to `/orc-todo` arrived - all of which was thrown away. That is the same economics as **#25**:
 work done twice because two views of the problem never met early enough. A simulated pass during
 design is paid in a paragraph; skipping it is paid in a rewrite.
+
+## #27: three deferred minors from v16's own review, worth tracking rather than losing
+
+Raised by v16's own final whole-branch review (2026-09-09), which triaged the deferred minors its
+per-task reviews had accumulated. Most were genuinely fine to leave. These three were not — not
+because any is urgent, but because each is the kind of thing that reads as fine forever and then
+costs an afternoon.
+
+**1. The concurrency test hangs instead of failing when a child dies.** In
+`skills/orc-todo/scripts/tests/test_allocate.py`,
+`test_two_real_concurrent_processes_get_different_numbers` calls `p.join(timeout=60)`, which
+returns without killing a hung child, then `q.get()` with no timeout at all. A child killed by a
+signal, or dying before its `put`, blocks the parent forever. Separately, if a child does put its
+`ERROR ...` string, `sorted()` over mixed `int` and `str` raises `TypeError` — still a failure,
+just an opaque one. The fix is `q.get(timeout=30)`, and it is worth taking precisely because this
+is the test that would have caught the 2026-09-08 collision: a test that hangs CI is a test people
+learn to skip.
+
+**2. Three test names in the same file promise setup that `make_repo` does not perform.** It never
+commits, so nothing in the fixture is ever tracked. Consequently
+`test_allocate_appends_even_when_the_file_is_dirty` never creates a git-dirty file — it tests that
+existing content survives, which is the behaviour that matters, but not the named condition; and
+`test_allocate_never_commits` asserts a non-empty `git status` on a file that was already
+untracked before the call, so it would pass on a no-op. Each still discriminates something real.
+Each asserts a weaker property than its name claims, which is how a test stops protecting what
+someone believes it protects.
+
+**3. `_sections()` treats any line starting `## #N: ` as a heading, including inside an entry's own
+prose.** In `skills/orc-todo/scripts/orc_todo/cli.py`, an entry that illustrates the heading format
+by quoting it splits into a phantom extra section, affecting `list` and `show` as well as the span
+arithmetic in `remove`. Verified harmless against the real `BACKLOG.md` today — `list` returns
+exactly the open entries — but this file is one about its own format, which makes it likelier than
+usual to quote a heading someday.
+
+**Scope boundary:** all three are inside v16's own code and tests. None affects the allocator's
+correctness under concurrency, which the review verified separately and by control.
+
+**Why one entry rather than three:** they share a cause and a moment. Each was seen during v16's
+review, judged not worth a fix round, and would otherwise live only in a ledger that was deleted
+with the worktree. Splitting them buys nothing, and the shared context — what the reviewer was
+looking at, and why they were deferred rather than fixed — is most of what a future reader needs.

@@ -40,6 +40,10 @@ below.
 - **/orc-release** — drive this project's own `RELEASING.md` end to end: ordered steps, real
   gates, human-step handoffs, and a position cursor so a release survives across sessions. Halts
   on failure. Ships as a skill only.
+- **/orc-todo** — look at and change the backlog: list what's open, read one entry in full, add
+  or remove one, and set up the lanes that say which work runs in what order. Entry numbers come
+  from an allocator holding a lock over one canonical file, so two agents working at once can't
+  take the same one. Ships as a skill only.
 - **/orc-reload** — reinstall the plugin you're currently developing so a fresh session picks up
   your changes, distinguishing the several causes that all look like "the reinstall didn't work"
   and verifying the expected version actually landed. Works for any plugin project, not just
