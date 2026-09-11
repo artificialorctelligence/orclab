@@ -267,7 +267,7 @@ Replace the whole `## Bare Invocation` section (from its heading to the line `St
 ## Bare Invocation
 
 Report the current version (from Step 0). If no current version exists yet, say so plainly and
-show the menu below without a proposal — there is no range to read.
+show the four bump lines from the block below — everything after the `Apply …?` line — without a proposal: there is no range to read.
 
 Otherwise, **propose a bump, with the reason stated.** Read the commits since the most recent
 `v*` tag — the same range the changelog draft uses:
@@ -276,7 +276,7 @@ Otherwise, **propose a bump, with the reason stated.** Read the commits since th
 git log <tag>..HEAD --format='%B---COMMIT-BOUNDARY---'
 ```
 
-If the range is empty, say there is nothing since `<tag>` and show the menu. If it is not, read
+If the range is empty, say there is nothing since `<tag>` and show the four bump lines from the block below, without the `Apply …?` line. If it is not, read
 the messages (bodies, not just subjects) and classify what they describe:
 
 - **major** — anything that removes or renames something a user of the project relies on: a

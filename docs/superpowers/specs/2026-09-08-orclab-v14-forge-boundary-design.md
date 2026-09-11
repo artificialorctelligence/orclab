@@ -207,6 +207,10 @@ already works. Semver is a judgment about intent, and commit messages are eviden
 refactor described as a fix can still break a consumer. A suggestion that presents its reasoning
 lets that judgment be corrected; a silent auto-bump would not.
 
+**Added 2026-09-10 from the final review:** if the current major is `0`, a breaking change
+proposes **minor** and the sentence says it is breaking — `1.0.0` is a declaration a commit range
+cannot make.
+
 `/orc-release` needs no change to benefit: it already delegates version-setting to `/orc-version`
 with `--no-commit`.
 

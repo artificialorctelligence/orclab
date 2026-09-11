@@ -1,7 +1,7 @@
 ---
 name: orc-version
-description: Use when the user explicitly asks to use orc-version, or types /orc-version, to set or increment the current project's version, draft a changelog entry, tag the commit, or cut a release.
-argument-hint: <major>.<minor>[.<point>] | increment <major|minor|point> [--no-commit] | release [tag]
+description: Use when the user explicitly asks to use orc-version, or types /orc-version, to set or increment the current project's version, draft a changelog entry, and tag the commit locally - or, with no arguments, to be told what bump the commits since the last tag suggest and why.
+argument-hint: <major>.<minor>[.<point>] | increment <major|minor|point> [--no-commit]
 ---
 # /orc-version
 
@@ -27,7 +27,7 @@ inside any other project, it's that project.
 
 ## Step 1: Parse $ARGUMENTS and route
 
-1. If `$ARGUMENTS` starts with `release` — go to **Release Flow** below.
+1. If `$ARGUMENTS` starts with `release` — go to **Moved: release** below. Do not run anything.
 2. If `$ARGUMENTS` starts with `increment ` — go to **Increment Flow** below.
 3. If `$ARGUMENTS` matches a version pattern (`<digits>.<digits>` or `<digits>.<digits>.<digits>`)
    — go to **Absolute-Set Flow** below.
@@ -35,19 +35,48 @@ inside any other project, it's that project.
 
 ## Bare Invocation
 
-Report the current version (from Step 0). If no current version exists yet, say so plainly. Then
-show this menu:
+Report the current version (from Step 0). If no current version exists yet, say so plainly and
+show the four bump lines from the block below — everything after the `Apply …?` line — without
+a proposal: there is no range to read.
+
+Otherwise, **propose a bump, with the reason stated.** Read the commits since the most recent
+`v*` tag — the same range the changelog draft uses:
+
+```bash
+git log <tag>..HEAD --format='%B---COMMIT-BOUNDARY---'
+```
+
+If the range is empty, say there is nothing since `<tag>` and show the four bump lines from the
+block below, without the `Apply …?` line. If it is not, read
+the messages (bodies, not just subjects) and classify what they describe:
+
+- **major** — anything that removes or renames something a user of the project relies on: a
+  command, a subcommand, a config key, a file format, a public function; or a message that says
+  `BREAKING` or uses the `!:` subject convention.
+- **minor** — otherwise, if anything was added: a new command, subcommand, option, skill, field,
+  or capability.
+- **point** — otherwise: only fixes, docs, refactors, tests.
+
+If the current major is `0`, a breaking change proposes **minor** and the sentence says it is
+breaking — `1.0.0` is a declaration a commit range cannot make.
+
+State the proposal as a sentence that shows its evidence — the counts and one or two subjects
+that decided it — for example: *"Since v0.14.0: 3 fixes (#24, #29, #30), 1 addition
+(`/orc-package`), nothing removed — so **minor**: `0.14.0` → `0.15.0`."* Then ask:
 
 ```
-To bump the version:
+Apply 0.15.0? Or pick another:
   /orc-version increment major   (resets minor and point to 0)
   /orc-version increment minor   (resets point to 0)
   /orc-version increment point
-Or set a specific version directly:
   /orc-version <major>.<minor>[.<point>]
 ```
 
-Stop here — do not proceed to any bump logic on a bare invocation.
+**The proposal never writes a file.** If the user says yes, proceed to **Apply the new version**
+with the proposed version exactly as if they had typed it. If they pick something else, honour
+that instead. If they say nothing decisive, stop. Semver is a judgment about intent and commit
+messages are evidence, not proof — a refactor described as a fix can still break a consumer —
+which is why this proposes and never decides.
 
 ## Absolute-Set Flow
 
@@ -160,28 +189,21 @@ Once the new version string is determined (from either flow above):
    git tag vX.Y.Z
    ```
    Do NOT push anything in this step. Report the new version and the tag, and mention that
-   `/orc-version release` is the separate, explicit next step if this version should become a
-   real, public GitHub Release.
+   `/orc-git release` is the separate, explicit next step if this version should become a real,
+   public GitHub Release — it lives under `/orc-git` because it pushes and publishes, which nothing
+   in this command does.
 
-## Release Flow
+## Moved: release
 
-1. Determine the target tag: the tag named in `$ARGUMENTS` after `release ` (e.g.
-   `/orc-version release v1.2.0`), or the most recent local tag if none was given.
-2. Confirm the tag exists locally:
-   ```bash
-   git tag --list '<tag>'
-   ```
-   If it doesn't exist, report this plainly and stop — do not guess what tag was meant.
-3. Push the commit and tag to `origin` if they aren't already there:
-   ```bash
-   git push origin HEAD
-   git push origin <tag>
-   ```
-4. Create the real GitHub Release, using the corresponding `CHANGELOG.md` section (if present) as
-   the release notes body:
-   ```bash
-   gh release create <tag> --notes-file <path to a temp file containing that section's content>
-   ```
-   (Extract just that one version's section from `CHANGELOG.md` — from its `## [X.Y.Z]` heading
-   to the next `## [` heading or end of file — into a temp file first, then pass that file's path.)
-5. Report the real Release URL that `gh release create` prints.
+`/orc-version release` no longer exists. Say exactly this, and stop:
+
+```
+/orc-version release has moved to /orc-git release.
+
+Everything else this command does is local and reversible - a manifest edit, a changelog entry,
+a commit, a local tag. Pushing a tag and creating a GitHub Release is neither, and it now lives
+with the other forge operations: /orc-git release [tag]
+```
+
+Do not run `/orc-git release` on the user's behalf. A redirect that names the new home teaches it;
+one that quietly still works preserves the old habit.
