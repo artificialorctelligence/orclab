@@ -7,7 +7,7 @@ Move the one subcommand that pushes and publicly publishes out of `/orc-version`
 becomes only about versions; `/orc-release` stays host-agnostic by construction; `/orc-git` owns
 forge operations and says so.
 
-Closes **BACKLOG #20**.
+Closes **BACKLOG #20**, and — folded in 2026-09-10, after v15 shipped — **#28**.
 
 **On the numbering:** `v12` (artifact preflight, **#21**), `v13` (async confirmation, **#18**) and
 `v14` here reflect the order these were specced, not a required implementation order. All three are
@@ -55,6 +55,7 @@ document.
   `/orc-git ci`. The section below says why building it now would be designing from one data point.
 - A version-suggestion capability in `/orc-version`.
 - Updating the four live Orclab references to the old command.
+- **`/orc-git merge <branch>`** — the one universal-git operation `/orc-git` was missing (#28).
 
 **Explicitly out of scope:**
 - **Any forge abstraction.** No `forge.yaml`, no provider field, no second-forge command. See
@@ -99,7 +100,7 @@ explicitly:
 
 | Universal git — works against any host | Forge-specific — `gh`, GitHub only |
 |---|---|
-| `commit`, `push`, `branch`, `switch` | `repo`, `pr`, `release`, and `ci` if it lands |
+| `commit`, `push`, `branch`, `switch`, `merge` | `repo`, `pr`, `release`, and `ci` if it lands |
 
 Auditing a real release for host coupling — Orcshot's, 2026-09-07 — gives three distinct answers,
 which is the evidence that this split is the right one:
@@ -152,6 +153,41 @@ reporting each workflow's latest run status for the current commit, and failing 
 `success`. **Build it when a second project needs it**, or when Orcshot's step 10 is actually
 delegated — not before.
 
+## `/orc-git merge <branch>` — landing a branch, without deciding how
+
+**Added 2026-09-10, folding in #28.** Raised the day after this spec was written: `/orc-git`'s
+subcommands each prepare work or publish a commit, and none lands a branch. Every finished branch
+under Orclab's own worktree-based workflow therefore leaves Orclab's vocabulary — four times in one
+session on 2026-09-10, each by hand: test, `git merge --no-ff`, test again, remove the worktree,
+delete the branch. The memory rule says raw git is a fallback to flag; a fallback needed every
+single time is the shape of a missing command.
+
+**#28's own objection, and how this answers it.** A landing command that *decides* merge-vs-PR
+would be the one surprising thing in an otherwise unsurprising command. So this one does not
+decide. `merge` means merge, and only that:
+
+1. Refuse if the current working tree is dirty — a merge over uncommitted work is how someone's
+   half-done change gets swept into a merge commit.
+2. Confirm `<branch>` exists locally; stop plainly if not.
+3. Run the project's test suites **on the branch as it stands** (for Orclab: every
+   `skills/*/scripts/tests` and `hooks/scripts/tests` suite). Stop if any fails; nothing has
+   been merged.
+4. `git merge --no-ff <branch>` into the current branch, with a message naming what landed.
+5. Run the same suites **on the merged result**. If any fails, stop and leave everything in
+   place — the merge is local and recoverable, and the branch and its worktree still exist.
+6. If `<branch>` has a worktree (`git worktree list`), remove it; then `git branch -d <branch>`.
+   `-d`, not `-D`: a branch git considers unmerged is a signal, not litter.
+7. Report: what landed, the suite results, what was cleaned up.
+
+**"How should this land?" stays a human question.** `superpowers:finishing-a-development-branch`
+is where it gets asked, if it has not been; `/orc-git merge` is what you type once the answer is
+"merge it locally." This is the same argument `push` already makes for itself — invoking the
+subcommand *is* the deliberate act — and it is why there is no `/orc-git land` wrapping that
+skill's menu: a name that adds no capability, plus an availability guard for the skill it wraps.
+
+**Universal git, left side of the table.** No `gh`, so it works against any host, and against
+no host at all.
+
 ## Version suggestion in `/orc-version`
 
 What `/orc-version` gains by becoming only about versions, and the reason it belongs here rather
@@ -196,6 +232,12 @@ If #17's design contradicts this — for instance by making GitHub Releases a fi
 type with its own setup flow — **that decision wins and this section is what gets revised**, since
 #17 ships first and will have the worked examples.
 
+**Settled 2026-09-10: #17 shipped as v15 and agreed.** Its spec's interlock reads *"`/orc-git
+release` is the mechanism, and whether a project treats it as a channel is expressed in that
+project's recipe. This spec agrees with that split."* The PPA ingredient it ships declares no
+GitHub Release channel, and nothing in v15 makes one a first-class type. This section stands as
+written; nothing here is revised.
+
 ## Testing
 
 `/orc-git` and `/orc-version` are prose skills with no bundled scripts, so this is verified the way
@@ -209,6 +251,11 @@ Orclab's other prose conventions are — `VERIFICATION.md` scenarios:
 - **Version suggestion**: in a scratch repo with commits since a tag, `/orc-version` with no
   arguments proposes a bump *and states its reason*; overriding the proposal is honoured; the
   proposal alone never writes a file.
+- **`/orc-git merge`**: in a scratch repo with a feature branch and a worktree for it, and a
+  trivially passing test suite, `/orc-git merge <branch>` lands it, runs the suite twice, removes
+  the worktree and deletes the branch. With a dirty tree it refuses before merging. With a suite
+  that fails on the merged result, it stops with the branch, worktree and merge commit all still
+  present and says so. With a branch name that does not exist, it stops without guessing.
 - **The boundary is documented**: `/orc-git`'s skill states the universal-vs-forge split, and the
   four stale references to the old command are gone (`grep -rn "orc-version release"` over live
   files, excluding `docs/superpowers/` and `BACKLOG.md`, returns nothing).
