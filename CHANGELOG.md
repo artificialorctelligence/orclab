@@ -2,6 +2,57 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.15.0] - 2026-09-10
+
+### Added
+- `/orc-package <channel>` — stand up a distribution channel by applying an *ingredient* (the
+  reusable knowledge of how to set up a PPA, a store, a registry) to the project's own
+  `channels.yaml`, `distro.yaml` and `RELEASING.md`. Ships the PPA ingredient, written from
+  Orcshot's real channel, with the Launchpad series-copy script as a template. A channel it
+  doesn't ship is captured into your own config directory through an interview, and a user-level
+  ingredient shadows a shipped one. Runs only an ingredient's checks, never its account-gated
+  setup; never writes or prints a credential.
+- `/orc-git merge <branch>` — land a finished branch locally: refuses a dirty tree or a self-merge,
+  runs the test suites before and after, removes the worktree, deletes the branch with `-d`. It
+  decides nothing about whether merging was the right way to land.
+- `/orc-git release [tag]` — push a tag and create its GitHub Release from the matching
+  `CHANGELOG.md` section (moved here from `/orc-version`, see Changed).
+- `/orc-version` with no arguments now proposes a bump — major, minor or point — and states the
+  evidence that decided it, with the changelog entry that version would get, as one question. It
+  never writes until you confirm; an override is honoured. On a `0.x` project a breaking change
+  proposes minor and says it is breaking rather than declaring `1.0.0`.
+- `/orc-publish --confirm` — for a channel whose publish is asynchronous (a remote build, a human
+  review), checks whether an accepted publish has actually landed, and publishes nothing. A leaf
+  declares `confirm:` with a `command` and/or a `url`; declaring it is what marks the publish
+  asynchronous, and such a leaf reports `accepted` rather than `success` on a zero-exit action.
+- A `PreToolUse` hook enforcing a model floor: a subagent dispatched below Sonnet to write code is
+  rewritten to Sonnet, with a message naming what it replaced.
+- `/orc-git` states which of its subcommands are plain git (`commit`, `push`, `branch`, `switch`,
+  `merge`) and which need `gh` (`repo`, `pr`, `release`), and carries one rule for the irreversible
+  ones: if you typed the command it runs; if reaching for it was Claude's idea, Claude says what
+  it is about to run and waits for a yes.
+
+### Changed
+- **`/orc-version release` has moved to `/orc-git release`.** Typing the old form reports the move
+  and stops; it does not run the release. `/orc-version` is now only about versions — every action
+  it takes is local and reversible.
+- `/orc-publish --dry-run`'s exit code is a verdict on the plan, not a receipt for printing it: it
+  exits non-zero when the plan already names a refusal the real run would give (an unknown
+  preflight rule, a missing artifact with no `prepare:`, a timed-out expansion). A wrapper doing
+  `--dry-run && publish` now stops where a person reading the plan would.
+- `/orc-todo add verification` writes the scenario into the checkout the command ran in, so a
+  scenario written on a feature branch stays there until the branch lands. The number still comes
+  from the one shared counter; `BACKLOG.md` entries still go to the main checkout. The discard
+  guard now watches whichever checkout the command runs in.
+
+### Fixed
+- `orc-publish`: a non-string `action:`, `metrics:` or `prepare:` (`action: true` is valid YAML)
+  is refused before anything runs, naming the leaf and the value — previously a traceback with no
+  summary, and healthy siblings never attempted.
+- `orc-publish`: the build-and-publish-in-one warning no longer misses an action that publishes,
+  builds, then publishes again.
+- Four small `/orc-todo` findings from its own review.
+
 ## [0.14.0] - 2026-09-09
 
 ### Added
