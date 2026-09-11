@@ -33,7 +33,11 @@ SOURCE = "__SOURCE__"
 FROM_SERIES = "__FROM_SERIES__"
 TO_SERIES = "__TO_SERIES__"
 
-DEFAULT_CREDENTIALS = pathlib.Path.home() / ".config" / SOURCE / "launchpad-credentials.txt"
+DEFAULT_CREDENTIALS = (
+    pathlib.Path(os.environ.get("XDG_CONFIG_HOME") or pathlib.Path.home() / ".config")
+    / SOURCE
+    / "launchpad-credentials.txt"
+)
 APPLICATION_NAME = f"{SOURCE}-release"
 
 

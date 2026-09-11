@@ -1,4 +1,3 @@
-# skills/orc-package/scripts/tests/test_ppa_template.py
 """The template is copied into a consuming project, never imported by Orclab. What Orclab can
 prove about it: after placeholder substitution it is valid Python, its --help runs, and its
 --check answers the one-time-setup question without launchpadlib installed and without ever
@@ -29,12 +28,14 @@ def instantiate(tmp_path):
     return out
 
 
-def run(script, *args, home):
+def run(script, *args, home, extra_env=None):
     # PYTHONPATH cleared and a fake HOME: launchpadlib must not be needed for these paths,
     # and nothing may be written into the real home directory.
+    env = {"HOME": str(home), "PATH": "/usr/bin:/bin"}
+    env.update(extra_env or {})
     return subprocess.run(
         [sys.executable, "-S", str(script), *args],
-        capture_output=True, text=True, env={"HOME": str(home), "PATH": "/usr/bin:/bin"},
+        capture_output=True, text=True, env=env,
     )
 
 
@@ -71,3 +72,7 @@ def test_the_default_credentials_path_is_per_project_under_xdg_config(tmp_path):
     home.mkdir()
     out = run(script, "--check", home=home)
     assert str(home / ".config" / "theirpkg" / "launchpad-credentials.txt") in out.stderr
+
+    xdg = tmp_path / "xdg"
+    out = run(script, "--check", home=home, extra_env={"XDG_CONFIG_HOME": str(xdg)})
+    assert str(xdg / "theirpkg" / "launchpad-credentials.txt") in out.stderr

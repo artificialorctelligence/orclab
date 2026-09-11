@@ -682,22 +682,27 @@ In a throwaway scratch git repo with a `debian/control` declaring `Architecture:
    the two credential checks, reports each as not satisfied, and **does not** open a browser,
    run `gpg --gen-key`, or visit Launchpad's activate page.
 3. **Expected:** `.orclab/publish/channels.yaml` now holds two leaves under the parent you named,
-   with the invented values substituted and no `__PLACEHOLDER__` left; `scripts/ppa-copy-series.py`
+   with the invented values substituted and
+   `grep -rn '__[A-Z_]*__' .orclab scripts RELEASING.md` prints nothing; `scripts/ppa-copy-series.py`
    exists with `OWNER = "nobody"`; `RELEASING.md` has two new steps between lint and
    install-test, every step renumbered so the sequence is contiguous integers.
 4. Run `python3 skills/orc-release/scripts/run.py --root . steps`.
 5. **Expected:** every step listed, no numbering warning, no cross-reference warning.
 6. Run `/orc-publish --dry-run` in the scratch project.
-7. **Expected:** both leaves resolve; the plan prints their actions with the invented values.
+7. **Expected:** both leaves resolve; the plan prints their actions with the invented values, and
+   no `warning: action builds and irreversibly publishes` line — the build is `prepare:`, so the
+   gate has somewhere to run.
 
 ## Scenario 50: no machine-local write for the PPA
 
-Run Scenario 49 with `HOME` pointed at an empty scratch directory (`HOME=/tmp/scratch-home
-claude ...`, or export it in the session before invoking).
+Run Scenario 49 with the real `HOME` (pointing `HOME` at a scratch directory breaks Claude Code
+itself — its own config and this plugin live under `$HOME`). Before running, `touch
+/tmp/orc-verify-50.marker`.
 
-1. **Expected:** after `/orc-package ppa` completes, `find $HOME -type f` prints nothing. No
-   `~/.dput.cf`, no `~/.config/scratchpkg/`, nothing. The PPA ingredient's section 4 says
-   "None", and the command must believe it.
+1. **Expected:** after `/orc-package ppa` completes,
+   `find "$HOME" -type f -newer /tmp/orc-verify-50.marker -not -path "$HOME/.claude/*"` prints
+   nothing, and both `test ! -e ~/.dput.cf` and `test ! -e ~/.config/scratchpkg` pass. The PPA
+   ingredient's section 4 says "None", and the command must believe it.
 
 ## Scenario 51: /orc-package never handles a credential
 
@@ -727,7 +732,7 @@ Run Scenario 49 twice in the same scratch project.
 ## Scenario 54: no ingredient offers capture, honouring ORCLAB_INGREDIENTS_DIR
 
 1. `export ORCLAB_INGREDIENTS_DIR=/tmp/scratch-ingredients` (a directory that does not exist yet),
-   then run `/orc-package snap` in any project.
+   then run `/orc-package snap` in a scratch project.
 2. **Expected:** it says plainly there is no `snap` ingredient, shipped or user-level, and offers
    to capture one. It does not fail, and does not invent a snap procedure on its own.
 3. Say yes, and answer the interview with invented-but-plausible values, giving a real shell
