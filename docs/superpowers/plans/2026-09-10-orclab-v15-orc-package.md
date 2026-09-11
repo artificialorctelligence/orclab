@@ -568,7 +568,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 name: orc-package
 description: Use when the user explicitly asks to use orc-package, or types /orc-package, to stand up a distribution channel for the current project - applying a shipped or captured ingredient (how to set up a PPA, a store, a registry) to the project's own channels.yaml, distro.yaml and RELEASING.md, or capturing a new ingredient for a channel Orclab does not ship yet.
 disable-model-invocation: true
-allowed-tools: Read, Bash(ls *), Bash(grep *), Bash(python3 *), Bash(gpg --list-secret-keys *), Bash(curl -sfI *)
+allowed-tools: Read, Bash(ls *), Bash(grep *), Bash(gpg --list-secret-keys *)
 ---
 
 # orc-package
@@ -678,7 +678,7 @@ it for free. If the user says yes:
 1. Interview for each of the eight sections below, in order. For sections 2 and 3, insist on a
    **checkable test** — an ingredient whose one-time setup cannot be checked is a note nobody
    can act on.
-2. Write `${ORCLAB_INGREDIENTS_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/orclab/ingredients/<channel>/ingredient.md`
+2. Write `${ORCLAB_INGREDIENTS_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/orclab/ingredients}/<channel>/ingredient.md`
    in the shape below. Create the directory. Show the file before writing it.
 3. Then apply it, above.
 
