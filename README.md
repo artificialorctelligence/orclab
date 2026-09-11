@@ -44,6 +44,12 @@ below.
   or remove one, and set up the lanes that say which work runs in what order. Entry numbers come
   from an allocator holding a lock over one canonical file, so two agents working at once can't
   take the same one. Ships as a skill only.
+- **/orc-package** — stand up a distribution channel for this project by applying an
+  *ingredient* (the reusable knowledge of how to set up a PPA, a store, a registry) to the
+  project's own `channels.yaml`, `distro.yaml` and `RELEASING.md`. Ships the PPA ingredient;
+  captures a new one, into your own config directory, for any channel it doesn't ship. Runs
+  only an ingredient's checks, never its account-gated setup, and never writes a credential.
+  Ships as a skill only.
 - **/orc-reload** — reinstall the plugin you're currently developing so a fresh session picks up
   your changes, distinguishing the several causes that all look like "the reinstall didn't work"
   and verifying the expected version actually landed. Works for any plugin project, not just

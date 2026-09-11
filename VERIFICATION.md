@@ -669,6 +669,87 @@ person then sees in `git status`, and that the guard protects it there.
 7. Commit the scenario, and run it again.
 8. **Expected:** silent.
 
+## Scenario 49: applying the PPA ingredient to a scratch project
+
+In a throwaway scratch git repo with a `debian/control` declaring `Architecture: all`, a
+`RELEASING.md` of at least four numbered steps (build, lint, install-test, tag), and no
+`.orclab/` at all, run `/orc-package ppa`. Answer its questions with invented values
+(owner `nobody`, ppa `scratch`, source `scratchpkg`, series noble → resolute, any 40-hex key).
+
+1. **Expected:** it asks for every input in the ingredient's table before writing anything, and
+   asks which `channels.yaml` parent path to use.
+2. **Expected:** it runs the registration check (`curl -sfI` against the invented PPA URL) and
+   the two credential checks, reports each as not satisfied, and **does not** open a browser,
+   run `gpg --gen-key`, or visit Launchpad's activate page.
+3. **Expected:** `.orclab/publish/channels.yaml` now holds two leaves under the parent you named,
+   with the invented values substituted and
+   `grep -rn '__[A-Z_]*__' .orclab scripts RELEASING.md` prints nothing; `scripts/ppa-copy-series.py`
+   exists with `OWNER = "nobody"`; `RELEASING.md` has two new steps between lint and
+   install-test, every step renumbered so the sequence is contiguous integers.
+4. Run `python3 skills/orc-release/scripts/run.py --root . steps`.
+5. **Expected:** every step listed, no numbering warning, no cross-reference warning.
+6. Run `/orc-publish --dry-run` in the scratch project.
+7. **Expected:** both leaves resolve; the plan prints their actions with the invented values, and
+   no `warning: action builds and irreversibly publishes` line — the build is `prepare:`, so the
+   gate has somewhere to run.
+
+## Scenario 50: no machine-local write for the PPA
+
+Run Scenario 49 with the real `HOME` (pointing `HOME` at a scratch directory breaks Claude Code
+itself — its own config and this plugin live under `$HOME`).
+
+1. **Expected:** after `/orc-package ppa` completes, both `test ! -e ~/.dput.cf` and
+   `test ! -e "${XDG_CONFIG_HOME:-$HOME/.config}/scratchpkg"` pass, and — only if
+   `${XDG_CONFIG_HOME:-$HOME/.config}/orclab` did not exist before the run — it still does not.
+   The PPA ingredient's section 4 says "None", and the command must believe it.
+
+## Scenario 51: /orc-package never handles a credential
+
+On a machine with no GPG secret key matching the fingerprint you give, apply the PPA ingredient.
+
+1. **Expected:** the signing-key check fails and is reported in the ingredient's words ("must
+   exist in this machine's keyring"), the OAuth check fails and is reported, and at no point does
+   the transcript contain a key, a token, or the contents of any file under `~/.config`. Nothing
+   is written outside the project.
+
+## Scenario 52: /orc-package never performs an account-gated action
+
+Give `/orc-package ppa` an owner/PPA pair that does not exist on Launchpad.
+
+1. **Expected:** the registration check reports the PPA missing, names the activate-ppa page as
+   the user's to visit, and the command continues to write the recipe. It never attempts to
+   create the PPA and never asks for Launchpad credentials to do so.
+
+## Scenario 53: /orc-package merges and never overwrites
+
+Run Scenario 49 twice in the same scratch project.
+
+1. **Expected:** the second run reports each leaf, each `distro.yaml` entry, each `RELEASING.md`
+   step and `scripts/ppa-copy-series.py` as already present and left alone. `git diff` after the
+   second run is empty.
+
+## Scenario 54: no ingredient offers capture, honouring ORCLAB_INGREDIENTS_DIR
+
+1. `export ORCLAB_INGREDIENTS_DIR=/tmp/scratch-ingredients` (a directory that does not exist yet),
+   then run `/orc-package snap` in a scratch project.
+2. **Expected:** it says plainly there is no `snap` ingredient, shipped or user-level, and offers
+   to capture one. It does not fail, and does not invent a snap procedure on its own.
+3. Say yes, and answer the interview with invented-but-plausible values, giving a real shell
+   check for registration (`snap info <name>`) and for credentials (`snapcraft whoami`).
+4. **Expected:** `/tmp/scratch-ingredients/snap/ingredient.md` exists, opens with an inputs
+   table, and has exactly eight `## N.` sections in the documented order. `~/.config/orclab`
+   was not created — the override was honoured.
+
+## Scenario 55: a user-level ingredient shadows a shipped one
+
+1. With `ORCLAB_INGREDIENTS_DIR` set to a scratch directory, copy the shipped
+   `ingredients/ppa/` into it and change one visible line in the copy's section 1.
+2. Run `/orc-package` (bare).
+3. **Expected:** the listing shows `ppa` as `user (shadows shipped)`.
+4. Run `/orc-package ppa` and stop after its first response.
+5. **Expected:** it says which ingredient it is using and names the user-level path, not the
+   plugin's.
+
 ## Recording the result
 
 Note the outcome of each scenario (pass/fail, with specifics) either back in this conversation or

@@ -568,7 +568,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 name: orc-package
 description: Use when the user explicitly asks to use orc-package, or types /orc-package, to stand up a distribution channel for the current project - applying a shipped or captured ingredient (how to set up a PPA, a store, a registry) to the project's own channels.yaml, distro.yaml and RELEASING.md, or capturing a new ingredient for a channel Orclab does not ship yet.
 disable-model-invocation: true
-allowed-tools: Read, Bash(ls *), Bash(grep *), Bash(python3 *), Bash(gpg --list-secret-keys *), Bash(curl -sfI *)
+allowed-tools: Read, Bash(ls *), Bash(grep *), Bash(gpg --list-secret-keys *)
 ---
 
 # orc-package
@@ -678,7 +678,7 @@ it for free. If the user says yes:
 1. Interview for each of the eight sections below, in order. For sections 2 and 3, insist on a
    **checkable test** — an ingredient whose one-time setup cannot be checked is a note nobody
    can act on.
-2. Write `${ORCLAB_INGREDIENTS_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/orclab/ingredients/<channel>/ingredient.md`
+2. Write `${ORCLAB_INGREDIENTS_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/orclab/ingredients}/<channel>/ingredient.md`
    in the shape below. Create the directory. Show the file before writing it.
 3. Then apply it, above.
 
@@ -757,7 +757,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Add the scenarios with `/orc-todo add verification`**
 
-Seven scenarios, one `add` each, body on stdin from a file (shell quoting multi-paragraph prose is how stubs get written). The numbers come back from the allocator; use whatever it prints. Run from the worktree — since #30, a verification scenario lands in the checkout it was written from. Bodies:
+Seven scenarios, one `add` each, body on stdin from a file (shell quoting multi-paragraph prose is how stubs get written). The numbers come back from the allocator; use whatever it prints — and where a later body says "Scenario A", write the number the allocator gave A, since the letters exist only in this plan. Run from the worktree — since #30, a verification scenario lands in the checkout it was written from. Bodies:
 
 **Scenario A — applying the PPA ingredient to a scratch project**
 

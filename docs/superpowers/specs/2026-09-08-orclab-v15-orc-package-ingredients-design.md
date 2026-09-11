@@ -152,7 +152,7 @@ unnecessary the second time.
 **Where a captured ingredient lives, and why not the three obvious wrong places:**
 
 ```
-${XDG_CONFIG_HOME:-~/.config}/orclab/ingredients/<channel>.md
+${XDG_CONFIG_HOME:-~/.config}/orclab/ingredients/<channel>/
 ```
 
 - **Not the project repo** — the entire point is the *next* project. An ingredient in Orcshot does
