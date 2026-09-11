@@ -692,7 +692,7 @@ In a throwaway scratch git repo with a `debian/control` declaring `Architecture:
 
 ## Scenario 50: no machine-local write for the PPA
 
-Run Scenario A with `HOME` pointed at an empty scratch directory (`HOME=/tmp/scratch-home
+Run Scenario 49 with `HOME` pointed at an empty scratch directory (`HOME=/tmp/scratch-home
 claude ...`, or export it in the session before invoking).
 
 1. **Expected:** after `/orc-package ppa` completes, `find $HOME -type f` prints nothing. No
@@ -718,7 +718,7 @@ Give `/orc-package ppa` an owner/PPA pair that does not exist on Launchpad.
 
 ## Scenario 53: /orc-package merges and never overwrites
 
-Run Scenario A twice in the same scratch project.
+Run Scenario 49 twice in the same scratch project.
 
 1. **Expected:** the second run reports each leaf, each `distro.yaml` entry, each `RELEASING.md`
    step and `scripts/ppa-copy-series.py` as already present and left alone. `git diff` after the
