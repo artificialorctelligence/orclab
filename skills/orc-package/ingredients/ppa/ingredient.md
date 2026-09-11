@@ -80,12 +80,19 @@ upload happening.
 
 `artifact:` must name the source tarball itself, not the `.changes` file that merely lists it —
 inspecting the `.changes` would check the wrong thing while reporting success. Which file that is
-depends on `debian/source/format`; read it and use the matching line, never guess:
+depends on `debian/source/format`; read it and use the matching line, never guess. If
+`debian/source/format` is absent or says `1.0`, the package needs converting to a 3.0 format
+first — say so and stop rather than guessing an artifact path.
 
 - `3.0 (native)`: `artifact: "../__SOURCE___$(dpkg-parsechangelog --show-field Version).tar.xz"`
-- `3.0 (quilt)`: `artifact: "../__SOURCE___$(dpkg-parsechangelog --show-field Version | cut -d- -f1).orig.tar.xz"`
+- `3.0 (quilt)`: `artifact: "../__SOURCE___$(dpkg-parsechangelog --show-field Version | sed 's/-[^-]*$//').orig.tar.xz"`
   (the quilt tarball is named by the upstream version only, without the Debian revision after the
-  last `-`).
+  last `-` — `sed 's/-[^-]*$//'` strips everything from the last `-` onward, which is correct even
+  when the upstream version itself contains a `-`, e.g. `2024-05-1`; `cut -d- -f1` cuts at the
+  *first* `-` and would produce the wrong version there. The `.orig.tar.xz` suffix is whatever
+  upstream shipped, not necessarily `.tar.xz` — the compression suffix must match the orig tarball
+  `dpkg-buildpackage -S` actually produced; confirm with `ls ../__SOURCE___*.orig.tar.*` after a
+  first build rather than assuming.)
 
 ```yaml
 __FROM_SERIES__:
@@ -95,7 +102,7 @@ __FROM_SERIES__:
   # file, and a binary build's .changes sits beside the source build's for the same
   # version - a PPA rejects a binary upload.
   prepare: "dpkg-buildpackage -us -uc -S -sa"
-  artifact: "../__SOURCE___$(dpkg-parsechangelog --show-field Version).tar.xz"  # 3.0 (native); see above for 3.0 (quilt)
+  artifact: "../__SOURCE___$(dpkg-parsechangelog --show-field Version).tar.xz"  # source tarball for a 3.0 (native) package; a 3.0 (quilt) package names its .orig tarball instead
   preflight: [no-vcs, no-tool-state, no-prebuilt-binaries]
   action: "debsign -k__KEY__ ../__SOURCE___$(dpkg-parsechangelog --show-field Version)_source.changes && dput ppa:__OWNER__/__PPA__ ../__SOURCE___$(dpkg-parsechangelog --show-field Version)_source.changes"
   metrics: "python3 $ORC_PUBLISH_SCRIPTS/metrics/launchpad_ppa.py __OWNER__/__PPA__ --package __SOURCE__ --series __FROM_SERIES__"

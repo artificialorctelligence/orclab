@@ -696,13 +696,12 @@ In a throwaway scratch git repo with a `debian/control` declaring `Architecture:
 ## Scenario 50: no machine-local write for the PPA
 
 Run Scenario 49 with the real `HOME` (pointing `HOME` at a scratch directory breaks Claude Code
-itself — its own config and this plugin live under `$HOME`). Before running, `touch
-/tmp/orc-verify-50.marker`.
+itself — its own config and this plugin live under `$HOME`).
 
-1. **Expected:** after `/orc-package ppa` completes,
-   `find "$HOME" -type f -newer /tmp/orc-verify-50.marker -not -path "$HOME/.claude/*"` prints
-   nothing, and both `test ! -e ~/.dput.cf` and `test ! -e ~/.config/scratchpkg` pass. The PPA
-   ingredient's section 4 says "None", and the command must believe it.
+1. **Expected:** after `/orc-package ppa` completes, both `test ! -e ~/.dput.cf` and
+   `test ! -e "${XDG_CONFIG_HOME:-$HOME/.config}/scratchpkg"` pass, and — only if
+   `${XDG_CONFIG_HOME:-$HOME/.config}/orclab` did not exist before the run — it still does not.
+   The PPA ingredient's section 4 says "None", and the command must believe it.
 
 ## Scenario 51: /orc-package never handles a credential
 
