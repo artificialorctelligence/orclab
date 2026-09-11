@@ -34,30 +34,14 @@ def shared_dir(cwd=None):
     return (base / out.strip()).resolve() / "orclab"
 
 
-def canonical_root(cwd=None):
-    d = shared_dir(cwd)
-    return d.parent.parent if d else None
-
-
-def in_canonical_checkout(cwd=None):
-    """Whether the caller's own working tree IS the canonical checkout.
-
-    A discard command reaches only the tree it runs in. The allocator writes canonically, so an
-    uncommitted entry normally lives there - and denying a worktree's `git reset --hard` because
-    the main checkout has one tells the user to commit something their tree does not contain.
-    Since an allocated entry is meant to sit uncommitted until someone deliberately commits it,
-    that would deny every whole-tree discard in every worktree for as long as it sits there, in
-    a project whose own workflow is worktree-based.
-    """
+def invoking_root(cwd=None):
+    """The working tree the caller is in - a worktree's own root, not the main checkout's."""
     top = git(["rev-parse", "--show-toplevel"], cwd)
-    root = canonical_root(cwd)
-    if not top or root is None:
-        return False
-    return pathlib.Path(top.strip()).resolve() == root.resolve()
+    return pathlib.Path(top.strip()).resolve() if top and top.strip() else None
 
 
 def uncommitted_entries(cwd=None):
-    """Entry headings added but not committed, as [(filename, heading)].
+    """Entry headings added but not committed in the caller's own tree, as [(filename, heading)].
 
     Read from the diff rather than by parsing the file, because only the diff distinguishes an
     entry that was just added from the hundreds already committed.
@@ -66,8 +50,13 @@ def uncommitted_entries(cwd=None):
     what is staged, so an entry that has been `git add`ed reads as no change at all - and then
     `git reset --hard` destroys it with nothing said. Staged is still uncommitted, which is the
     only thing this function is being asked.
+
+    The tree read is the one the command runs in, because that is the only tree a discard
+    reaches. A backlog entry lands in the main checkout and a verification scenario in the
+    checkout it was written from (BACKLOG #30); reading the caller's own tree covers both, and
+    never denies a worktree's reset over an entry that tree does not contain.
     """
-    root = canonical_root(cwd)
+    root = invoking_root(cwd)
     if root is None:
         return []
     found = []

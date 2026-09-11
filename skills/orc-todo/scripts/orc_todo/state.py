@@ -58,6 +58,19 @@ def canonical_root(cwd=None):
     return git_common_dir(cwd).parent
 
 
+def invoking_root(cwd=None):
+    """The working tree the caller is actually in - a worktree's own root, not the main one."""
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=str(cwd) if cwd else None,
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        raise NotAGitRepo(f"not a git repository: {cwd or os.getcwd()}") from e
+    return pathlib.Path(out).resolve()
+
+
 def lock_path(cwd=None):
     return shared_dir(cwd) / "lock"
 

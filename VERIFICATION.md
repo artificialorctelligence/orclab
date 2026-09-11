@@ -626,8 +626,10 @@ subprocess harness.
     waved through — which is the failure it exists to prevent.
 11. In the worktree from step 3, with the main checkout still holding an uncommitted entry, run
     `git reset --hard`.
-12. **Expected:** silent. That command cannot reach the canonical file, and denying it would
-    advise committing something the tree does not contain.
+12. **Expected:** silent. The worktree holds no uncommitted entry of its own, and the guard reads
+    only the tree the command runs in; denying it over the main checkout's entry would advise
+    committing something this tree does not contain. (Scenario 48 covers the worktree holding
+    one of its own.)
 
 ## Scenario 47: an accepted publish reads as not-done to an operator
 
@@ -645,6 +647,27 @@ and still pass on a line an operator would misread as done.
 4. Expected: the operator reads it as "this is not finished yet," names what the leaf's `confirm`
    block says to do next (run `--confirm`, or check the URL), and does not mistake it for
    `success`.
+
+## Scenario 48: a scenario written in a worktree stays on its branch
+
+BACKLOG #30. During v13, `/orc-todo add verification` run from a worktree wrote the new scenario
+into the main checkout's file, describing a field that existed only on the branch. Unit tests
+cover the routing; this covers the two things they cannot: that the right file is the one a
+person then sees in `git status`, and that the guard protects it there.
+
+1. In a worktree of a project with a real `VERIFICATION.md`, run
+   `/orc-todo add verification "<title>"` with a real paragraph on stdin.
+2. **Expected:** the number printed is one higher than the highest scenario anywhere in the
+   project, including the main checkout. `git status` in the worktree shows `VERIFICATION.md`
+   modified; `git status` in the main checkout shows it clean. The scenario is on the branch.
+3. In the same worktree, run `/orc-todo add backlog "<title>"` with a real paragraph.
+4. **Expected:** the main checkout's `BACKLOG.md` is modified and the worktree's is not. The
+   other file's behaviour did not change.
+5. In the worktree, with the scenario from step 1 still uncommitted, run `git reset --hard`.
+6. **Expected:** refused, naming that scenario. A discard reaches only the tree it runs in, and
+   this tree now holds something the allocator wrote.
+7. Commit the scenario, and run it again.
+8. **Expected:** silent.
 
 ## Recording the result
 

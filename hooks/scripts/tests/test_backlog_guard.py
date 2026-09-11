@@ -158,3 +158,22 @@ def test_garbage_on_stdin_fails_open(tmp_path):
     out = subprocess.run([sys.executable, GUARD], input="{not json",
                          capture_output=True, text=True, cwd=str(tmp_path))
     assert out.returncode == 0 and not out.stdout.strip()
+
+
+def test_a_worktree_is_denied_for_its_own_uncommitted_scenario(tmp_path):
+    """BACKLOG #30: the allocator now writes a verification scenario into the checkout the
+    command ran in. A discard reaches only the tree it runs in, so the guard reads that tree."""
+    repo = make_repo(tmp_path / "main", dirty=False)
+    wt = tmp_path / "wt"
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", str(wt), "-b", "b"],
+                   check=True)
+    (wt / "VERIFICATION.md").write_text("## Scenario 9: branch only\n\nprose\n")
+    subprocess.run(["git", "-C", str(wt), "add", "VERIFICATION.md"], check=True)
+    subprocess.run(["git", "-C", str(wt), "-c", "user.email=t@t", "-c", "user.name=t",
+                    "commit", "-qm", "v"], check=True)
+    with open(wt / "VERIFICATION.md", "a") as f:
+        f.write("\n## Scenario 10: not yet committed\n\nprose\n")
+    verdict = guard("git reset --hard", wt)
+    assert verdict is not None
+    assert "Scenario 10" in verdict["hookSpecificOutput"]["permissionDecisionReason"]
+    assert guard("git reset --hard", repo) is None, "main has nothing at risk"
