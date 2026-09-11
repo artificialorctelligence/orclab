@@ -190,7 +190,7 @@ genuine stdout redirect (no fd digit before `>`, no `>&` form). Writing the regr
 the real command first, rather than for a tidied-up version of it, is what surfaced that.
 
 
-## #4: Real per-language/per-domain default stacks for /orc-code — mostly undecided, one confirmed
+## #4: Real per-language/per-domain default stacks for /orc-code — mostly undecided, one confirmed (PARTIALLY RESOLVED 2026-09-11 — mobile and game stacks chosen)
 
 Raised by direflail (2026-09-05) while designing `/orc-code`'s defaults table (part of #1's work).
 When asked for real personal stack preferences to bake in (replacing the original idea's
@@ -250,6 +250,15 @@ ingredient Orclab does not ship, stored user-level so it survives a plugin reins
 someone who will never touch Orclab's source. Whether a settled language stack should be capturable
 the same way — direflail's real Java-desktop preference living somewhere reusable rather than only
 in Orclab's own table — is a genuine question, and is not decided here.
+
+**Partially resolved 2026-09-11 (BACKLOG #33).** direflail settled three of the open lines:
+cross-platform mobile is **Flutter + Dart**; cross-platform games (including mobile) are **Unity
+and Godot**; Android native and iOS native are wanted alongside, with "current accepted" toolchains
+to be determined by #33's research pass. The open question above — whether a settled stack should
+live somewhere reusable rather than only in the table — is answered by #33: each stack becomes a
+background knowledge skill (`skills/stack-<name>/SKILL.md`, `user-invocable: false`), and the
+Defaults Table row points at it. Python desktop, .NET, web combos, database strategy, Docker and
+observability remain as undecided as before.
 
 ## #5: `/orc-data` — a command for tracking legacy-system info during refactor work
 
@@ -2394,3 +2403,70 @@ to meet; the README's current paragraphs are the before-picture.
 Scope boundary: this is not about `CLAUDE.md`, which is deliberately Orclab's internal notes and
 stays that way, and not about the `SKILL.md` bodies, which are Claude's instructions and are
 correct as they are. It is a new, user-facing layer on top of both.
+
+## #33: Orclab ships researched platform knowledge for every store and stack it targets — reversing v15's "capture is how they arrive"
+
+Decided by direflail 2026-09-11, in a brainstorming pass on iOS and Android publishing. The
+argument: Orclab should carry accurate, at least base-level, knowledge about every platform it
+can publish to *before* anyone ships through it. Not having that has cost Orcshot two refactors
+so far (one in progress as this is written) — arriving at a store with no baseline, building
+against assumptions, and rebuilding when the store's actual rules turned out to differ.
+
+**What this reverses.** The v15 `/orc-package` spec (2026-09-08) lists as an explicit non-goal:
+"Ingredients for snap, Flathub, npm, App Store, Play, winget. Nobody here has published to them.
+Writing recipes for stores we have not used would be inventing. Capture is how they arrive." That
+rule guarded against *invented* knowledge — instructions written from memory that look as
+authoritative as ones learned live. What direflail is asking for is *researched, live-verified*
+knowledge under `currency-discipline`, with dated stamps. The v15 wording blurred "not used" into
+"not known"; those are different states. The non-goal is amended in the spec (same commit as this
+entry) to: an ingredient for a store nobody here has shipped through is researched and
+live-verified, carries a marker saying no release has gone through it, and is corrected by
+capture on first real use. Capture stays; its job changes from "how knowledge arrives" to "how
+the first real release corrects what research got wrong."
+
+**Where the knowledge lives — two boxes, one existing and one new.**
+
+1. *Channel knowledge* — Play Store, App Store, snap, Flathub, and the PPA update — lives in
+   `skills/orc-package/ingredients/<channel>/ingredient.md`, the shape that already exists. Store
+   governance (privacy declarations, data-safety forms, age rating, signing requirements, review
+   guidelines, target-SDK deadlines) is *channel* knowledge: it is the store's rule, stated once,
+   here. A Flutter app, a Kotlin app and a Unity game all publish through the same two mobile
+   ingredients.
+
+2. *Stack knowledge* — Android native, iOS native, Flutter/Dart now; Unity and Godot later —
+   lives as **background knowledge skills**: `skills/stack-<name>/SKILL.md` with
+   `user-invocable: false`. This is the documented Claude Code shape for exactly this case
+   (`CLAUDE.md` quotes the docs' `legacy-system-context` example). Chosen over the alternative —
+   stack files under `skills/orc-code/` read only at scaffold time — because the Orcshot
+   refactors happened when knowledge was absent *at the moment a decision was made*, and most
+   decisions are made mid-development, not at scaffold. A file only `/orc-code` reads reproduces
+   that failure mode; a skill whose description sits in every session's context does not.
+   `/orc-code`'s Defaults Table gains a row per stack that points at the skill.
+
+   Each stack skill states the current accepted toolchain, project layout, how it produces each
+   platform's artifact, and — the cross-reference that prevents the refactors — *where in this
+   stack's build each store rule lands*. The rule itself is not repeated; the stack skill points
+   at the channel ingredient.
+
+**Games are stacks, not stores.** Mobile games publish through the same two channel ingredients.
+The differences direflail expects but cannot yet name (controls, a desktop sibling with different
+input) will live in the Unity and Godot stack skills when those are written. No third kind of
+thing is needed. Not in focus now.
+
+**Currency.** The mechanism is the one the PPA ingredient already uses: every claim carries a
+"confirmed live YYYY-MM-DD" stamp, and `currency-discipline` governs re-checking before use.
+Nothing more is built until that proves insufficient.
+
+**Sequence agreed:** settle storage (this entry) → research each platform live → write the
+ingredients and stack skills → build a first Flutter app in a separate session, which is the
+first real test of both. Orcshot's in-progress apt/snap/flatpak work will be handed over in the
+PPA ingredient's section shape, as the form to fill.
+
+**Partially resolves #4:** cross-platform mobile is Flutter + Dart; cross-platform games are
+Unity and Godot. Android native and iOS native are wanted alongside, not instead. Which native
+toolchains are "current accepted" is what the research pass determines.
+
+Scope boundary: this changes what Orclab *ships*, not what `/orc-publish` or `/orc-package` *do*.
+`/orc-publish` stays channel-agnostic and executes whatever the leaf says; `/orc-package` applies
+an ingredient the same way whether it was researched or captured. Neither command's code changes
+for this entry.

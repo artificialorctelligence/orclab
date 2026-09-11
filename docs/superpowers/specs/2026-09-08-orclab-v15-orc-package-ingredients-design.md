@@ -46,8 +46,15 @@ written its own recipe. Not this spec's job to fix, but it is the same gap seen 
   it); the machinery deliberately does not. A channel ingredient and a language ingredient may
   share nothing past the metaphor, and generalising on two examples — one unbuilt — is the
   speculative work this repo keeps deleting.
-- **Ingredients for snap, Flathub, npm, App Store, Play, winget.** Nobody here has published to
-  them. Writing recipes for stores we have not used would be inventing. Capture is how they arrive.
+- ~~**Ingredients for snap, Flathub, npm, App Store, Play, winget.** Nobody here has published to
+  them. Writing recipes for stores we have not used would be inventing. Capture is how they arrive.~~
+  **Amended 2026-09-11 (BACKLOG #33), direflail's decision.** This non-goal guarded against
+  *invented* knowledge and blurred "not used" into "not known." An ingredient for a store nobody
+  here has shipped through *is* shipped, provided it is researched and live-verified under
+  `currency-discipline`, carries a marker saying no release has gone through it, and is corrected
+  by capture on first real use. Capture stays; its job changes from how knowledge arrives to how
+  the first real release corrects what research got wrong. Two Orcshot refactors from arriving at
+  a store with no baseline are the cost this line did not weigh.
 
 ## What it does
 
