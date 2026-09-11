@@ -1804,7 +1804,7 @@ read-modify-write on the canonical file with no lock while `add` took one — th
 lost update this entry is about, inside the mechanism built to prevent it. Reproduced live before
 it was fixed. A mechanism does not exempt its own code from the failure it models.
 
-## #26: Claude's designs and explanations are built inside-out — the user has to ask for facts Claude already had
+## #26: Claude's designs and explanations are built inside-out — the user has to ask for facts Claude already had (RESOLVED 2026-09-10)
 
 Raised by direflail 2026-09-09, at the end of the session that produced v16's spec and plan, and
 raised as a working-relationship problem rather than a defect: *"your plans are good, if you're an
@@ -1986,6 +1986,19 @@ identified as the thing actually asked for, which had lived only in the memory f
 explanation, and not run. Still open: this remains prose, and the paragraph above on what a next
 attempt should not do still stands. What is new is a checkable before/after on one real
 explanation, which no prior wording had.
+
+**Resolved 2026-09-10, by direflail, at the end of the session that added the second mechanism.**
+Asked to talk briefly about this entry, then: *"i've been more comfortable with your explanations.
+we can close this."* That is the only judge this entry ever had - the user is the one party who can
+see the gap - and it is the judgement.
+
+What closes it is not a wording. The two `CLAUDE.md` sections stay as written, prose remains the
+weakest place for a rule, and the paragraph above about a next attempt needing a mechanism is
+still true. What changed is the evidence: one session in which every design and every merge
+summary after the morning's correction was written from the reader's side, and the reader said
+so. If the pattern returns, this is the entry to reopen - it holds the diagnosis, the six worked
+instances, the corrected framing ("think user-centric, not be user-centric"), and the record of
+what each wording did and did not catch.
 
 ## #27: three deferred minors from v16's own review, worth tracking rather than losing (RESOLVED 2026-09-09)
 
