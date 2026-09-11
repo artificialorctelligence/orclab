@@ -62,19 +62,30 @@ breaking — `1.0.0` is a declaration a commit range cannot make.
 
 State the proposal as a sentence that shows its evidence — the counts and one or two subjects
 that decided it — for example: *"Since v0.14.0: 3 fixes (#24, #29, #30), 1 addition
-(`/orc-package`), nothing removed — so **minor**: `0.14.0` → `0.15.0`."* Then ask:
+(`/orc-package`), nothing removed — so **minor**: `0.14.0` → `0.15.0`."*
+
+**Then, in the same message, show the changelog entry that version would get** — drafted exactly
+as **Apply the new version** step 1 describes, from the same range — and ask **one** question:
 
 ```
-Apply 0.15.0? Or pick another:
+Apply 0.15.0 with this changelog entry? Yes writes it, sets the version, commits and tags
+locally. Or edit the entry, or pick another version:
   /orc-version increment major   (resets minor and point to 0)
   /orc-version increment minor   (resets point to 0)
   /orc-version increment point
   /orc-version <major>.<minor>[.<point>]
 ```
 
+One question, not two. An earlier form asked "apply 0.15.0?" and then, after a yes, showed the
+draft and asked again whether to change anything — which read as stalling, and on 2026-09-10
+direflail took the first yes as the decision and was surprised nothing had been written. The
+version and its changelog are one decision; present them as one.
+
 **The proposal never writes a file.** If the user says yes, proceed to **Apply the new version**
-with the proposed version exactly as if they had typed it. If they pick something else, honour
-that instead. If they say nothing decisive, stop. Semver is a judgment about intent and commit
+with the proposed version exactly as if they had typed it — and since the draft has already been
+shown and approved, step 1's "show and ask" is satisfied; write the entry (with any edits they
+gave) without asking a second time. If they pick another version, honour that instead, and
+redraft for it. If they say nothing decisive, stop. Semver is a judgment about intent and commit
 messages are evidence, not proof — a refactor described as a fix can still break a consumer —
 which is why this proposes and never decides.
 
