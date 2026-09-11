@@ -1925,6 +1925,25 @@ call is observable, which is why the model floor could be a hook; a property of 
 far, and a hook that speaks every turn gets tuned out - which `hooks/scripts/lane_notice.py` says
 in its own docstring.
 
+**A second mechanism, 2026-09-10 — the simulation itself, and the first time it was watched
+working.** Asked to fix #30, Claude wrote a design that satisfied every clause of the
+show-what-it-rests-on section — the deciding line quoted, the file:line cited — in the vocabulary
+of `canonical_root`, `--show-toplevel` and `in_canonical_checkout`. direflail: *"i'll admit, i
+don't understand what you're talking about. it's ok. can you explain where someone from my
+viewpoint can understand?"* The rewrite in a person's terms — two copies of the project, the text
+went into the wrong one, keep the shared number and write where you ran it — was understood and
+approved on first read. direflail: *"i think this is the solution we've been looking for
+regarding you explaining things 'inside-out'"*, and asked for it in `CLAUDE.md`, accepting the
+cost: *"it seems well worth it if it works."*
+
+`CLAUDE.md` now carries "Before explaining anything, explain it again from the reader's side" as
+a sibling of the evidence pass. It is the *simulating* capacity this entry's own correction
+identified as the thing actually asked for, which had lived only in the memory file
+`show-the-ground-not-just-the-conclusion` — loaded in the session that produced the unreadable
+explanation, and not run. Still open: this remains prose, and the paragraph above on what a next
+attempt should not do still stands. What is new is a checkable before/after on one real
+explanation, which no prior wording had.
+
 ## #27: three deferred minors from v16's own review, worth tracking rather than losing (RESOLVED 2026-09-09)
 
 Raised by v16's own final whole-branch review (2026-09-09), which triaged the deferred minors its

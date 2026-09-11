@@ -202,6 +202,39 @@ brainstorming pass on an undecided taxonomy" was a 260-line written one. One com
 Full record, five more worked examples, and why this is a section rather than a fixed defect:
 **#26**.
 
+## Before explaining anything, explain it again from the reader's side
+
+**The trigger is that you are about to explain something to a person** — a change, a design, a
+problem, a why — whether or not the explanation is also an answer, and whether or not the topic
+is "user-facing." A change to a Python module is still explained to a person.
+
+**The reader** directs this project and decides what happens next, but has not been in this
+session, has not read the files you just read, does not hold the code in their head, and will
+not go and read it. That is not a deficiency to route around; it is who the explanation is for.
+
+**The pass.** Having worked out what to say, think it through a second time *as that reader*,
+then write that version. What happened, in terms of what a person does and sees. Why. What
+changes. Names of functions, flags, files and git commands come only after the reader could say
+in their own words what the thing is — and often not at all. The section above asks whether the
+answer is *checkable*; this one asks whether it is *readable*. Both passes run; this one runs
+last, over the finished text, because evidence the reader cannot parse has not been shown.
+
+**What it looks like, 2026-09-10.** Asked to fix #30, Claude explained the design in two
+paragraphs built on `canonical_root`, `git rev-parse --show-toplevel`, `next_number`'s scan and
+`in_canonical_checkout`, with the CLAUDE.md line it rested on quoted and the file:line cited.
+Every clause of the section above was satisfied. direflail: *"i'll admit, i don't understand
+what you're talking about."* The rewrite — two copies of the project, the command wrote a test
+scenario into the wrong one, keep the shared number but write the text where you ran it, and the
+safety net has to look at the same copy — was understood on first read and approved. Same design,
+same facts, one extra pass. direflail, on the cost: *"it seems well worth it if it works."*
+
+**Why this is a section and not a rewording of the one above.** #26's own diagnosis separates
+two capacities: *noticing* that the reader lacks a fact, which is unavailable from inside a
+context where the fact is present, and *simulating* a reader who has not seen it, which needs no
+noticing and can be run on purpose. The section above is the floor — mechanical habits that
+work without simulation. This is the simulation itself, which #26 names as "the thing actually
+being asked for," and which until today lived only in Claude's memory file and not here.
+
 ## Before building anything, name what should already have covered it
 
 **Before proposing to build anything — a component, a script, a hook, a lint, a check — name the
