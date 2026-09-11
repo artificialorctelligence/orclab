@@ -647,7 +647,9 @@ def test_preflight_with_no_artifact_refuses(tmp_path):
 
 # The plan is what the operator says yes to, so for every refusal knowable without the artifact
 # existing, the dry-run line and the real run's detail must be the same sentence - asserted
-# against each other rather than each against its own hardcoded copy.
+# against each other rather than each against its own hardcoded copy. And the exit code agrees
+# with the line: a plan that already says it will be refused exits non-zero, so a wrapper doing
+# `--dry-run && publish` stops where a human reading the plan would (BACKLOG #24).
 @pytest.mark.parametrize(
     "extra",
     [
@@ -659,7 +661,7 @@ def test_preflight_with_no_artifact_refuses(tmp_path):
 )
 def test_dry_run_reports_the_refusal_the_real_run_will_give(tmp_path, capsys, extra):
     path = write_yaml(tmp_path, "channels.yaml", "a:\n" + extra + '  action: "true"\n')
-    assert main(["--channels", path, "--dry-run"]) == 0
+    assert main(["--channels", path, "--dry-run"]) == 1
     plan = capsys.readouterr().out
     assert "will be inspected" not in plan
 
@@ -809,9 +811,20 @@ def test_dry_run_does_not_crash_on_a_malformed_preflight_list(tmp_path, capsys):
         'a: { artifact: "nope.tar.gz", preflight: [no-vcs, 5], action: "true" }\n'
         'b: { action: "true" }\n',
     )
-    assert main(["--channels", path, "--dry-run"]) == 0
+    assert main(["--channels", path, "--dry-run"]) == 1, "a healthy sibling does not outvote a refusal"
     out = capsys.readouterr().out
     assert "preflight result: unknown preflight rule(s): 5" in out
+    assert "b: true" in out, "the whole plan is still printed - only the exit code changed"
+
+
+def test_dry_run_exits_zero_on_a_warning_alone(tmp_path, capsys):
+    """A warning is advice the real run proceeds past; only a refusal the real run would give
+    makes the dry run non-zero."""
+    path = write_yaml(
+        tmp_path, "channels.yaml", 'a: { action: "debuild && dput ppa:x ../y.changes" }\n'
+    )
+    assert main(["--channels", path, "--dry-run"]) == 0
+    assert "warning:" in capsys.readouterr().out
 
 
 def test_a_hanging_artifact_expansion_refuses_and_does_not_stop_siblings(tmp_path):
@@ -851,7 +864,7 @@ def test_dry_run_reports_findings_when_the_artifact_already_exists(tmp_path, cap
         "channels.yaml",
         f'a: {{ artifact: "{tmp_path}/src.tar.gz", preflight: [no-vcs], action: "true" }}\n',
     )
-    assert main(["--channels", path, "--dry-run"]) == 0
+    assert main(["--channels", path, "--dry-run"]) == 1  # a real finding is a refusal the real run will give (BACKLOG #24)
     out = capsys.readouterr().out
     # "no-vcs" alone appears unconditionally in the "preflight: no-vcs" declaration line
     # even when the artifact is never inspected - assert on the rendered inspection result
@@ -900,7 +913,7 @@ def test_dry_run_does_not_crash_on_a_hanging_artifact_expansion(tmp_path, capsys
         'a: { artifact: "$(sleep 30; echo x).tar.gz", preflight: [no-vcs], timeout: 1, '
         'action: "true" }\n',
     )
-    assert main(["--channels", path, "--dry-run"]) == 0
+    assert main(["--channels", path, "--dry-run"]) == 1  # a timed-out expansion refuses at execution too (BACKLOG #24)
     out = capsys.readouterr().out
     assert "preflight result: artifact path expansion timed out after 1s" in out
 

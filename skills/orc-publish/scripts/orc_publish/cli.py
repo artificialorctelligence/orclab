@@ -101,46 +101,67 @@ def _preflight_plan_result(leaf, default_timeout):
     resolved = _expand_artifact(leaf, effective_timeout(leaf, default_timeout))
     path, error = resolved
     if not error and not (path and pathlib.Path(path).is_file()) and leaf.prepare:
-        return "artifact not built yet - will be inspected after prepare, at execution time"
-    return preflight_refusal(leaf, default_timeout, resolved=resolved) or "clean"
+        return PLAN_DEFERRED
+    return preflight_refusal(leaf, default_timeout, resolved=resolved) or PLAN_CLEAN
+
+
+PLAN_CLEAN = "clean"
+PLAN_DEFERRED = "artifact not built yet - will be inspected after prepare, at execution time"
 
 
 def _preflight_plan_lines(leaf, default_timeout):
-    """The dry-run plan's preflight and action-shape lines for one actionable leaf.
+    """The dry-run plan's preflight and action-shape lines for one actionable leaf, and
+    whether the preflight result is a refusal the real run would give.
 
-    Action path only - `format_plan` calls this only for GATED_COMMAND_KEY, so a `--metrics`
-    plan never inspects an artifact.
+    Action path only - `plan` calls this only for GATED_COMMAND_KEY, so a `--metrics` plan
+    never inspects an artifact. A warning is not a refusal: the real run proceeds past it.
     """
-    lines = []
+    lines, refused = [], False
     if leaf.preflight:
+        result = _preflight_plan_result(leaf, default_timeout)
+        refused = result not in (PLAN_CLEAN, PLAN_DEFERRED)
         lines.append(f"  preflight: {', '.join(leaf.preflight)}")
-        lines.append(f"  preflight result: {_preflight_plan_result(leaf, default_timeout)}")
+        lines.append(f"  preflight result: {result}")
     warning = action_shape_warning(leaf)
     if warning:
         lines.append(f"  warning: {warning}")
     if leaf.confirm:
         lines.append("  asynchronous: declares confirm - check separately with --confirm")
-    return lines
+    return lines, refused
 
 
-def format_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS, command_key="action"):
+def plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS, command_key="action"):
+    """The dry-run plan as text, and whether any leaf in it is already known to be refused.
+
+    The plan is what a human approves, and it already prints the refusal the real run will
+    give wherever that is knowable now. The verdict makes the exit code say the same thing, so
+    a wrapper doing `--dry-run && publish` stops where a reader of the plan would. See BACKLOG
+    #24. Computed once, here, rather than by re-walking the leaves: an artifact expansion can
+    time out, and a second walk would wait out that timeout twice.
+    """
     if not leaves:
-        return "(no leaves selected)"
-    lines = []
+        return "(no leaves selected)", False
+    lines, refused = [], False
     for leaf in leaves:
         command = leaf.command(command_key)
         if command:
             lines.append(f"{leaf.dotted_path}: {command}")
             lines.append(f"  timeout: {effective_timeout(leaf, default_timeout)}s")
             if command_key == GATED_COMMAND_KEY:
-                lines.extend(_preflight_plan_lines(leaf, default_timeout))
+                more, leaf_refused = _preflight_plan_lines(leaf, default_timeout)
+                lines.extend(more)
+                refused = refused or leaf_refused
         else:
             lines.append(f"{leaf.dotted_path}: ({NOT_SET[command_key]})")
         for req in leaf.requirements:
             lines.append(f"  requirement: {req}")
         for issue in leaf.issues:
             lines.append(f"  issue: {issue}")
-    return "\n".join(lines)
+    return "\n".join(lines), refused
+
+
+def format_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS, command_key="action"):
+    return plan(leaves, default_timeout, command_key)[0]
 
 
 def is_bad_timeout(value):
@@ -637,10 +658,11 @@ def main(argv=None):
         return 0 if all(status != "not confirmed" for _, status, _ in results) else 1
 
     command_key = "metrics" if args.metrics else "action"
-    print(format_plan(leaves, default_timeout=args.timeout, command_key=command_key), flush=True)
+    text, refused = plan(leaves, default_timeout=args.timeout, command_key=command_key)
+    print(text, flush=True)
 
     if args.dry_run:
-        return 0
+        return 1 if refused else 0
 
     results = execute_plan(
         leaves,
