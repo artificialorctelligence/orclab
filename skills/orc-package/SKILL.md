@@ -2,7 +2,7 @@
 name: orc-package
 description: Use when the user explicitly asks to use orc-package, or types /orc-package, to stand up a distribution channel for the current project - applying a shipped or captured ingredient (how to set up a PPA, a store, a registry) to the project's own channels.yaml, distro.yaml and RELEASING.md, or capturing a new ingredient for a channel Orclab does not ship yet.
 disable-model-invocation: true
-allowed-tools: Read, Bash(ls *), Bash(grep *), Bash(python3 *), Bash(gpg --list-secret-keys *), Bash(curl -sfI *)
+allowed-tools: Read, Bash(ls *), Bash(grep *), Bash(gpg --list-secret-keys *)
 ---
 
 # orc-package
@@ -82,8 +82,9 @@ Show every write before making it. For each:
   ingredient's conditions for them hold. An existing file of the same name is left alone.
 
 After writing `RELEASING.md`, run `/orc-release`'s parser to prove the numbering:
-`python3 <orc-release's scripts/run.py> --root . steps` prints the steps and any numbering or
-cross-reference warning. A warning means the insertion was wrong; fix it before reporting done.
+`python3 ${CLAUDE_SKILL_DIR}/../orc-release/scripts/run.py --root . steps` prints the steps and any
+numbering or cross-reference warning. A warning means the insertion was wrong; fix it before
+reporting done.
 
 ### 4. Machine-local config — the three rules
 
@@ -112,7 +113,7 @@ it for free. If the user says yes:
 1. Interview for each of the eight sections below, in order. For sections 2 and 3, insist on a
    **checkable test** — an ingredient whose one-time setup cannot be checked is a note nobody
    can act on.
-2. Write `${ORCLAB_INGREDIENTS_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/orclab/ingredients/<channel>/ingredient.md`
+2. Write `${ORCLAB_INGREDIENTS_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/orclab/ingredients}/<channel>/ingredient.md`
    in the shape below. Create the directory. Show the file before writing it.
 3. Then apply it, above.
 
@@ -133,6 +134,9 @@ headings:
 6. `## 6. Confirmation` — how anyone finds out the publish landed (`confirm`, per `/orc-publish`).
 7. `## 7. RELEASING.md steps` — the steps, and where they belong in dependency order.
 8. `## 8. Script template` — what `templates/` holds and when to instantiate it.
+
+The numbered label is the required part; a descriptive suffix after it is fine — the shipped PPA
+ingredient uses them.
 
 Placeholders the command substitutes are written `__LIKE_THIS__` and every one must appear in
 the opening table.
