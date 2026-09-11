@@ -29,6 +29,24 @@ this table tells you what has to move. A `ci` subcommand (confirm named workflow
 the current commit) would also sit on the right; it is not built — it has exactly one example to
 design from, and that is one too few.
 
+## Whose idea was it
+
+Three subcommands here do something that is not undone by the next command: `push` and
+`release` reach a remote, `merge` deletes a branch. For each of them, one rule with two cases:
+
+- **The user typed the command.** That is the authorization. It runs — no confirmation prompt,
+  the way every other subcommand here works.
+- **You reached for it yourself** — the user asked for something else and you decided this
+  subcommand is the way to get there. **Say exactly what you are about to run, and wait for a
+  yes.** "Push it to origin?" "Merge `feature` into `main`?" A vague earlier "sounds good" about
+  something else does not count.
+
+You always know which case you are in. This is a rule the skill can carry that the per-skill
+`disable-model-invocation` flag cannot: that flag would hide `commit` and `branch` from
+natural-language requests along with these three, which is the wrong trade. (direflail,
+2026-09-10: *"i don't think it's reasonable that you can't call these commands when you feel you
+need to. i do feel like you do need to ask."*)
+
 ## Bare invocation (no arguments)
 
 List the available subcommands:
@@ -111,7 +129,7 @@ Stop here — do not proceed to any subcommand logic on a bare invocation.
    first).
    - Has an upstream: `git push`.
    - No upstream: `git push -u origin <branch>`.
-4. No confirmation prompt — invoking this command directly is the authorization.
+4. If the user typed this, it runs; if pushing was your idea, ask first — see "Whose idea was it" above.
 
 ## commit-push [text] / cp [text]
 
@@ -184,7 +202,8 @@ itself.
    reporting, not litter to force past with `-D`.
 7. **Report:** the merge commit, the branch that landed, both suite results, and what was removed.
 
-No confirmation prompt beyond the gates above — invoking the subcommand is the authorization.
+Beyond the gates above: if the user typed this, it runs; if merging was your idea, ask first — see
+"Whose idea was it" above.
 
 ## pr <id>
 
@@ -223,5 +242,6 @@ and reversible.
    say so and create the Release with `--generate-notes` instead, naming which happened.
 6. **Report the real Release URL** that `gh release create` prints.
 
-No confirmation prompt — invoking this subcommand directly is the authorization, as with `push`.
+If the user typed this, it runs; if releasing was your idea, ask first — see "Whose idea was it"
+above.
 It is not reachable from `/orc-version`; that command reports the move and stops.

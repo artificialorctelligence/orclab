@@ -2269,7 +2269,7 @@ Confirmed live on itself: Scenario 48 was added from this fix's own worktree wit
 `run.py`, and landed in the worktree's `VERIFICATION.md` with main's untouched. Done directly,
 without a spec or plan, on #27's precedent for fixes of this size.
 
-## #31: disable-model-invocation is per-skill, and /orc-git now holds both families
+## #31: disable-model-invocation is per-skill, and /orc-git now holds both families (RESOLVED 2026-09-10)
 
 Found while planning v14 (2026-09-10) and confirmed by its final review; kept out of that plan's
 scope deliberately so it would not be changed silently in either direction.
@@ -2303,3 +2303,28 @@ does not reopen the determinism spectrum itself, which is settled.
 **Searched before filing**, per CLAUDE.md: `CLAUDE.md` (the section quoted), every
 `skills/*/SKILL.md` frontmatter, `BACKLOG.md`, `hooks/scripts/`. Nothing tracks it; the v14 plan's
 Global Constraints is the only place it is written down, and a plan is not a tracker.
+
+**Resolved 2026-09-10, the same day, by direflail — none of the three options as written.** Asked
+who wrote the `CLAUDE.md` sentence: `9f64d88`, 2026-09-06, the commit that created the file, empty
+body, four days before `/orc-git` held a `release`. An illustration of what the flag is for that
+later read as a requirement. direflail's ruling: *"i don't think it's reasonable that you can't
+call these commands when you feel you need to. i do feel like you do need to ask."*
+
+**What shipped:** one rule with two cases, carried inside the irreversible subcommands rather than
+as a per-skill flag. If the user typed the command, it runs. If Claude reached for it — the user
+asked for something else and Claude decided this subcommand was the way — Claude says exactly what
+it is about to run and waits for a yes. `skills/orc-git/SKILL.md` gains a "Whose idea was it"
+section stating it once; `push`, `merge` and `release` each point at it in place of their old "no
+confirmation prompt — invoking it is the authorization" line, which was true for one case and
+silent about the other. `CLAUDE.md`'s paragraph now names the skills that genuinely fit the flag
+(`/orc-publish`, `/orc-release`, `/orc-package`, all of which carry it), records why `/orc-git`
+does not, and points at the two-case rule as the reference form.
+
+**Why this is better than (a), (b) or (c).** (a) fixed the sentence and left the ask unstated; (b)
+bought a flag at the cost of a second command; (c) argued the routing already protects. The ask is
+what direflail actually wanted, and Claude always knows which case it is in — so unlike the flag,
+it is a rule that can be applied per subcommand, and unlike #26's rules, its trigger is a concrete
+event ("about to run `git push`"), not a property of prose. Still prose, and no hook can enforce it
+today: the hooks interface has allow/deny and no "ask" (checked against the live docs 2026-09-09,
+per `hooks/scripts/backlog_guard.py`). If that changes, a PreToolUse hook on `git push` and
+`gh release create` is the mechanical form.

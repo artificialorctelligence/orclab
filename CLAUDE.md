@@ -117,11 +117,23 @@ Both are real, documented Boolean frontmatter fields (accept `true`/`false`/`yes
 **`disable-model-invocation: true`** — the skill becomes invisible to Claude's own ambient
 judgment (its description isn't even sitting in context as a candidate) until explicitly
 invoked. The official docs' own example is `/deploy`: *"You don't want Claude deciding to
-deploy because your code looks ready."* Real fit for Orclab: anything genuinely one-shot and
-side-effecting the moment it runs — `/orc-git release` (pushes and publishes), `/orc-git
-push`. Anything more conversational and workflow-starting (`/orc-code`'s ask-questions-then-
+deploy because your code looks ready."* Real fit for Orclab: a skill whose *whole purpose* is
+one-shot and side-effecting — `/orc-publish`, `/orc-release`, `/orc-package`, which all carry
+it. Anything more conversational and workflow-starting (`/orc-code`'s ask-questions-then-
 scaffold flow) should stay default, since the whole point there is natural-language
 triggerability matching a `/cat-code`-style dual-invocation UX.
+
+**The flag is per-skill, so it cannot protect one subcommand.** An earlier version of this
+paragraph — from `CLAUDE.md`'s first commit, 2026-09-06, four days before `/orc-git` held a
+`release` — named `/orc-git release` and `/orc-git push` as the fit. It was an illustration of
+what the flag is for that later read as a requirement, and it was never applied, because
+applying it would hide `commit` and `branch` from "commit this for me" along with the two
+dangerous subcommands. Found by v14's final review, tracked as BACKLOG #31, settled by direflail
+the same day: a skill that mixes everyday and irreversible subcommands carries the rule *inside*
+the irreversible ones instead — **if the user typed it, it runs; if it was Claude's idea, Claude
+says what it is about to run and waits for a yes.** `/orc-git`'s "Whose idea was it" section is
+the reference form. Claude always knows which case it is in, which is what makes this a rule it
+can follow and the flag a rule it cannot apply.
 
 **Critical, confirmed-live nuance**: `disable-model-invocation` blocks *ambient self-selection*
 — Claude spontaneously reaching for the skill because some unrelated request superficially
@@ -227,6 +239,13 @@ what you're talking about."* The rewrite — two copies of the project, the comm
 scenario into the wrong one, keep the shared number but write the text where you ran it, and the
 safety net has to look at the same copy — was understood on first read and approved. Same design,
 same facts, one extra pass. direflail, on the cost: *"it seems well worth it if it works."*
+
+**A second instance, same day, different shape.** Asked about BACKLOG #31, Claude recommended
+"option (a) with (c)'s reasoning" — labels that existed only inside the entry Claude had written
+an hour earlier and direflail had never opened. *"you're saying option a and c and never told me
+what those options are."* No jargon this time; a reference to something the reader has not seen.
+The pass has to catch both: anything the reader could not have read, whether it is a function
+name or a label from a file, gets restated in full.
 
 **Why this is a section and not a rewording of the one above.** #26's own diagnosis separates
 two capacities: *noticing* that the reader lacks a fact, which is unavailable from inside a
