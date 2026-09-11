@@ -122,7 +122,8 @@ situations (empty scratch dir, existing project, etc.).
 
 1. In Orclab's own repo, run `/orc-version` with no arguments.
 2. **Expected:** the current version (whatever `plugin.json` currently reports) is reported,
-   followed by the increment/set menu — and nothing else happens; no files change.
+   followed by a proposed bump with its reason (see Scenario 57) and the `Apply …?` menu; no files
+   change.
 
 ## Scenario 11: /orc-git release
 
@@ -758,8 +759,8 @@ Run Scenario 49 twice in the same scratch project.
 
 ## Scenario 56: /orc-git merge lands a branch with the suites as its gates
 
-1. In a scratch git repo with one committed file and a `tests/test_ok.py` containing a single
-   passing test, create a branch `feature` with a worktree
+1. In a scratch git repo with one commit containing a README and `tests/test_ok.py` (a single
+   passing test), create a branch `feature` with a worktree
    (`git worktree add ../feature-wt -b feature`), commit a second file on it, and return to the
    main checkout.
 2. Run `/orc-git merge feature`.
@@ -770,7 +771,7 @@ Run Scenario 49 twice in the same scratch project.
 4. Create a second branch `broken` whose one commit makes `tests/test_ok.py` fail. Run
    `/orc-git merge broken`.
 5. **Expected:** the pre-merge suite fails, the command says so and stops; `git log --oneline -1`
-   is unchanged and `broken` still exists.
+   is unchanged and `broken` still exists. `git worktree list` shows no temporary worktree.
 6. Edit a tracked file in the main checkout without committing, then run `/orc-git merge broken`
    again.
 7. **Expected:** it refuses before running anything, naming the uncommitted file.
@@ -779,9 +780,9 @@ Run Scenario 49 twice in the same scratch project.
 
 ## Scenario 57: /orc-version proposes a bump and says why
 
-1. In a scratch repo with a `v0.1.0` tag, add three commits whose subjects are
-   `Fix a typo`, `Add a --verbose flag`, and `Fix the exit code`. Run `/orc-version` with no
-   arguments.
+1. In a scratch repo with a `v0.1.0` tag and a `pyproject.toml` with `version = "0.1.0"`, add
+   three commits whose subjects are `Fix a typo`, `Add a --verbose flag`, and `Fix the exit code`.
+   Run `/orc-version` with no arguments.
 2. **Expected:** it reports the current version `0.1.0`, then proposes **minor** → `0.2.0`,
    citing the addition (`--verbose`) as the reason and counting the two fixes, and asks whether
    to apply it or pick another. `git status` is clean — no file was written.
@@ -790,7 +791,8 @@ Run Scenario 49 twice in the same scratch project.
    not `0.2.0`.
 5. In a scratch repo whose only commit since the tag has the subject `Remove the legacy
    --old flag`, run `/orc-version`.
-6. **Expected:** it proposes **major**, naming the removal as the reason.
+6. **Expected:** it says the removal is breaking, and — because the major is `0` — proposes
+   **minor** → `0.2.0` rather than `1.0.0`, saying why.
 
 ## Scenario 58: /orc-git's split is stated, and the old home is gone
 
@@ -800,8 +802,8 @@ Run Scenario 49 twice in the same scratch project.
 4. **Expected:** `merge` is on the universal-git side; `release`, `repo` and `pr` are on the
    `gh` side; `ci` is named as not built.
 5. Run: `grep -rn "orc-version release" --include=*.md . | grep -v "docs/superpowers/\|BACKLOG.md\|CHANGELOG.md"`
-6. **Expected:** the only hits are inside `skills/orc-version/SKILL.md`'s moved-notice. No other
-   live file names the old command.
+6. **Expected:** the only hits are Scenario 11 step 5 in this file, and
+   `skills/orc-version/SKILL.md`'s moved-notice. No other live file names the old command.
 
 ## Recording the result
 

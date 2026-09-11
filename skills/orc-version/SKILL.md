@@ -57,6 +57,9 @@ the messages (bodies, not just subjects) and classify what they describe:
   or capability.
 - **point** — otherwise: only fixes, docs, refactors, tests.
 
+If the current major is `0`, a breaking change proposes **minor** and the sentence says it is
+breaking — `1.0.0` is a declaration a commit range cannot make.
+
 State the proposal as a sentence that shows its evidence — the counts and one or two subjects
 that decided it — for example: *"Since v0.14.0: 3 fixes (#24, #29, #30), 1 addition
 (`/orc-package`), nothing removed — so **minor**: `0.14.0` → `0.15.0`."* Then ask:

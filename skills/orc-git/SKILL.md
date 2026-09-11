@@ -149,25 +149,32 @@ itself.
 
 1. **Refuse a dirty tree.** `git status --porcelain` must print nothing. If it does, report what is
    uncommitted and stop — a merge over uncommitted work sweeps someone's half-done change into a
-   merge commit that claims to be something else.
+   merge commit that claims to be something else. If `<branch>` has a worktree (`git worktree
+   list`), the same check applies there — `git -C <path> status --porcelain` must also print
+   nothing; otherwise the pre-merge suite would test content that is not what merges, and `git
+   worktree remove` would refuse at the end.
 2. **Confirm the branch exists locally:** `git show-ref --verify --quiet refs/heads/<branch>`. If
-   not, say so and stop; never guess which branch was meant.
+   not, say so and stop; never guess which branch was meant. Also confirm `<branch>` is not the
+   current branch (`git branch --show-current`); if it is, say so and stop — merging a branch into
+   itself is "Already up to date" followed by deleting it.
 3. **Run the project's test suites on the branch as it stands, before merging.** For a project
    with Python suites in Orclab's layout, that is every `skills/*/scripts/tests` and
    `hooks/scripts/tests` directory:
    ```bash
-   for d in skills/*/scripts hooks/scripts; do [ -d "$d/tests" ] && (cd "$d" && python3 -m pytest tests/ -q); done
+   for d in skills/*/scripts hooks/scripts; do [ -d "$d/tests" ] && { (cd "$d" && python3 -m pytest tests/ -q) || break; }; done
    ```
    For any other project, run whatever its own test command is (`npm test`, `cargo test`, `go test
    ./...`, `pytest`), found the way `superpowers:using-git-worktrees` finds it. Run them against
    the branch's tree — check it out in its worktree if it has one (`git worktree list`), otherwise
    `git stash` is *not* the tool (the tree is clean by step 1); use `git worktree add` to a
-   temporary path and remove it after. If any suite fails, report the failure and stop. Nothing
-   has been merged.
+   temporary path and remove it as soon as the suites finish, whichever way they went — a leftover
+   temporary worktree blocks `git switch <branch>`, which is the next thing a user does after a
+   failing suite. If any suite fails, report the failure and stop. Nothing has been merged.
 4. **Merge:** `git merge --no-ff <branch> -m "Merge <branch>: <one line saying what landed>"`.
    Draft that line from the branch's commit subjects (`git log <current>..<branch> --oneline`),
    not from the branch name. If the merge conflicts, stop and report the conflicting files; do
-   not resolve conflicts on the user's behalf.
+   not resolve conflicts on the user's behalf. The tree is mid-merge; `git merge --abort` is the
+   user's call, not this command's.
 5. **Run the same suites on the merged result.** If any fails: stop, say so, and leave everything
    exactly as it is — the merge commit, the branch, and its worktree all still exist, nothing has
    been pushed, and `git reset --hard HEAD~1` is the user's call, not this command's.
