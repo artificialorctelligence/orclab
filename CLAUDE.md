@@ -118,7 +118,7 @@ Both are real, documented Boolean frontmatter fields (accept `true`/`false`/`yes
 judgment (its description isn't even sitting in context as a candidate) until explicitly
 invoked. The official docs' own example is `/deploy`: *"You don't want Claude deciding to
 deploy because your code looks ready."* Real fit for Orclab: anything genuinely one-shot and
-side-effecting the moment it runs — `/orc-version release` (pushes and publishes), `/orc-git
+side-effecting the moment it runs — `/orc-git release` (pushes and publishes), `/orc-git
 push`. Anything more conversational and workflow-starting (`/orc-code`'s ask-questions-then-
 scaffold flow) should stay default, since the whole point there is natural-language
 triggerability matching a `/cat-code`-style dual-invocation UX.

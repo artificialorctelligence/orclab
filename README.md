@@ -28,12 +28,14 @@ below.
   Routes deterministically to one of three flows, wrapping the `feature-dev` and
   `code-modernization` plugins where applicable rather than reimplementing their work.
 - **/orc-version** — set or increment the current project's version, draft a changelog entry from
-  real git history, tag the commit, and optionally cut a real GitHub Release
-  (`/orc-version release`).
+  real git history, and tag the commit locally. With no arguments, proposes the bump the commits
+  since the last tag suggest, and says why. Never pushes or publishes.
 - **/orc-help** (alias: **/orc**) — reports Orclab's own running version and a synopsis of its
   available commands.
-- **/orc-git** — shortcuts for common git/GitHub operations: connect a repo, commit with a
-  drafted message, push, commit-then-push (alias `cp`), branch/switch, and check out a PR.
+- **/orc-git** — git and GitHub shortcuts: connect a repo, commit with a drafted message, push,
+  commit-then-push (alias `cp`), branch/switch, merge a finished branch with the tests run before
+  and after, check out a PR, and cut a GitHub Release from an existing tag. States which of its
+  subcommands are plain git and which need `gh`.
 - **/orc-publish** — push a project's built artifacts to its own configured distribution
   channels (PPA, Snap Store, Flathub, npm, etc.), resolved from `.orclab/publish/channels.yaml`
   and `distro.yaml`. Ships as a skill only — see `CLAUDE.md` for why.

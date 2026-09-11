@@ -1235,7 +1235,7 @@ otherwise only asserted in tests.
 invoke that command," which was already correct and is now actually served by the parsed field.
 Suites green at 102 / 62 / 48.
 
-## #20: where release-adjacent responsibilities live — `/orc-version release` is misplaced
+## #20: where release-adjacent responsibilities live — `/orc-version release` is misplaced (RESOLVED 2026-09-10)
 
 Raised by direflail 2026-09-07, after asking what the difference between `/orc-version release`
 and `/orc-release` actually is — a question the current naming does not answer. His own framing:
@@ -1304,6 +1304,16 @@ plumbing to reach it from a release already exists (`/orc-release` delegates ver
 across three shipped commands and touches naming, so it is not an inline edit. Fix **#19** first
 or alongside. Nothing here is urgent: `/orc-version release` works today, and the only real cost
 of the status quo is that nobody can tell the two commands apart from their names.
+
+**Resolved 2026-09-10 — v14 shipped, as specced on 2026-09-08 and amended 2026-09-10.**
+`/orc-version release` moved outright to `/orc-git release`, with a moved-notice in its old place
+that names the new home and stops. `/orc-git` states its two families in its own skill — `commit`,
+`push`, `branch`, `switch`, `merge` are git; `repo`, `pr`, `release` are `gh` — and is not renamed.
+`/orc-release` did not change: `RELEASING.md`'s `**Run:**` marker was already the forge-agnostic
+delegation mechanism, and #19 had made it carry the verb. `/orc-git ci` is a recorded shape, not
+a build. `/orc-version` with no arguments now proposes a bump and states the evidence, never
+writing until confirmed. Orclab still has no `RELEASING.md` of its own; `/orc-git release` is
+directly typable, which is the path this entry said must exist.
 
 ## #21: nothing inspects an artifact before it is irreversibly published (RESOLVED 2026-09-08)
 
@@ -2061,7 +2071,7 @@ note, which is the one place this resolution departs from `backlog-discipline`'s
 original diagnostic text" - a miscount is not reasoning worth preserving, and the original wording
 is recorded here.
 
-## #28: should /orc-git land a branch, or is finishing-a-development-branch the answer
+## #28: should /orc-git land a branch, or is finishing-a-development-branch the answer (RESOLVED 2026-09-10)
 
 Raised by direflail 2026-09-09, immediately after a session said "merge and push" as though
 `/orc-git` covered it. It does not: its subcommands are `repo`, `commit`, `push`,
@@ -2101,6 +2111,16 @@ conflict handling, or branch protection. None of those change whichever way it g
 `BACKLOG.md`, and the bundled scripts under `hooks/scripts/` and `skills/*/scripts/`. Nothing in
 Orclab lands a branch; the only hits for merging are `orc-git`'s `pr` subcommand, which checks a
 pull request out rather than landing it.
+
+**Resolved 2026-09-10 — folded into v14 as `/orc-git merge <branch>`, decided by direflail
+between three shapes.** It merges locally with the test suites as gates before and after, removes
+the branch's worktree and deletes the branch with `-d`, and decides nothing about whether merging
+was the right way to land — that question stays with a person, or with
+`superpowers:finishing-a-development-branch`, which asks it. Typing the subcommand is the answer
+"merge it locally," the same argument `push` makes for itself. The alternative, a `/orc-git land`
+wrapping that skill's menu, was rejected as a name that adds no capability plus an availability
+guard for the thing it wraps. The 2026-09-10 session that decided this had landed four branches
+by hand, each with the same seven steps the subcommand now performs.
 
 ## #29: a bare YAML scalar in action: or metrics: aborts the whole run instead of failing one leaf (RESOLVED 2026-09-10)
 
