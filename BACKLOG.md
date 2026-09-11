@@ -958,7 +958,7 @@ lesson generalises to this entry — asserting that the right things are *true* 
 asserting they are true *for the right reason*, and a control that used to pass is the cheapest
 way to tell the difference.
 
-## #17: what belongs in a `/orc-package` component, and what belongs elsewhere — scope undecided
+## #17: what belongs in a `/orc-package` component, and what belongs elsewhere — scope undecided (RESOLVED 2026-09-10)
 
 Raised by direflail 2026-09-07, immediately after automating Orcshot's Launchpad
 noble→resolute copy: "this whole process is going to have to be done for any new project... i'm
@@ -1031,6 +1031,19 @@ when this was raised: whether the component dispatches per channel (`/orc-packag
 PPA-only, and whether it writes the config and `RELEASING.md` steps itself or only instructs.
 Answer **#18** first or alongside — a channel that isn't finished when the command exits changes
 what "set up a channel" even means.
+
+**Resolved 2026-09-10 — v15 shipped.** The cleave the entry called "a candidate, explicitly not a
+decision" is the one taken: `/orc-package` owns standing up the channel (registration, credentials,
+wiring into the recipe) and not producing the artifact, which stays with `/orc-code` and **#4**.
+The four things wearing one word are now three places: the artifact is `/orc-code`'s, the channel
+is an *ingredient* `/orc-package` applies, the release is `/orc-release`'s. The parked disagreement
+about a Launchpad client is settled by the ingredient carrying the copy script as a *template*
+instantiated into the project — Orclab ships the knowledge, the project owns the code.
+
+One correction found while planning, recorded in the spec: the PPA has no machine-local config.
+`~/.dput.cf` was named as the worked example and was never needed; `dput` resolves `ppa:` through
+`/etc/dput.cf`. The shape is still proven for exactly one channel, and the first capture — snap,
+per Orcshot #198 — is where it gets tested against a second.
 
 ## #18: a publish can be accepted without being done — nothing models the wait, or how to check (RESOLVED 2026-09-09)
 
