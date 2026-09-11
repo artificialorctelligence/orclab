@@ -11,6 +11,7 @@ from orc_publish.selection import SelectionError
 from orc_publish.cli import (
     action_shape_warning,
     build_plan,
+    command_error,
     DEFAULT_TIMEOUT_SECONDS,
     effective_timeout,
     execute_plan,
@@ -1502,3 +1503,52 @@ def test_metrics_plan_never_shows_the_asynchronous_line(tmp_path, capsys):
     assert main(["--channels", path, "--metrics", "--dry-run", "ppa"]) == 0
     out = capsys.readouterr().out
     assert "asynchronous" not in out
+
+
+# BACKLOG #29: `action: true` is valid YAML and parses as a bool. It used to raise out of
+# action_shape_warning (dry run) and out of _run (real run) as a traceback - no summary, and a
+# healthy sibling never attempted. A declaration that cannot do what it claims is refused before
+# anything runs, exactly as a bad timeout: or confirm: is.
+
+
+@pytest.mark.parametrize("key", ["action", "metrics", "prepare"])
+def test_command_error_rejects_a_non_string_command(tmp_path, key):
+    root = load_tree(write_yaml(tmp_path, "channels.yaml", f"a: {{ {key}: true }}"))
+    message = command_error(build_plan(root, []))
+    assert message is not None
+    assert f"a: {key} must be a command string, got True" in message
+
+
+def test_command_error_accepts_strings_and_unset(tmp_path):
+    root = load_tree(
+        write_yaml(
+            tmp_path,
+            "channels.yaml",
+            """
+            a: { action: "true", prepare: "true", metrics: "true" }
+            b: { channel: only-a-channel }
+            """,
+        )
+    )
+    assert command_error(build_plan(root, [])) is None
+
+
+def test_main_refuses_a_non_string_action_in_dry_run_without_a_traceback(tmp_path, capsys):
+    path = write_yaml(tmp_path, "channels.yaml", "a: { action: true }")
+    assert main(["--channels", path, "--dry-run"]) == 1
+    assert "error: a: action must be a command string, got True" in capsys.readouterr().err
+
+
+def test_main_refuses_a_non_string_metrics_before_a_healthy_sibling_runs(tmp_path, capsys):
+    marker = tmp_path / "sibling-ran"
+    path = write_yaml(
+        tmp_path,
+        "channels.yaml",
+        f"""
+        bad: {{ metrics: 5 }}
+        good: {{ metrics: "touch {marker}" }}
+        """,
+    )
+    assert main(["--channels", path, "--metrics"]) == 1
+    assert "error: bad: metrics must be a command string, got 5" in capsys.readouterr().err
+    assert not marker.exists(), "nothing runs when a declaration is refused"

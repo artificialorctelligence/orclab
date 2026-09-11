@@ -2069,7 +2069,7 @@ conflict handling, or branch protection. None of those change whichever way it g
 Orclab lands a branch; the only hits for merging are `orc-git`'s `pr` subcommand, which checks a
 pull request out rather than landing it.
 
-## #29: a bare YAML scalar in action: or metrics: aborts the whole run instead of failing one leaf
+## #29: a bare YAML scalar in action: or metrics: aborts the whole run instead of failing one leaf (RESOLVED 2026-09-10)
 
 Found by v13's own final whole-branch review (2026-09-09), with a live reproduction, and
 deliberately scoped out of that branch's fix wave rather than smuggled into it.
@@ -2116,6 +2116,23 @@ command that is a valid string and simply fails, which is already handled correc
 **Searched before filing**, per CLAUDE.md: every shipped `skills/*/SKILL.md`, `CLAUDE.md`,
 `BACKLOG.md`, `hooks/scripts/` and `skills/*/scripts/`. `tree.py`'s `preflight` property is the
 only place the class is handled; nothing covers `action:` or `metrics:`.
+
+**Resolved 2026-09-10 — the second candidate, not the third, chosen by direflail.** A
+`command_error(leaves)` sibling to `timeout_error` and `confirm_error`, run in the same place
+before anything executes: a non-string `action:`, `metrics:` or `prepare:` is refused with
+`<leaf>: <key> must be a command string, got <value>`, exit 1, nothing run. `prepare:` was added
+to the entry's two because it reaches `_run` the same way and had the same hole.
+
+**Why the whole-run refusal, against the entry's own lean.** The entry framed the property as
+"one bad leaf, everything else still runs," which is how a command that *runs and fails* is
+treated. But a non-string command is not a failed run, it is a malformed declaration — the class
+`timeout_error` and `confirm_error` already handle, and both stop the run before anything
+happens. Making this one field behave differently would be a distinction nobody would remember.
+And a publish is irreversible: letting the healthy siblings go out and then re-running after the
+typo is fixed means re-publishing what already went. Stopping first is the safer default. The
+real defect the entry recorded — a traceback escaping with no summary printed — is gone either
+way. Both live crashes (`rfind` on a bool in the dry-run plan, `Popen` on an int in the real run)
+are reproduced by the tests and closed by the one check.
 
 ## #30: /orc-todo's allocator writes to the canonical checkout, which is right for BACKLOG.md and wrong for a feature branch's VERIFICATION.md (RESOLVED 2026-09-10)
 

@@ -136,7 +136,10 @@ what marks a publish asynchronous** — deliberately the only signal: there is n
 flag, so nothing can disagree with a leaf's own `confirm:` block about whether it's asynchronous.
 At least one sub-field is required — a `confirm:` that names neither is refused before anything
 runs, the same treatment a bad leaf-level `timeout:` already gets: a declaration that can't do
-what it claims is an error, not something to guess a default for.
+what it claims is an error, not something to guess a default for. An `action:`, `metrics:` or
+`prepare:` that isn't a string (`action: true` is valid YAML, and a bool) is refused the same
+way, naming the leaf and the value — never a traceback, and never a run in which the healthy
+siblings published while this one crashed.
 
 A leaf declaring `confirm` reports **`accepted`**, not `success`, when its action exits 0. **Exit
 code stays 0** — the upload genuinely succeeded and nothing went wrong; confirming it actually

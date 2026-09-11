@@ -167,6 +167,24 @@ def timeout_error(leaves):
     return None
 
 
+def command_error(leaves):
+    """The first `action:`, `metrics:` or `prepare:` that isn't a command string - or None.
+
+    `action: true` is valid YAML and a Python bool. It used to escape as a traceback from two
+    places - `action_shape_warning` on the dry-run plan, `subprocess.Popen` on the real run -
+    with no summary printed and a healthy sibling never attempted. Same treatment as a bad
+    `timeout:` or `confirm:`, for the same reason: it is a declaration that cannot do what it
+    claims, and a publish is irreversible, so stopping before anything runs beats publishing
+    the siblings and re-publishing them after the typo is fixed. See BACKLOG #29.
+    """
+    for leaf in leaves:
+        for key in ("action", "metrics", "prepare"):
+            value = leaf.command(key)
+            if value is not None and not isinstance(value, str):
+                return f"{leaf.dotted_path}: {key} must be a command string, got {value!r}"
+    return None
+
+
 def confirm_error(leaves):
     """The first unusable `confirm:` block, as a message - or None.
 
@@ -605,6 +623,11 @@ def main(argv=None):
     bad_confirm = confirm_error(leaves)
     if bad_confirm:
         print(f"error: {bad_confirm}", file=sys.stderr, flush=True)
+        return 1
+
+    bad_command = command_error(leaves)
+    if bad_command:
+        print(f"error: {bad_command}", file=sys.stderr, flush=True)
         return 1
 
     if args.confirm:
