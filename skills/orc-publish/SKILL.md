@@ -118,13 +118,23 @@ knowing where the plugin is installed.
 |---|---|---|
 | Launchpad PPA | `python3 $ORC_PUBLISH_SCRIPTS/metrics/launchpad_ppa.py <owner>/<ppa> --package <name> --series <series>` | Confirmed live 2026-09-08 |
 | GitHub Releases | `gh release list -L 50 --json tagName --jq '.[].tagName' \| while read t; do gh release view "$t" --json assets --jq "\"$t: \" + ([.assets[].downloadCount] \| add // 0 \| tostring)"; done` | Confirmed live 2026-09-08 (real field, all zero for Orcshot) |
-| Snap Store | `snapcraft metrics <snap-name> --format table --name weekly_installed_base_by_operating_system` | **Unverified** — see below |
-| Flathub | `curl -sS https://flathub.org/api/v2/stats/<app-id>` | **Unverified** — see below |
+| Snap Store | `snapcraft metrics <snap-name> --format=json --name weekly_installed_base_by_operating_system` | **Never run** — needs the snap's author account; see below |
+| Flathub | `curl -fsS https://flathub.org/api/v2/stats/<app-id> \| python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["id"], "-", d["installs_total"], "installs total,", d["installs_last_month"], "last month,", d["installs_last_7_days"], "last 7 days")'` | Confirmed live 2026-09-10 (against `org.gimp.GIMP`; a 404 for an unpublished id fails the leaf) |
 
-The Snap and Flathub rows are named mechanisms, not confirmed ones: no Orclab-adjacent project
-has been onboarded to either, so neither has ever been run against a real published app. Before
-putting one in a real `channels.yaml`, verify it live and correct this table — do not present an
-unverified command as if it worked. `orclab:currency-discipline` covers exactly this.
+The Flathub endpoint is public and per-app: it answers for any published app id without any
+login, which is how it was confirmed without an Orclab-adjacent project on Flathub. The number is
+what Flathub calls `installs`; the API schema (`StatsResultApp` in Flathub's live `openapi.json`)
+does not say whether updates are included, so read it with the same caveat as the PPA count —
+fetches, not people. The bare endpoint also returns 180 days of per-day and ~250 per-country
+figures, which is why the leaf prints the three totals rather than the raw body.
+
+The Snap row is the opposite case. Its options, its metric names and its JSON output shape were
+checked against the live snapcraft reference (2026-09-10), but Snap metrics are confidential to
+the snap's author — the Store API demands the `package_metrics` permission on a logged-in
+account — so the command cannot be run by anyone but the publisher, and no Orclab-adjacent
+project has a snap. Until one does, that row is a command that has never produced output. Do not
+present it as if it had; when a real snap exists, run it once and correct this line.
+`orclab:currency-discipline` covers exactly this.
 
 ## Reporting an asynchronous publish (`confirm`, `accepted`)
 

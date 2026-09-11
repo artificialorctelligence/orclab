@@ -318,7 +318,7 @@ read/write pair plus its entry in `KNOWN_FORMATS`, not a new mechanism. The firs
 "suggest a starting version from what's already there" half of the original ask is also still
 unbuilt.
 
-## #7: Distribution-channel download/install metrics — carried over from Orcshot #186, direflail wants Orclab to own this eventually (PARTIALLY ADDRESSED 2026-09-08 — Launchpad confirmed, Snap/Flathub still unverified)
+## #7: Distribution-channel download/install metrics — carried over from Orcshot #186, direflail wants Orclab to own this eventually (PARTIALLY ADDRESSED 2026-09-10 — Launchpad and Flathub confirmed, Snap blocked until a snap exists)
 
 Raised by direflail (2026-09-06), explicitly carrying over Orcshot's own `BACKLOG.md` #186 (raised
 there 2026-08-28, still open, not resolved on that side) and widening it: direflail wants whatever
@@ -414,6 +414,38 @@ says where to go count, so the metrics read is a second command key (`metrics:`)
 `channels.yaml` leaf that already carries `action:`. No new tree, no new selection syntax, no new
 config file. See **#18**, whose proposed `status:` key is the identical shape against the same
 leaves; that entry stays open, but its mechanism is now a two-line change rather than a design.
+
+**Flathub confirmed live, 2026-09-10 — and it never needed Orcshot to be on Flathub.** The
+paragraph above said both remaining rows "stay unverified until a real Snap Store or Flathub
+publish exists." Half of that was wrong, and it kept this entry parked for two more days for the
+same reason the Launchpad half was: the check was assumed to be blocked instead of tried.
+Flathub's stats endpoint is public and takes any app id, so it was checked against a real
+published app instead:
+
+```bash
+curl -fsS https://flathub.org/api/v2/stats/org.gimp.GIMP
+```
+
+returns 200 with `installs_total` (3,816,552), `installs_last_month`, `installs_last_7_days`,
+180 days of `installs_per_day` and ~250 `installs_per_country` figures; the same call for
+`org.orcshot.Orcshot` returns 404, and `-f` turns that into a failed leaf rather than a parsed
+error body. The shape is `StatsResultApp` in Flathub's own live `openapi.json`, which is where
+the field names come from. The `/orc-publish` table row now carries a one-liner that prints the
+three totals — the raw body is far too much to put in front of someone who asked for one number.
+The schema does not say whether `installs` includes updates, so the count carries the same
+"fetches, not people" caveat the PPA count does.
+
+**Snap is not unverified; it is blocked, and the block is a fact about the Store, not about
+Orclab.** The live snapcraft reference (`ubuntu.com/docs/snapcraft/9/reference/metrics/`,
+2026-09-10) lists the real metric names — `weekly_installed_base_by_operating_system` is one of
+twelve, all real — and the how-to says outright: *"As snap metrics are confidential, only a
+snap's author can access them."* The Store API demands a `package_metrics` permission on a
+logged-in account, and `snapcraft whoami` on this machine has no credentials. So the command's
+options and output shape are checked, but it cannot produce output until someone owns a snap.
+That is Orcshot's own BACKLOG #198 (publish to the Snap Store), a real account-gated action that
+belongs in a session centred on Orcshot, per `CLAUDE.md`'s dogfooding rule. When that snap
+exists, running the row once and correcting the table's "Never run" is the whole remaining work
+here; there is no Orclab-side design left in this entry.
 
 ## #8: Two stale version literals left in VERIFICATION.md, found during v5's own final review (RESOLVED 2026-09-06)
 
