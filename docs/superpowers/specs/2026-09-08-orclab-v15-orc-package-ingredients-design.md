@@ -66,16 +66,26 @@ work, and the boundary between them is the safety property:
 
 ### 2. Writes machine-local config, under three hard rules
 
-Some setup is genuinely per-machine and belongs nowhere in a repo — `~/.dput.cf` being the worked
-example. `/orc-package` may write these, bounded by:
+Some setup is genuinely per-machine and belongs nowhere in a repo. `/orc-package` may write these,
+bounded by:
 
-- **Merge, never overwrite.** `~/.dput.cf` may already carry entries for other PPAs. Appending a
-  missing section is allowed; rewriting the file is not.
+- **Merge, never overwrite.** A per-user config file may already carry entries for other projects.
+  Appending a missing section is allowed; rewriting the file is not.
 - **Idempotent, and shown before writing.** A second run changes nothing, and the exact content is
   displayed before it is written.
 - **Never a credential.** Orclab may create a *directory* for one, or a config file that contains
-  none — `~/.dput.cf` holds an endpoint and `login = anonymous`. The moment real secret material is
-  involved, it checks and prompts. It never writes a token, a key, or a passphrase.
+  none. The moment real secret material is involved, it checks and prompts. It never writes a
+  token, a key, or a passphrase.
+
+**Corrected 2026-09-10, before the plan was written: the shipped PPA ingredient has no
+machine-local config, so these rules ship unexercised.** An earlier draft named `~/.dput.cf` as the
+worked example. Checked against the machine the 2026-09-07 work ran on: the file does not exist
+there, and Orcshot's own `RELEASING.md` says why — *"`dput` understands the `ppa:` shorthand
+directly without needing the `[orcshot-ppa]` section at all"*; `/etc/dput.cf` ships a stock
+`[ppa]` stanza. The PPA's only per-machine state is the Launchpad OAuth token, which is a
+credential and falls under rule 3, not this one. The rules stay because a captured ingredient may
+genuinely need them (a store CLI's config file, say); the PPA ingredient's own "machine-local
+config" section says **none**, and nothing in the shipped work pretends otherwise.
 
 ### 3. Checks, and prompts, for everything account-gated
 
@@ -240,9 +250,10 @@ matching `/orc-code` and `/orc-git`. So this is verified through `VERIFICATION.m
 - **Applying the PPA ingredient** to a synthetic scratch project: the `channels.yaml` leaf,
   `distro.yaml` entries and `RELEASING.md` steps all appear, the steps are contiguous integers
   after insertion, and `/orc-release`'s parser reports no warning.
-- **Machine-local merge**: given a `~/.dput.cf`-shaped file in a scratch `HOME` that already holds
-  an unrelated section, that section survives and the new one is appended. Running twice changes
-  nothing.
+- **No machine-local write for the PPA**: applying the ingredient in a scratch `HOME` leaves
+  `$HOME` untouched except for nothing — no `~/.dput.cf`, no config directory. (The merge rules
+  above have no shipped ingredient to exercise them; the first captured ingredient that needs a
+  per-user config file is where that scenario gets written, against a real file.)
 - **Never a credential**: applying the ingredient on a machine with no GPG key reports the missing
   key and writes nothing secret.
 - **Account-gated refusal**: it never creates a PPA, and says plainly that is the user's to do.
