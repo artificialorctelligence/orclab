@@ -52,6 +52,15 @@ often name something the user needs to do *before* confirming (e.g. unlocking a 
 don't let those scroll by unread. This is the safety gate. **Never skip straight to execution**,
 even if the request sounded confident ("just publish everything," "ship it all").
 
+**The dry run's exit code is a verdict on the plan, not a receipt for printing it.** It exits
+non-zero when the plan it printed already contains a refusal the real run would give — an unknown
+preflight rule, `preflight:` with no `artifact:`, an artifact that is missing with no `prepare:`
+to build it, an unreadable archive, a real inspection finding, or an expansion that timed out. It
+exits 0 for a plan that is clean, deferred ("will be inspected after prepare"), or carries only a
+warning, since the real run proceeds in all three of those cases too. So a wrapper doing
+`--dry-run && <publish>` stops exactly where a person reading the plan would. When it is
+non-zero, say so: the plan is already known broken, and there is nothing to confirm yet.
+
 ## Step 3: Get an explicit go-ahead for that specific list
 
 Ask the user to confirm the list from Step 2. A vague "sounds good" earlier in the conversation,

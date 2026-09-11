@@ -1630,7 +1630,7 @@ without the fix, not just that it passes with it. The one existing case that cou
 same index and it still correctly does not warn. 127 passed. The check remains advisory;
 `preflight:` is untouched.
 
-## #24: `--dry-run`'s exit code doesn't distinguish a resolvable plan from one already known broken
+## #24: `--dry-run`'s exit code doesn't distinguish a resolvable plan from one already known broken (RESOLVED 2026-09-10)
 
 Raised by the final review of v12 artifact preflight (2026-09-08) and deliberately scoped out of
 that work's own fix wave rather than smuggled into it.
@@ -1665,6 +1665,26 @@ here, not decided, deliberately: whether exit 0 is defensible (the dry run's job
 and print, and it did) or a real gap (a wrapper doing `orc-publish --dry-run && orc-publish`
 proceeds anyway) is a design question for whoever picks this up, not something to settle in the
 act of filing it.
+
+**Resolved 2026-09-10 — the exit code is a verdict on the plan.** `--dry-run` exits 1 when the
+plan it printed contains a refusal the real run would give, and 0 when every leaf is clean,
+deferred to after `prepare`, or carries only a warning. All five conditions the entry listed
+went together, plus a real inspection finding on an artifact that already exists, which the entry
+did not list and which is the same thing. The line is the one `main` already draws for a real
+run: would this leaf be `refused` as things stand.
+
+**Why this reading and not the other.** The dry run's own `SKILL.md` already said it "reports the
+refusal the real run will give" — the text was a verdict and only the code was a receipt. Nothing
+in the repo consumed exit 0 as "report produced": the one caller is Step 2, where a person reads
+the output. The only reason anyone checks the code is the `--dry-run && publish` wrapper, and for
+that caller the old meaning was a lie. Deciding it by the plan's own words, not by what existing
+callers happened to tolerate, is what the entry asked for in "one deliberate pass."
+
+Implemented as `plan()` returning `(text, refused)` with `format_plan` kept as its text-only face
+for the tests that only read the plan, and the verdict computed in the same walk that prints it —
+an artifact expansion can time out, and a second walk to compute the verdict would wait out that
+timeout twice. Four existing tests that pinned exit 0 on a printed refusal were the old contract
+written down; they now pin 1.
 
 ## #25: BACKLOG #22's collision happened - two agents built the same feature, neither could see the other (RESOLVED 2026-09-09)
 
