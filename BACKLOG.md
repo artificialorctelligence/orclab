@@ -2255,3 +2255,38 @@ uncommitted entries rather than main's — which is the only ones that session c
 Confirmed live on itself: Scenario 48 was added from this fix's own worktree with the branch's
 `run.py`, and landed in the worktree's `VERIFICATION.md` with main's untouched. Done directly,
 without a spec or plan, on #27's precedent for fixes of this size.
+
+## #31: disable-model-invocation is per-skill, and /orc-git now holds both families
+
+Found while planning v14 (2026-09-10) and confirmed by its final review; kept out of that plan's
+scope deliberately so it would not be changed silently in either direction.
+
+`CLAUDE.md`'s `disable-model-invocation` section names the "real fit for Orclab" as *"anything
+genuinely one-shot and side-effecting the moment it runs — `/orc-git release` (pushes and
+publishes), `/orc-git push`."* Neither `skills/orc-git/SKILL.md` nor `skills/orc-version/SKILL.md`
+sets the flag. `grep -l 'disable-model-invocation' skills/*/SKILL.md` finds only `orc-package`,
+`orc-publish` and `orc-release` (2026-09-10). So the guidance and the frontmatter have disagreed
+since v4, and the design checklist's item 2 — which every new `/orc-*` is supposed to answer —
+was answered "default" for `/orc-git` without the reasoning being recorded anywhere.
+
+**v14 turned an oversight into a granularity problem.** The flag is per-*skill*, and `release`
+now lives in the same skill as `commit`, `branch` and `switch` — the conversational, ambiently
+useful subcommands. Setting the flag on `/orc-git` to protect `release` and `push` would hide the
+whole command from ambient matching: "commit this for me" would stop reaching it. Not setting it
+leaves two irreversible, outward-facing subcommands reachable by Claude's own judgment, which is
+exactly what the flag exists to prevent.
+
+**Options, none chosen:** (a) accept the status quo and rewrite the `CLAUDE.md` sentence so it
+stops naming subcommands the flag cannot isolate; (b) split the side-effecting subcommands into
+their own skill (`orc-git-release`? — the naming is the objection, and it is the `commit`/`cp`
+alias problem in reverse); (c) rely on the subcommands' own text ("invoking it is the
+authorization") plus the fact that ambient matching lands on the *skill*, not a subcommand — a
+Claude that ambiently reaches `/orc-git` still has to choose `release`, which the skill's own
+routing does not do for it. Option (c) may already be the real answer; if so, (a) is the fix.
+
+**Scope boundary:** this is about the three skills named above and the `CLAUDE.md` sentence. It
+does not reopen the determinism spectrum itself, which is settled.
+
+**Searched before filing**, per CLAUDE.md: `CLAUDE.md` (the section quoted), every
+`skills/*/SKILL.md` frontmatter, `BACKLOG.md`, `hooks/scripts/`. Nothing tracks it; the v14 plan's
+Global Constraints is the only place it is written down, and a plan is not a tracker.
