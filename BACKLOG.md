@@ -2328,3 +2328,37 @@ event ("about to run `git push`"), not a property of prose. Still prose, and no 
 today: the hooks interface has allow/deny and no "ask" (checked against the live docs 2026-09-09,
 per `hooks/scripts/backlog_guard.py`). If that changes, a PreToolUse hook on `git push` and
 `gh release create` is the mechanical form.
+
+## #32: write documentation for all the commands, in simple language with clear explanations
+
+Requested by direflail 2026-09-10, via `/orc-todo add`. Orclab has ten `/orc-*` commands
+(`orc`, `orc-code`, `orc-git`, `orc-help`, `orc-package`, `orc-publish`, `orc-release`,
+`orc-reload`, `orc-todo`, `orc-version`) and no documentation written for the person who will
+type them. What exists today:
+
+- `README.md`'s "Commands" section: one dense paragraph per command, written from the builder's
+  side. It leans on words a first-time user has no way to unpack — "an allocator holding a lock
+  over one canonical file", "applying an *ingredient*", "a position cursor" — and several
+  entries end with "Ships as a skill only — see `CLAUDE.md` for why", which points a user at
+  Orclab's own internal workshop notes.
+- Each `skills/<name>/SKILL.md`: the instructions Claude follows to run the command. They are
+  addressed to Claude, not to a user, and a user only sees them by opening the plugin cache.
+- `docs/` holds only `docs/superpowers/` (specs and plans) — design records, not user docs.
+
+The concrete consequence: someone who installs Orclab and runs `/orc-help` gets a synopsis, and
+the next place to look for "what does this actually do, what will it ask me, what will it never
+do on its own" is the README paragraph above, which assumes they already know how the thing is
+built. `/orc-git`'s "if it was Claude's idea, it asks first" rule, `/orc-todo`'s "add never
+commits", `/orc-version`'s "never pushes" — the properties a user most needs to trust a command
+are stated, but in the builder's vocabulary and mixed in with implementation detail.
+
+The ask is one document (or one per command — that is a design call for the spec) that a person
+who has never opened `SKILL.md` can read: for each command, what it is for, what you type, what
+it will ask you, what it changes, and what it will not do without asking. Plain words, no
+`CLAUDE.md` pointers, no lock/allocator/ingredient vocabulary unless it is explained on the spot.
+`CLAUDE.md`'s "explain it again from the reader's side" section is the standard the writing has
+to meet; the README's current paragraphs are the before-picture.
+
+Scope boundary: this is not about `CLAUDE.md`, which is deliberately Orclab's internal notes and
+stays that way, and not about the `SKILL.md` bodies, which are Claude's instructions and are
+correct as they are. It is a new, user-facing layer on top of both.
