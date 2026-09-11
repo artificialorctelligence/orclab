@@ -141,3 +141,46 @@ def test_a_failed_write_leaves_the_original_file_intact(tmp_path, monkeypatch):
     with pytest.raises(OSError):
         alloc.allocate("backlog", "t", "b", cwd=repo)
     assert (repo / "BACKLOG.md").read_text() == before, "the original must survive intact"
+
+
+def make_worktree(repo, tmp_path):
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", str(tmp_path / "wt"), "-b", "b"],
+                   check=True)
+    return tmp_path / "wt"
+
+
+def test_a_verification_scenario_lands_in_the_invoking_checkout(tmp_path):
+    """BACKLOG #30. A scenario written during feature work describes behaviour that exists only
+    on the branch; landing it on main advertises a check nobody can run yet."""
+    repo = make_repo(tmp_path, backlog="# Backlog\n")
+    (repo / "VERIFICATION.md").write_text("# V\n\n## Scenario 3: old\n\nx\n\n## Recording the result\n\ny\n")
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.email=t@t", "-c", "user.name=t",
+                    "commit", "-qm", "v"], check=True)
+    wt = make_worktree(repo, tmp_path)
+    assert alloc.allocate("verification", "on the branch", "b", cwd=wt) == 4
+    assert "## Scenario 4: on the branch" in (wt / "VERIFICATION.md").read_text()
+    assert "Scenario 4" not in (repo / "VERIFICATION.md").read_text(), "main must be untouched"
+
+
+def test_a_backlog_entry_still_lands_canonically_from_a_worktree(tmp_path):
+    """The other resource is not in question: a finding is true the moment it is written."""
+    repo = make_repo(tmp_path)
+    wt = make_worktree(repo, tmp_path)
+    assert alloc.allocate("backlog", "from the branch", "b", cwd=wt) == 23
+    assert "## #23:" in (repo / "BACKLOG.md").read_text()
+    assert "## #23:" not in (wt / "BACKLOG.md").read_text()
+
+
+def test_a_branch_only_scenario_is_not_reissued_when_the_counter_is_lost(tmp_path):
+    """The counter is what keeps numbers unique across branches. If it is lost, the scan must
+    cover the file being written to, not only the canonical one it no longer sees."""
+    repo = make_repo(tmp_path, backlog="# Backlog\n")
+    (repo / "VERIFICATION.md").write_text("# V\n\n## Scenario 3: old\n\nx\n")
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.email=t@t", "-c", "user.name=t",
+                    "commit", "-qm", "v"], check=True)
+    wt = make_worktree(repo, tmp_path)
+    (wt / "VERIFICATION.md").write_text("# V\n\n## Scenario 3: old\n\nx\n\n## Scenario 9: branch only\n\nz\n")
+    state.write_counters({}, repo)
+    assert alloc.allocate("verification", "next", "b", cwd=wt) == 10

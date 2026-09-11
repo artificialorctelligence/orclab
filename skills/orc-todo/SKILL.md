@@ -71,12 +71,25 @@ in. Never invent a placeholder spec, and never drop the item from the lane reque
 
 ## Entries are written uncommitted, on purpose
 
-`add` writes directly into the canonical `BACKLOG.md` (or `VERIFICATION.md`) and stops there —
-it never runs `git commit`. Every agent reads the same canonical file, so the entry is visible
-the moment it's written; nothing about correctness needs a commit. Committing here would also
-mean running git in a checkout this command doesn't own, sweeping in whatever else is
+`add` writes directly into the file and stops there — it never runs `git commit`. Committing
+here would mean running git in a checkout this command doesn't own, sweeping in whatever else is
 uncommitted in that file as if it were part of the entry. Committing the entry is a separate,
 deliberate step the user takes themselves.
+
+## The number is always shared; where the text lands depends on the file
+
+The number comes from one counter shared by every checkout of the project, so two agents can
+never take the same one. The text goes to different places for the two files:
+
+- A **backlog** entry is written into the **main checkout's** `BACKLOG.md`, even when the
+  command runs in a worktree. A finding is true the moment it is written, and every agent
+  reads that one file, so it is visible immediately.
+- A **verification** scenario is written into the `VERIFICATION.md` of **the checkout the
+  command ran in**. A scenario written during feature work describes behaviour that exists only
+  on that branch; landing it on main early would advertise a check nobody can run yet. It
+  reaches main when the branch does.
+
+Run from the main checkout, the two are the same file and there is nothing to think about.
 
 ## `lock clear` is for a lock you've decided is stale — never a reflex
 

@@ -2,8 +2,9 @@
 """PreToolUse guard: consent before a command discards an uncommitted backlog entry.
 
 The allocator writes entries without committing them - see orc_todo/allocate.py for why - so
-real findings sit in the canonical working tree until someone commits. Several ordinary git
-commands throw exactly that away.
+real findings sit in a working tree until someone commits: a backlog entry in the main checkout,
+a verification scenario in whichever checkout it was written from. Several ordinary git commands
+throw exactly that away.
 
 Two conditions, both required, and the second is what keeps this usable: the command must
 really discard a tracked modification, AND there must actually be an uncommitted entry to lose.
@@ -27,7 +28,7 @@ import json
 import re
 import sys
 
-from orclab_shared import in_canonical_checkout, uncommitted_entries
+from orclab_shared import uncommitted_entries
 
 ALLOW_MARKER = "orclab:discard-entries"
 
@@ -79,9 +80,7 @@ def evaluate(command):
         return None
     if not _discards(command):
         return None
-    if not in_canonical_checkout():
-        return None  # this tree cannot reach the canonical file; nothing here is at risk
-    at_risk = uncommitted_entries()
+    at_risk = uncommitted_entries()  # in the tree the command runs in - the only one it reaches
     if not at_risk:
         return None
     listed = "\n".join(f"  {name}: {heading}" for name, heading in at_risk)

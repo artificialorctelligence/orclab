@@ -26,25 +26,42 @@ def canonical_file(resource, cwd=None):
     return state.canonical_root(cwd) / resource.filename
 
 
+def target_file(resource, cwd=None):
+    """Where the text lands. The number is always canonical; the text is only for a backlog
+    entry. A verification scenario written during feature work describes behaviour that exists
+    only on that branch, so it goes into the checkout the command ran in (BACKLOG #30). In the
+    main checkout the two are the same file."""
+    if resource.canonical_text:
+        return canonical_file(resource, cwd)
+    return state.invoking_root(cwd) / resource.filename
+
+
 def next_number(resource, cwd=None):
-    """max(stored counter, file scan) + 1. Call only inside a held lock.
+    """max(stored counter, file scans) + 1. Call only inside a held lock.
 
     Both sources are consulted because each covers the other's failure. A lost counter (fresh
     clone, cleaned .git) would reissue numbers the file already has; a file whose highest entry
     was deleted would reissue a number the counter remembers, and backlog numbers are permanent
     and never reused.
+
+    Both the canonical file and the target are scanned. They differ only for a scenario written
+    on a branch, and there the counter is what keeps the number unique across branches; the
+    scan of the target is the lost-counter fallback for the one file the canonical scan cannot
+    see.
     """
-    path = canonical_file(resource, cwd)
-    if not path.exists():
-        raise ResourceMissing(f"{resource.filename} not found at {path}")
+    target = target_file(resource, cwd)
+    if not target.exists():
+        raise ResourceMissing(f"{resource.filename} not found at {target}")
+    paths = {canonical_file(resource, cwd), target}
     stored = state.read_counters(cwd).get(resource.key, 0)
-    return max(stored, scan_max(path.read_text(), resource)) + 1
+    scanned = max(scan_max(p.read_text(), resource) for p in paths if p.exists())
+    return max(stored, scanned) + 1
 
 
 def allocate(resource_key, title, body, cwd=None, timeout=10.0):
-    """Allocate the next number, write the entry into the canonical file, return the number."""
+    """Allocate the next number, write the entry into the target file, return the number."""
     resource = RESOURCES[resource_key]
-    path = canonical_file(resource, cwd)
+    path = target_file(resource, cwd)
     if not path.exists():
         raise ResourceMissing(f"{resource.filename} not found at {path}")
     with state.held(f"allocating a {resource.key} number", cwd=cwd, timeout=timeout):

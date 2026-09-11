@@ -2117,7 +2117,7 @@ command that is a valid string and simply fails, which is already handled correc
 `BACKLOG.md`, `hooks/scripts/` and `skills/*/scripts/`. `tree.py`'s `preflight` property is the
 only place the class is handled; nothing covers `action:` or `metrics:`.
 
-## #30: /orc-todo's allocator writes to the canonical checkout, which is right for BACKLOG.md and wrong for a feature branch's VERIFICATION.md
+## #30: /orc-todo's allocator writes to the canonical checkout, which is right for BACKLOG.md and wrong for a feature branch's VERIFICATION.md (RESOLVED 2026-09-10)
 
 Hit for real 2026-09-09 while executing the v13 plan in a git worktree. Task 5 ran
 `/orc-todo add verification ...` from inside the worktree; the allocator resolved to the shared
@@ -2164,3 +2164,24 @@ know a worktree exists per plan. This entry is that same property, met from the 
 SKILL.md`, `CLAUDE.md`, `BACKLOG.md`, and the scripts under `skills/orc-todo/scripts/`. The
 canonical-root behaviour is implemented in `orc_todo/state.py` and documented nowhere as a
 worktree-facing consequence.
+
+**Resolved 2026-09-10 — the first option, chosen by direflail.** The command now does what the
+v13 implementer did by hand: the number still comes from the shared counter, and a verification
+scenario's text goes into the checkout the command ran in. `Resource` carries one new field,
+`canonical_text`, true for backlog and false for verification; `allocate.target_file` picks the
+file from it; `next_number` scans both the canonical file and the target so a lost counter
+cannot reissue a branch-only scenario. `BACKLOG.md` is untouched, as the scope boundary said.
+
+**One consequence the entry did not foresee.** `hooks/scripts/backlog_guard.py` stayed silent in
+any worktree, on the premise — its own docstring — that "the allocator writes canonically, so an
+uncommitted entry normally lives there." Once scenarios land on the branch, a `git reset --hard`
+there would have discarded one unprotected. The fix was a deletion: `uncommitted_entries` diffs
+the tree the command runs in rather than the canonical root, and `in_canonical_checkout` and
+its gate are gone. In the main checkout that is the same tree as before; in a worktree it now
+guards what that tree actually holds, and still never denies a reset over an entry the tree
+does not contain. `lane_notice.py` shares the helper and so now reports a session's own tree's
+uncommitted entries rather than main's — which is the only ones that session could commit.
+
+Confirmed live on itself: Scenario 48 was added from this fix's own worktree with the branch's
+`run.py`, and landed in the worktree's `VERIFICATION.md` with main's untouched. Done directly,
+without a spec or plan, on #27's precedent for fixes of this size.

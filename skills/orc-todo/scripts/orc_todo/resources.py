@@ -22,6 +22,7 @@ class Resource:
     heading: str          # format string with {n} and {title}
     number_re: str        # must anchor at line start; group 1 is the number
     anchor: str | None    # insert before this line; None or absent means append
+    canonical_text: bool  # write the text to the main checkout, or to the invoking one
 
 
 RESOURCES = {
@@ -31,6 +32,7 @@ RESOURCES = {
         heading="## #{n}: {title}",
         number_re=r"^## #(\d+):",
         anchor=None,
+        canonical_text=True,   # a finding is true the moment it is written
     ),
     "verification": Resource(
         key="verification",
@@ -38,6 +40,7 @@ RESOURCES = {
         heading="## Scenario {n}: {title}",
         number_re=r"^## Scenario (\d+):",
         anchor="## Recording the result",
+        canonical_text=False,  # a scenario describes the branch it was written on (BACKLOG #30)
     ),
 }
 
