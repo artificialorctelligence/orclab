@@ -757,7 +757,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Add the scenarios with `/orc-todo add verification`**
 
-Seven scenarios, one `add` each, body on stdin from a file (shell quoting multi-paragraph prose is how stubs get written). The numbers come back from the allocator; use whatever it prints. Run from the worktree — since #30, a verification scenario lands in the checkout it was written from. Bodies:
+Seven scenarios, one `add` each, body on stdin from a file (shell quoting multi-paragraph prose is how stubs get written). The numbers come back from the allocator; use whatever it prints — and where a later body says "Scenario A", write the number the allocator gave A, since the letters exist only in this plan. Run from the worktree — since #30, a verification scenario lands in the checkout it was written from. Bodies:
 
 **Scenario A — applying the PPA ingredient to a scratch project**
 
