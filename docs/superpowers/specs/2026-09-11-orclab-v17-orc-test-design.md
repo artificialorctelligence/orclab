@@ -105,10 +105,14 @@ language) and does not touch git.
 
 #### `/orc-test coverage` — how much is exercised?
 
-Runs the tests with coverage on and holds each language to 80% of lines. Where the tool has a
-threshold switch it is used (`--cov-fail-under`, jest `coverageThreshold`, JaCoCo `check`, Kover
-`verify`, coverlet `/p:Threshold`). Dart, Swift and GDScript only produce an lcov file; `run.py`
-has one lcov reader that does the arithmetic for all three.
+Runs the tests with coverage on and holds each language to 80% of lines. **The gate is computed
+by `run.py` from each tool's report** — lcov for Python, JS, C#, Dart and GDScript; JaCoCo XML for
+Java and Kotlin; xccov JSON for Swift — so the per-file worst-first list and the pass/fail come
+from one read of one file, and a coverage failure is never confused with a test failure in the exit
+code. The tools' own threshold switches (`--cov-fail-under`, jest `coverageThreshold`, JaCoCo
+`check`, Kover `verify`, coverlet `/p:Threshold`) are documented in `languages/<lang>.md` for the
+deferred `ci` subcommand, which is where a project-side gate belongs. (Amended 2026-09-11 while
+planning: the original wording had the tool gate and `run.py` both deciding.)
 
 Report per language: lines covered / total, percentage, pass/fail, then files under threshold
 sorted worst first — the list `generate` consumes. Per-line detail stays in the tool's own HTML
@@ -123,11 +127,14 @@ Includes `coverage`. Per language, in order:
 1. Run the tests. Red → stop for that language; a red suite cannot be measured.
 2. Coverage, gate 80.
 3. Mutation, gate 70. Incremental mode wherever the tool has one (StrykerJS, Pitest,
-   Stryker.NET; mutmut keeps a cache). Before a whole-repo first run it counts mutants and says
-   how big the job is, then proceeds — the user typed it. A path narrows it. `--no-mutation`
+   Stryker.NET; mutmut keeps a cache). Before a whole-repo first run it says how big the job is —
+   the number of source files in scope, since most tools cannot count mutants without generating
+   them — then proceeds; the user typed it. A path narrows it. `--no-mutation`
    skips this step and the report says "TCE skipped".
-4. Test lint — the language's linter with its test-specific rules: assertion-free tests, `sleep`
-   in tests, disabled or skipped tests, duplicate test names.
+4. Test lint — assertion-free tests, `sleep` in tests, disabled or skipped tests, duplicate test
+   names. Through the language's linter where one has those rules; for Python it is a small
+   stdlib `ast` scan in `run.py`, because ruff's `PT` rules have no assertion-free check (run
+   against one, 2026-09-11: no findings).
 
 Summary:
 
@@ -210,7 +217,7 @@ say to check GitHub releases, not `search.maven.org`.
 
 | Language | Runner | Coverage + gate | Mutation (TCE) | Test lint |
 |---|---|---|---|---|
-| Python | pytest 9.1.1 | pytest-cov 7.1.0, `--cov-fail-under` | mutmut 3.7.0 (most active); cosmic-ray 8.7.0 alternative | ruff `PT` rules |
+| Python | pytest 9.1.1 | pytest-cov 7.1.0, lcov report | mutmut 3.7.0 (most active); cosmic-ray 8.7.0 alternative. **mutmut 3 copies tests into `mutants/`; every later pytest needs `--ignore=mutants`** (hit live 2026-09-11) | own `ast` scan (ruff `PT` has no assertion-free rule) |
 | JS/TS | vitest 5.0.0 / jest 30.5.1 | `@vitest/coverage-v8` 5.0.0 / jest `coverageThreshold` | StrykerJS 10.0.0, incremental, runners for both | `@vitest/eslint-plugin` 1.6.27 / `eslint-plugin-jest` 29.16.6 |
 | Java | JUnit 5 | JaCoCo 0.8.15 `check` | Pitest 1.30.0 + junit5-plugin, `scmMutationCoverage` incremental | PMD / Error Prone test rules |
 | Kotlin | JUnit 5 via Gradle | Kover 0.9.9 `verify` | Pitest on bytecode (junk mutants); Arcmutate Kotlin plugin is clean but **commercial, free for open source** | detekt |
