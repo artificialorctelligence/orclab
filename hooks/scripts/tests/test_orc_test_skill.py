@@ -15,5 +15,5 @@ def test_every_rule_the_spec_names_is_stated():
     for phrase in ["## generate", "analyze.json", "Nothing is deleted until", "Another round?",
                    "never starts a third round", "**offers**", "does not start it",
                    "test-discipline", "uncommitted", "## When something goes wrong",
-                   "## Deferred", "ci"]:
+                   "## Deferred", "`ci`"]:
         assert phrase in TEXT, phrase
