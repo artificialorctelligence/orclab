@@ -108,10 +108,13 @@ three — don't assume only one shape.
 
 ## Defaults Table
 
-| Language | Type    | Default stack              |
-|----------|---------|-----------------------------|
-| Java     | Desktop | Java + Spring + JavaFX      |
+| Language | Type                     | Default stack              | Knowledge |
+|----------|--------------------------|----------------------------|-----------|
+| Java     | Desktop                  | Java + Spring + JavaFX     | — |
+| Dart     | Mobile (cross-platform)  | Flutter                    | `skills/stack-flutter/SKILL.md` — read it in full before scaffolding |
 
-This table currently has exactly one entry. Do not invent additional defaults beyond what's listed
-here — if a combination isn't in this table, ask directly in the New-Project Flow's step 3
-instead of guessing. Add rows here only once a real, confirmed preference exists.
+Do not invent additional defaults beyond what's listed here — if a combination isn't in this
+table, ask directly in the New-Project Flow's step 3 instead of guessing. Add rows here only once
+a real, confirmed preference exists. A row's **Knowledge** column names the background skill that
+holds the stack's current toolchain, project layout and store rules (BACKLOG #33); when a row has
+one, its scaffold step follows that file rather than this one's generic step 5.
