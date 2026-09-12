@@ -2555,7 +2555,7 @@ The noise: mutmut mutates every string literal three ways and every keyword argu
 
 Fixing this is `/orc-test generate`'s first real use and should be its own session, per the Task 19 brief — not a side quest of v17's landing. Rerun `analyze` on the same path afterwards; the before → after is the point.
 
-## #36: GDScript has no mutation-testing tool, so /orc-test cannot measure TCE for Godot projects
+## #36: GDScript has no mutation-testing tool, so /orc-test cannot measure TCE for Godot projects (UPDATED 2026-09-12 — a tool exists; re-scoped to adopting it)
 
 Found researching v17 (2026-09-11): Python, JS/TS, Java, Kotlin, C#, Dart and Swift each have at
 least one mutation tool; GDScript has none — searched GitHub, the Godot Asset Library and the
@@ -2574,3 +2574,29 @@ checkout's BACKLOG.md with a test fixture — destroyed that uncommitted entry, 
 restored from its last commit, and #34 was reissued to the incident itself before anyone noticed
 the first allocation was gone. The allocator's "never reissued" rule held as far as it could see:
 the number it lost was in a file that no longer existed. This entry is the same finding, renumbered.
+
+**Update 2026-09-12 — the premise is wrong; a tool exists.** Asked whether anything was in
+development so this could be closed, a fresh search found `gdmutant` (PyPI, MIT,
+https://github.com/kphutt/gdmutant): "Mutation testing for GDScript and Godot: find the bugs your
+green tests would miss." v0.1.2 was released 2026-08-07 — a month *before* the 2026-09-11 search
+above recorded "none exists". It was missed because it is tiny (2 stars, one maintainer) and lives
+on PyPI, not the Godot Asset Library or the awesome-mutation-testing list that search covered.
+Checked live against PyPI and the GitHub README on 2026-09-12: Godot 4.3+ (verified on 4.7.0),
+both GUT 9.x and gdUnit4 6.x via `--runner gut|gdunit4`, `pip install gdmutant`, prints a
+mutation score ("Mutation score: 61.1% killed: 11 timeout: 0 survived: 7"), and `--json` writes
+the mutation-testing-elements schema — the same Stryker report format
+`skills/orc-test/scripts/orc_test/stryker.py` already parses for JS, C# and Dart.
+
+So this entry meets its own closing condition ("any tool that mutates `.gd` files and re-runs
+gdUnit4 or GUT") and is re-scoped from "no tool exists" to "adopt gdmutant". The work is what the
+original text predicted, and the parser half is already written: a Mutation row in
+`skills/orc-test/languages/gdscript.md`; `langs/gdscript.py`'s `mutation_unavailable` returning
+None when `gdmutant` is on PATH; `mutation_cmd` building `gdmutant run <target> --project <root>
+--runner <gut|gdunit4> --json` (GUT needs `--tests res://test/unit` spelled out, gdUnit4 does
+not); `mutation_parse` calling `stryker.parse`. Same shape as `langs/csharp.py`.
+
+Caveat that shapes the work, not whether to do it: gdmutant is a one-month-old 0.1.x from a single
+maintainer. Wire it as optional — `mutation_unavailable` already makes an absent tool plain words
+rather than a fake number — and before resolving, actually install it and run it against a small
+gdUnit4 project headless; a README claim is not the same as it working. If it goes unmaintained,
+Godot projects fall back to exactly what they get today.
