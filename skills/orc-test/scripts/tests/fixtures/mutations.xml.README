@@ -1,0 +1,5 @@
+mutations.xml — from documented schema — verify on first real run.
+
+Hand-built against the documented Pitest mutations.xml report format, not captured from a real
+tool run. Verify its shape against a real Pitest report the first time one is actually generated
+(Task 19).

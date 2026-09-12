@@ -58,6 +58,10 @@ untick *Export With Debug*, then export — or headless: `godot --headless --exp
 "Android" build/game.aab`. iOS: export the preset to a directory; open the `.xcodeproj` it writes
 and archive as the App Store ingredient's local shape describes.
 
+Coverage, mutation testing and test lint for this language: GDScript:
+`skills/orc-test/languages/gdscript.md`; C#: `skills/orc-test/languages/csharp.md` — `/orc-test`
+reads them.
+
 ## Where each store rule lands
 
 The store ingredients (`skills/orc-package/ingredients/play`, `.../app-store`) state the rules.

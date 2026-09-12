@@ -1,0 +1,5 @@
+stryker.json — from documented schema — verify on first real run.
+
+Hand-built against the documented Stryker mutation-report schema v2 (the format shared by
+StrykerJS, Stryker.NET and dart_mutant), not captured from a real tool run. Verify its shape
+against a real StrykerJS report the first time one is actually generated (Task 19).

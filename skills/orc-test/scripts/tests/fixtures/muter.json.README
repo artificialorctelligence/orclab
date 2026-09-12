@@ -1,0 +1,6 @@
+muter.json — from documented schema — verify on first real run.
+
+Hand-built against `MuterTestReport`'s documented JSON shape (read from Muter's source,
+2026-09-11), not captured from a real tool run. `appliedOperators` entries' inner shape is not
+confirmed — the parser uses only the file-level numbers. Verify its shape against a real Muter
+report the first time one is actually generated (Task 19).

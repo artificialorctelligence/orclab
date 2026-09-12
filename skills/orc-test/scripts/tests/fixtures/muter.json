@@ -1,0 +1,4 @@
+{"globalMutationScore": 62, "totalAppliedMutationOperators": 8, "numberOfKilledMutants": 5, "projectCodeCoverage": 70,
+ "fileReports": [{"fileName": "Clamp.swift", "mutationScore": 50, "appliedOperators": [{}, {}, {}, {}]},
+                 {"fileName": "Other.swift", "mutationScore": 75, "appliedOperators": [{}, {}, {}, {}]}],
+ "timeElapsed": "00:03:12.000"}

@@ -23,8 +23,19 @@ KNOWN_FORMATS = [PYPROJECT, PLUGIN_JSON, MARKETPLACE_JSON, DEBIAN_CHANGELOG]
 
 
 def detect(root):
-    """Repo-relative paths of every known version-holding file that actually exists."""
-    return [rel for rel in KNOWN_FORMATS if os.path.exists(os.path.join(root, rel))]
+    """Repo-relative paths of every known version-holding file that actually exists.
+
+    pyproject.toml only counts if it has a [project] table — one that's only e.g.
+    [tool.pytest.ini_options] holds no version, and write_version would raise on it.
+    """
+    found = []
+    for rel in KNOWN_FORMATS:
+        if not os.path.exists(os.path.join(root, rel)):
+            continue
+        if rel == PYPROJECT and "project" not in tomllib.loads(_read_text(root, rel)):
+            continue
+        found.append(rel)
+    return found
 
 
 def _read_text(root, relpath):

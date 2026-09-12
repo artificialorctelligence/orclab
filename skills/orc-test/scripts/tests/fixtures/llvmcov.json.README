@@ -1,0 +1,6 @@
+llvmcov.json — from documented schema — verify on first real run.
+
+Hand-built against the documented `llvm-cov export` JSON shape (what SPM's `swift test
+--show-codecov-path` actually points at — not xccov's shape), not captured from a real tool run.
+Verify its shape against a real llvm-cov export the first time one is actually generated
+(Task 19).

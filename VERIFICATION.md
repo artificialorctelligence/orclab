@@ -805,6 +805,50 @@ Run Scenario 49 twice in the same scratch project.
 6. **Expected:** the only hits are Scenario 11 step 5 in this file, and
    `skills/orc-version/SKILL.md`'s moved-notice. No other live file names the old command.
 
+## Scenario 59: /orc-test run on Orclab reads right
+
+1. Requires the root `pyproject.toml` from v17 Task 19. At the Orclab repo root, run
+   `python3 skills/orc-test/scripts/run.py run`.
+   **Expected:** first line `detected: Python`; the printed `$ python3 -m pytest -q
+   '--ignore-glob=*/mutants/*'` line; one summary line with a ✓ and a passed count.
+2. Create a failing test file (e.g. `hooks/scripts/tests/test_scratch_fail.py` with a bare
+   `assert False`), and run the same command again.
+   **Expected:** ✗ instead of ✓, the failure tail from pytest's own output, exit code 1.
+3. Delete the failing test file.
+   **Expected:** the repo's own suite is untouched — nothing scratch left behind.
+
+## Scenario 60: /orc-test analyze on Orclab: the summary reads as an operator would read it
+
+Same prerequisite as Scenario 59 (the root `pyproject.toml`).
+
+1. At the Orclab repo root, run `python3 skills/orc-test/scripts/run.py analyze
+   skills/orc-todo/scripts`.
+   **Expected:** a coverage block (percent, lines, ✓/✗ against 80) with every file under the
+   threshold listed worst first; a TCE line that is either a percentage with ✓/✗ against 70, or
+   the words `TCE not measurable — mutmut not installed — pip install mutmut` if mutmut isn't
+   present; a lint finding count; a `gates failed: … — run /orc-test generate to repair` line if
+   any gate failed; `.orclab/test/analyze.json` written.
+2. Read the printed report only — do not open any other file.
+   **Expected:** every failing item names its own file, line (or count), and the exact next
+   command — coverage's worst-file list, TCE's surviving-mutant file:line entries, lint's
+   file:line findings. The judgement this scenario asks: could you act on this without opening
+   anything else? If yes, the report passes.
+
+## Scenario 61: /orc-test on a language with a missing tool is a sentence, not a crash
+
+1. In a fresh git repository, create an empty `package.json` (`{}`) and no `node_modules`
+   directory. First check `PATH=/usr/bin:/bin command -v npx` fails (no output, nonzero exit) —
+   that PATH excludes wherever Node/npx is actually installed, forcing the missing-tool path
+   instead of a real `npx jest` run against the registry. Then run
+   `env PATH=/usr/bin:/bin python3 <path to>/skills/orc-test/scripts/run.py run`.
+   **Expected:** first line `detected: JS/TS`, then the line `JS/TS: missing npx — <install
+   line> — skipped`.
+2. Check the exit code of that run.
+   **Expected:** `0` when the language was skipped for a missing tool — a skip is not a failure.
+3. Check for anything installed as a side effect.
+   **Expected:** no `node_modules` directory was created and nothing was installed globally —
+   `/orc-test` never installs a tool, it only names the missing one and its install line.
+
 ## Recording the result
 
 Note the outcome of each scenario (pass/fail, with specifics) either back in this conversation or

@@ -39,6 +39,16 @@ def test_detect_finds_pyproject(tmp_path):
     assert detect(str(tmp_path)) == ["pyproject.toml"]
 
 
+def test_detect_ignores_a_pyproject_with_no_project_table(tmp_path):
+    write(tmp_path, "pyproject.toml", '[tool.pytest.ini_options]\ntestpaths = ["tests"]\n')
+    assert detect(str(tmp_path)) == []
+
+
+def test_detect_finds_a_pyproject_with_a_project_table(tmp_path):
+    write(tmp_path, "pyproject.toml", '[project]\nversion = "1.0.0"\n')
+    assert detect(str(tmp_path)) == ["pyproject.toml"]
+
+
 def test_detect_finds_plugin_manifests(tmp_path):
     write(tmp_path, ".claude-plugin/plugin.json", '{"name": "x", "version": "0.1.0"}')
     write(
