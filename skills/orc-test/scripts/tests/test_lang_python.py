@@ -23,10 +23,11 @@ def test_commands_ignore_mutants_and_honour_target(tmp_path):
 
 
 def test_mutation_parse_reads_results_and_diffs(monkeypatch, tmp_path):
-    (tmp_path / "results.txt").write_text((FIX / "mutmut_results.txt").read_text())
+    monkeypatch.setattr(py, "_results", lambda root: (FIX / "mutmut_results.txt").read_text())
     monkeypatch.setattr(py, "_show", lambda root, key: (FIX / "mutmut_show.txt").read_text())
     m = py.mutation_parse(tmp_path, tmp_path)
-    assert (m.killed, m.total) == (1, 3)          # "no tests" is not a mutant that was tested
+    # killed + timeout count as killed; suspicious/skipped/"no tests" don't count at all
+    assert (m.killed, m.total) == (2, 4)
     assert [s.file for s in m.survivors] == ["src/calc/__init__.py"] * 2
     assert m.survivors[0].line == 2
     assert "x <= lo" in m.survivors[0].description
@@ -60,3 +61,30 @@ def test_lint_finds_the_four_smells(tmp_path):
         (8, "skipped: test_skipped"),
         (13, "duplicate test name test_dup"),
     ]
+
+
+def test_lint_finds_star_test_py_too(tmp_path):
+    t = tmp_path / "tests"
+    t.mkdir()
+    (t / "foo_test.py").write_text("def test_nothing():\n    x = 1\n")
+    msgs = [(f.line, f.message) for f in py.lint(tmp_path, None, tmp_path)]
+    assert msgs == [(1, "no assertion in test_nothing")]
+
+
+def test_duplicate_name_is_scoped_per_class(tmp_path):
+    t = tmp_path / "tests"
+    t.mkdir()
+    (t / "test_classes.py").write_text(textwrap.dedent("""
+        class TestA:
+            def test_run(self):
+                assert True
+        class TestB:
+            def test_run(self):
+                assert True
+        def test_run():
+            assert True
+        def test_run():
+            assert True
+    """))
+    msgs = [(f.line, f.message) for f in py.lint(tmp_path, None, tmp_path)]
+    assert msgs == [(10, "duplicate test name test_run")]

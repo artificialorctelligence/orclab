@@ -17,7 +17,10 @@ KEY = "python"
 LABEL = "Python"
 MARKERS = ["pyproject.toml", "setup.py", "setup.cfg"]
 TOOLS = {"pytest": "pip install pytest", "pytest_cov": "pip install pytest-cov"}
-CAVEATS = ["mutmut writes its cache and a copy of the tests to mutants/; add it to .gitignore."]
+CAVEATS = [
+    "mutmut writes its cache and a copy of the tests to mutants/; add it to .gitignore.",
+    "A path argument does not narrow mutmut; it mutates paths_to_mutate from pyproject.toml.",
+]
 
 _IGNORE = "--ignore=mutants"
 _RESULT = re.compile(r"^\s*(\S+): (.+)$")
@@ -49,9 +52,7 @@ def mutation_unavailable(root):
 
 
 def mutation_cmd(root, target, out):
-    # mutmut takes its paths from pyproject.toml; `target` narrows nothing here, and the
-    # report says so. mutation_parse reads the `mutmut results` listing from out/results.txt,
-    # written there by whoever runs this command (mirrors coverage_parse reading coverage.lcov).
+    # mutmut takes its paths from pyproject.toml (see CAVEATS); `target` narrows nothing here.
     return ["python3", "-m", "mutmut", "run"]
 
 
@@ -59,18 +60,25 @@ def _show(root, key):
     return run(["python3", "-m", "mutmut", "show", key], cwd=root).stdout
 
 
+def _results(root):
+    return run(["python3", "-m", "mutmut", "results"], cwd=root).stdout
+
+
 def mutation_parse(root, out):
-    text = (out / "results.txt").read_text()
+    text = _results(root)
     killed, total, survivors = 0, 0, []
     for line in text.splitlines():
         m = _RESULT.match(line)
-        if not m or m.group(2) == "no tests":
+        if not m:
             continue
-        total += 1
-        if m.group(2) == "killed":
+        status = m.group(2)
+        if status in ("killed", "timeout"):        # timeout: the mutant hung the suite — a catch
             killed += 1
-        elif m.group(2) == "survived":
+            total += 1
+        elif status == "survived":
+            total += 1
             survivors.append(_survivor(root, m.group(1)))
+        # else: suspicious, skipped, "no tests" — not a verdict on the mutant, don't count it
     return Mutation(killed, total, survivors)
 
 
@@ -97,23 +105,34 @@ def _survivor(root, key):
 
 def lint(root, target, out):
     base = pathlib.Path(root) / (target or ".")
+    paths = set(base.rglob("test_*.py")) | set(base.rglob("*_test.py"))
     findings = []
-    for path in sorted(base.rglob("test_*.py")):
+    for path in sorted(paths):
         if "mutants" in path.parts:
             continue
         findings += _scan(path, path.relative_to(root))
     return findings
 
 
+def _test_funcs(body, cls):
+    """(enclosing class name or None, FunctionDef) for every test* def, one class level deep —
+    duplicate-name scoping needs to know which class (if any) a function belongs to, which
+    plain ast.walk doesn't track."""
+    for node in body:
+        if isinstance(node, ast.ClassDef):
+            yield from _test_funcs(node.body, node.name)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test"):
+            yield cls, node
+
+
 def _scan(path, rel):
     tree = ast.parse(path.read_text())
     seen, out = set(), []
-    for node in ast.walk(tree):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) or not node.name.startswith("test"):
-            continue
-        if node.name in seen:
+    for cls, node in _test_funcs(tree.body, None):
+        key = (cls, node.name)
+        if key in seen:
             out.append(Finding(str(rel), node.lineno, f"duplicate test name {node.name}"))
-        seen.add(node.name)
+        seen.add(key)
         body = list(ast.walk(node))
         skip = next((d for d in node.decorator_list if _is_skip(d)), None)
         if skip is not None:
@@ -142,7 +161,7 @@ def _is_skip(dec):
 
 
 def _is_assert_call(n):
-    if isinstance(n, ast.Call):
-        name = _dotted(n.func)
-        return name.endswith("raises") or ".assert_" in name or name.startswith("assert")
-    return isinstance(n, ast.With) and any(_is_assert_call(i.context_expr) for i in n.items)
+    if not isinstance(n, ast.Call):
+        return False
+    name = _dotted(n.func)
+    return name.endswith("raises") or ".assert_" in name or name.startswith("assert")
