@@ -2522,3 +2522,51 @@ two ingredients deliberately not written from research alone, `ego` (GNOME Shell
 drop the "no release has gone through this" marker from each. Orcshot's spec
 `docs/superpowers/specs/2026-09-11-snap-compliant-extension-delivery-design.md` §5 holds the
 leaf shapes those two ingredients will start from.
+
+## #34: Mutation-testing orc-todo's suite writes test data into the real BACKLOG.md, VERIFICATION.md and .git/orclab — a cwd→None mutant falls back to the process cwd
+
+Found 2026-09-12 by the first real `/orc-test analyze skills/orc-todo/scripts` (v17, Task 19). Until this is fixed, **running mutation testing on orc-todo's suite overwrites the real repo's BACKLOG.md, VERIFICATION.md and `.git/orclab/` state.** It did: after the run the main checkout's BACKLOG.md was a 33-line test fixture (`## #23: t` / `b`), the worktree's VERIFICATION.md had nine "Scenario 62–70: on the branch" stubs appended, `.git/orclab/lock` held `{not json`, `counters.json` said 23 and `lanes.json` held the test lane "B". All restored the same session (main's BACKLOG.md from its commit, byte-identical; `lock clear`; `lane delete B`); the worktree's VERIFICATION.md was still carrying the stubs when Task 19 finished — `git checkout -- VERIFICATION.md # orclab:discard-entries` removes them.
+
+Why. Every orc-todo test isolates itself by building a throwaway git repo under `tmp_path` and passing it as `cwd`. That isolation holds exactly as long as the code honours the argument. mutmut plants, among its ~930 mutants, some forty that replace a `cwd` argument with `None` or drop it (`read_lanes(None)`, `state.held(..., )`, `_write_lanes(data, )` …), and every `cwd=None` path falls back to the process cwd — which during the run is `skills/orc-todo/scripts/mutants/`, inside the real repo. The test then does exactly what it says: allocates a backlog number into the canonical file, appends a scenario to the invoking root's VERIFICATION.md, writes a corrupt lock to see that it still blocks. On the real files. And the mutant survives, because the tmp repo the assertion looks at is untouched.
+
+`test-discipline` rule 4 (Isolation) already says the filesystem is replaced with a fake; the miss is that the fake was supplied as an argument and nothing pinned the ambient state a dropped argument falls back to. Task 19 widened that rule by a sentence. The fix in orc-todo's tests is one autouse fixture in `skills/orc-todo/scripts/tests/conftest.py` (or the existing empty `conftest.py` at `scripts/`): `monkeypatch.chdir(tmp_path)` into a throwaway `git init`'d dir — then a `cwd → None` mutant lands in the sandbox, where the assertion sees it, and those forty survivors die for free. Not done in Task 19 because the brief says orc-todo's tests are `generate`'s job, in a session of its own; but this one is the precondition for that session, not part of it: run it first, or the `generate` session's own `analyze` calls do the damage again.
+
+Also worth a line in the shipped skill: `/orc-test analyze` runs the project's suite hundreds of times with the code deliberately broken, so a test that reaches anything outside its temp dir will, under some mutant, reach the real thing. `languages/python.md` carries this now; the other seven `languages/*.md` should say it when their first real run lands.
+
+## #35: orc-todo's tests run the code but do not pin it: TCE 68.6%, the specific gaps
+
+Found 2026-09-12 by the first real `/orc-test analyze skills/orc-todo/scripts` (v17, Task 19): coverage 95.3%, TCE 68.6% — 637 of 928 mutants killed, 291 survived, gate 70. Coverage is high and the score is just under the gate, which is the shape `analyze` exists to expose: the lines run, the assertions do not pin them. The survivors list (in `.orclab/test/analyze.json` after a run; the numbers are in `skills/orc-test/languages/python.md`) sorts into real gaps and noise.
+
+The real gaps, by what a test would have to do:
+
+- `lane delete` and `lane current` are never exercised through the CLI (`cli.cmd_lane`, 56 survivors). Every mutation of those two calls survives — arguments swapped for `None`, dropped entirely — and so does inverting the "no lanes yet" branch of `lane list`. The `-` that clears a lane's current item is never sent through the parser.
+- `lock` subcommand: `return 0` → `return 1` and the inverted `if not info["alive"]` both survive (`cli.cmd_lock`), so its exit codes and the stale-vs-running branch are unproven; `state.lock_info`'s `started`/`age_seconds` are never asserted at all.
+- `list`: inverting `if not open_entries` survives, and so does `mark = None` for the "(in progress: …)" suffix — a listing with an in-progress lane is never checked.
+- The `--cwd` plumbing: some forty `cwd` → `None` mutations survive across `allocate`, `lanes` and `cli`, because every test runs with the process cwd equal to the default. One test per layer that passes an explicit `cwd` different from `os.getcwd()` would kill all of them.
+- Whitespace normalisation in `resources.insert` and `cli.cmd_remove`: `rstrip("\n")` → `rstrip(None)`, `at + 1` → `at + 2`, `find` → `rfind` survive; the blank-line contract is pinned only for the one happy input shape (no trailing spaces, anchor appearing once).
+- `allocate(..., timeout=)` is never propagated: dropping the `timeout` argument to `state.held` survives, as does the `ResourceMissing` message.
+- `build_parser`: `required=True` on all three subparser groups survives — nothing checks that a bare `orc-todo`, `orc-todo lane` or `orc-todo lock` errors.
+
+The noise: mutmut mutates every string literal three ways and every keyword argument to `None`, so `cli.py`'s messages (172 of the 291) and the `held(...)` lock descriptions are survivors that no test should chase; read the list for branch, comparison and argument mutations.
+
+Fixing this is `/orc-test generate`'s first real use and should be its own session, per the Task 19 brief — not a side quest of v17's landing. Rerun `analyze` on the same path afterwards; the before → after is the point.
+
+## #36: GDScript has no mutation-testing tool, so /orc-test cannot measure TCE for Godot projects
+
+Found researching v17 (2026-09-11): Python, JS/TS, Java, Kotlin, C#, Dart and Swift each have at
+least one mutation tool; GDScript has none — searched GitHub, the Godot Asset Library and the
+awesome-mutation-testing list. `/orc-test analyze` therefore reports "TCE not measurable — no
+mutation tool exists for GDScript" in words rather than a number (spec: never a fake number).
+
+What would close it: any tool that mutates `.gd` files and re-runs gdUnit4 or GUT. When one
+appears, `skills/orc-test/languages/gdscript.md` gets a Mutation row, `langs/gdscript.py`'s
+`mutation_unavailable` returns None when it is installed, and this entry is resolved. Until then,
+`test-discipline` rule 5 (break the code by hand once, watch the test go red) is the only TCE a
+Godot project gets, and `/orc-test` says so.
+
+**Numbering note.** v17's Task 18 first allocated this finding #34 (2026-09-12, uncommitted in
+the main checkout). The incident recorded as #34 — a mutation run that replaced the main
+checkout's BACKLOG.md with a test fixture — destroyed that uncommitted entry, the file was
+restored from its last commit, and #34 was reissued to the incident itself before anyone noticed
+the first allocation was gone. The allocator's "never reissued" rule held as far as it could see:
+the number it lost was in a file that no longer existed. This entry is the same finding, renumbered.
