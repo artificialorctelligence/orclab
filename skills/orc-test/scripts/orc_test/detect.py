@@ -1,6 +1,7 @@
 """Which languages a project contains, and whether it already says how to run its tests."""
 
 import json
+import os
 import pathlib
 import re
 import shlex
@@ -24,12 +25,15 @@ def project_root(cwd):
 
 
 def _candidates(root):
+    """Files at depth <= MAX_DEPTH, never descending into SKIP_DIRS at all."""
     root = pathlib.Path(root)
-    for p in root.rglob("*"):
-        rel = p.relative_to(root)
-        if len(rel.parts) > MAX_DEPTH or SKIP_DIRS & set(rel.parts):
-            continue
-        yield p
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+        depth = len(pathlib.Path(dirpath).relative_to(root).parts)
+        for name in filenames:
+            yield pathlib.Path(dirpath) / name
+        if depth >= MAX_DEPTH - 1:
+            dirnames[:] = []  # already at max depth for files; don't walk further down
 
 
 def languages(root, modules):
@@ -48,7 +52,11 @@ def declared_test_cmd(root, key, cfg):
         return shlex.split(override)
     pkg = root / "package.json"
     if key == "javascript" and pkg.exists():
-        if (json.loads(pkg.read_text()).get("scripts") or {}).get("test"):
+        try:
+            data = json.loads(pkg.read_text())
+        except json.JSONDecodeError:
+            data = {}
+        if (data.get("scripts") or {}).get("test"):
             return ["npm", "test"]
     mk = root / "Makefile"
     if mk.exists() and re.search(r"^test\s*:", mk.read_text(), re.M):

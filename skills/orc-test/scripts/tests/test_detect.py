@@ -1,3 +1,5 @@
+import os
+import pathlib
 import subprocess
 import types
 
@@ -41,3 +43,34 @@ def test_declared_test_cmd_precedence(tmp_path):
     assert detect.declared_test_cmd(tmp_path, "dart", {"languages": {}}) == ["make", "test"]
     (tmp_path / "Makefile").unlink()
     assert detect.declared_test_cmd(tmp_path, "dart", {"languages": {}}) is None
+
+
+def test_declared_test_cmd_ignores_malformed_package_json(tmp_path):
+    (tmp_path / "package.json").write_text("{not valid json")
+    assert detect.declared_test_cmd(tmp_path, "javascript", {"languages": {}}) is None
+
+
+def test_languages_marker_at_depth_three_not_found(tmp_path):
+    (tmp_path / "a" / "b" / "c").mkdir(parents=True)
+    (tmp_path / "a" / "b" / "c" / "pyproject.toml").write_text("")
+    found = detect.languages(tmp_path, [PY])
+    assert found == []
+
+
+def test_candidates_never_walks_into_skipped_dirs(tmp_path, monkeypatch):
+    (tmp_path / "node_modules" / "x" / "y" / "z").mkdir(parents=True)
+    (tmp_path / "node_modules" / "x" / "y" / "z" / "deep.json").write_text("{}")
+
+    real_walk = os.walk
+    visited = []
+
+    def spying_walk(top, *a, **kw):
+        for dirpath, dirnames, filenames in real_walk(top, *a, **kw):
+            visited.append(dirpath)
+            yield dirpath, dirnames, filenames
+
+    monkeypatch.setattr(detect.os, "walk", spying_walk)
+    list(detect._candidates(tmp_path))
+    # node_modules gets pruned from the root's dirnames before os.walk ever descends,
+    # so no visited dirpath should even be (or be under) node_modules.
+    assert not any("node_modules" in pathlib.Path(v).parts for v in visited)

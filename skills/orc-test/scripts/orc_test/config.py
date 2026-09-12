@@ -4,16 +4,24 @@ import pathlib
 
 import yaml
 
-DEFAULTS = {"coverage": 80, "tce": 70, "languages": {}}
+
+class BadConfig(Exception):
+    """`.orclab/test.yaml` exists but is malformed."""
 
 
 def load(root):
     path = pathlib.Path(root) / ".orclab" / "test.yaml"
-    cfg = dict(DEFAULTS)
+    cfg = {"coverage": 80, "tce": 70, "languages": {}}
     if path.exists():
-        data = yaml.safe_load(path.read_text()) or {}
+        try:
+            data = yaml.safe_load(path.read_text()) or {}
+        except yaml.YAMLError as e:
+            raise BadConfig(f"{path}: invalid YAML ({e})")
         for k in ("coverage", "tce"):
             if k in data:
-                cfg[k] = int(data[k])
+                try:
+                    cfg[k] = int(data[k])
+                except (ValueError, TypeError):
+                    raise BadConfig(f"{path}: {k!r} must be an integer, got {data[k]!r}")
         cfg["languages"] = dict(data.get("languages") or {})
     return cfg
