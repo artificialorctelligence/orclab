@@ -179,7 +179,7 @@ def cmd_analyze(args):
             lines.append(f"    survived  {s[0]}:{s[1]}  {s[2]}")
         for f in lint:
             lines.append(f"    lint      {f.file}:{f.line}  {f.message}")
-        for c in m.CAVEATS:
+        for c in (m.CAVEATS_FOR(root) if hasattr(m, "CAVEATS_FOR") else m.CAVEATS):
             lines.append(f"    note: {c}")
         blocks.append("\n".join(lines))
     if langs_found:

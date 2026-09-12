@@ -42,6 +42,13 @@ def languages(root, modules):
     for m in modules:
         if any(f.match(pat) for pat in m.MARKERS for f in files):
             found.append(m)
+    keys = {m.KEY for m in found}
+    if "kotlin" in keys and "java" in keys:
+        kot = next(m for m in found if m.KEY == "kotlin")
+        if kot.claims(root):
+            found = [m for m in found if m.KEY != "java"]
+        else:
+            found = [m for m in found if m.KEY != "kotlin"]
     return found
 
 
