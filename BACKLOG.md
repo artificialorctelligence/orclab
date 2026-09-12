@@ -2488,7 +2488,15 @@ changed about the design, recorded here so the entry stays true:
   target-SDK and 16 KB rules (defaults read from Flutter's own source), and *neither* Flutter's
   nor Xcode's app template ships the App Store's mandatory `PrivacyInfo.xcprivacy`.
 
-Still open under this entry: the Unity and Godot stack skills (not in focus); the snap/Flathub
-ingredients from Orcshot's in-progress work, to arrive in the nine-section shape; and the first
-real release through any of the three researched ingredients, which is what turns "researched"
-into "proven" and is the reason this entry is not resolved.
+**Later the same day:** direflail asked for Unity and Godot after all; `stack-unity` and
+`stack-godot` landed (`2c3e4de`), thinner by design. One finding worth its own line: Godot's iOS
+export *generates* the App Store privacy manifest from preset options, where Flutter, Xcode and
+Unity all leave it to be added by hand. The snap and Flathub ingredients were named as living at
+`orcshot/skills/orc-package/ingredients/{snap,flatpak}/ingredient.md`, but on 2026-09-11 neither
+path existed in Orcshot's main checkout, either worktree, or its git history — Orcshot has no
+`skills/` directory at all. Presumably the Orcshot session had not written them yet.
+
+Still open under this entry: the snap/Flathub ingredients from Orcshot, to arrive in the
+nine-section shape once they exist; and the first real release through any of the researched
+ingredients, which is what turns "researched" into "proven" and is the reason this entry is not
+resolved.
