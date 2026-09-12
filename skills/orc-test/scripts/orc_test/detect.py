@@ -25,15 +25,15 @@ def project_root(cwd):
 
 
 def _candidates(root):
-    """Files at depth <= MAX_DEPTH, never descending into SKIP_DIRS at all."""
+    """Files up to MAX_DEPTH directories below root, never descending into SKIP_DIRS at all."""
     root = pathlib.Path(root)
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
-        depth = len(pathlib.Path(dirpath).relative_to(root).parts)
+        depth = len(pathlib.Path(dirpath).relative_to(root).parts)  # 0 == root itself
         for name in filenames:
             yield pathlib.Path(dirpath) / name
-        if depth >= MAX_DEPTH - 1:
-            dirnames[:] = []  # already at max depth for files; don't walk further down
+        if depth >= MAX_DEPTH:
+            dirnames[:] = []  # already MAX_DEPTH directories down; don't descend further
 
 
 def languages(root, modules):

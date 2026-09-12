@@ -33,9 +33,9 @@ setup).
 
 ## Test lint
 No tool. ruff's `PT` rules (flake8-pytest-style) report nothing for an assertion-free test or a
-bare `@pytest.mark.skip` — checked 2026-09-11 with ruff 0.16.7. `run.py` scans `test_*.py` with
-the stdlib `ast` module for: no assertion (an `assert`, `pytest.raises`, or a `.assert_*` call
-counts), `sleep` calls, `@pytest.mark.skip`/`skipif`, duplicate test names.
+bare `@pytest.mark.skip` — checked 2026-09-11 with ruff 0.16.7. `run.py` scans `test_*.py` and
+`*_test.py` with the stdlib `ast` module for: no assertion (an `assert`, `pytest.raises`, or a
+`.assert_*` call counts), `sleep` calls, `@pytest.mark.skip`/`skipif`, duplicate test names.
 
 ## Caveats
 - **mutmut 3 copies the tests into `mutants/`.** A later plain `pytest` collects both copies and

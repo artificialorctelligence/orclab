@@ -57,6 +57,13 @@ def test_languages_marker_at_depth_three_not_found(tmp_path):
     assert found == []
 
 
+def test_languages_marker_two_directories_down_found(tmp_path):
+    (tmp_path / "a" / "b").mkdir(parents=True)
+    (tmp_path / "a" / "b" / "pyproject.toml").write_text("")
+    found = detect.languages(tmp_path, [PY])
+    assert [m.KEY for m in found] == ["python"]
+
+
 def test_candidates_never_walks_into_skipped_dirs(tmp_path, monkeypatch):
     (tmp_path / "node_modules" / "x" / "y" / "z").mkdir(parents=True)
     (tmp_path / "node_modules" / "x" / "y" / "z" / "deep.json").write_text("{}")
