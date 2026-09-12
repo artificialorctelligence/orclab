@@ -112,6 +112,8 @@ three — don't assume only one shape.
 |----------|--------------------------|----------------------------|-----------|
 | Java     | Desktop                  | Java + Spring + JavaFX     | — |
 | Dart     | Mobile (cross-platform)  | Flutter                    | `skills/stack-flutter/SKILL.md` — read it in full before scaffolding |
+| Kotlin   | Mobile (Android only)    | Jetpack Compose            | `skills/stack-android-native/SKILL.md` — same |
+| Swift    | Mobile (iOS only)        | SwiftUI                    | `skills/stack-ios-native/SKILL.md` — same; needs a Mac to build |
 
 Do not invent additional defaults beyond what's listed here — if a combination isn't in this
 table, ask directly in the New-Project Flow's step 3 instead of guessing. Add rows here only once
