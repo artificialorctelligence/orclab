@@ -73,12 +73,50 @@ def cmd_run(args):
     return 1 if failed else 0
 
 
+def _coverage(mod, root, target, cfg, out):
+    cp = run(mod.coverage_cmd(root, target, out), cwd=root)
+    if cp.returncode != 0:
+        print(cp.stdout[-3000:])
+        print(f"{mod.LABEL}: tests failed; coverage not measured")
+        return None
+    return mod.coverage_parse(root, out)
+
+
+def _coverage_block(mod, cov, threshold, out):
+    ok = cov.percent >= threshold
+    lines = [f"{mod.LABEL:<10} coverage {cov.percent}% ({cov.covered}/{cov.total} lines) "
+             f"{'✓' if ok else '✗ (min ' + str(threshold) + ')'}"]
+    for path, pct in cov.under(threshold):
+        lines.append(f"    {pct:5.1f}%  {path}")
+    html = out / "html"
+    if html.exists():
+        lines.append(f"    html report: {html}")
+    return "\n".join(lines)
+
+
+def cmd_coverage(args):
+    failed, blocks = False, []
+    for m, root, target, cfg in _each_language(args):
+        cov = _coverage(m, root, target, cfg, _out(root, m))
+        if cov is None:
+            failed = True
+            continue
+        failed |= cov.percent < cfg["coverage"]
+        blocks.append(_coverage_block(m, cov, cfg["coverage"], _out_path(root, m)))
+    print("\n" + "\n\n".join(blocks) if blocks else "nothing measured")
+    return 1 if failed else 0
+
+
+def _out_path(root, mod):
+    return pathlib.Path(root) / ".orclab" / "test" / mod.KEY
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="orc-test")
     p.add_argument("--cwd", default=".")
     p.add_argument("--lang", help="only this language KEY (python, javascript, ...)")
     sub = p.add_subparsers(dest="cmd", required=True)
-    for name, fn in (("detect", cmd_detect), ("run", cmd_run)):
+    for name, fn in (("detect", cmd_detect), ("run", cmd_run), ("coverage", cmd_coverage)):
         sp = sub.add_parser(name)
         sp.add_argument("path", nargs="?")
         sp.set_defaults(fn=fn)
