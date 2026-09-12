@@ -2,6 +2,35 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.17.0] - 2026-09-12
+
+### Added
+- `/orc-test`: runs every test suite in the project and holds it to 80% line
+  coverage and a 70% mutation score (TCE). Subcommands `run`, `detect`,
+  `coverage`, `analyze` (coverage + mutation score + test lint in one saved
+  report) and `generate` (repairs weak suites from what `analyze` found — two
+  rounds, deletions only by consent). Thresholds read from `.orclab/test.yaml`.
+- Language support for `/orc-test`, each with a researched, dated
+  `languages/<lang>.md`: Python (pytest, pytest-cov, mutmut 3), JavaScript/
+  TypeScript (vitest or jest, StrykerJS), Java (Maven/Gradle, JaCoCo, Pitest),
+  Kotlin (Kover, Pitest, Arcmutate gated on the project's licence), C# (dotnet
+  test, coverlet, Stryker.NET), Dart/Flutter, Swift (xccov, Muter) and GDScript
+  (gdUnit4; mutation score honestly reported as not measurable).
+- `test-discipline`: background rules for any test Claude writes or changes —
+  know the code and scenarios first, TDD, realistic data, mock everything that
+  leaves the process, prove the test can fail, 80% coverage on what the change
+  touches.
+- BACKLOG #34, #35, #36: what the first real mutation run on Orclab found.
+
+### Changed
+- `/orc-git merge` now runs `/orc-test` before and after landing a branch.
+- Stack skills link to `/orc-test`'s per-language pages.
+
+### Fixed
+- `/orc-test` mutation sandbox no longer flags committed language scratch files
+  as a false positive, runs from the marker's directory, and reports a
+  genuinely unmeasured score instead of 0%.
+
 ## [0.16.0] - 2026-09-11
 
 ### Added
