@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="lib/clamp.dart" tests="3" failures="1">
+    <testcase name="lib/clamp.dart:3:10 &lt; replaced with &lt;=" classname="lib/clamp.dart"/>
+    <testcase name="lib/clamp.dart:5:10 &gt; replaced with &gt;=" classname="lib/clamp.dart">
+      <failure message="mutation survived">if (x &gt;= hi) return hi;</failure>
+    </testcase>
+    <testcase name="lib/clamp.dart:7:3 return replaced" classname="lib/clamp.dart"/>
+  </testsuite>
+</testsuites>
