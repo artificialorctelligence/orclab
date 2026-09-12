@@ -1,6 +1,7 @@
 """/orc-test: run, measure and (via SKILL.md prose) repair a project's tests, per language."""
 
 import argparse
+import json
 import pathlib
 import re
 import shutil
@@ -111,15 +112,96 @@ def _out_path(root, mod):
     return pathlib.Path(root) / ".orclab" / "test" / mod.KEY
 
 
+_SOURCE_EXT = {"python": ".py", "javascript": ".js", "java": ".java", "kotlin": ".kt",
+               "csharp": ".cs", "dart": ".dart", "swift": ".swift", "gdscript": ".gd"}
+
+
+def _source_count(root, mod, target):
+    base = pathlib.Path(root) / (target or ".")
+    ext = _SOURCE_EXT.get(mod.KEY, ".py")
+    return sum(1 for p in base.rglob(f"*{ext}") if not detect.SKIP_DIRS & set(p.relative_to(root).parts))
+
+
+def _mutation(mod, root, target, cfg, out):
+    why = mod.mutation_unavailable(root)
+    if why:
+        return {"unavailable": why}
+    if not target:
+        print(f"{mod.LABEL}: mutating {_source_count(root, mod, None)} files"
+              " — a first run on the whole project takes a while; later runs are incremental")
+    cp = run(mod.mutation_cmd(root, target, out), cwd=root)
+    if cp.returncode not in (0, 1, 2):        # tools exit non-zero on survivors; a crash is higher
+        print(cp.stdout[-3000:])
+        return {"unavailable": f"mutation tool exited {cp.returncode}"}
+    mut = mod.mutation_parse(root, out)
+    return {"score": mut.score, "killed": mut.killed, "total": mut.total,
+            "survivors": [[s.file, s.line, s.description] for s in mut.survivors]}
+
+
+def _tce_line(tce, threshold):
+    if "unavailable" in tce:
+        return f"TCE not measurable — {tce['unavailable']}"
+    if tce.get("skipped"):
+        return "TCE skipped"
+    ok = tce["score"] >= threshold
+    return f"TCE {tce['score']}% {'✓' if ok else '✗ (min ' + str(threshold) + ')'}"
+
+
+def cmd_analyze(args):
+    result = {"when": int(time.time()), "target": args.path, "languages": {}}
+    failed_gates, blocks = set(), []
+    project = detect.project_root(args.cwd)
+    for m, root, target, cfg in _each_language(args):
+        out = _out(root, m)
+        ok, _ = _run_tests(m, root, target, cfg)
+        if not ok:
+            print(f"{m.LABEL}: tests failed; nothing measured")
+            failed_gates.add("tests")
+            continue
+        cov = _coverage(m, root, target, cfg, out)
+        if cov is None:
+            failed_gates.add("tests")
+            continue
+        tce = {"skipped": True} if args.no_mutation else _mutation(m, root, target, cfg, out)
+        lint = m.lint(root, target, out)
+        lint_note = lint if isinstance(lint, str) else None
+        lint = [] if lint_note else lint
+        if cov.percent < cfg["coverage"]:
+            failed_gates.add("coverage")
+        if "score" in tce and tce["score"] < cfg["tce"]:
+            failed_gates.add("tce")
+        result["languages"][m.KEY] = {
+            "coverage": {"percent": cov.percent, "under": cov.under(cfg["coverage"])},
+            "tce": tce, "lint": [[f.file, f.line, f.message] for f in lint], "lint_note": lint_note}
+        lint_txt = f"not run — {lint_note}" if lint_note else f"{len(lint)} finding{'s' if len(lint) != 1 else ''}"
+        lines = [_coverage_block(m, cov, cfg["coverage"], _out_path(root, m)),
+                 f"{'':<10} {_tce_line(tce, cfg['tce'])}    lint: {lint_txt}"]
+        for s in tce.get("survivors", []):
+            lines.append(f"    survived  {s[0]}:{s[1]}  {s[2]}")
+        for f in lint:
+            lines.append(f"    lint      {f.file}:{f.line}  {f.message}")
+        for c in m.CAVEATS:
+            lines.append(f"    note: {c}")
+        blocks.append("\n".join(lines))
+    if blocks:
+        (project / ".orclab" / "test" / "analyze.json").write_text(json.dumps(result, indent=1))
+    print("\n" + "\n\n".join(blocks) if blocks else "nothing measured")
+    if failed_gates:
+        print(f"\ngates failed: {', '.join(sorted(failed_gates))} — run `/orc-test generate` to repair")
+    return 1 if failed_gates else 0
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="orc-test")
     p.add_argument("--cwd", default=".")
     p.add_argument("--lang", help="only this language KEY (python, javascript, ...)")
     sub = p.add_subparsers(dest="cmd", required=True)
-    for name, fn in (("detect", cmd_detect), ("run", cmd_run), ("coverage", cmd_coverage)):
+    for name, fn in (("detect", cmd_detect), ("run", cmd_run), ("coverage", cmd_coverage),
+                     ("analyze", cmd_analyze)):
         sp = sub.add_parser(name)
         sp.add_argument("path", nargs="?")
-        sp.set_defaults(fn=fn)
+        sp.add_argument("--no-mutation", action="store_true")
+        sp.set_defaults(fn=fn, no_mutation=False)
     args = p.parse_args(argv)
     try:
         return args.fn(args)
