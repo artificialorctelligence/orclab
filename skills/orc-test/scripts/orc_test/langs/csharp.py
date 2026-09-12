@@ -29,9 +29,9 @@ def test_cmd(root, target):
 
 
 def coverage_cmd(root, target, out):
-    return ["dotnet", "test", _COLLECT, f"--results-directory={out}",
-            "--", "DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=lcov"] + \
-           ([target] if target else [])
+    return (["dotnet", "test"] + ([target] if target else []) +
+            [_COLLECT, f"--results-directory={out}",
+             "--", "DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=lcov"])
 
 
 def coverage_parse(root, out):

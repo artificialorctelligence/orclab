@@ -12,6 +12,10 @@ def test_commands(tmp_path):
     assert f"--results-directory={out}" in cmd
     assert "DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=lcov" in " ".join(cmd)
 
+    cmd2 = cs.coverage_cmd(tmp_path, "tests/App.Tests", out)
+    assert cmd2[2] == "tests/App.Tests"
+    assert cmd2.index("--") > cmd2.index("tests/App.Tests")
+
 
 def test_coverage_parse_finds_lcov_under_results(tmp_path):
     d = tmp_path / "guid-1"

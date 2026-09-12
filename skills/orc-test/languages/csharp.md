@@ -11,8 +11,8 @@ first is Task 19 of the v17 plan, on Orclab itself.
 own `*.runsettings` is honoured by `dotnet test` itself.
 
 ## Coverage
-coverlet.collector 10.0.1, built into `dotnet test`: `--collect:"XPlat Code Coverage"
---results-directory=<out> -- DataCollectionRunSettings.DataCollectors.DataCollector
+coverlet.collector 10.0.1, built into `dotnet test`: `dotnet test [path] --collect:"XPlat Code
+Coverage" --results-directory=<out> -- DataCollectionRunSettings.DataCollectors.DataCollector
 .Configuration.Format=lcov`. Coverlet writes `<out>/<guid>/coverage.info`; `run.py` takes the
 newest `coverage.info` (or `*.lcov`) found anywhere under `<out>` and reads it with the shared
 `lcov.py` reader. Alternative, not used here: `Microsoft.Testing.Extensions.CodeCoverage` 18.11.2,
