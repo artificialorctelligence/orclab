@@ -1,0 +1,12 @@
+[tool.pytest.ini_options]
+testpaths = ["skills", "hooks"]
+norecursedirs = ["mutants", "venv", ".orclab"]
+addopts = "--import-mode=importlib"
+pythonpath = [
+  "hooks/scripts",
+  "skills/orc-package/scripts",
+  "skills/orc-publish/scripts",
+  "skills/orc-release/scripts",
+  "skills/orc-test/scripts",
+  "skills/orc-todo/scripts",
+]

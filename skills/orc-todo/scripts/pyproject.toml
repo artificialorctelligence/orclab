@@ -1,0 +1,8 @@
+[tool.mutmut]
+source_paths = ["orc_todo/"]
+pytest_add_cli_args_test_selection = ["tests/"]
+also_copy = ["tests/"]
+
+# Present so pytest stops here rather than at the repo root: the root config's pythonpath would
+# put the unmutated orc_todo ahead of mutmut's copy and every mutant would report "no tests".
+[tool.pytest.ini_options]

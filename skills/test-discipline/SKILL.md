@@ -41,6 +41,12 @@ environment variable — is mocked or replaced with a fake, so the test never fa
 network, the time of day, or state a previous test left behind. A test that needs the real thing
 is an integration test and is named as one.
 
+The fake has to hold even when the code ignores it. A temp dir handed over as an argument
+isolates nothing once that argument is dropped — and `/orc-test analyze` runs the suite hundreds
+of times with exactly such defects planted, so a `cwd=None` fallback lands on the process cwd,
+inside the real repo (BACKLOG #34: orc-todo's suite rewrote the real BACKLOG.md this way). Pin
+the ambient state too: `monkeypatch.chdir(tmp_path)`, a temp `HOME`, whatever the fallback reads.
+
 ## 5. Prove the test can fail
 
 After writing it, break the code on purpose once, run the test, confirm it goes red, and revert.

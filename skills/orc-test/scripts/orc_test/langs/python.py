@@ -1,7 +1,8 @@
 """Python: pytest, pytest-cov (lcov), mutmut 3, and a stdlib ast scan for test smells.
 
-mutmut 3 copies the tests into mutants/ for its own runs; a later plain pytest collects both
-copies and dies with "import file mismatch". Every command here passes --ignore=mutants.
+mutmut 3 keeps a copy of the tests under mutants/ (via also_copy) for its own runs; a later plain
+pytest collects both copies and dies with "import file mismatch". Every command here passes
+--ignore-glob=*/mutants/* — a glob because each sub-project's mutmut has its own mutants/.
 """
 
 import ast
@@ -20,10 +21,11 @@ MARKERS = ["pyproject.toml", "setup.py", "setup.cfg"]
 TOOLS = {"pytest": "pip install pytest", "pytest_cov": "pip install pytest-cov"}
 CAVEATS = [
     "mutmut writes its cache and a copy of the tests to mutants/; add it to .gitignore.",
-    "A path argument does not narrow mutmut; it mutates paths_to_mutate from pyproject.toml.",
+    "mutmut runs from the nearest pyproject.toml with [tool.mutmut] at or above the path and"
+    " mutates that file's source_paths; a path narrows only by picking which config runs.",
 ]
 
-_IGNORE = "--ignore=mutants"
+_IGNORE = "--ignore-glob=*/mutants/*"       # nested too: each suite's mutmut has its own mutants/
 _RESULT = re.compile(r"^\s*(\S+): (.+)$")
 _HUNK = re.compile(r"^@@ -(\d+)")
 
@@ -52,8 +54,26 @@ def mutation_unavailable(root):
     return None
 
 
+def mutation_cwd(root, target):
+    """Where mutmut runs: the nearest dir from `target` up to `root` whose pyproject.toml has a
+    [tool.mutmut] section. mutmut names mutants from the file path relative to its cwd and must
+    import the code by that same name, so a package under skills/x/scripts/ runs from there."""
+    root = pathlib.Path(root)
+    here = root / (target or ".")
+    for d in [here, *here.parents]:
+        if "[tool.mutmut]" in _read(d / "pyproject.toml"):
+            return d
+        if d == root:
+            break
+    return root
+
+
+def _read(path):
+    return path.read_text() if path.is_file() else ""
+
+
 def mutation_cmd(root, target, out):
-    # mutmut takes its paths from pyproject.toml (see CAVEATS); `target` narrows nothing here.
+    # mutmut takes its paths from pyproject.toml (see CAVEATS); `root` here is mutation_cwd().
     return ["python3", "-m", "mutmut", "run"]
 
 
@@ -62,7 +82,8 @@ def _show(root, key):
 
 
 def _results(root):
-    return run(["python3", "-m", "mutmut", "results"], cwd=root).stdout
+    # mutmut 3.7 lists only the non-killed mutants unless asked for all; "--all" takes a value
+    return run(["python3", "-m", "mutmut", "results", "--all", "true"], cwd=root).stdout
 
 
 def mutation_parse(root, out):
@@ -94,8 +115,9 @@ def _survivor(root, key):
         elif (h := _HUNK.match(raw)):
             line, context = int(h.group(1)), 0
         elif raw.startswith("-") and not raw.startswith("---"):
-            line += context
-            context = None            # frozen: the mutated line is found
+            if context is not None:   # first removed line only; a multi-line statement has several
+                line += context
+                context = None        # frozen: the mutated line is found
         elif raw.startswith("+") and not raw.startswith("+++"):
             change = raw[1:].strip()
             break

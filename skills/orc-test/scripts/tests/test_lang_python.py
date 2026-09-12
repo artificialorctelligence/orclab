@@ -16,10 +16,10 @@ def test_registered_first_and_mutation_needs_mutmut(tmp_path, monkeypatch):
 
 
 def test_commands_ignore_mutants_and_honour_target(tmp_path):
-    assert py.test_cmd(tmp_path, None) == ["python3", "-m", "pytest", "-q", "--ignore=mutants"]
-    assert py.test_cmd(tmp_path, "src/x") == ["python3", "-m", "pytest", "-q", "--ignore=mutants", "src/x"]
+    assert py.test_cmd(tmp_path, None) == ["python3", "-m", "pytest", "-q", "--ignore-glob=*/mutants/*"]
+    assert py.test_cmd(tmp_path, "src/x") == ["python3", "-m", "pytest", "-q", "--ignore-glob=*/mutants/*", "src/x"]
     cmd = py.coverage_cmd(tmp_path, None, tmp_path / "out")
-    assert "--ignore=mutants" in cmd and f"--cov-report=lcov:{tmp_path / 'out' / 'coverage.lcov'}" in cmd
+    assert "--ignore-glob=*/mutants/*" in cmd and f"--cov-report=lcov:{tmp_path / 'out' / 'coverage.lcov'}" in cmd
 
 
 def test_mutation_parse_reads_results_and_diffs(monkeypatch, tmp_path):
@@ -31,6 +31,26 @@ def test_mutation_parse_reads_results_and_diffs(monkeypatch, tmp_path):
     assert [s.file for s in m.survivors] == ["src/calc/__init__.py"] * 2
     assert m.survivors[0].line == 2
     assert "x <= lo" in m.survivors[0].description
+
+
+def test_survivor_from_a_multi_line_removal_is_the_first_removed_line(monkeypatch, tmp_path):
+    # seen live on orc-todo: mutmut replaces a two-line string argument with None
+    diff = textwrap.dedent("""\
+        # orc_todo.cli.x_cmd_add__mutmut_3: survived
+        --- orc_todo/cli.py
+        +++ orc_todo/cli.py
+        @@ -2,8 +2,7 @@
+             body = sys.stdin.read()
+             if not body.strip():
+                 print(
+        -            "error: an entry needs a real paragraph of context, not a stub - that is what "
+        -            "makes it worth keeping. Pipe the body in on stdin.",
+        +            None,
+                     file=sys.stderr,
+        """)
+    monkeypatch.setattr(py, "_show", lambda root, key: diff)
+    s = py._survivor(tmp_path, "orc_todo.cli.x_cmd_add__mutmut_3")
+    assert (s.file, s.line, s.description) == ("orc_todo/cli.py", 5, "None,")
 
 
 def test_lint_finds_the_four_smells(tmp_path):
@@ -88,3 +108,20 @@ def test_duplicate_name_is_scoped_per_class(tmp_path):
     """))
     msgs = [(f.line, f.message) for f in py.lint(tmp_path, None, tmp_path)]
     assert msgs == [(10, "duplicate test name test_run")]
+
+
+def test_mutation_runs_where_the_nearest_tool_mutmut_config_is(tmp_path):
+    sub = tmp_path / "skills" / "x" / "scripts"
+    (sub / "pkg").mkdir(parents=True)
+    (sub / "pyproject.toml").write_text("[tool.mutmut]\nsource_paths = ['pkg/']\n")
+    (tmp_path / "pyproject.toml").write_text("[tool.pytest.ini_options]\n")
+    assert py.mutation_cwd(tmp_path, "skills/x/scripts/pkg") == sub
+    assert py.mutation_cwd(tmp_path, "skills/x") == tmp_path
+    assert py.mutation_cwd(tmp_path, None) == tmp_path
+
+
+def test_results_asks_mutmut_for_every_mutant_not_just_the_unkilled(monkeypatch, tmp_path):
+    seen = []
+    monkeypatch.setattr(py, "run", lambda cmd, cwd: seen.append(cmd) or type("R", (), {"stdout": ""})())
+    py._results(tmp_path)
+    assert seen == [["python3", "-m", "mutmut", "results", "--all", "true"]]

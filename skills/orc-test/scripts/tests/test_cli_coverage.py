@@ -1,8 +1,7 @@
 import pytest
 
 from orc_test import cli, langs
-from tests.test_cli import make_repo, run
-from tests.test_cli_analyze import fake
+from tests.helpers import fake, make_repo, run
 
 pytest.importorskip("pytest_cov")
 

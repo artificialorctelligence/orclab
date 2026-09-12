@@ -1,23 +1,9 @@
-import subprocess
 import types
 
 import pytest
 
-from orc_test import cli, langs
-
-
-def make_repo(tmp_path):
-    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
-    (tmp_path / "pyproject.toml").write_text("[tool.pytest.ini_options]\n")
-    (tmp_path / "tests").mkdir()
-    (tmp_path / "tests" / "test_ok.py").write_text("def test_ok():\n    assert 1\n")
-    return tmp_path
-
-
-def run(args, repo, capsys):
-    code = cli.main(["--cwd", str(repo), *args])
-    out = capsys.readouterr()
-    return code, out.out + out.err
+from orc_test import langs
+from tests.helpers import make_repo, run
 
 
 def test_outside_git_says_so(tmp_path, capsys):
@@ -33,7 +19,7 @@ def test_detect_lists_languages(tmp_path, capsys):
 def test_run_green_suite_exits_zero_and_prints_command(tmp_path, capsys):
     code, out = run(["run"], make_repo(tmp_path), capsys)
     assert code == 0
-    assert "$ python3 -m pytest -q --ignore=mutants" in out
+    assert "$ python3 -m pytest -q '--ignore-glob=*/mutants/*'" in out
     assert "Python" in out and "passed" in out
 
 

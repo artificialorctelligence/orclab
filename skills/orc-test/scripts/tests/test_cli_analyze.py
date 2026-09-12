@@ -1,24 +1,9 @@
 import json
-import types
+import pathlib
 
 from orc_test import langs
-from orc_test.model import Coverage, Finding, Mutation, Survivor
-from tests.test_cli import make_repo, run
-
-
-def fake(mutation=None, unavailable=None, cov=(9, 10), lint=None, test_cmd=None, coverage_unavailable=None):
-    m = types.SimpleNamespace(
-        KEY="fake", LABEL="Fake", SOURCE_EXT=".py", MARKERS=["pyproject.toml"], TOOLS={}, CAVEATS=["a caveat"],
-        mutation_unavailable=lambda root: unavailable, missing=lambda root: [],
-        test_cmd=lambda root, t: test_cmd if test_cmd is not None else ["true"],
-        coverage_unavailable=lambda root: coverage_unavailable,
-        coverage_cmd=lambda root, t, out: ["true"],
-        coverage_parse=lambda root, out: Coverage(*cov, {"src/a.py": cov}),
-        mutation_cmd=lambda root, t, out: ["true"],
-        mutation_parse=lambda root, out: mutation,
-        lint=lambda root, t, out: lint if lint is not None else [
-            Finding("tests/test_a.py", 3, "no assertion in test_x")])
-    return m
+from orc_test.model import Mutation, Survivor
+from tests.helpers import fake, make_repo, run
 
 
 def test_analyze_lint_not_run_is_a_reason_not_a_count(tmp_path, capsys, monkeypatch):
@@ -84,3 +69,13 @@ def test_analyze_coverage_unavailable_is_words_not_a_failed_gate(tmp_path, capsy
     assert out.count("coverage not measurable — no coverage tool for Fake") == 1
     data = json.loads((repo / ".orclab" / "test" / "analyze.json").read_text())
     assert data["languages"]["fake"]["coverage"] == {"unavailable": "no coverage tool for Fake"}
+
+
+def test_analyze_rebases_survivors_from_a_sub_project_to_the_root(tmp_path, capsys, monkeypatch):
+    repo = make_repo(tmp_path)
+    m = fake(Mutation(9, 10, [Survivor("pkg/a.py", 2, "x <= 1")]))
+    (repo / "skills" / "x" / "scripts").mkdir(parents=True)
+    m.mutation_cwd = lambda root, target: pathlib.Path(root) / "skills" / "x" / "scripts"
+    monkeypatch.setattr(langs, "ALL", [m])
+    code, out = run(["analyze"], repo, capsys)
+    assert "skills/x/scripts/pkg/a.py:2  x <= 1" in out

@@ -135,15 +135,17 @@ def _mutation(mod, root, target, cfg, out):
         print(f"{mod.LABEL}: mutating {_source_count(root, mod, None)} files"
               " — a first run on the whole project takes a while; later runs are incremental"
               " where the tool supports it")
-    cp = run(mod.mutation_cmd(root, target, out), cwd=root)
+    where = getattr(mod, "mutation_cwd", lambda r, t: r)(root, target)   # a sub-project's own config
+    cp = run(mod.mutation_cmd(where, target, out), cwd=where)
     if cp.returncode not in (0, 1, 2):        # tools exit non-zero on survivors; a crash is higher
         print(cp.stdout[-3000:])
         return {"unavailable": f"mutation tool exited {cp.returncode}"}
-    mut = mod.mutation_parse(root, out)
+    mut = mod.mutation_parse(where, out)
     if not mut.total:
         return {"unavailable": "mutation tool produced no mutants — check its configuration"}
+    sub = pathlib.Path(where).relative_to(root)
     return {"score": mut.score, "killed": mut.killed, "total": mut.total,
-            "survivors": [[s.file, s.line, s.description] for s in mut.survivors]}
+            "survivors": [[str(sub / s.file), s.line, s.description] for s in mut.survivors]}
 
 
 def _tce_line(tce, threshold):
