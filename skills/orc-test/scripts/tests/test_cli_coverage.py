@@ -1,9 +1,8 @@
-import types
-
 import pytest
 
 from orc_test import cli, langs
 from tests.test_cli import make_repo, run
+from tests.test_cli_analyze import fake
 
 pytest.importorskip("pytest_cov")
 
@@ -45,25 +44,18 @@ def test_coverage_with_red_tests_stops_that_language(tmp_path, capsys):
     assert code == 1 and "tests failed; coverage not measured" in out
 
 
-def _fake(coverage_unavailable=None):
-    return types.SimpleNamespace(
-        KEY="fake", LABEL="Fake", SOURCE_EXT=".py", MARKERS=["pyproject.toml"], TOOLS={}, CAVEATS=[],
-        missing=lambda root: [], test_cmd=lambda root, t: ["true"],
-        coverage_unavailable=lambda root: coverage_unavailable,
-        coverage_cmd=lambda root, t, out: ["true"],
-        coverage_parse=lambda root, out: (_ for _ in ()).throw(AssertionError("should not run")))
-
-
 def test_coverage_unavailable_is_words_not_a_failure(tmp_path, capsys, monkeypatch):
-    monkeypatch.setattr(langs, "ALL", [_fake(coverage_unavailable="nano-coverage addon not installed")])
+    monkeypatch.setattr(langs, "ALL", [fake(coverage_unavailable="nano-coverage addon not installed")])
     code, out = run(["coverage"], make_repo(tmp_path), capsys)
     assert code == 0
-    assert "Fake: coverage not measurable — nano-coverage addon not installed" in out
+    assert out.count("coverage not measurable — nano-coverage addon not installed") == 1
+    assert "nothing measured" not in out
 
 
 def test_coverage_unavailable_never_calls_coverage_cmd_or_parse(tmp_path, capsys, monkeypatch):
-    fake = _fake(coverage_unavailable="no tool")
-    fake.coverage_cmd = lambda root, t, out: (_ for _ in ()).throw(AssertionError("should not run"))
-    monkeypatch.setattr(langs, "ALL", [fake])
+    m = fake(coverage_unavailable="no tool")
+    m.coverage_cmd = lambda root, t, out: (_ for _ in ()).throw(AssertionError("should not run"))
+    m.coverage_parse = lambda root, out: (_ for _ in ()).throw(AssertionError("should not run"))
+    monkeypatch.setattr(langs, "ALL", [m])
     code, out = run(["coverage"], make_repo(tmp_path), capsys)
     assert code == 0

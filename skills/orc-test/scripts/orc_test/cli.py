@@ -77,7 +77,6 @@ def cmd_run(args):
 def _coverage(mod, root, target, cfg, out):
     why = getattr(mod, "coverage_unavailable", lambda r: None)(root)
     if why:
-        print(f"{mod.LABEL}: coverage not measurable — {why}")
         return {"unavailable": why}
     cp = run(mod.coverage_cmd(root, target, out), cwd=root)
     if cp.returncode != 0:
@@ -106,7 +105,8 @@ def cmd_coverage(args):
         if cov is None:
             failed = True
             continue
-        if isinstance(cov, dict):   # not measurable — words already printed, not a gate failure
+        if isinstance(cov, dict):   # not measurable — not a gate failure
+            blocks.append(f"{m.LABEL:<10} coverage not measurable — {cov['unavailable']}")
             continue
         failed |= cov.percent < cfg["coverage"]
         blocks.append(_coverage_block(m, cov, cfg["coverage"], _out_path(root, m)))

@@ -5,7 +5,7 @@ def test_source_ext():
     assert gd.SOURCE_EXT == ".gd"
 
 
-def test_gdunit4_runner_and_exit_codes(tmp_path, monkeypatch):
+def test_gdunit4_runner_and_godot_bin(tmp_path, monkeypatch):
     (tmp_path / "project.godot").write_text("")
     (tmp_path / "addons" / "gdUnit4").mkdir(parents=True)
     (tmp_path / "addons" / "gdUnit4" / "runtest.sh").write_text("")

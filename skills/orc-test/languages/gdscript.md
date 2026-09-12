@@ -36,5 +36,5 @@ for other languages.
 - nano-coverage is alpha and built from source; its lcov lands at the project root, not under
   `.orclab/test/gdscript/` like every other language's coverage output.
 - Coverage is genuinely two-tier here: `coverage_unavailable` reports "not installed" in words
-  when the addon is missing, distinct from the ordinary "tests failed; coverage not measured"
-  case — neither one fails the gate on its own; only a real percentage under threshold does.
+  when the addon is missing — that case alone does not fail the gate. Red tests still do
+  ("tests failed; coverage not measured" fails the gate exactly like any other language).

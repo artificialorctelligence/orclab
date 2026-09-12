@@ -81,6 +81,6 @@ def test_analyze_coverage_unavailable_is_words_not_a_failed_gate(tmp_path, capsy
     monkeypatch.setattr(langs, "ALL", [fake(Mutation(9, 10, []), coverage_unavailable="no coverage tool for Fake")])
     code, out = run(["analyze"], repo, capsys)
     assert code == 0
-    assert "coverage not measurable — no coverage tool for Fake" in out
+    assert out.count("coverage not measurable — no coverage tool for Fake") == 1
     data = json.loads((repo / ".orclab" / "test" / "analyze.json").read_text())
     assert data["languages"]["fake"]["coverage"] == {"unavailable": "no coverage tool for Fake"}
