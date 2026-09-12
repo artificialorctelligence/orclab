@@ -7,7 +7,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[3]
 LANG_DIR = ROOT / "skills" / "orc-test" / "languages"
 REQUIRED = ["## Detect", "## Run", "## Coverage", "## Mutation (TCE)", "## Test lint",
             "## Caveats", "Researched on:", "Last real run:"]
-EXPECTED = {"python", "javascript", "java", "kotlin", "csharp", "dart", "swift"}   # each language task adds its key here
+EXPECTED = {"python", "javascript", "java", "kotlin", "csharp", "dart", "swift", "gdscript"}   # each language task adds its key here
 
 
 @pytest.mark.parametrize("key", sorted(EXPECTED))

@@ -75,6 +75,10 @@ def cmd_run(args):
 
 
 def _coverage(mod, root, target, cfg, out):
+    why = getattr(mod, "coverage_unavailable", lambda r: None)(root)
+    if why:
+        print(f"{mod.LABEL}: coverage not measurable — {why}")
+        return {"unavailable": why}
     cp = run(mod.coverage_cmd(root, target, out), cwd=root)
     if cp.returncode != 0:
         print(cp.stdout[-3000:])
@@ -101,6 +105,8 @@ def cmd_coverage(args):
         cov = _coverage(m, root, target, cfg, _out(root, m))
         if cov is None:
             failed = True
+            continue
+        if isinstance(cov, dict):   # not measurable — words already printed, not a gate failure
             continue
         failed |= cov.percent < cfg["coverage"]
         blocks.append(_coverage_block(m, cov, cfg["coverage"], _out_path(root, m)))
@@ -165,16 +171,21 @@ def cmd_analyze(args):
         lint = m.lint(root, target, out)
         lint_note = lint if isinstance(lint, str) else None
         lint = [] if lint_note else lint
-        if cov.percent < cfg["coverage"]:
-            failed_gates.add("coverage")
+        if isinstance(cov, dict):   # not measurable — words, not a gate failure
+            cov_result = cov
+            cov_line = f"{m.LABEL:<10} coverage not measurable — {cov['unavailable']}"
+        else:
+            cov_result = {"percent": cov.percent, "under": cov.under(cfg["coverage"])}
+            cov_line = _coverage_block(m, cov, cfg["coverage"], _out_path(root, m))
+            if cov.percent < cfg["coverage"]:
+                failed_gates.add("coverage")
         if "score" in tce and tce["score"] < cfg["tce"]:
             failed_gates.add("tce")
         result["languages"][m.KEY] = {
-            "coverage": {"percent": cov.percent, "under": cov.under(cfg["coverage"])},
+            "coverage": cov_result,
             "tce": tce, "lint": [[f.file, f.line, f.message] for f in lint], "lint_note": lint_note}
         lint_txt = f"not run — {lint_note}" if lint_note else f"{len(lint)} finding{'s' if len(lint) != 1 else ''}"
-        lines = [_coverage_block(m, cov, cfg["coverage"], _out_path(root, m)),
-                 f"{'':<10} {_tce_line(tce, cfg['tce'])}    lint: {lint_txt}"]
+        lines = [cov_line, f"{'':<10} {_tce_line(tce, cfg['tce'])}    lint: {lint_txt}"]
         for s in tce.get("survivors", []):
             lines.append(f"    survived  {s[0]}:{s[1]}  {s[2]}")
         for f in lint:

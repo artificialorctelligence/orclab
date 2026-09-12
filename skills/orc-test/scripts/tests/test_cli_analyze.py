@@ -6,11 +6,12 @@ from orc_test.model import Coverage, Finding, Mutation, Survivor
 from tests.test_cli import make_repo, run
 
 
-def fake(mutation=None, unavailable=None, cov=(9, 10), lint=None, test_cmd=None):
+def fake(mutation=None, unavailable=None, cov=(9, 10), lint=None, test_cmd=None, coverage_unavailable=None):
     m = types.SimpleNamespace(
         KEY="fake", LABEL="Fake", SOURCE_EXT=".py", MARKERS=["pyproject.toml"], TOOLS={}, CAVEATS=["a caveat"],
         mutation_unavailable=lambda root: unavailable, missing=lambda root: [],
         test_cmd=lambda root, t: test_cmd if test_cmd is not None else ["true"],
+        coverage_unavailable=lambda root: coverage_unavailable,
         coverage_cmd=lambda root, t, out: ["true"],
         coverage_parse=lambda root, out: Coverage(*cov, {"src/a.py": cov}),
         mutation_cmd=lambda root, t, out: ["true"],
@@ -73,3 +74,13 @@ def test_analyze_writes_result_file_even_when_every_language_fails_tests(tmp_pat
     code, out = run(["analyze"], repo, capsys)
     data = json.loads((repo / ".orclab" / "test" / "analyze.json").read_text())
     assert data["languages"] == {}
+
+
+def test_analyze_coverage_unavailable_is_words_not_a_failed_gate(tmp_path, capsys, monkeypatch):
+    repo = make_repo(tmp_path)
+    monkeypatch.setattr(langs, "ALL", [fake(Mutation(9, 10, []), coverage_unavailable="no coverage tool for Fake")])
+    code, out = run(["analyze"], repo, capsys)
+    assert code == 0
+    assert "coverage not measurable — no coverage tool for Fake" in out
+    data = json.loads((repo / ".orclab" / "test" / "analyze.json").read_text())
+    assert data["languages"]["fake"]["coverage"] == {"unavailable": "no coverage tool for Fake"}
