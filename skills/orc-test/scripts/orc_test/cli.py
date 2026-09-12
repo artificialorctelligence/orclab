@@ -112,14 +112,10 @@ def _out_path(root, mod):
     return pathlib.Path(root) / ".orclab" / "test" / mod.KEY
 
 
-_SOURCE_EXT = {"python": ".py", "javascript": ".js", "java": ".java", "kotlin": ".kt",
-               "csharp": ".cs", "dart": ".dart", "swift": ".swift", "gdscript": ".gd"}
-
-
 def _source_count(root, mod, target):
     base = pathlib.Path(root) / (target or ".")
-    ext = _SOURCE_EXT.get(mod.KEY, ".py")
-    return sum(1 for p in base.rglob(f"*{ext}") if not detect.SKIP_DIRS & set(p.relative_to(root).parts))
+    return sum(1 for p in base.rglob(f"*{mod.SOURCE_EXT}")
+               if not detect.SKIP_DIRS & set(p.relative_to(root).parts))
 
 
 def _mutation(mod, root, target, cfg, out):
@@ -134,6 +130,8 @@ def _mutation(mod, root, target, cfg, out):
         print(cp.stdout[-3000:])
         return {"unavailable": f"mutation tool exited {cp.returncode}"}
     mut = mod.mutation_parse(root, out)
+    if not mut.total:
+        return {"unavailable": "mutation tool produced no mutants — check its configuration"}
     return {"score": mut.score, "killed": mut.killed, "total": mut.total,
             "survivors": [[s.file, s.line, s.description] for s in mut.survivors]}
 
@@ -150,8 +148,9 @@ def _tce_line(tce, threshold):
 def cmd_analyze(args):
     result = {"when": int(time.time()), "target": args.path, "languages": {}}
     failed_gates, blocks = set(), []
-    project = detect.project_root(args.cwd)
-    for m, root, target, cfg in _each_language(args):
+    langs_found = _each_language(args)
+    project = langs_found[0][1] if langs_found else detect.project_root(args.cwd)
+    for m, root, target, cfg in langs_found:
         out = _out(root, m)
         ok, _ = _run_tests(m, root, target, cfg)
         if not ok:
@@ -183,8 +182,10 @@ def cmd_analyze(args):
         for c in m.CAVEATS:
             lines.append(f"    note: {c}")
         blocks.append("\n".join(lines))
-    if blocks:
-        (project / ".orclab" / "test" / "analyze.json").write_text(json.dumps(result, indent=1))
+    if langs_found:
+        out_path = pathlib.Path(project) / ".orclab" / "test" / "analyze.json"
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(json.dumps(result, indent=1))
     print("\n" + "\n\n".join(blocks) if blocks else "nothing measured")
     if failed_gates:
         print(f"\ngates failed: {', '.join(sorted(failed_gates))} — run `/orc-test generate` to repair")

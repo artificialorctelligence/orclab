@@ -1,16 +1,16 @@
 import json
 import types
 
-from orc_test import cli, langs
+from orc_test import langs
 from orc_test.model import Coverage, Finding, Mutation, Survivor
 from tests.test_cli import make_repo, run
 
 
-def fake(mutation=None, unavailable=None, cov=(9, 10), lint=None):
+def fake(mutation=None, unavailable=None, cov=(9, 10), lint=None, test_cmd=None):
     m = types.SimpleNamespace(
-        KEY="fake", LABEL="Fake", MARKERS=["pyproject.toml"], TOOLS={}, CAVEATS=["a caveat"],
+        KEY="fake", LABEL="Fake", SOURCE_EXT=".py", MARKERS=["pyproject.toml"], TOOLS={}, CAVEATS=["a caveat"],
         mutation_unavailable=lambda root: unavailable, missing=lambda root: [],
-        test_cmd=lambda root, t: ["true"],
+        test_cmd=lambda root, t: test_cmd if test_cmd is not None else ["true"],
         coverage_cmd=lambda root, t, out: ["true"],
         coverage_parse=lambda root, out: Coverage(*cov, {"src/a.py": cov}),
         mutation_cmd=lambda root, t, out: ["true"],
@@ -58,3 +58,18 @@ def test_analyze_announces_size_on_whole_repo(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr(langs, "ALL", [fake(Mutation(9, 10, []))])
     code, out = run(["analyze"], repo, capsys)
     assert "mutating 4 files" in out    # 3 modules + tests/test_ok.py; first run, no cache yet
+
+
+def test_analyze_no_mutants_is_words_not_a_fabricated_zero(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr(langs, "ALL", [fake(Mutation(0, 0, []))])
+    code, out = run(["analyze"], make_repo(tmp_path), capsys)
+    assert "TCE not measurable — mutation tool produced no mutants" in out
+    assert "TCE 0" not in out
+
+
+def test_analyze_writes_result_file_even_when_every_language_fails_tests(tmp_path, capsys, monkeypatch):
+    repo = make_repo(tmp_path)
+    monkeypatch.setattr(langs, "ALL", [fake(test_cmd=["false"])])
+    code, out = run(["analyze"], repo, capsys)
+    data = json.loads((repo / ".orclab" / "test" / "analyze.json").read_text())
+    assert data["languages"] == {}

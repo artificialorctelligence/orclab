@@ -15,6 +15,7 @@ from ..runner import run
 
 KEY = "python"
 LABEL = "Python"
+SOURCE_EXT = ".py"
 MARKERS = ["pyproject.toml", "setup.py", "setup.cfg"]
 TOOLS = {"pytest": "pip install pytest", "pytest_cov": "pip install pytest-cov"}
 CAVEATS = [
