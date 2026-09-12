@@ -811,13 +811,15 @@ Run Scenario 49 twice in the same scratch project.
    `python3 skills/orc-test/scripts/run.py run`.
    **Expected:** first line `detected: Python`; the printed `$ python3 -m pytest -q
    --ignore=mutants` line; one summary line with a ✓ and a passed count.
-2. Create a failing test file (e.g. `tests/test_scratch_fail.py` with a bare `assert False`), and
-   run the same command again.
+2. Create a failing test file (e.g. `hooks/scripts/tests/test_scratch_fail.py` with a bare
+   `assert False`), and run the same command again.
    **Expected:** ✗ instead of ✓, the failure tail from pytest's own output, exit code 1.
 3. Delete the failing test file.
    **Expected:** the repo's own suite is untouched — nothing scratch left behind.
 
 ## Scenario 60: /orc-test analyze on Orclab: the summary reads as an operator would read it
+
+Same prerequisite as Scenario 59 (the root `pyproject.toml`).
 
 1. At the Orclab repo root, run `python3 skills/orc-test/scripts/run.py analyze
    skills/orc-todo/scripts`.
@@ -834,10 +836,12 @@ Run Scenario 49 twice in the same scratch project.
 
 ## Scenario 61: /orc-test on a language with a missing tool is a sentence, not a crash
 
-1. In a fresh scratch repo, create an empty `package.json` (`{}`) and no `node_modules`
-   directory. Run `python3 <path to>/skills/orc-test/scripts/run.py run`.
-   **Expected:** first line `detected: JS/TS`, then either the npx test attempt's own failure
-   tail (if npx happens to be on PATH and runs) or the line `JS/TS: missing npx — <install
+1. In a fresh git repository, create an empty `package.json` (`{}`) and no `node_modules`
+   directory. First check `PATH=/usr/bin:/bin command -v npx` fails (no output, nonzero exit) —
+   that PATH excludes wherever Node/npx is actually installed, forcing the missing-tool path
+   instead of a real `npx jest` run against the registry. Then run
+   `env PATH=/usr/bin:/bin python3 <path to>/skills/orc-test/scripts/run.py run`.
+   **Expected:** first line `detected: JS/TS`, then the line `JS/TS: missing npx — <install
    line> — skipped`.
 2. Check the exit code of that run.
    **Expected:** `0` when the language was skipped for a missing tool — a skip is not a failure.
