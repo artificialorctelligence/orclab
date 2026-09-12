@@ -55,8 +55,9 @@ guessed owner writes a wrong action into a real release process.
 
 ### 2. Run the ingredient's checks — and only its checks
 
-For registration (section 2) and each credential mechanism (section 3), run **the check the
-ingredient supplies**, read-only by construction. Report each as satisfied or not.
+For registration (section 2), each credential mechanism (section 3) and each per-app item
+(section 5), run **the check the ingredient supplies**, read-only by construction. Report each as
+satisfied or not.
 
 **Never perform the setup.** Creating the PPA, registering a key, authorizing OAuth, registering
 a store name: each is the user's to do, and each becomes a `**One-time setup:**` block in
@@ -68,17 +69,17 @@ before the account work is done, and the release will halt at the right step unt
 
 Show every write before making it. For each:
 
-- **`channels.yaml` leaf(s)** from section 5, at the parent the user named, placeholders
+- **`channels.yaml` leaf(s)** from section 6, at the parent the user named, placeholders
   substituted. If a leaf with that path already exists, leave it exactly as it is and report
   that it was not touched. Create `.orclab/publish/channels.yaml` if the project has none.
 - **`distro.yaml` entries**, only for targets the user names. Same rule: existing entries stay.
-- **`RELEASING.md` steps** from section 7, at the position the ingredient describes, **renumbered
+- **`RELEASING.md` steps** from section 8, at the position the ingredient describes, **renumbered
   so steps stay contiguous integers** — follow `release-checklist`; a sub-numbered step (`6a`)
   vanishes from `/orc-release`'s parser, which is a recorded incident. Keep the `**One-time
   setup:**` and `**Run:**` markers verbatim; `/orc-release` parses them. If the project has no
   `RELEASING.md`, say so and stop before this write: `release-checklist` sets one up, and this
   command does not stand in for it.
-- **Templates** from section 8, into `scripts/`, placeholders substituted, only when the
+- **Templates** from section 9, into `scripts/`, placeholders substituted, only when the
   ingredient's conditions for them hold. An existing file of the same name is left alone.
 
 After writing `RELEASING.md`, run `/orc-release`'s parser to prove the numbering:
@@ -110,7 +111,7 @@ There is no ingredient for `<channel>`. Refusing teaches nothing. Instead, offer
 standing the channel up **and write the result as a new ingredient**, so the second project gets
 it for free. If the user says yes:
 
-1. Interview for each of the eight sections below, in order. For sections 2 and 3, insist on a
+1. Interview for each of the nine sections below, in order. For sections 2, 3 and 5, insist on a
    **checkable test** — an ingredient whose one-time setup cannot be checked is a note nobody
    can act on.
 2. Write `${ORCLAB_INGREDIENTS_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/orclab/ingredients}/<channel>/ingredient.md`
@@ -123,20 +124,33 @@ so the next person knows the shape moved.
 
 ## The shape of an ingredient
 
-`ingredient.md` opens with a table of the inputs it asks for, then eight sections with these
+`ingredient.md` opens with a table of the inputs it asks for, then nine sections with these
 headings:
 
-1. `## 1. What the channel is` — and what kind of artifact it takes.
+1. `## 1. What the channel is` — what kind of artifact it takes, and **what machine can build
+   it** (the App Store needs macOS; a PPA needs nothing in particular). Stated first because it
+   decides whether the channel is usable from where the user sits at all.
 2. `## 2. Registration` — the one-time, account-gated step, **with a checkable test**.
 3. `## 3. Credentials` — each mechanism named separately, each **with its own check**.
 4. `## 4. Machine-local config` — the exact content to merge, or `None`.
-5. `## 5. The publish action` — the `channels.yaml` leaf(s) with real requirements and issues.
-6. `## 6. Confirmation` — how anyone finds out the publish landed (`confirm`, per `/orc-publish`).
-7. `## 7. RELEASING.md steps` — the steps, and where they belong in dependency order.
-8. `## 8. Script template` — what `templates/` holds and when to instantiate it.
+5. `## 5. Per-app setup` — what has to be done **once per app, before its first release**, and
+   is neither registration nor a per-release act: a store listing, a privacy declaration, a
+   closed-test gate, an age rating. Each item with a check where one exists, and `None` where the
+   channel has nothing of the kind (a PPA does not).
+6. `## 6. The publish action` — the `channels.yaml` leaf(s) with real requirements and issues.
+7. `## 7. Confirmation` — how anyone finds out the publish landed (`confirm`, per `/orc-publish`).
+8. `## 8. RELEASING.md steps` — the steps, and where they belong in dependency order.
+9. `## 9. Script template` — what `templates/` holds and when to instantiate it.
 
-The numbered label is the required part; a descriptive suffix after it is fine — the shipped PPA
-ingredient uses them.
+The numbered label is the required part; a descriptive suffix after it is fine — the shipped
+ingredients use them. Section 5 was added 2026-09-11 when the Play and App Store ingredients were
+researched (BACKLOG #33): both stores have a stage between "account exists" and "every release"
+that the PPA-derived shape had no place for.
+
+**An ingredient for a channel no one here has shipped through says so in its first paragraph** —
+"researched against the live docs on <date>; no release has gone through this yet" — and stays
+marked until a real release corrects it (capture, below). The reader is deciding whether to trust
+a command; that marker is what they are trusting or not.
 
 Placeholders the command substitutes are written `__LIKE_THIS__` and every one must appear in
 the opening table.

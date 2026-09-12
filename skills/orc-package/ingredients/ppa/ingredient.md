@@ -21,6 +21,8 @@ An apt repository hosted by Launchpad. It builds from a **source** upload: you s
 `_source.changes`, and Launchpad's build farm compiles or assembles the binary. Users add
 `ppa:__OWNER__/__PPA__` and `apt install __SOURCE__`.
 
+Built on: any machine with `dpkg-dev` and `devscripts` — there is no platform requirement.
+
 Takes: a Debian source package — a `debian/` directory in the project and a working
 `dpkg-buildpackage -S`. Producing that is out of this ingredient's scope (it is the artifact,
 `/orc-code`'s territory); this ingredient assumes `debian/` exists and checks that it does.
@@ -56,7 +58,7 @@ supply. `scripts/ppa-copy-series.py` stores the token at
 
 - **Check:** `test -s "${XDG_CONFIG_HOME:-$HOME/.config}/__SOURCE__/launchpad-credentials.txt"` —
   a shell test needs no script to exist yet, unlike `scripts/ppa-copy-series.py --check`, which is
-  only usable later, once §7's `RELEASING.md` step has written the template into the project.
+  only usable later, once §8's `RELEASING.md` step has written the template into the project.
 - **If missing:** the user runs `python3 scripts/ppa-copy-series.py --version <X.Y.Z-1>` once and
   completes the browser authorization it opens. Orclab never runs that command on the user's
   behalf, and never reads, prints, or copies the file.
@@ -68,7 +70,13 @@ supply. `scripts/ppa-copy-series.py` stores the token at
 `[orcshot-ppa]` section was written and then found unnecessary). The OAuth token in section 3 is a
 credential, not config, and is governed by that section.
 
-## 5. The publish action
+## 5. Per-app setup — once per package, before its first release
+
+**None.** A PPA has no per-package declarations, listing, or review: the first upload of a new
+source package is the same act as every later one. (This section exists because app stores are
+different — see the Play and App Store ingredients.)
+
+## 6. The publish action
 
 The `channels.yaml` leaf at `<parent>.__FROM_SERIES__`. The build is its own `prepare:` step
 rather than folded into `action:` with `&&` — that shape was tried and found actively wrong: it
@@ -153,13 +161,13 @@ source upload per series, not a copy; say so and apply only the upload leaf.
 `__FROM_SERIES__`, `channel: <parent>.__FROM_SERIES__`; for targets on `__TO_SERIES__`,
 `channel: <parent>.__TO_SERIES__`. Ask which targets the project supports; do not invent them.
 
-## 6. Confirmation
+## 7. Confirmation
 
 The upload leaf needs no `confirm`: `dput` exits non-zero on rejection, and the build's success is
 the *next* step's precondition, not this step's outcome. The copy leaf declares `confirm.url` (the
 packages page) because Launchpad's copy is asynchronous — `accepted` is the honest status.
 
-## 7. `RELEASING.md` steps
+## 8. `RELEASING.md` steps
 
 Two steps, inserted **after the artifact is built and linted** and **before** any install-test,
 commit/tag/push, or forge-release step, in this order:
@@ -200,7 +208,7 @@ browser authorization it opens.
 Omit step N+1 entirely when there is no `__TO_SERIES__`. Renumber everything after the insertion
 point so the document's steps stay contiguous integers.
 
-## 8. Script template
+## 9. Script template
 
 The template itself takes five placeholders (`__OWNER__`, `__PPA__`, `__SOURCE__`,
 `__FROM_SERIES__`, `__TO_SERIES__`); this ingredient's own prose and `channels.yaml`/
