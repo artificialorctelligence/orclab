@@ -260,6 +260,9 @@ background knowledge skill (`skills/stack-<name>/SKILL.md`, `user-invocable: fal
 Defaults Table row points at it. Python desktop, .NET, web combos, database strategy, Docker and
 observability remain as undecided as before.
 
+2026-09-11, v17: a new stack skill's Testing row links to `skills/orc-test/languages/<lang>.md`
+rather than restating tools — that is where `/orc-test` reads them from.
+
 ## #5: `/orc-data` — a command for tracking legacy-system info during refactor work
 
 Raised by direflail (2026-09-05) alongside `/orc-code`'s design, describing the real motivation

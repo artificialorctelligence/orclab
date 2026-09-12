@@ -64,6 +64,9 @@ iOS: Build produces an **Xcode project**; from there the App Store ingredient's 
 applies (`xcodebuild archive` / `-exportArchive`, or Xcode by hand). The Unity-generated project's
 `Unity-iPhone` target is where signing and `PrivacyInfo.xcprivacy` end up.
 
+Coverage, mutation testing and test lint for this language: `skills/orc-test/languages/csharp.md`
+— `/orc-test` reads it.
+
 ## Where each store rule lands
 
 The store ingredients (`skills/orc-package/ingredients/play`, `.../app-store`) state the rules.

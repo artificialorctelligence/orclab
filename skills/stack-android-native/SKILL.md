@@ -76,6 +76,9 @@ ships it off; turn it on and keep `proguard-rules.pro` for anything reflection-b
 `mapping.txt` R8 writes (`app/build/outputs/mapping/release/`) — Play Console takes it so crash
 traces are readable.
 
+Coverage, mutation testing and test lint for this language: `skills/orc-test/languages/kotlin.md`
+— `/orc-test` reads it.
+
 ## Where each Play rule lands
 
 The Play ingredient (`skills/orc-package/ingredients/play`) states the rules and owns them. This

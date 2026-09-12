@@ -43,7 +43,7 @@ question; this skill does not repeat it.
 | Swift | 6.4 in Xcode 27; 6.2 in Xcode 26; Swift 6 language mode has strict concurrency checking on — new projects should adopt it rather than stay in 5 mode | Xcode release notes |
 | UI | SwiftUI; state via the `Observation` framework (`@Observable`) and SwiftUI property wrappers; navigation via `NavigationStack` | developer.apple.com/swiftui |
 | Concurrency | Swift concurrency — `async`/`await`, actors, `@MainActor` for UI | Swift 6 language |
-| Testing | **Swift Testing** (`import Testing`, `@Test`, `#expect`) for unit tests — Apple's current framework, integrated with SwiftPM; XCTest remains for UI tests (`XCUIApplication`) | developer.apple.com/documentation/testing |
+| Testing | **Swift Testing** (`import Testing`, `@Test`, `#expect`) for unit tests — Apple's current framework, integrated with SwiftPM; XCTest remains for UI tests (`XCUIApplication`). Coverage, mutation testing and test lint for this language: `skills/orc-test/languages/swift.md` — `/orc-test` reads it. | developer.apple.com/documentation/testing |
 | Dependencies | Swift Package Manager, in Xcode (File → Add Package Dependencies) or `Package.swift`. CocoaPods is not for new projects — its registry goes read-only 2026-12-02 | Flutter's SwiftPM page records the CocoaPods date; Apple docs for SwiftPM |
 | Persistence | SwiftData (Apple's current, Swift-native layer over Core Data) when local persistence is needed; not a default, a choice | Apple docs |
 | Signing | Xcode's *Automatically manage signing* with the team selected; Xcode uses cloud-managed certificates | Xcode distribution docs |

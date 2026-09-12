@@ -80,6 +80,9 @@ Confirm the output filenames with `ls` after the first build rather than trustin
 the PPA ingredient learned that lesson with tarball names. Release builds shrink and obfuscate by
 default (R8 on Android); `--split-debug-info=<dir>` keeps symbols for crash reports.
 
+Coverage, mutation testing and test lint for this language: `skills/orc-test/languages/dart.md` —
+`/orc-test` reads it.
+
 ## Where each store rule lands
 
 The two store ingredients (`skills/orc-package/ingredients/play`, `.../app-store`) state the rules
