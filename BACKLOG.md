@@ -2408,7 +2408,7 @@ Scope boundary: this is not about `CLAUDE.md`, which is deliberately Orclab's in
 stays that way, and not about the `SKILL.md` bodies, which are Claude's instructions and are
 correct as they are. It is a new, user-facing layer on top of both.
 
-## #33: Orclab ships researched platform knowledge for every store and stack it targets — reversing v15's "capture is how they arrive"
+## #33: Orclab ships researched platform knowledge for every store and stack it targets — reversing v15's "capture is how they arrive" (RESOLVED 2026-09-12)
 
 Decided by direflail 2026-09-11, in a brainstorming pass on iOS and Android publishing. The
 argument: Orclab should carry accurate, at least base-level, knowledge about every platform it
@@ -2527,6 +2527,23 @@ drop the "no release has gone through this" marker from each. Orcshot's spec
 `docs/superpowers/specs/2026-09-11-snap-compliant-extension-delivery-design.md` §5 holds the
 leaf shapes those two ingredients will start from.
 
+**Resolved 2026-09-12 — the deliverables are written and the rule now lives where it fires.**
+Asked whether the "first real release" condition above was a real reason to keep this open,
+direflail said no: this entry was meant as guidance — research any new platform or language
+before Orclab is used with it — not as an ongoing tracker, and some projects will only ever be
+private and never released, so a release-gated closure would never arrive. Checked the tree: all
+five ingredients (`app-store`, `play`, `ppa`, `snap`, `flatpak`) and all five stack skills
+(`stack-flutter`, `stack-android-native`, `stack-ios-native`, `stack-unity`, `stack-godot`) exist.
+The "proven by a real release" job is done by the marker each unproven ingredient carries in its
+own first paragraph (`skills/orc-package/SKILL.md`, "An ingredient for a channel no one here has
+shipped through says so"), which the reader of the ingredient sees and this entry's reader does
+not. The guidance itself was stated for channels (v15 spec's amended non-goal, `orc-package`
+rules) but nowhere for stacks; it is now a section of `CLAUDE.md`, "Before the first project
+builds on a stack or ships to a channel Orclab has never met", phrased by the situation so it
+fires for a private project too. The one pending action with a real trigger — correcting `snap`
+and `flatpak` and writing `ego`/`spices` once Orcshot's #198 and #205 resolve — is split out as
+**#37**, so this heading no longer hides it.
+
 ## #34: Mutation-testing orc-todo's suite writes test data into the real BACKLOG.md, VERIFICATION.md and .git/orclab — a cwd→None mutant falls back to the process cwd
 
 Found 2026-09-12 by the first real `/orc-test analyze skills/orc-todo/scripts` (v17, Task 19). Until this is fixed, **running mutation testing on orc-todo's suite overwrites the real repo's BACKLOG.md, VERIFICATION.md and `.git/orclab/` state.** It did: after the run the main checkout's BACKLOG.md was a 33-line test fixture (`## #23: t` / `b`), the worktree's VERIFICATION.md had nine "Scenario 62–70: on the branch" stubs appended, `.git/orclab/lock` held `{not json`, `counters.json` said 23 and `lanes.json` held the test lane "B". All restored the same session (main's BACKLOG.md from its commit, byte-identical; `lock clear`; `lane delete B`); the worktree's VERIFICATION.md was still carrying the stubs when Task 19 finished — `git checkout -- VERIFICATION.md # orclab:discard-entries` removes them.
@@ -2600,3 +2617,32 @@ maintainer. Wire it as optional — `mutation_unavailable` already makes an abse
 rather than a fake number — and before resolving, actually install it and run it against a small
 gdUnit4 project headless; a README claim is not the same as it working. If it goes unmaintained,
 Godot projects fall back to exactly what they get today.
+
+## #37: Correct the snap and flatpak ingredients from Orcshot's first real runs, and write ego and spices from the captured ones
+
+Split out of #33 on 2026-09-12 when that entry was resolved: #33 was a decision and a day's
+writing, and this is the one pending action it carried that has a real trigger of its own.
+
+The `snap` and `flatpak` ingredients under `skills/orc-package/ingredients/` were written
+2026-09-11 from Orcshot's research: Snap's login, name registration and `review-tools` run were
+real, the upload was not; Flathub is from its live docs plus a real sandbox test, with no
+submission yet. Both carry "verify at first use" spots — metric names, the Flathub manifest `sed`
+shape, moderation-hold behaviour — that only a real run can settle.
+
+**Trigger: Orcshot's #198 (first real Snap Store upload and Flathub submission) and #205
+(GNOME Shell extension delivery via extensions.gnome.org, and the Cinnamon Spices PR) resolve.**
+Checked 2026-09-12: neither is; Orcshot's latest work is the XApp tray (#208, #211). Nothing
+here can move until they do, and nothing in Orclab is blocked on this in the meantime.
+
+direflail's standing instruction, given 2026-09-11 when the two ingredients were committed, is
+what to do then: (1) correct `snap` and `flatpak` with whatever the real run contradicted; (2)
+write the two ingredients deliberately not written from research alone — `ego` (GNOME Shell
+extensions via `gnome-extensions upload`, needs GNOME Shell ≥ 50 on the publishing machine) and
+`spices` (Cinnamon applets via PR to `linuxmint/cinnamon-spices-applets`) — from the captured
+runs, starting from the leaf shapes in Orcshot's
+`docs/superpowers/specs/2026-09-11-snap-compliant-extension-delivery-design.md` §5; (3) drop the
+"no release has gone through this" marker from each ingredient a release actually went through.
+
+Scope boundary: this is Orcshot-gated ingredient maintenance only. The rule that new stacks and
+channels are researched before first use now lives in `CLAUDE.md` ("Before the first project
+builds on a stack or ships to a channel Orclab has never met"), not here.

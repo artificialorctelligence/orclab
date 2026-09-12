@@ -330,6 +330,30 @@ path, suggesting it may not exist the same way in every client). Any component t
 one needs the same "check it's actually available, tell the user plainly if not" guard
 `skills/orc-code/SKILL.md`'s flows already use for `feature-dev`/`code-modernization` — never assume silently.
 
+## Before the first project builds on a stack or ships to a channel Orclab has never met
+
+**The trigger is the situation: a language, framework or toolchain with no `skills/stack-<name>/`,
+or a store, registry or distribution channel with no `skills/orc-package/ingredients/<name>/`, is
+about to be used through Orclab for the first time.** Whether the result will ever be released is
+irrelevant — this fires for a private, never-shipped project just the same, because the cost it
+guards against lands during development, not at release.
+
+**Write the knowledge first, from live research, then build.** A stack gets a background skill
+(`user-invocable: false`, the shape the five shipped `stack-*` skills use): the current accepted
+toolchain, project layout, how it produces each platform's artifact, and where each store rule
+lands in that stack's build. A channel gets an ingredient in `orc-package`'s nine-section shape.
+Every claim carries a "confirmed live YYYY-MM-DD" stamp under `currency-discipline`; anything no
+release has gone through says so in its first paragraph, and the first real use corrects it.
+Research is not invention: the difference is the stamp and the marker.
+
+**Why this is a rule and not a preference.** Orcshot reached its stores with no baseline, built
+against assumptions, and was refactored twice when the stores' real rules turned out to differ —
+the second time while BACKLOG #33 was being written (2026-09-11). The knowledge has to be present
+*at the moment a decision is made*, and most decisions are made mid-development, which is why a
+stack is a skill whose description sits in every session rather than a file only `/orc-code`
+reads at scaffold time. #33 records the decision and the day the ten shipped skills and
+ingredients were written; this section is the rule it was meant to leave behind.
+
 ## Checklist for designing a new `/orc-*` thing
 
 1. Build it as `skills/<name>/SKILL.md`. There is no `commands/` directory any more, and the
