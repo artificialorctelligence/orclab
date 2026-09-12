@@ -1,4 +1,6 @@
+import os
 import pathlib
+import time
 
 from orc_test import stryker
 
@@ -17,6 +19,9 @@ def test_find_newest_report(tmp_path):
     (tmp_path / "old.json").write_text('{"files": {}}')
     new = tmp_path / "sub"
     new.mkdir()
-    (new / "mutation.json").write_text('{"files": {}}')
+    new_file = new / "mutation.json"
+    new_file.write_text('{"files": {}}')
     (tmp_path / "other.json").write_text('{"not": "a report"}')
-    assert stryker.find(tmp_path) == new / "mutation.json"
+    later = time.time() + 10
+    os.utime(new_file, (later, later))
+    assert stryker.find(tmp_path) == new_file

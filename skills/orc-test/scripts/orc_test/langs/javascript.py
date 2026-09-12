@@ -5,7 +5,7 @@ import pathlib
 import shutil
 
 from .. import lcov, stryker
-from ..model import Finding
+from ..model import Finding, Mutation
 from ..runner import run
 
 KEY = "javascript"
@@ -50,7 +50,8 @@ def coverage_parse(root, out):
 
 
 def mutation_unavailable(root):
-    if "@stryker-mutator/core" not in _deps(root):
+    deps = _deps(root)
+    if "@stryker-mutator/core" not in deps or f"@stryker-mutator/{_runner(root)}-runner" not in deps:
         return ("StrykerJS not installed — npm i -D @stryker-mutator/core "
                 f"@stryker-mutator/{_runner(root)}-runner, then npx stryker init")
     return None
@@ -65,12 +66,15 @@ def mutation_cmd(root, target, out):
 
 
 def mutation_parse(root, out):
-    return stryker.parse(stryker.find(out), root)
+    p = stryker.find(out)
+    return stryker.parse(p, root) if p else Mutation(0, 0)
 
 
 def lint(root, target, out):
     deps = _deps(root)
-    plugin = next((p for p in ("@vitest/eslint-plugin", "eslint-plugin-jest") if p in deps), None)
+    candidates = ("@vitest/eslint-plugin", "eslint-plugin-jest") if _runner(root) == "vitest" \
+        else ("eslint-plugin-jest", "@vitest/eslint-plugin")
+    plugin = next((p for p in candidates if p in deps), None)
     if not plugin or "eslint" not in deps:
         return "eslint not configured with @vitest/eslint-plugin or eslint-plugin-jest"
     cp = run(["npx", "eslint", "--format", "json", "--no-error-on-unmatched-pattern", target or "."], cwd=root)
