@@ -7,8 +7,10 @@ pytest collects both copies and dies with "import file mismatch". Every command 
 
 import ast
 import importlib.util
+import os
 import pathlib
 import re
+import tomllib
 
 from .. import lcov
 from ..model import Finding, Mutation, Survivor
@@ -57,19 +59,21 @@ def mutation_unavailable(root):
 def mutation_cwd(root, target):
     """Where mutmut runs: the nearest dir from `target` up to `root` whose pyproject.toml has a
     [tool.mutmut] section. mutmut names mutants from the file path relative to its cwd and must
-    import the code by that same name, so a package under skills/x/scripts/ runs from there."""
+    import the code by that same name, so a package under skills/x/scripts/ runs from there.
+    A `target` whose ".." walks above `root` never searches above it — it just returns `root`."""
     root = pathlib.Path(root)
     here = root / (target or ".")
+    normalized = pathlib.Path(os.path.normpath(here))
+    if normalized != root and root not in normalized.parents:
+        return root
     for d in [here, *here.parents]:
-        if "[tool.mutmut]" in _read(d / "pyproject.toml"):
+        pyproject = d / "pyproject.toml"
+        text = pyproject.read_text() if pyproject.is_file() else ""
+        if text and tomllib.loads(text).get("tool", {}).get("mutmut") is not None:
             return d
         if d == root:
             break
     return root
-
-
-def _read(path):
-    return path.read_text() if path.is_file() else ""
 
 
 def mutation_cmd(root, target, out):

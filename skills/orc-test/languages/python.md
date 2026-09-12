@@ -23,6 +23,12 @@ under importlib mode a `conftest.py` no longer puts its own dir on `sys.path`, s
 that used to work by accident have to be declared. Under that mode test modules cannot import
 each other; shared helpers go in a non-test module.
 
+This root config isn't scoped to a root-level run: pytest searches upward for it, so `cd
+skills/x/scripts && pytest tests/` for any of the five suites other than orc-todo (which has its
+own per-suite `pyproject.toml`, see Mutation below) also picks up the root's importlib mode and
+its six-`scripts/`-dirs-wide `pythonpath` — a same-named top-level module in two of those
+`scripts/` dirs would then shadow one silently.
+
 ## Coverage
 pytest-cov: `--cov=<path> --cov-report=lcov:.orclab/test/python/coverage.lcov
 --cov-report=html:.orclab/test/python/html`. `run.py` reads the lcov and applies the 80% gate.

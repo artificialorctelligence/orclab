@@ -810,7 +810,7 @@ Run Scenario 49 twice in the same scratch project.
 1. Requires the root `pyproject.toml` from v17 Task 19. At the Orclab repo root, run
    `python3 skills/orc-test/scripts/run.py run`.
    **Expected:** first line `detected: Python`; the printed `$ python3 -m pytest -q
-   --ignore=mutants` line; one summary line with a ✓ and a passed count.
+   '--ignore-glob=*/mutants/*'` line; one summary line with a ✓ and a passed count.
 2. Create a failing test file (e.g. `hooks/scripts/tests/test_scratch_fail.py` with a bare
    `assert False`), and run the same command again.
    **Expected:** ✗ instead of ✓, the failure tail from pytest's own output, exit code 1.

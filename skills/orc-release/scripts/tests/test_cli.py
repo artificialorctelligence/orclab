@@ -199,16 +199,19 @@ def test_version_set_is_atomic_when_changelog_body_is_missing(tmp_path, capsys):
 def test_abort_reports_a_failed_rollback_as_not_rolled_back(tmp_path, capsys):
     root = setup_project(tmp_path)
     main(["--root", root, "start", "0.2.0"])
-    # Corrupt the [project] section mid-release so write_version cannot find it to roll back.
-    (tmp_path / "pyproject.toml").write_text('name = "x"\nversion = "0.1.0"\n')
+    # Corrupt mid-release: [project] stays (detect() still finds a real version-holding file)
+    # but its version field is gone, so write_version has nowhere to write the rollback. (Not
+    # dropping [project] itself: detect() now requires it, so that would just make the file
+    # invisible to abort rather than exercise a failed rollback - see versionfiles.detect.)
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "x"\n')
     assert main(["--root", root, "abort"]) == 0
     out = capsys.readouterr().out
     assert "NOT rolled back" in out
     assert "pyproject.toml" in out
-    assert "no [project] section" in out
+    assert "no version field in [project]" in out
     assert "Rolled back to" not in out
     # And the file provably still holds the corrupted content - no rollback actually happened.
-    assert "[project]" not in (tmp_path / "pyproject.toml").read_text()
+    assert "version" not in (tmp_path / "pyproject.toml").read_text()
 
 
 def test_abort_reports_a_successful_rollback(tmp_path, capsys):

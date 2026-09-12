@@ -120,6 +120,20 @@ def test_mutation_runs_where_the_nearest_tool_mutmut_config_is(tmp_path):
     assert py.mutation_cwd(tmp_path, None) == tmp_path
 
 
+def test_mutation_cwd_ignores_a_commented_out_tool_mutmut_line(tmp_path):
+    (tmp_path / "pyproject.toml").write_text("# [tool.mutmut]\n[tool.pytest.ini_options]\n")
+    assert py.mutation_cwd(tmp_path, None) == tmp_path
+
+
+def test_mutation_cwd_never_searches_above_root(tmp_path):
+    root = tmp_path / "root"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "pyproject.toml").write_text("[tool.mutmut]\nsource_paths = ['x/']\n")
+    assert py.mutation_cwd(root, "../outside") == root
+
+
 def test_results_asks_mutmut_for_every_mutant_not_just_the_unkilled(monkeypatch, tmp_path):
     seen = []
     monkeypatch.setattr(py, "run", lambda cmd, cwd: seen.append(cmd) or type("R", (), {"stdout": ""})())
