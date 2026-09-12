@@ -19,7 +19,9 @@ test org.jacoco:jacoco-maven-plugin:report`, report at `target/site/jacoco/jacoc
 needs `plugins { jacoco }` and `jacocoTestReport { reports { xml.required = true } }` in the
 build file, report at `build/reports/jacoco/test/jacocoTestReport.xml`. `run.py` reads that XML
 (per-`<sourcefile>` `LINE` counters) and applies the 80% gate. For a project-side gate in CI,
-JaCoCo's own switch is the `jacoco:check` goal with `minimum 0.80` on `LINE`.
+JaCoCo's own switch is the `jacoco:check` goal with `minimum 0.80` on `LINE`. `jacoco.find` also
+checks a third location, `build/reports/kover/report.xml` — Kotlin's Kover writes the same JaCoCo
+XML shape there, so the same reader covers a Kotlin project sharing this language module.
 
 ## Mutation (TCE)
 Pitest 1.30.0 (2026-08-27) + pitest-junit5-plugin 1.2.2. Maven:
@@ -40,9 +42,22 @@ PMD does not flag `@Disabled` tests — checked 2026-09-11 with PMD 7; the fallb
 plain `grep -rn @Disabled src/test`, not run automatically by `run.py`.
 
 ## Caveats
-- **The JUnit 5 support for Pitest is a pom/build dependency (`pitest-junit5-plugin`), not a CLI
-  flag.** `mutation_unavailable` checks for it in the pom (Maven) or for `pitest` in the build
-  file (Gradle) before trying to run Pitest at all.
+- **The JUnit 5 support for Pitest is a `<dependency>` nested inside the `pitest-maven` plugin's
+  own `<plugin>` block, not a project dependency and not a CLI flag.** It does not go in the
+  pom's top-level `<dependencies>`:
+  ```xml
+  <plugin>
+    <artifactId>pitest-maven</artifactId>
+    <dependencies>
+      <dependency>
+        <artifactId>pitest-junit5-plugin</artifactId>
+      </dependency>
+    </dependencies>
+  </plugin>
+  ```
+  `mutation_unavailable` just checks for the string `pitest-junit5-plugin` anywhere in the pom
+  (Maven) or for `pitest` in the build file (Gradle) before trying to run Pitest at all — it does
+  not parse the XML structure, so it doesn't care which block the dependency sits in.
 - **Pitest exits non-zero when the run falls below its own `mutationThreshold`.** Leave that
   setting unset in the project's pom/build file — `run.py` reads the XML report and applies the
   gate itself, the same rule as every other tool here (never the tool's own threshold).

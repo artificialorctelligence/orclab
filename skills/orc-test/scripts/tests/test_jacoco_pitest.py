@@ -1,3 +1,4 @@
+import os
 import pathlib
 
 from orc_test import jacoco, pitest
@@ -25,8 +26,12 @@ def test_find_maven_and_gradle_locations(tmp_path):
     assert jacoco.find(tmp_path) == tmp_path / "target" / "site" / "jacoco" / "jacoco.xml"
     g = tmp_path / "build" / "reports" / "jacoco" / "test"
     g.mkdir(parents=True)
-    (g / "jacocoTestReport.xml").write_text("<report/>")
-    assert jacoco.find(tmp_path) == g / "jacocoTestReport.xml"       # newest wins
+    gradle_report = g / "jacocoTestReport.xml"
+    gradle_report.write_text("<report/>")
+    maven_report = tmp_path / "target" / "site" / "jacoco" / "jacoco.xml"
+    newer = maven_report.stat().st_mtime + 5
+    os.utime(gradle_report, (newer, newer))
+    assert jacoco.find(tmp_path) == gradle_report       # newest wins
     (tmp_path / "target" / "pit-reports" / "202609111200").mkdir(parents=True)
     (tmp_path / "target" / "pit-reports" / "202609111200" / "mutations.xml").write_text("<mutations/>")
     assert pitest.find(tmp_path).name == "mutations.xml"
