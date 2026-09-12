@@ -1,0 +1,10 @@
+{"schemaVersion": "2", "thresholds": {"high": 80, "low": 60},
+ "files": {"src/clamp.js": {"language": "javascript", "source": "...", "mutants": [
+   {"id": "1", "mutatorName": "ConditionalExpression", "status": "Killed",
+    "location": {"start": {"line": 2, "column": 7}, "end": {"line": 2, "column": 13}}, "replacement": "true"},
+   {"id": "2", "mutatorName": "EqualityOperator", "status": "Survived",
+    "location": {"start": {"line": 2, "column": 7}, "end": {"line": 2, "column": 13}}, "replacement": "x <= lo"},
+   {"id": "3", "mutatorName": "BlockStatement", "status": "NoCoverage",
+    "location": {"start": {"line": 4, "column": 15}, "end": {"line": 6, "column": 4}}, "replacement": "{}"},
+   {"id": "4", "mutatorName": "StringLiteral", "status": "Ignored",
+    "location": {"start": {"line": 8, "column": 1}, "end": {"line": 8, "column": 9}}, "replacement": "\"\""}]}}}
