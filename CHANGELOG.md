@@ -2,6 +2,40 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.16.0] - 2026-09-11
+
+### Added
+- Four `/orc-package` ingredients beside the PPA one, each saying in its first paragraph how far
+  it has been proven: **Google Play** and the **Apple App Store**, researched against the stores'
+  own live pages with no release through them yet; the **Snap Store** and **Flathub**, stood up
+  for Orcshot up to the first upload/submission. Play carries the closed-test gate on new personal
+  accounts, target API 36, 16 KB page alignment and the Data Safety form, publishes via fastlane
+  with a real dry run, and reads installs from the Play stats bucket; the App Store carries the
+  macOS requirement as a `local` / `cloud` choice of leaf shape, Xcode 26 and the privacy
+  manifest, uploads with `altool`, and ships `appstore-status.py`, whose `state` mode makes
+  `--confirm` report `READY_FOR_SALE` programmatically.
+- Five background stack skills, `user-invocable: false`, read by Claude whenever that stack is in
+  play: `stack-flutter`, `stack-android-native` (Kotlin + Compose), `stack-ios-native` (Swift +
+  SwiftUI), `stack-unity` and `stack-godot`. Each states the current toolchain with dates, where
+  things live in the project, and — the reason they exist — a table per store mapping each rule the
+  ingredient states to the file where it is satisfied and the check that proves it.
+  `/orc-code`'s Defaults Table gains a row per stack pointing at its skill.
+- A ninth ingredient section, `## 5. Per-app setup`: what has to be done once per app, before its
+  first release, and is neither registration nor a per-release act — a store listing, privacy
+  declarations, Play's 12-testers-for-14-days gate, Apple's age rating. Section 1 now also states
+  what machine can build the artifact.
+
+### Changed
+- Orclab now ships researched, live-verified knowledge for stores nobody here has shipped
+  through, reversing the v15 spec's "capture is how they arrive" non-goal (BACKLOG #33). Such an
+  ingredient carries a marker saying no release has gone through it; capture becomes how the
+  first real release corrects it.
+
+### Fixed
+- `/orc-publish`'s metrics table: the Flathub row is confirmed live (against `org.gimp.GIMP`) and
+  prints three totals instead of the raw body; the Snap row is marked "never run" — its metrics
+  are confidential to the snap's publisher — rather than "unverified" (BACKLOG #7).
+
 ## [0.15.0] - 2026-09-10
 
 ### Added
