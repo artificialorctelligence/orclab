@@ -1,0 +1,4 @@
+    calc.x_clamp__mutmut_1: survived
+    calc.x_clamp__mutmut_2: killed
+    calc.x_clamp__mutmut_3: survived
+    calc.x_other__mutmut_1: no tests
