@@ -19,6 +19,7 @@ TOOLS = {
 }
 CAVEATS = ["Gradle projects must apply the `jacoco` plugin (and `pitest` for TCE) themselves; "
            "Maven needs nothing in the pom for coverage, only the pitest-junit5-plugin dependency for TCE."]
+SANDBOX = {"target", "build", ".gradle"}   # Maven/Gradle/Pitest/JaCoCo build output
 
 _JACOCO = "org.jacoco:jacoco-maven-plugin"
 

@@ -100,6 +100,47 @@ def test_mutation_run_that_only_writes_its_sandbox_is_scored(tmp_path, capsys, m
     assert code == 0 and "TCE 90.0% ✓" in out
 
 
+def test_mutation_run_that_rewrites_a_committed_sandbox_file_is_scored(tmp_path, capsys, monkeypatch):
+    # javascript.py's own caveat tells a user to commit reports/stryker-incremental.json; a
+    # module's SANDBOX must cover that even though it's tracked (BACKLOG #34 follow-up).
+    repo = make_repo(tmp_path)
+    (repo / "reports").mkdir()
+    (repo / "reports" / "stryker-incremental.json").write_text("{}\n")
+    subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "x"], check=True)
+    m = fake(Mutation(9, 10, []))
+    m.mutation_cmd = lambda root, t, out: ["bash", "-c", "echo '{\"x\":1}' > reports/stryker-incremental.json"]
+    m.SANDBOX = {"reports"}
+    monkeypatch.setattr(langs, "ALL", [m])
+    code, out = run(["analyze"], repo, capsys)
+    assert code == 0 and "TCE 90.0% ✓" in out
+
+
+def test_mutation_run_that_rewrites_a_committed_file_with_no_sandbox_is_not_measurable(tmp_path, capsys, monkeypatch):
+    repo = make_repo(tmp_path)
+    (repo / "reports").mkdir()
+    (repo / "reports" / "stryker-incremental.json").write_text("{}\n")
+    subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "x"], check=True)
+    m = fake(Mutation(9, 10, []))
+    m.mutation_cmd = lambda root, t, out: ["bash", "-c", "echo '{\"x\":1}' > reports/stryker-incremental.json"]
+    monkeypatch.setattr(langs, "ALL", [m])
+    code, out = run(["analyze"], repo, capsys)
+    assert "mutation run changed tracked files outside its sandbox: reports/stryker-incremental.json" in out
+    assert "TCE not measurable — mutation run modified the working tree — see above" in out
+
+
+def test_mutation_run_that_creates_an_untracked_file_is_scored(tmp_path, capsys, monkeypatch):
+    repo = make_repo(tmp_path)
+    subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "x"], check=True)
+    m = fake(Mutation(9, 10, []))
+    m.mutation_cmd = lambda root, t, out: ["bash", "-c", "echo x > newthing.log"]   # untracked, no SANDBOX
+    monkeypatch.setattr(langs, "ALL", [m])
+    code, out = run(["analyze"], repo, capsys)
+    assert code == 0 and "TCE 90.0% ✓" in out
+
+
 def test_analyze_writes_result_file_even_when_every_language_fails_tests(tmp_path, capsys, monkeypatch):
     repo = make_repo(tmp_path)
     monkeypatch.setattr(langs, "ALL", [fake(test_cmd=["false"])])

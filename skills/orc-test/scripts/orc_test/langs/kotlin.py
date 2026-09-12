@@ -16,6 +16,7 @@ MARKERS = ["build.gradle", "build.gradle.kts"]
 TOOLS = {"java": "install a JDK (https://adoptium.net)",
          "gradle": "install Gradle (https://gradle.org), or commit the wrapper (./gradlew)"}
 CAVEATS = []          # computed per project — see CAVEATS_FOR
+SANDBOX = {"build", ".gradle"}   # Gradle/Kover/Pitest build output
 
 
 def claims(root):

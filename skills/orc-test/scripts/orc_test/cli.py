@@ -13,9 +13,12 @@ from . import config, detect, langs
 from .runner import run
 
 _PYTEST_SUMMARY = re.compile(r"(\d+) passed|(\d+) failed|(\d+) error")
-# What a mutation tool may legitimately leave behind; anything else it dirtied is the suite
-# writing to the real tree under a planted defect (test-discipline rule 4; BACKLOG #34).
-_SANDBOX = {".orclab", "mutants", ".coverage", "__pycache__", ".pytest_cache"}
+# What every mutation tool may legitimately touch, whatever the language. A language module adds
+# its own leftovers via an optional top-level `SANDBOX: set[str]` (path prefixes), alongside the
+# other optional module members: `CAVEATS_FOR(root)`, `coverage_unavailable(root)`,
+# `mutation_cwd(root, target)`. Anything a tracked file gains outside the union of the two is the
+# suite writing to the real tree under a planted defect (test-discipline rule 4; BACKLOG #34).
+_SANDBOX = {".orclab"}
 
 
 def _resolve(args):
@@ -148,10 +151,13 @@ def _source_count(d, mod, target):
                if not detect.SKIP_DIRS & set(p.relative_to(d).parts))
 
 
-def _dirty(root):
+def _dirty(root, sandbox):
+    """Tracked paths `git status --porcelain` reports changed, outside `sandbox`. Untracked (`??`)
+    lines are never a defect signature here — a mutation tool's own scratch files it never
+    committed are not "the suite writing to the real tree" (test-discipline rule 4; BACKLOG #34)."""
     cp = run(["git", "status", "--porcelain"], cwd=root)
-    paths = (ln[3:] for ln in cp.stdout.splitlines())
-    return {p for p in paths if not _SANDBOX & set(pathlib.PurePath(p).parts)}
+    paths = (ln[3:] for ln in cp.stdout.splitlines() if not ln.startswith("??"))
+    return {p for p in paths if not sandbox & set(pathlib.PurePath(p).parts)}
 
 
 def _mutation(mod, root, d, target, out):
@@ -163,9 +169,10 @@ def _mutation(mod, root, d, target, out):
               " — a first run on the whole project takes a while; later runs are incremental"
               " where the tool supports it")
     where = getattr(mod, "mutation_cwd", lambda r, t: r)(d, target)   # a sub-project's own config
-    before = _dirty(root)
+    sandbox = _SANDBOX | getattr(mod, "SANDBOX", set())   # the language's own legitimate scratch paths
+    before = _dirty(root, sandbox)
     cp = run(mod.mutation_cmd(where, target, out), cwd=where)
-    changed = sorted(_dirty(root) - before)
+    changed = sorted(_dirty(root, sandbox) - before)
     if changed:
         print(f"mutation run changed tracked files outside its sandbox: {' '.join(changed)} — the "
               "suite writes to the real tree under a planted defect (test-discipline rule 4; BACKLOG #34)")

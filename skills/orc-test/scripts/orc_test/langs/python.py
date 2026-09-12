@@ -29,6 +29,7 @@ CAVEATS = [
     "mutmut runs from the nearest pyproject.toml with [tool.mutmut] at or above the path and"
     " mutates that file's source_paths; a path narrows only by picking which config runs.",
 ]
+SANDBOX = {"mutants", ".coverage", "__pycache__", ".pytest_cache"}   # mutmut/pytest-cov's own scratch
 
 _IGNORE = "--ignore-glob=*mutants/*"        # root and nested: each suite's mutmut has its own mutants/
 _RESULT = re.compile(r"^\s*(\S+): (.+)$")

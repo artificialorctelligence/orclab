@@ -19,6 +19,7 @@ TOOLS = {"swift": "install Swift (https://swift.org/install) — Xcode on a Mac"
 CAVEATS = ["Muter has two open bugs (muter#307, #310, 2026) where SPM projects score 0%; treat "
            "a 0% TCE on an SPM package as the bug until a real run says otherwise.",
            "Muter's per-mutant detail is not parsed yet — survivors are listed per file."]
+SANDBOX = {".build"}   # SPM build output
 
 
 def _xcodeproj(root):

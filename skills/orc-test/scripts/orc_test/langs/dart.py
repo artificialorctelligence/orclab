@@ -21,6 +21,7 @@ CAVEATS = ["mutation_test is young (pub.dev 1.8.0, 2026-02); its report is read 
            "dart_mutant (Rust, Stryker JSON) is the alternative if this proves unreliable.",
            "No test-specific lint exists for Dart; `dart analyze` runs, but it cannot see an "
            "assertion-free test."]
+SANDBOX = {"coverage", ".dart_tool"}   # package:coverage/mutation_test/pub output
 
 _CASE = re.compile(r"^(?P<file>[^:]+):(?P<line>\d+):\d+ (?P<what>.*)$")
 

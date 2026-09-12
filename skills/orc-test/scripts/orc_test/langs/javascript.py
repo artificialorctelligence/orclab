@@ -16,6 +16,7 @@ MARKERS = ["package.json"]
 TOOLS = {"npx": "install Node.js (https://nodejs.org) — npx ships with npm"}
 CAVEATS = ["Stryker's incremental file is reports/stryker-incremental.json; commit it or add it "
            "to .gitignore, either is fine, but do not delete it between runs."]
+SANDBOX = {"reports", ".stryker-tmp"}   # legitimate even when committed, per the caveat above
 
 
 def _deps(root):

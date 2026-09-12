@@ -160,10 +160,11 @@ One rule: say what, show the command, stop that language, continue the others.
 - Tool missing → its name and install line, language skipped. Nothing is installed.
 - Tests red under `analyze` → "tests failed; nothing measured" for that language.
 - Mutation run interrupted → the tool's incremental file keeps what finished; run again.
-- Mutation run changed files outside its own output (`.orclab/`, `mutants/`, `.coverage`) →
-  the paths are named, TCE is "not measurable", and the run is not scored: the suite wrote to
-  the real tree under a planted defect (test-discipline rule 4; BACKLOG #34). Fix the tests'
-  isolation first.
+- Mutation run changed a *tracked* file outside `.orclab/` and its language's own build/report
+  output (e.g. `mutants/` for Python, `reports/` for JS/TS) → the paths are named, TCE is "not
+  measurable", and the run is not scored: the suite wrote to the real tree under a planted
+  defect (test-discipline rule 4; BACKLOG #34). Fix the tests' isolation first. An untracked
+  file the tool left behind is never this — only a committed file changing is the signature.
 - Mutation tool produced no mutants → its own output is shown above the line, since the usual
   cause (a missing `[tool.mutmut]`, a wrong test path) is in there.
 - Tests red under `analyze` and nothing else → `generate` is not offered; a red suite is fixed
