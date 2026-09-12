@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<report name="demo">
+  <package name="com/example">
+    <class name="com/example/Clamp" sourcefilename="Clamp.java">
+      <counter type="LINE" missed="2" covered="4"/>
+    </class>
+    <sourcefile name="Clamp.java">
+      <line nr="3" mi="0" ci="1"/><line nr="4" mi="1" ci="0"/>
+      <counter type="INSTRUCTION" missed="5" covered="9"/>
+      <counter type="LINE" missed="2" covered="4"/>
+    </sourcefile>
+    <sourcefile name="Other.java">
+      <counter type="LINE" missed="0" covered="3"/>
+    </sourcefile>
+    <counter type="LINE" missed="2" covered="7"/>
+  </package>
+  <counter type="LINE" missed="2" covered="7"/>
+</report>
