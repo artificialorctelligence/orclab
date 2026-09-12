@@ -52,8 +52,11 @@ def _run_tests(mod, root, target, cfg):
     secs = time.monotonic() - t0
     ok = cp.returncode == 0
     print(cp.stdout[-3000:])
-    counts = " ".join(m.group(0) for m in _PYTEST_SUMMARY.finditer(cp.stdout)) or (
-        "passed" if ok else "failed")
+    counts = " ".join(m.group(0) for m in _PYTEST_SUMMARY.finditer(cp.stdout))
+    if not counts:
+        empty = "no tests ran" in cp.stdout or cp.returncode == 5
+        counts = "0 tests" if empty else ("passed" if ok else "failed")
+        ok = ok and not empty
     return ok, f"{mod.LABEL:<10} {'✓' if ok else '✗'} {counts} ({secs:.1f}s)"
 
 
@@ -130,7 +133,8 @@ def _mutation(mod, root, target, cfg, out):
         return {"unavailable": why}
     if not target:
         print(f"{mod.LABEL}: mutating {_source_count(root, mod, None)} files"
-              " — a first run on the whole project takes a while; later runs are incremental")
+              " — a first run on the whole project takes a while; later runs are incremental"
+              " where the tool supports it")
     cp = run(mod.mutation_cmd(root, target, out), cwd=root)
     if cp.returncode not in (0, 1, 2):        # tools exit non-zero on survivors; a crash is higher
         print(cp.stdout[-3000:])

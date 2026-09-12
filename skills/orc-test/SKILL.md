@@ -52,8 +52,9 @@ git. Guess a language it cannot see a marker for.
 
 ## `run` — does the code work?
 
-`python3 ${CLAUDE_SKILL_DIR}/scripts/run.py run [path]`. One line per language: ✓/✗, counts,
-seconds. Exit 1 on any failure. `/orc-git merge` calls this before and after landing a branch.
+`python3 ${CLAUDE_SKILL_DIR}/scripts/run.py run [path]`. One line per language: ✓/✗, counts where
+the runner prints a `N passed` summary, seconds. Exit 1 on any failure. `/orc-git merge` calls
+this before and after landing a branch.
 
 ## `coverage` — how much do the tests exercise?
 
@@ -67,7 +68,8 @@ HTML report path is printed; per-line detail lives there, not in the summary.
 one defect at a time (a `<` becomes `<=`, a branch is deleted, a call is removed) and re-runs the
 suite; a mutant the suite does not catch *survived*. The share caught is the mutation score —
 Test Case Effectiveness, TCE — gated at 70. Then a lint over the test files for the four smells:
-no assertion, `sleep`, skipped, duplicate name. A language with no test lint of its own (Dart, or
+no assertion, `sleep`, skipped, duplicate name — where the language's linter has those rules;
+`languages/<lang>.md` says which. A language with no test lint of its own (Dart, or
 JS/TS without the eslint plugin) reports `lint: not run — <reason>` instead of a count.
 
 Read it like this:
@@ -89,12 +91,14 @@ That list is the most valuable thing this command produces.
 
 **Before a whole-project run it says how many files it is about to mutate**, once per language,
 and that a first run takes a while (later runs are incremental where the tool supports it). It
-does not ask — you typed the command. Give it a path to narrow it. `--no-mutation` skips the
+does not ask — you typed the command. Give it a path to narrow it — how far a path narrows the
+mutation step is per language; `languages/<lang>.md` says. `--no-mutation` skips the
 slow step and the report says `TCE skipped` rather than showing a number that is not one.
 
 **When it cannot measure something it says so in words** — no mutation tool for the language,
-the tool not installed (with the install line), Kotlin without an open-source licence, a tests
-run that was red. It never prints 0% for "did not measure".
+the tool not installed (with the install line), a tests run that was red. It never prints 0% for
+"did not measure". Kotlin without an open-source licence still gets a number, marked approximate
+in a `note:` line.
 
 **Hand-off.** If any gate failed, the last line is
 `gates failed: … — run /orc-test generate to repair`. `analyze` **offers** `generate`; it
@@ -118,7 +122,7 @@ under the path changed after it was written, run `analyze` first. Never guess wh
 1. **Surviving mutants first.** Each one says: "at this file and line, this change went
    unnoticed." Write the test that goes red on exactly that change. `test-discipline` rule 5
    ("prove the test can fail") is free here — the mutant *is* the planted defect; re-run
-   `analyze <that file>` and confirm it is now killed.
+   `analyze` and confirm it is now killed.
 2. **Uncovered code next**, worst file first from the coverage list. Realistic data, mocks for
    anything that leaves the process, per the discipline.
 3. **Lint findings last.** Give an assertion-free test an assertion. If it genuinely tests
@@ -151,10 +155,10 @@ One rule: say what, show the command, stop that language, continue the others.
 - Tool missing → its name and install line, language skipped. Nothing is installed.
 - Tests red under `analyze` → "tests failed; nothing measured" for that language.
 - Mutation run interrupted → the tool's incremental file keeps what finished; run again.
-- A language detected with no tests → `0 tests`, `0.0%` — an empty suite is a finding, not a
-  pass.
-- Wrong detection → override the command in `.orclab/test.yaml`; the `detected:` line always
-  shows what it saw.
+- A language detected with no tests → `0 tests ✗`, nothing measured — an empty suite is a
+  failure, not a pass.
+- Wrong detection → override the command in `.orclab/test.yaml`, or run with `--lang <key>` to
+  narrow to one language; the `detected:` line always shows what it saw.
 - gdUnit4 exits 100 (failures) / 101 (warnings); both are failures here.
 
 ## Deferred, by name

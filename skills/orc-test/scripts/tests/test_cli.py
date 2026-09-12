@@ -44,6 +44,14 @@ def test_run_red_suite_exits_nonzero(tmp_path, capsys):
     assert code == 1 and "failed" in out
 
 
+def test_empty_suite_reports_zero_tests_not_failed(tmp_path, capsys):
+    repo = make_repo(tmp_path)
+    (repo / "tests" / "test_ok.py").unlink()
+    code, out = run(["run"], repo, capsys)
+    assert code == 1
+    assert "0 tests" in out and "✗" in out
+
+
 def test_missing_tool_skips_language_with_install_line(tmp_path, capsys, monkeypatch):
     fake = types.SimpleNamespace(KEY="fake", LABEL="Fake", MARKERS=["pyproject.toml"],
                                  TOOLS={"faketool": "brew install faketool"},
