@@ -2491,12 +2491,34 @@ changed about the design, recorded here so the entry stays true:
 **Later the same day:** direflail asked for Unity and Godot after all; `stack-unity` and
 `stack-godot` landed (`2c3e4de`), thinner by design. One finding worth its own line: Godot's iOS
 export *generates* the App Store privacy manifest from preset options, where Flutter, Xcode and
-Unity all leave it to be added by hand. The snap and Flathub ingredients were named as living at
-`orcshot/skills/orc-package/ingredients/{snap,flatpak}/ingredient.md`, but on 2026-09-11 neither
-path existed in Orcshot's main checkout, either worktree, or its git history — Orcshot has no
-`skills/` directory at all. Presumably the Orcshot session had not written them yet.
+Unity all leave it to be added by hand.
 
-Still open under this entry: the snap/Flathub ingredients from Orcshot, to arrive in the
-nine-section shape once they exist; and the first real release through any of the researched
-ingredients, which is what turns "researched" into "proven" and is the reason this entry is not
-resolved.
+**The snap and Flathub ingredients arrived by a different route than expected, and were committed
+by accident.** They were first named as living under `orcshot/skills/orc-package/ingredients/`,
+where nothing existed. The Orcshot session wrote them directly into *this* tree instead, between
+two of the commits above, and the `git add -A` in `2c3e4de` swept both files into the game-stacks
+commit — whose message does not mention them. Recorded here so the history reads right: `2c3e4de`
+carries four new files, not two. Two small reconciliations were made afterwards: each leaf gained
+the `metrics:` command `/orc-publish` had already verified (Flathub live, Snap against the
+reference) instead of its own "verify at first use" note, and each section 1 gained the
+"Built on" line the nine-section shape requires.
+
+Still open under this entry: the first real release through any of the researched ingredients,
+which is what turns "researched" into "proven" and is the reason this entry is not resolved — and
+the `ego` / `spices` follow-up in the next paragraph.
+
+**Update 2026-09-11 (late) — snap and flatpak ingredients written; follow-up owed.** Both live in
+`skills/orc-package/ingredients/{snap,flatpak}/`, in the nine-section shape, from Orcshot's
+research that day: Snap's login/name registration/`review-tools` run were real, the upload was
+not; Flathub is from its live docs plus a real sandbox test, with no submission yet. direflail's
+standing instruction on committing them: **update the ingredient lists once Orcshot's #205 and
+#198 resolve.** Concretely, when Orcshot's first real snap upload, Flathub submission,
+extensions.gnome.org upload and Cinnamon Spices PR have gone through: (1) correct `snap` and
+`flatpak` with whatever the real run contradicted (the "verify at first use" markers name the
+spots — metric names, the Flathub manifest `sed` shape, moderation-hold behaviour); (2) write the
+two ingredients deliberately not written from research alone, `ego` (GNOME Shell extensions via
+`gnome-extensions upload`, needs GNOME Shell ≥ 50 on the publishing machine) and `spices`
+(Cinnamon applets via PR to `linuxmint/cinnamon-spices-applets`), from the captured runs; (3)
+drop the "no release has gone through this" marker from each. Orcshot's spec
+`docs/superpowers/specs/2026-09-11-snap-compliant-extension-delivery-design.md` §5 holds the
+leaf shapes those two ingredients will start from.

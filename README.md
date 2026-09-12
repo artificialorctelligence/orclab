@@ -55,9 +55,11 @@ below.
 - **/orc-package** — stand up a distribution channel for this project by applying an
   *ingredient* (the reusable knowledge of how to set up a PPA, a store, a registry) to the
   project's own `channels.yaml`, `distro.yaml` and `RELEASING.md`. Ships ingredients for a
-  Launchpad PPA (proven by a real release), Google Play and the Apple App Store (researched
-  against the stores' live rules, not yet proven by one — each says so); captures a new one, into
-  your own config directory, for any channel it doesn't ship. Runs
+  Launchpad PPA (proven by a real release), the Snap Store and Flathub (stood up for real up to
+  the first upload/submission, which has not happened yet), and Google Play and the Apple App
+  Store (researched against the stores' live rules, not yet proven by one) — each says which in
+  its first paragraph; captures a new one, into your own config directory, for any channel it
+  doesn't ship. Runs
   only an ingredient's checks, never its account-gated setup, and never writes a credential.
   Ships as a skill only.
 - **/orc-reload** — reinstall the plugin you're currently developing so a fresh session picks up

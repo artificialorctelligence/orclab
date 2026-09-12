@@ -24,6 +24,9 @@ to a channel (`edge`, `beta`, `candidate`, `stable`); users `snap install __SNAP
 non-stable channel). Ubuntu preinstalls snapd; Fedora and Arch make it an opt-in install; Linux
 Mint blocks it by default. Plan the audience accordingly.
 
+Built on: Linux with `snapcraft` installed (`sudo snap install snapcraft --classic`); `snapcraft
+pack` builds inside an LXD or Multipass container it sets up itself. No other platform requirement.
+
 Takes: a built `.snap` from `snapcraft pack` — a working `snapcraft.yaml` is the artifact and is
 `/orc-code`'s territory. This ingredient assumes it exists and checks that it does
 (`test -f snapcraft.yaml || test -f snap/snapcraft.yaml`).
@@ -119,6 +122,7 @@ snap:
   action: "snapcraft upload --release=__CHANNEL__ __SNAP___$(grep -m1 '^version' pyproject.toml | sed -E 's/^version *= *\"([^\"]+)\"/\\1/')___ARCH__.snap"
   confirm:
     url: "https://snapcraft.io/__SNAP__"
+  metrics: "snapcraft metrics __SNAP__ --format=json --name weekly_installed_base_by_operating_system"
   requirements:
     - "Run `review-tools.snap-review <the .snap>` first. Any `human review required` line is a
        store hold; a `dbus` slot hold needs the one-time forum request (RELEASING.md's one-time
@@ -146,9 +150,11 @@ map with the new version on `__CHANNEL__` — this is also the only thing that d
 "accepted and released" from "accepted and held for human review", which `snapcraft upload`'s exit
 code does not.
 
-Metrics: `snapcraft metrics __SNAP__ --name installed_base_by_channel --format=json` (needs the
-store login; `package_metrics` is in the default permission set). Verify the exact metric names
-against `snapcraft metrics --help` at first use — not exercised for Orcshot yet.
+Metrics: the leaf's `metrics:` uses `weekly_installed_base_by_operating_system`, one of the twelve
+metric names checked against the live snapcraft reference on 2026-09-10 (`/orc-publish`'s own
+table; `installed_base_by_channel` is another). It needs the store login — Snap metrics are
+confidential to the publisher, so no one but the author can run it — and has never produced
+output for any Orclab-adjacent snap. When it first does, correct `/orc-publish`'s "Never run" row.
 
 ## 8. `RELEASING.md` steps
 

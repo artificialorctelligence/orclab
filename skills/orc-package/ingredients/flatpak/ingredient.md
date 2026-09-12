@@ -24,6 +24,9 @@ it owns (`github.com/flathub/__APP_ID__`); users install from the Software app o
 Flathub enabled — Fedora, Linux Mint and most others ship it enabled; Ubuntu does not, and its
 users add it by hand. That makes Flathub the channel for everything that is not Ubuntu-with-snaps.
 
+Built on: nothing in particular — Flathub builds the app itself. The local lint and test build
+need `flatpak` and `org.flatpak.Builder` on any Linux; the publish action needs only `git` and `gh`.
+
 Takes: a manifest (`__MANIFEST__`), a metainfo file, a desktop file and an icon, all in the
 project. Producing them is `/orc-code`'s territory; this ingredient checks the manifest exists and
 that `flatpak-builder-lint` passes on both the manifest and the metainfo:
@@ -116,6 +119,7 @@ flatpak:
     gh pr create --fill --base master --head "update-$V"
   confirm:
     url: "https://github.com/flathub/__APP_ID__/pulls"
+  metrics: "curl -fsS https://flathub.org/api/v2/stats/__APP_ID__ | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d[\"id\"], \"-\", d[\"installs_total\"], \"installs total,\", d[\"installs_last_month\"], \"last month,\", d[\"installs_last_7_days\"], \"last 7 days\")'"
   requirements:
     - "Section 5 must be complete: `gh repo view flathub/__APP_ID__` succeeds and
        `gh api repos/flathub/__APP_ID__/collaborators/__GH_USER__/permission` says write."
@@ -143,8 +147,11 @@ flatpak:
 version once the merged build has published. `confirm.url` above points at the PR list because at
 the moment the action finishes, "PR open, test build pending" is the honest status.
 
-Metrics: `https://flathub.org/api/v2/stats/__APP_ID__` (installs, per day and total). Verify the
-exact field names at first use; not exercised for Orcshot yet.
+Metrics: the leaf's `metrics:` reads `https://flathub.org/api/v2/stats/__APP_ID__` and prints the
+three totals. The field names (`installs_total`, `installs_last_month`, `installs_last_7_days`)
+were confirmed live on 2026-09-10 against `org.gimp.GIMP` (`/orc-publish`'s table, BACKLOG #7); the
+endpoint 404s for an unpublished id, which fails the leaf honestly. Fetches, not people — the
+schema does not say whether updates are counted.
 
 ## 8. `RELEASING.md` steps
 
