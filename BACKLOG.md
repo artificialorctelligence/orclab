@@ -2470,3 +2470,25 @@ Scope boundary: this changes what Orclab *ships*, not what `/orc-publish` or `/o
 `/orc-publish` stays channel-agnostic and executes whatever the leaf says; `/orc-package` applies
 an ingredient the same way whether it was researched or captured. Neither command's code changes
 for this entry.
+
+**Progress 2026-09-11, same day — the mobile half is written.** Research and writing ran in one
+session: the Play and App Store channel ingredients (`7e9c227`), then `stack-flutter`
+(`fe93b8a`), `stack-android-native` and `stack-ios-native` (`ff0df3a`). Two things the research
+changed about the design, recorded here so the entry stays true:
+
+- *The ingredient shape moved.* Both stores have a stage between "the account exists" and "every
+  release" — a store listing, privacy declarations, Play's 12-testers-for-14-days gate, Apple's
+  age rating and EU trader status. The PPA-derived eight sections had no place for it, so
+  ingredients now have nine: `## 5. Per-app setup`. Section 1 also states what machine can build
+  the artifact, because the App Store needs macOS and nothing before it had a platform
+  requirement.
+- *The cross-reference is load-bearing, not decorative.* Every stack skill ends up with a table
+  mapping each store rule to a file and a check. Two findings from writing them are exactly the
+  kind of thing the Orcshot refactors came from: a fresh Flutter 3.47 project already meets Play's
+  target-SDK and 16 KB rules (defaults read from Flutter's own source), and *neither* Flutter's
+  nor Xcode's app template ships the App Store's mandatory `PrivacyInfo.xcprivacy`.
+
+Still open under this entry: the Unity and Godot stack skills (not in focus); the snap/Flathub
+ingredients from Orcshot's in-progress work, to arrive in the nine-section shape; and the first
+real release through any of the three researched ingredients, which is what turns "researched"
+into "proven" and is the reason this entry is not resolved.
