@@ -41,22 +41,29 @@ def coverage_parse(root, out):
     return lcov.parse(max(hits, key=lambda p: p.stat().st_mtime))
 
 
-def mutation_unavailable(root):
+def mutation_unavailable(root, target=None):
     if shutil.which("dotnet-stryker") is None:
         return "Stryker.NET not installed — dotnet tool install -g dotnet-stryker"
     return None
 
 
+def _stryker_out(root):
+    # Stryker.NET keeps its baseline under --output; `.orclab/test/csharp/` is emptied every run,
+    # so the report and baseline live beside it instead and survive from one run to the next.
+    return pathlib.Path(root) / ".orclab" / "stryker-net"
+
+
 def mutation_cmd(root, target, out):
     cmd = ["dotnet", "stryker", "--reporter", "json", "--reporter", "progress",
-           "--with-baseline", "--output", str(out)]
+           "--with-baseline", "--output", str(_stryker_out(root))]
     if target:
         cmd += ["--mutate", f"{target}/**/*.cs"]
     return cmd
 
 
 def mutation_parse(root, out):
-    p = stryker.find(out)
+    home = _stryker_out(root)
+    p = stryker.find(home) if home.is_dir() else None
     return stryker.parse(p, root) if p else Mutation(0, 0)
 
 

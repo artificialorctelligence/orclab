@@ -49,7 +49,7 @@ def coverage_parse(root, out):
     return lcov.parse(pathlib.Path(out) / "lcov.info")
 
 
-def mutation_unavailable(root):
+def mutation_unavailable(root, target=None):
     deps = _deps(root)
     if "@stryker-mutator/core" not in deps or f"@stryker-mutator/{_runner(root)}-runner" not in deps:
         return ("StrykerJS not installed — npm i -D @stryker-mutator/core "

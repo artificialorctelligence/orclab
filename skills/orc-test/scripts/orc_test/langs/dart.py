@@ -57,7 +57,7 @@ def coverage_parse(root, out):
     return lcov.parse(report) if report.exists() else Coverage(0, 0)
 
 
-def mutation_unavailable(root):
+def mutation_unavailable(root, target=None):
     if "mutation_test" not in (pathlib.Path(root) / "pubspec.yaml").read_text():
         return "mutation_test not installed — dart pub add --dev mutation_test"
     return None

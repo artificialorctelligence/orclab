@@ -26,7 +26,7 @@ def run(args, repo, capsys):
 def fake(mutation=None, unavailable=None, cov=(9, 10), lint=None, test_cmd=None, coverage_unavailable=None):
     m = types.SimpleNamespace(
         KEY="fake", LABEL="Fake", SOURCE_EXT=".py", MARKERS=["pyproject.toml"], TOOLS={}, CAVEATS=["a caveat"],
-        mutation_unavailable=lambda root: unavailable, missing=lambda root: [],
+        mutation_unavailable=lambda root, target=None: unavailable, missing=lambda root: [],
         test_cmd=lambda root, t: test_cmd if test_cmd is not None else ["true"],
         coverage_unavailable=lambda root: coverage_unavailable,
         coverage_cmd=lambda root, t, out: ["true"],

@@ -1,5 +1,6 @@
 import json
 import pathlib
+import subprocess
 
 from orc_test import langs
 from orc_test.model import Mutation, Survivor
@@ -46,11 +47,57 @@ def test_analyze_announces_size_on_whole_repo(tmp_path, capsys, monkeypatch):
     assert "mutating 4 files" in out    # 3 modules + tests/test_ok.py; first run, no cache yet
 
 
-def test_analyze_no_mutants_is_words_not_a_fabricated_zero(tmp_path, capsys, monkeypatch):
-    monkeypatch.setattr(langs, "ALL", [fake(Mutation(0, 0, []))])
+def test_analyze_no_mutants_is_words_not_a_fabricated_zero_and_shows_the_tool_output(tmp_path, capsys, monkeypatch):
+    m = fake(Mutation(0, 0, []))
+    m.mutation_cmd = lambda root, t, out: ["bash", "-c", "echo 'BadTestExecutionCommandsException: no tests'"]
+    monkeypatch.setattr(langs, "ALL", [m])
     code, out = run(["analyze"], make_repo(tmp_path), capsys)
     assert "TCE not measurable — mutation tool produced no mutants" in out
+    assert "BadTestExecutionCommandsException" in out     # the tool's own error, not hidden
     assert "TCE 0" not in out
+
+
+def test_analyze_red_suite_is_not_offered_generate(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr(langs, "ALL", [fake(test_cmd=["false"])])
+    code, out = run(["analyze"], make_repo(tmp_path), capsys)
+    assert code == 1
+    assert "gates failed: tests — fix the failing tests first; generate cannot repair a red suite" in out
+    assert "generate` to repair" not in out
+
+
+def test_analyze_absent_coverage_report_is_words_not_zero_percent(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr(langs, "ALL", [fake(Mutation(9, 10, []), cov=(0, 0))])
+    code, out = run(["analyze"], make_repo(tmp_path), capsys)
+    assert code == 0
+    assert "coverage not measurable — no coverage report found — see languages/fake.md" in out
+    assert "coverage 0.0%" not in out
+
+
+def test_mutation_run_that_dirties_the_tree_is_reported_not_scored(tmp_path, capsys, monkeypatch):
+    repo = make_repo(tmp_path)
+    (repo / "tracked.txt").write_text("x\n")
+    subprocess.run(["git", "-C", str(repo), "add", "tracked.txt"], check=True)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "x"], check=True)
+    m = fake(Mutation(9, 10, []))
+    m.mutation_cmd = lambda root, t, out: ["bash", "-c", "echo x >> tracked.txt; mkdir -p mutants; touch mutants/ok"]
+    monkeypatch.setattr(langs, "ALL", [m])
+    code, out = run(["analyze"], repo, capsys)
+    assert "$ git status --porcelain" in out
+    assert "mutation run changed tracked files outside its sandbox: tracked.txt — the suite writes" in out
+    assert "BACKLOG #34" in out
+    assert "TCE not measurable — mutation run modified the working tree — see above" in out
+    assert "mutants" not in out.split("outside its sandbox:")[1].split("—")[0]   # mutants/ is the tool's own
+
+
+def test_mutation_run_that_only_writes_its_sandbox_is_scored(tmp_path, capsys, monkeypatch):
+    repo = make_repo(tmp_path)
+    subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "x"], check=True)
+    m = fake(Mutation(9, 10, []))
+    m.mutation_cmd = lambda root, t, out: ["bash", "-c", "mkdir -p mutants; touch mutants/ok .coverage"]
+    monkeypatch.setattr(langs, "ALL", [m])
+    code, out = run(["analyze"], repo, capsys)
+    assert code == 0 and "TCE 90.0% ✓" in out
 
 
 def test_analyze_writes_result_file_even_when_every_language_fails_tests(tmp_path, capsys, monkeypatch):

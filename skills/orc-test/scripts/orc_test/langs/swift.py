@@ -69,7 +69,10 @@ def coverage_parse(root, out):
         report = pathlib.Path(cp.stdout.strip()) if cp.stdout.strip() else None
     if report is None or not report.exists():
         return Coverage(0, 0)
-    return _parse_xccov(report, root)
+    try:
+        return _parse_xccov(report, root)
+    except ValueError:            # xccov printed something that is not its JSON report
+        return Coverage(0, 0)
 
 
 def _relativise(p, root):
@@ -90,7 +93,7 @@ def _parse_xccov(path, root):
     return Coverage(sum(c for c, _ in files.values()), sum(t for _, t in files.values()), files)
 
 
-def mutation_unavailable(root):
+def mutation_unavailable(root, target=None):
     if shutil.which("muter") is None:
         return "Muter not installed — brew install muter-mutation-testing/formulae/muter"
     if not (pathlib.Path(root) / "muter.conf.yml").exists():

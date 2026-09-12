@@ -37,18 +37,22 @@ def _candidates(root):
 
 
 def languages(root, modules):
-    files = list(_candidates(root))
+    """[(module, dir)] — dir is where the module's first marker sits (root when it is at root),
+    shallowest first, so a root build file wins over a module's. Everything that language's tools
+    do runs from dir; the marker two directories down is a real sub-project, not a root one."""
+    root = pathlib.Path(root)
+    files = sorted(_candidates(root), key=lambda f: (len(f.relative_to(root).parts), str(f)))
     found = []
     for m in modules:
-        if any(f.match(pat) for pat in m.MARKERS for f in files):
-            found.append(m)
-    keys = {m.KEY for m in found}
-    if "kotlin" in keys and "java" in keys:
-        kot = next(m for m in found if m.KEY == "kotlin")
-        if kot.claims(root):
-            found = [m for m in found if m.KEY != "java"]
-        else:
-            found = [m for m in found if m.KEY != "kotlin"]
+        hit = next((f for f in files if any(f.match(pat) for pat in m.MARKERS)), None)
+        if hit is not None:
+            depth = max(len(pathlib.PurePath(pat).parts) for pat in m.MARKERS if hit.match(pat))
+            found.append((m, hit.parents[depth - 1]))   # *.xcodeproj/project.pbxproj → its parent
+    dirs = {m.KEY: d for m, d in found}
+    if "kotlin" in dirs and "java" in dirs:
+        kot = next(m for m, _ in found if m.KEY == "kotlin")
+        drop = "java" if kot.claims(dirs["kotlin"]) else "kotlin"
+        found = [(m, d) for m, d in found if m.KEY != drop]
     return found
 
 

@@ -13,7 +13,8 @@ KEY = "kotlin"
 LABEL = "Kotlin"
 SOURCE_EXT = ".kt"
 MARKERS = ["build.gradle", "build.gradle.kts"]
-TOOLS = {"java": "install a JDK (https://adoptium.net)"}
+TOOLS = {"java": "install a JDK (https://adoptium.net)",
+         "gradle": "install Gradle (https://gradle.org), or commit the wrapper (./gradlew)"}
 CAVEATS = []          # computed per project — see CAVEATS_FOR
 
 
@@ -31,10 +32,16 @@ def claims(root):
 
 def CAVEATS_FOR(root):
     label = licence.open_source(root)
-    if label:
+    build = _find_build_gradle(root)
+    arcmutate = build is not None and "arcmutate" in build.read_text()
+    if label and arcmutate:
         return [f"TCE via Pitest + Arcmutate's Kotlin plugin (free for open source; this project "
                 f"declares {label}). Arcmutate filters the junk mutants plain Pitest "
                 "produces on Kotlin bytecode."]
+    if label:
+        return [f"TCE is approximate (plain Pitest); this project declares {label}, so Arcmutate's "
+                "Kotlin plugin is free — add com.arcmutate:pitest-kotlin-plugin to the build to "
+                "filter the junk mutants plain Pitest produces on Kotlin bytecode."]
     return ["TCE is approximate: plain Pitest on Kotlin bytecode reports junk mutants from compiler-"
             "generated code. Arcmutate's Kotlin plugin fixes that but needs an open-source licence, "
             "and this project does not declare one."]
@@ -45,7 +52,10 @@ def _gradle(root):
 
 
 def missing(root):
-    return [t for t in TOOLS if shutil.which(t) is None]
+    needed = dict(TOOLS)
+    if (pathlib.Path(root) / "gradlew").exists():
+        del needed["gradle"]
+    return [t for t in needed if shutil.which(t) is None]
 
 
 def test_cmd(root, target):
@@ -61,7 +71,7 @@ def coverage_parse(root, out):
     return jacoco.parse(p) if p else Coverage(0, 0)
 
 
-def mutation_unavailable(root):
+def mutation_unavailable(root, target=None):
     build_file = _find_build_gradle(root)
     if build_file is None:
         return "no build.gradle found at or below the project root"

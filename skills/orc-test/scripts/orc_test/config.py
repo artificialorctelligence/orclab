@@ -17,6 +17,8 @@ def load(root):
             data = yaml.safe_load(path.read_text()) or {}
         except yaml.YAMLError as e:
             raise BadConfig(f"{path}: invalid YAML ({e})")
+        if not isinstance(data, dict):
+            raise BadConfig(f"{path}: top level must be a mapping")
         for k in ("coverage", "tce"):
             if k in data:
                 try:

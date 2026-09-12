@@ -77,7 +77,7 @@ def _find_build_gradle(root):
     return None
 
 
-def mutation_unavailable(root):
+def mutation_unavailable(root, target=None):
     if _maven(root):
         if "pitest-junit5-plugin" not in (pathlib.Path(root) / "pom.xml").read_text():
             return ("Pitest needs the org.pitest:pitest-junit5-plugin dependency in the pom "

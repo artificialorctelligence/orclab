@@ -48,6 +48,13 @@ def test_coverage_parse_no_report(tmp_path):
     assert swift.coverage_parse(tmp_path, tmp_path / "out") == Coverage(0, 0)
 
 
+def test_coverage_parse_xccov_garbage_is_zero_not_a_crash(tmp_path, monkeypatch):
+    _make_xcodeproj(tmp_path, "App.xcodeproj")
+    (tmp_path / "out").mkdir()
+    monkeypatch.setattr(swift, "run", lambda cmd, cwd: type("R", (), {"stdout": "xcrun: error: no result bundle"})())
+    assert swift.coverage_parse(tmp_path, tmp_path / "out") == Coverage(0, 0)
+
+
 def test_muter_parse_uses_file_level_numbers():
     m = swift._parse_muter(FIX / "muter.json")
     assert (m.killed, m.total) == (5, 8)
@@ -71,7 +78,7 @@ def test_xcodeproj_marker_matches_nested_bundle(tmp_path):
     the file inside the bundle, and it must be found through nesting too."""
     _make_xcodeproj(tmp_path, "App", "App.xcodeproj")
     found = detect.languages(tmp_path, [swift])
-    assert found == [swift]
+    assert found == [(swift, tmp_path / "App")]     # the bundle's parent, never inside the bundle
     cmd = swift.test_cmd(tmp_path, None)
     assert cmd[cmd.index("-project") + 1] == "App/App.xcodeproj"
 

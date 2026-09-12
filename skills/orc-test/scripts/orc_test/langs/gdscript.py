@@ -52,7 +52,7 @@ def coverage_parse(root, out):
     return lcov.parse(report)
 
 
-def mutation_unavailable(root):
+def mutation_unavailable(root, target=None):
     return "no mutation tool exists for GDScript (checked 2026-09-11)"
 
 

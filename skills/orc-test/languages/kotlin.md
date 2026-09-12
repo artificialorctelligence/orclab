@@ -39,11 +39,13 @@ test or an assertion-free test body is not caught. The fallback there is a plain
 `grep -rn '@Disabled'` (or eyeballing), not run automatically by `cli.py`.
 
 ## Caveats
-- **The Arcmutate caveat printed by `/orc-test analyze` depends on which licence the project
-  declares, not on whether Arcmutate is actually installed.** `kotlin.CAVEATS_FOR(root)` reports
-  "TCE is approximate" (junk mutants included) when `licence.open_source` finds nothing, and
-  names Arcmutate by name once a recognised licence is found — it never runs Arcmutate itself or
-  confirms the plugin is on the build's classpath.
+- **The Arcmutate caveat printed by `/orc-test analyze` reads two things: the licence the
+  project declares, and whether the Gradle build file mentions `arcmutate`.** With neither, "TCE
+  is approximate" (junk mutants included) and the licence is named as the blocker. With a
+  recognised open-source licence but no `arcmutate` in the build, still approximate — and the
+  caveat says the plugin would be free and names the dependency to add
+  (`com.arcmutate:pitest-kotlin-plugin`). With both, TCE is reported as via Arcmutate. It never
+  runs Arcmutate itself or confirms the plugin resolved on the build's classpath.
 - **A private repo carrying an MIT `LICENSE` file passes the licence check anyway.** Arcmutate's
   own free-for-open-source term means *publicly* available, not merely MIT-licensed source sitting
   in a private repository — `licence.open_source` only reads the file's declared licence, it has

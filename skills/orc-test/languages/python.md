@@ -2,7 +2,9 @@
 
 Researched on: 2026-09-11 (versions read from PyPI that day). Last real run: 2026-09-12, on
 Orclab itself — `python3 skills/orc-test/scripts/run.py analyze skills/orc-todo/scripts`:
-coverage 95.3% (816/856 lines), TCE 68.6% (637 killed of 928; 291 survived, 1 suspicious),
+coverage 91.6% (373/407 lines — re-measured the same day with `coverage skills/orc-todo/scripts`
+after the test files were dropped from the denominator; the first run's 95.3% (816/856) had
+counted `tests/` as covered source), TCE 68.6% (637 killed of 928; 291 survived, 1 suspicious),
 lint 0 findings; 68 tests, 929 mutants, mutmut's run 29s, the whole command ~2 min (most of it
 one `mutmut show` per survivor). What had to change to get there is in "Caveats" — every one
 was found by that run, none by the research.
@@ -11,10 +13,14 @@ was found by that run, none by the research.
 `pyproject.toml`, `setup.py` or `setup.cfg` at the root or up to two directories down.
 
 ## Run
-`python3 -m pytest -q --ignore-glob=*/mutants/* [path]`. A `[tool.pytest.ini_options]` section is
+`python3 -m pytest -q --ignore-glob=*mutants/* [path]`. A `[tool.pytest.ini_options]` section is
 the project's own config and is honoured by pytest itself. The ignore is not optional: see
-Caveats. PyPI had pytest 9.1.1 on 2026-09-11; the real run was on Ubuntu's pytest 7.4.4 and
-pytest-cov 4.1.0, and nothing here depends on the newer ones.
+Caveats. The path is passed to pytest only when it contains test files (`test_*.py` or
+`*_test.py`, or is one); a source-only path such as `src/` would make pytest collect nothing, so
+the whole suite runs and the path narrows only what coverage *measures*.
+
+PyPI had pytest 9.1.1 on 2026-09-11; the real run was on Ubuntu's pytest 7.4.4 and pytest-cov
+4.1.0, and nothing here depends on the newer ones.
 
 A repo with several `scripts/tests/` dirs and no `__init__.py` in them (Orclab) collides on
 basenames (`test_cli.py` twice → "import file mismatch") when one pytest collects them all. The
@@ -31,7 +37,9 @@ its six-`scripts/`-dirs-wide `pythonpath` — a same-named top-level module in t
 
 ## Coverage
 pytest-cov: `--cov=<path> --cov-report=lcov:.orclab/test/python/coverage.lcov
---cov-report=html:.orclab/test/python/html`. `run.py` reads the lcov and applies the 80% gate.
+--cov-report=html:.orclab/test/python/html`. `run.py` reads the lcov, drops the test files
+themselves (`--cov=.` includes `tests/`, which would inflate the number — every test line runs)
+and applies the 80% gate to what is left.
 For a project-side gate in CI, pytest-cov's own switch is `--cov-fail-under=80`.
 
 ## Mutation (TCE)
@@ -72,9 +80,10 @@ bare `@pytest.mark.skip` — checked 2026-09-11 with ruff 0.16.7. `run.py` scans
   unless `also_copy` names them.** Without it the inner pytest says "file or directory not
   found: tests/" and mutmut stops with `BadTestExecutionCommandsException`. With it, `mutants/`
   holds a second copy of the tests, so a later plain pytest collects both and fails with "import
-  file mismatch". Every pytest here passes `--ignore-glob=*/mutants/*` (a glob, because each
-  sub-project's mutmut has its own nested `mutants/`); a project should also add `mutants/` to
-  `.gitignore`.
+  file mismatch". Every pytest here passes `--ignore-glob=*mutants/*` (a glob, because each
+  sub-project's mutmut has its own nested `mutants/`; no leading `*/`, because pytest matches
+  the glob against the full path and `*/mutants/*` misses a `mutants/` at the directory it runs
+  from); a project should also add `mutants/` and `.coverage` to `.gitignore`.
 - **A `pythonpath` in an enclosing pytest config defeats mutmut silently.** pytest resolves
   `pythonpath` relative to the config file, and if the config it finds is the repo root's, the
   *unmutated* package is first on `sys.path`: the tests pass, hit no mutant, and mutmut stops
@@ -88,8 +97,10 @@ bare `@pytest.mark.skip` — checked 2026-09-11 with ruff 0.16.7. `run.py` scans
   passes in then runs against the process cwd: on 2026-09-12 orc-todo's suite overwrote the main
   checkout's BACKLOG.md, appended nine stub scenarios to VERIFICATION.md and left a corrupt lock
   in `.git/orclab/` (BACKLOG #34). Before the first `analyze` on a suite that touches files, git
-  or the network, check that its tests pin the ambient state (`monkeypatch.chdir(tmp_path)`),
-  and run `git status` afterwards.
+  or the network, check that its tests pin the ambient state (`monkeypatch.chdir(tmp_path)`).
+  `run.py` now takes `git status --porcelain` before and after the mutation run; if anything
+  outside `.orclab/`, `mutants/` and `.coverage` changed, it names the paths, reports TCE as not
+  measurable, and does not score the run.
 - `debug = true` under `[tool.mutmut]` prints the inner pytest run and is the way to see why it
   failed; it also changed three verdicts (640/288 with it, 637/291 without, stable across two
   clean runs), so measure with it off.

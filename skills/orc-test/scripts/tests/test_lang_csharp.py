@@ -36,10 +36,20 @@ def test_mutation_needs_stryker_tool(tmp_path, monkeypatch):
     cmd = cs.mutation_cmd(tmp_path, "src/App", tmp_path / "out")
     assert cmd[:3] == ["dotnet", "stryker", "--reporter"] and "--with-baseline" in cmd
     assert "--mutate" in cmd and "src/App/**/*.cs" in cmd
+    # the baseline lives under --output, and .orclab/test/csharp is emptied every run: keep it apart
+    assert cmd[cmd.index("--output") + 1] == str(tmp_path / ".orclab" / "stryker-net")
 
 
 def test_mutation_parse_no_report(tmp_path):
-    assert cs.mutation_parse(tmp_path, tmp_path) == Mutation(0, 0)
+    assert cs.mutation_parse(tmp_path, tmp_path / "out") == Mutation(0, 0)
+
+
+def test_mutation_parse_reads_the_stryker_net_home_not_the_wiped_out_dir(tmp_path):
+    home = tmp_path / ".orclab" / "stryker-net" / "reports"
+    home.mkdir(parents=True)
+    (home / "mutation-report.json").write_text(
+        '{"files": {"A.cs": {"mutants": [{"status": "Killed", "mutatorName": "x", "location": {"start": {"line": 1}}}]}}}')
+    assert cs.mutation_parse(tmp_path, tmp_path / "out") == Mutation(1, 1)
 
 
 def test_lint_parses_xunit_analyzer_warnings(tmp_path, monkeypatch):

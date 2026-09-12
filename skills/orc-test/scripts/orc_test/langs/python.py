@@ -2,7 +2,9 @@
 
 mutmut 3 keeps a copy of the tests under mutants/ (via also_copy) for its own runs; a later plain
 pytest collects both copies and dies with "import file mismatch". Every command here passes
---ignore-glob=*/mutants/* — a glob because each sub-project's mutmut has its own mutants/.
+--ignore-glob=*mutants/* — a glob because each sub-project's mutmut has its own mutants/, and
+no leading */ because pytest matches the glob against the full path, so */mutants/* would miss
+a mutants/ at the directory pytest runs from.
 """
 
 import ast
@@ -13,7 +15,8 @@ import re
 import tomllib
 
 from .. import lcov
-from ..model import Finding, Mutation, Survivor
+from ..detect import SKIP_DIRS
+from ..model import Coverage, Finding, Mutation, Survivor
 from ..runner import run
 
 KEY = "python"
@@ -27,7 +30,7 @@ CAVEATS = [
     " mutates that file's source_paths; a path narrows only by picking which config runs.",
 ]
 
-_IGNORE = "--ignore-glob=*/mutants/*"       # nested too: each suite's mutmut has its own mutants/
+_IGNORE = "--ignore-glob=*mutants/*"        # root and nested: each suite's mutmut has its own mutants/
 _RESULT = re.compile(r"^\s*(\S+): (.+)$")
 _HUNK = re.compile(r"^@@ -(\d+)")
 
@@ -36,8 +39,20 @@ def missing(root):
     return [t for t in TOOLS if importlib.util.find_spec(t) is None]
 
 
+def _has_tests(base):
+    return base.is_file() or any(base.rglob("test_*.py")) or any(base.rglob("*_test.py"))
+
+
+def _is_test_file(path):
+    p = pathlib.PurePath(path)
+    return bool({"tests", "test"} & set(p.parts[:-1])) or p.name.startswith("test_") or p.name.endswith("_test.py")
+
+
 def test_cmd(root, target):
-    return ["python3", "-m", "pytest", "-q", _IGNORE] + ([target] if target else [])
+    # A source-only path would make pytest collect 0 tests; then the whole suite runs and the
+    # path narrows only what coverage measures (see languages/python.md).
+    narrow = target and _has_tests(pathlib.Path(root) / target)
+    return ["python3", "-m", "pytest", "-q", _IGNORE] + ([target] if narrow else [])
 
 
 def coverage_cmd(root, target, out):
@@ -47,25 +62,29 @@ def coverage_cmd(root, target, out):
 
 
 def coverage_parse(root, out):
-    return lcov.parse(out / "coverage.lcov")
+    cov = lcov.parse(out / "coverage.lcov")
+    files = {p: v for p, v in cov.files.items() if not _is_test_file(p)}   # --cov=. pulls tests/ in
+    return Coverage(sum(c for c, _ in files.values()), sum(t for _, t in files.values()), files)
 
 
-def mutation_unavailable(root):
+def mutation_unavailable(root, target=None):
     if importlib.util.find_spec("mutmut") is None:
         return "mutmut not installed — pip install mutmut"
+    if _mutmut_config(root, target) is None:
+        where = pathlib.Path(root) / (target or ".")
+        return (f"no [tool.mutmut] found in any pyproject.toml at or above {where} — add [tool.mutmut]"
+                " with source_paths = [...]; see languages/python.md")
     return None
 
 
-def mutation_cwd(root, target):
-    """Where mutmut runs: the nearest dir from `target` up to `root` whose pyproject.toml has a
-    [tool.mutmut] section. mutmut names mutants from the file path relative to its cwd and must
-    import the code by that same name, so a package under skills/x/scripts/ runs from there.
-    A `target` whose ".." walks above `root` never searches above it — it just returns `root`."""
+def _mutmut_config(root, target):
+    """The nearest dir from `target` up to `root` whose pyproject.toml has a [tool.mutmut]
+    section, or None. A `target` whose ".." walks above `root` never searches above it."""
     root = pathlib.Path(root)
     here = root / (target or ".")
     normalized = pathlib.Path(os.path.normpath(here))
     if normalized != root and root not in normalized.parents:
-        return root
+        return None
     for d in [here, *here.parents]:
         pyproject = d / "pyproject.toml"
         text = pyproject.read_text() if pyproject.is_file() else ""
@@ -73,7 +92,13 @@ def mutation_cwd(root, target):
             return d
         if d == root:
             break
-    return root
+    return None
+
+
+def mutation_cwd(root, target):
+    """Where mutmut runs. mutmut names mutants from the file path relative to its cwd and must
+    import the code by that same name, so a package under skills/x/scripts/ runs from there."""
+    return _mutmut_config(root, target) or pathlib.Path(root)
 
 
 def mutation_cmd(root, target, out):
@@ -135,7 +160,7 @@ def lint(root, target, out):
     paths = set(base.rglob("test_*.py")) | set(base.rglob("*_test.py"))
     findings = []
     for path in sorted(paths):
-        if "mutants" in path.parts:
+        if SKIP_DIRS & set(path.relative_to(root).parts):
             continue
         findings += _scan(path, path.relative_to(root))
     return findings
@@ -153,7 +178,10 @@ def _test_funcs(body, cls):
 
 
 def _scan(path, rel):
-    tree = ast.parse(path.read_text())
+    try:
+        tree = ast.parse(path.read_text())
+    except SyntaxError:
+        return []
     seen, out = set(), []
     for cls, node in _test_funcs(tree.body, None):
         key = (cls, node.name)

@@ -27,6 +27,13 @@ def test_non_integer_threshold_raises_bad_config(tmp_path):
         config.load(tmp_path)
 
 
+def test_non_mapping_top_level_raises_bad_config(tmp_path):
+    (tmp_path / ".orclab").mkdir()
+    (tmp_path / ".orclab" / "test.yaml").write_text("- coverage\n- 80\n")
+    with pytest.raises(config.BadConfig, match="top level must be a mapping"):
+        config.load(tmp_path)
+
+
 def test_file_overrides_thresholds_and_commands(tmp_path):
     (tmp_path / ".orclab").mkdir()
     (tmp_path / ".orclab" / "test.yaml").write_text(

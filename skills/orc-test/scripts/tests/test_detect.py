@@ -31,7 +31,7 @@ def test_languages_by_marker_depth_two_and_skips_node_modules(tmp_path):
     (tmp_path / "node_modules" / "x").mkdir(parents=True)
     (tmp_path / "node_modules" / "x" / "package.json").write_text("{}")
     found = detect.languages(tmp_path, [PY, JS, CS])
-    assert [m.KEY for m in found] == ["python", "csharp"]
+    assert [(m.KEY, d) for m, d in found] == [("python", tmp_path), ("csharp", tmp_path / "app")]
 
 
 def test_declared_test_cmd_precedence(tmp_path):
@@ -61,7 +61,14 @@ def test_languages_marker_two_directories_down_found(tmp_path):
     (tmp_path / "a" / "b").mkdir(parents=True)
     (tmp_path / "a" / "b" / "pyproject.toml").write_text("")
     found = detect.languages(tmp_path, [PY])
-    assert [m.KEY for m in found] == ["python"]
+    assert [(m.KEY, d) for m, d in found] == [("python", tmp_path / "a" / "b")]
+
+
+def test_languages_root_marker_wins_over_a_nested_one(tmp_path):
+    (tmp_path / "pyproject.toml").write_text("")
+    (tmp_path / "a").mkdir()
+    (tmp_path / "a" / "setup.py").write_text("")
+    assert detect.languages(tmp_path, [PY]) == [(PY, tmp_path)]
 
 
 def test_candidates_never_walks_into_skipped_dirs(tmp_path, monkeypatch):

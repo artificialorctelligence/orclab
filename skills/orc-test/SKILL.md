@@ -13,7 +13,9 @@ python3 ${CLAUDE_SKILL_DIR}/scripts/run.py [--cwd <project>] [--lang <key>] <sub
 ```
 
 `--cwd` and `--lang` go **before** the subcommand. `path` narrows every subcommand to that part
-of the project. Outside a git repository the command says so and stops.
+of the project (for Python a path narrows what coverage *measures*, not which tests run, unless
+the path itself contains tests — `languages/python.md`). Outside a git repository the command
+says so and stops.
 
 | Subcommand | Question it answers | Writes |
 |---|---|---|
@@ -30,9 +32,12 @@ Typing `/orc-test` with no subcommand means `run`.
 By marker file, at the project root or up to two directories down: `pyproject.toml`/`setup.py`
 → Python; `package.json` → JavaScript/TypeScript; `pom.xml`/`build.gradle` → Java (Kotlin if
 `.kt` files exist); `*.csproj` → C#; `pubspec.yaml` → Dart; `Package.swift`/`*.xcodeproj` →
-Swift; `project.godot` → GDScript. Every hit runs. The first line of every report is
-`detected: …` so a wrong guess is visible. What each language's tools are, and their gotchas, is
-in `languages/<lang>.md` beside this file — read the relevant one before interpreting a report.
+Swift; `project.godot` → GDScript. Every hit runs, from the directory its marker was found in
+— a marker under `app/` means that language's tools run with `app/` as their working directory,
+and a `path` is made relative to it. The first line of every report is `detected: …`, naming
+that directory when it is not the root (`Dart (app/)`), so a wrong guess is visible. What each
+language's tools are, and their gotchas, is in `languages/<lang>.md` beside this file — read the
+relevant one before interpreting a report.
 
 A project's own declared test command wins: a `test` script in `package.json`, a `Makefile`
 `test:` target, or `.orclab/test.yaml`:
@@ -155,6 +160,14 @@ One rule: say what, show the command, stop that language, continue the others.
 - Tool missing → its name and install line, language skipped. Nothing is installed.
 - Tests red under `analyze` → "tests failed; nothing measured" for that language.
 - Mutation run interrupted → the tool's incremental file keeps what finished; run again.
+- Mutation run changed files outside its own output (`.orclab/`, `mutants/`, `.coverage`) →
+  the paths are named, TCE is "not measurable", and the run is not scored: the suite wrote to
+  the real tree under a planted defect (test-discipline rule 4; BACKLOG #34). Fix the tests'
+  isolation first.
+- Mutation tool produced no mutants → its own output is shown above the line, since the usual
+  cause (a missing `[tool.mutmut]`, a wrong test path) is in there.
+- Tests red under `analyze` and nothing else → `generate` is not offered; a red suite is fixed
+  by hand first.
 - A language detected with no tests → `0 tests ✗`, nothing measured — an empty suite is a
   failure, not a pass.
 - Wrong detection → override the command in `.orclab/test.yaml`, or run with `--lang <key>` to

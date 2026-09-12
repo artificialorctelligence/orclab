@@ -43,6 +43,23 @@ def test_coverage_with_red_tests_stops_that_language(tmp_path, capsys):
     assert code == 1 and "tests failed; coverage not measured" in out
 
 
+def test_coverage_denominator_excludes_the_tests_themselves(tmp_path, capsys):
+    repo = make_repo(tmp_path)
+    _src(repo, "def clamp(x, lo, hi):\n    if x < lo:\n        return lo\n"
+               "    if x > hi:\n        return hi\n    return x\n")
+    code, out = run(["coverage"], repo, capsys)        # --cov=. would count tests/ too
+    assert "(4/6 lines)" in out and "tests/" not in out
+
+
+def test_coverage_empty_suite_still_fails_the_gate(tmp_path, capsys):
+    repo = make_repo(tmp_path)
+    (repo / "tests" / "test_ok.py").unlink()
+    (repo / "src").mkdir()
+    (repo / "src" / "calc.py").write_text("x = 1\n")
+    code, out = run(["coverage", "src"], repo, capsys)
+    assert code == 1 and "tests failed; coverage not measured" in out
+
+
 def test_coverage_unavailable_is_words_not_a_failure(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr(langs, "ALL", [fake(coverage_unavailable="nano-coverage addon not installed")])
     code, out = run(["coverage"], make_repo(tmp_path), capsys)
