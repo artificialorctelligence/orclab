@@ -19,3 +19,13 @@ def test_none_when_missing_or_proprietary(tmp_path):
 def test_manifest_field(tmp_path):
     (tmp_path / "package.json").write_text('{"license": "ISC"}')
     assert licence.open_source(tmp_path) == "ISC"
+
+
+def test_unlicensed_field_is_not_unlicense(tmp_path):
+    (tmp_path / "package.json").write_text('{"license": "UNLICENSED"}')
+    assert licence.open_source(tmp_path) is None
+
+
+def test_manifest_field_with_spdx_suffix(tmp_path):
+    (tmp_path / "package.json").write_text('{"license": "BSD-3-Clause"}')
+    assert licence.open_source(tmp_path) == "BSD"

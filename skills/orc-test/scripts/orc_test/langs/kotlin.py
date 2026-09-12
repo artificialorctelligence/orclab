@@ -4,6 +4,7 @@ import pathlib
 import shutil
 
 from .. import jacoco, licence, pitest
+from ..detect import SKIP_DIRS
 from ..model import Coverage, Finding, Mutation
 from ..runner import run
 from .java import _find_build_gradle
@@ -17,14 +18,22 @@ CAVEATS = []          # computed per project — see CAVEATS_FOR
 
 
 def claims(root):
-    src = pathlib.Path(root) / "src"
-    return src.exists() and any(True for _ in src.rglob("*.kt"))
+    root = pathlib.Path(root)
+    dirs = [root] + list(root.glob("*")) + list(root.glob("*/*"))
+    for d in dirs:
+        if any(part in SKIP_DIRS for part in d.relative_to(root).parts):
+            continue
+        src = d / "src"
+        if src.is_dir() and any(True for _ in src.rglob("*.kt")):
+            return True
+    return False
 
 
 def CAVEATS_FOR(root):
-    if licence.open_source(root):
+    label = licence.open_source(root)
+    if label:
         return [f"TCE via Pitest + Arcmutate's Kotlin plugin (free for open source; this project "
-                f"declares {licence.open_source(root)}). Arcmutate filters the junk mutants plain Pitest "
+                f"declares {label}). Arcmutate filters the junk mutants plain Pitest "
                 "produces on Kotlin bytecode."]
     return ["TCE is approximate: plain Pitest on Kotlin bytecode reports junk mutants from compiler-"
             "generated code. Arcmutate's Kotlin plugin fixes that but needs an open-source licence, "

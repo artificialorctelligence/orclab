@@ -1,4 +1,4 @@
-from orc_test import detect, langs
+from orc_test import detect
 from orc_test.langs import java, kotlin
 
 
@@ -17,6 +17,15 @@ def test_kotlin_claims_gradle_project_and_java_steps_aside(tmp_path):
     repo = _gradle_kotlin(tmp_path)
     assert kotlin.claims(repo)
     assert [m.KEY for m in detect.languages(repo, [java, kotlin])] == ["kotlin"]
+
+
+def test_kotlin_claims_multi_module_gradle_project(tmp_path):
+    app = tmp_path / "app"
+    (app / "src" / "main" / "kotlin").mkdir(parents=True)
+    (app / "build.gradle.kts").write_text("plugins { kotlin(\"jvm\") }\n")
+    (app / "src" / "main" / "kotlin" / "A.kt").write_text("class A\n")
+    assert kotlin.claims(tmp_path)
+    assert [m.KEY for m in detect.languages(tmp_path, [java, kotlin])] == ["kotlin"]
 
 
 def test_coverage_is_kover(tmp_path):

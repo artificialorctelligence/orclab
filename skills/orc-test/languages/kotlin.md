@@ -5,8 +5,10 @@ Last real run: none yet — the first is Task 19 of the v17 plan, on Orclab itse
 
 ## Detect
 `build.gradle` or `build.gradle.kts` at the root or up to two directories down — same markers as
-Java. A Gradle project counts as Kotlin, not Java, when a `.kt` file exists anywhere under
-`src/`; `detect.languages` drops Java from the result for that project so the two never both run.
+Java. A Gradle project counts as Kotlin, not Java, when a `.kt` file exists under a `src/`
+directory at the root or up to two directories down (so a module layout like
+`app/src/main/kotlin/A.kt` alongside `app/build.gradle.kts` still counts); `detect.languages`
+drops Java from the result for that project so the two never both run.
 
 ## Run
 `./gradlew test` (or `gradle test` without the wrapper). JUnit 5.
@@ -25,7 +27,7 @@ default-argument dispatchers) that no test could plausibly kill — junk, not re
 
 **Arcmutate's Kotlin plugin** (`com.arcmutate:pitest-kotlin-plugin`, requires pitest ≥ 1.22.0)
 filters those out. It is commercial, but free for open source — verified by an
-`arcmutate-licence.txt` file at the project root, which `run.py` does not check; instead
+`arcmutate-licence.txt` file at the project root, which `cli.py` does not check; instead
 `licence.open_source(root)` reads the project's own `LICENSE`/`LICENCE`/`COPYING` file or its
 `pyproject.toml`/`package.json` `license` field, the same declaration every other gate already
 reads, never a new setting. The original `pitest-kotlin` open-source plugin is unmaintained —
@@ -34,7 +36,7 @@ don't reach for it.
 ## Test lint
 detekt (no version pinned; run via its CLI). It has no test-specific rule set — an `@Disabled`
 test or an assertion-free test body is not caught. The fallback there is a plain
-`grep -rn '@Disabled'` (or eyeballing), not run automatically by `run.py`.
+`grep -rn '@Disabled'` (or eyeballing), not run automatically by `cli.py`.
 
 ## Caveats
 - **The Arcmutate caveat printed by `/orc-test analyze` depends on which licence the project
