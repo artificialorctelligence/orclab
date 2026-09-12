@@ -114,6 +114,8 @@ three — don't assume only one shape.
 | Dart     | Mobile (cross-platform)  | Flutter                    | `skills/stack-flutter/SKILL.md` — read it in full before scaffolding |
 | Kotlin   | Mobile (Android only)    | Jetpack Compose            | `skills/stack-android-native/SKILL.md` — same |
 | Swift    | Mobile (iOS only)        | SwiftUI                    | `skills/stack-ios-native/SKILL.md` — same; needs a Mac to build |
+| C#       | Game (cross-platform)    | Unity 6                    | `skills/stack-unity/SKILL.md` — same; Unity and Godot are both settled, neither preferred: ask which |
+| GDScript / C# | Game (cross-platform) | Godot 4                 | `skills/stack-godot/SKILL.md` — same; GDScript for mobile per Godot's own docs |
 
 Do not invent additional defaults beyond what's listed here — if a combination isn't in this
 table, ask directly in the New-Project Flow's step 3 instead of guessing. Add rows here only once

@@ -17,11 +17,12 @@ other projects (starting with Orcshot).
   mechanisms.
 - **verify-before-asserting** — verify a challenged factual/technical claim instead of defending
   it; reinforces superpowers' own `systematic-debugging` signal recognition.
-- **stack-flutter**, **stack-android-native**, **stack-ios-native** — background knowledge, not
-  commands: for each stack, the current toolchain with dates, where things live in the project,
-  and where each Google Play / App Store rule lands in the build. Claude reads one whenever that
-  stack is in play; `/orc-code` follows it when scaffolding. Researched against live sources and
-  dated; no app has shipped through any of them yet.
+- **stack-flutter**, **stack-android-native**, **stack-ios-native**, **stack-unity**,
+  **stack-godot** — background knowledge, not commands: for each stack, the current toolchain with
+  dates, where things live in the project, and where each Google Play / App Store rule lands in
+  the build. Claude reads one whenever that stack is in play; `/orc-code` follows it when
+  scaffolding. Researched against live sources and dated; no app or game has shipped through any
+  of them yet. The two game stacks are deliberately thinner — games are not in focus.
 
 ## Commands
 
