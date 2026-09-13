@@ -53,6 +53,12 @@ for other languages.
   the README's own number) but 8.1% overall, because the corpus ships a `harness/run_tests.gd`
   no gdUnit4 test reaches. That is the fixture's shape, not a defect; on a real project a file
   like that is a coverage gap the survivors list names by line.
+- **A mutant that drops a path argument sends the test at the real thing.** gdmutant edits the
+  project's own `.gd` files in place and reruns the suite once per mutant, so a test that reaches
+  anything outside its own sandbox — a `user://` save file, a real directory — will, under some
+  mutant, reach the real one (BACKLOG #34 is the Python case: a suite rewrote the real
+  BACKLOG.md). `run.py`'s tracked-files guard catches the damage after the fact; pinning the
+  ambient state in the suite prevents it.
 - gdUnit4 exits 100 on test failures and 101 on warnings — both non-zero, both read as "failed"
   here; no separate handling needed.
 - nano-coverage is alpha and built from source; its lcov lands at the project root, not under

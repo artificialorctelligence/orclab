@@ -2548,7 +2548,7 @@ fires for a private project too. The one pending action with a real trigger — 
 and `flatpak` and writing `ego`/`spices` once Orcshot's #198 and #205 resolve — is split out as
 **#37**, so this heading no longer hides it.
 
-## #34: Mutation-testing orc-todo's suite writes test data into the real BACKLOG.md, VERIFICATION.md and .git/orclab — a cwd→None mutant falls back to the process cwd
+## #34: Mutation-testing orc-todo's suite writes test data into the real BACKLOG.md, VERIFICATION.md and .git/orclab — a cwd→None mutant falls back to the process cwd (RESOLVED 2026-09-13)
 
 Found 2026-09-12 by the first real `/orc-test analyze skills/orc-todo/scripts` (v17, Task 19). Until this is fixed, **running mutation testing on orc-todo's suite overwrites the real repo's BACKLOG.md, VERIFICATION.md and `.git/orclab/` state.** It did: after the run the main checkout's BACKLOG.md was a 33-line test fixture (`## #23: t` / `b`), the worktree's VERIFICATION.md had nine "Scenario 62–70: on the branch" stubs appended, `.git/orclab/lock` held `{not json`, `counters.json` said 23 and `lanes.json` held the test lane "B". All restored the same session (main's BACKLOG.md from its commit, byte-identical; `lock clear`; `lane delete B`); the worktree's VERIFICATION.md was still carrying the stubs when Task 19 finished — `git checkout -- VERIFICATION.md # orclab:discard-entries` removes them.
 
@@ -2557,6 +2557,19 @@ Why. Every orc-todo test isolates itself by building a throwaway git repo under 
 `test-discipline` rule 4 (Isolation) already says the filesystem is replaced with a fake; the miss is that the fake was supplied as an argument and nothing pinned the ambient state a dropped argument falls back to. Task 19 widened that rule by a sentence. The fix in orc-todo's tests is one autouse fixture in `skills/orc-todo/scripts/tests/conftest.py` (or the existing empty `conftest.py` at `scripts/`): `monkeypatch.chdir(tmp_path)` into a throwaway `git init`'d dir — then a `cwd → None` mutant lands in the sandbox, where the assertion sees it, and those forty survivors die for free. Not done in Task 19 because the brief says orc-todo's tests are `generate`'s job, in a session of its own; but this one is the precondition for that session, not part of it: run it first, or the `generate` session's own `analyze` calls do the damage again.
 
 Also worth a line in the shipped skill: `/orc-test analyze` runs the project's suite hundreds of times with the code deliberately broken, so a test that reaches anything outside its temp dir will, under some mutant, reach the real thing. `languages/python.md` carries this now; the other seven `languages/*.md` should say it when their first real run lands.
+
+**Resolved for real, not just tracked** (2026-09-13): the one autouse fixture, in
+`skills/orc-todo/scripts/conftest.py` — `monkeypatch.chdir` into a fresh `git init`'d temp dir
+with a stub BACKLOG.md, before every test. Proven with a negative control rather than assumed:
+`cwd = None` planted by hand at the top of `allocate.allocate` and `lanes.read_lanes`, suite run
+once with the fixture and once with it removed. With it: 22 tests fail (the mutant dies) and the
+real repo is untouched — `git status` clean, counter still 39. Without it: the same 22 fail, and
+the real BACKLOG.md gained fourteen fixture entries (#40–#53), VERIFICATION.md two stub scenarios,
+and `.git/orclab/counters.json` read 53/63 — this entry's incident, reproduced on demand. All
+restored (the discard hook caught the checkout and needed its `# orclab:discard-entries` marker;
+the counter was set back to 39/61 by hand, since `.git/orclab/` is untracked). The isolation
+warning python.md carries is now in `languages/gdscript.md` too, whose first real run landed
+2026-09-12 (#36); the other six still wait for theirs.
 
 ## #35: orc-todo's tests run the code but do not pin it: TCE 68.6%, the specific gaps
 
