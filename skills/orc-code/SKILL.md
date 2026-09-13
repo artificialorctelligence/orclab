@@ -105,7 +105,7 @@ step's output is the next step's input.
    clone, a worktree) that means doing the project's documented install first (its README's
    venv and `pip install -e`, or the stack's equivalent) and running `/orc-test` with that
    interpreter — concretely, the project's own venv `bin` first on `PATH` for the orc-test
-   commands, because `run.py` invokes a bare `python3`; and only a venv that has pytest
+   commands, because orc-test's `run.py` invokes a bare `python3`; and only a venv that has pytest
    installed, since any other venv first on `PATH` breaks the runner the other way (the
    scratch venv of 2026-09-13: "8 failed", no pytest in it). Found 2026-09-13: a clone of Orcshot reported 10 collection errors because
    `import orcshot` resolved to the machine's installed `.deb` copy, not `src/`. That is not a
@@ -181,8 +181,9 @@ subtree.
    subagents (`test-engineer`, `architecture-critic`, …), which exist only once it is installed,
    and the run would degrade silently at the first spawn. Installed, the agents are reachable as
    `code-modernization:<agent>` through the Agent tool and that is how "spawn the test-engineer
-   subagent" in a command file is carried out. The plugin's manifest carries no `version`;
-   `installed_plugins.json` records `"unknown"` — cite the cache directory's commit id instead.
+   subagent" in one of the plugin's own command files is carried out. The plugin's manifest
+   carries no `version`; `~/.claude/plugins/installed_plugins.json` records `"unknown"` — cite
+   the cache directory's commit id instead.
 2. **Decide the target the way a new project is decided.** Ask the New-Project Flow's two
    questions — type, and the platforms ticked — for the *target*, and take the Defaults Table's
    row. That row's `stack-*` skill is the migration's constraint: its toolchain versions, its
@@ -195,7 +196,7 @@ subtree.
    and lint block are the first items of the quality-mode pass that follows the uplift, and the
    brief says so in its target-architecture section rather than pretending the uplift will do it.
    On 2026-09-13 the target was Python 3.12 because that was the only interpreter present
-   (the skill names 3.14) and installing a newer one was not attempted. A future run should
+   (`stack-python-desktop` names 3.14) and installing a newer one was not attempted. A future run should
    install the stack skill's named version first (`uv python install <version>`, or pyenv) and
    fall back to the machine's interpreter only if that fails — and say which happened in the
    target-stack line.
@@ -234,7 +235,7 @@ subtree.
    `transform`'s `<target-stack>` — is the stack skill's own naming, in one line: e.g.
    `Kotlin + Jetpack Compose, per Orclab's stack-android-native: AGP 9.x, compileSdk 36, app/build.gradle.kts layout`.
    When `brief` produces its target architecture, check it against the stack skill's layout
-   section before the user approves it, and correct the brief, not the result, if it lands
+   section before the user approves it, and correct the brief, not the migrated code, if it lands
    elsewhere — or, for an uplift, record in the brief why it lands elsewhere (step 2). A
    same-stack version bump goes through `modernize-uplift <name> <source-version>
    <target-version>` instead of `transform`; it takes versions, not a stack line, and never
@@ -252,8 +253,8 @@ subtree.
    and every command's stated fallback (direct subagents through the Agent tool) is what runs;
    and the plugin has human gates of its own — `brief`'s approval block, `uplift`'s Step 2 plan
    and Step 5a pilot review — where "as if the user had typed it" means stopping and showing,
-   not signing on the user's behalf. `status` at the start reports nothing; run again after the
-   pilot it flags the brief stale, because the pilot appends what it learned to the delta
+   not signing on the user's behalf. `status` at the start reports nothing; run it again after the
+   pilot — it flags the brief stale, because the pilot appends what it learned to the delta
    catalog — expected, not a defect.
 6. **Exit gate.** Copy the plugin's output back over the checkout as the branch's content —
    `modernized/<name>-uplifted/` for an uplift (not `modernized/<name>/`, which is

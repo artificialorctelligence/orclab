@@ -2924,7 +2924,7 @@ with guard clauses and extracted helpers (`_analyze_one`, `_gate`/`_run_leaf`, `
 so orc-test's subprocess `python3` had no pytest — my shell, not the code. `lint_on_write` now
 fires on every Python file Orclab itself writes.
 
-## #41: /orc-code refactor has two flavours — a code-quality pass and a language/version migration — and today delivers neither: the wrapped plugin is not installed, the wrapper hands over with no stack and no exit gate
+## #41: /orc-code refactor has two flavours — a code-quality pass and a language/version migration — and today delivers neither: the wrapped plugin is not installed, the wrapper hands over with no stack and no exit gate (RESOLVED 2026-09-13)
 
 direflail asked on 2026-09-13 whether Orclab has a skill that refactors a codebase, in two
 flavours: (A) make the code better in place, and (B) move it to a different version of its
@@ -3046,3 +3046,28 @@ flags the brief stale after every pilot; step 6 copies `modernized/<name>-uplift
 `modernized/<name>/`) back; for an uplift only the toolchain version is the target, not the
 stack skill's layout. Full report:
 `.superpowers/sdd/2026-09-13-orclab-v19-orc-code-refactor/task-7-report.md`.
+
+**Resolved for real, not just tracked:** spec
+`docs/superpowers/specs/2026-09-13-orclab-v19-orc-code-refactor-design.md`, plan
+`docs/superpowers/plans/2026-09-13-orclab-v19-orc-code-refactor.md`. Both modes were run once for
+real, not just written to. **Quality mode** — this entry's "Quality mode, first real run"
+paragraph above — took Orcshot's ruff findings 376 → 0, coverage 77.9% → 78.3% (the remaining gap
+entirely in the 17 GTK files the suite never imports), TCE 75.6% → 76.3%, and forced 4 corrections
+to the skill's prose. **Migration mode** — this entry's "Migration mode, first real run" paragraph
+above — uplifted `itsdangerous` 1.1.0 to Python 3.12 through `code-modernization`: exit gate
+passed, 97 tests red under `-W error` on the 3.12 baseline → 423 green with 0 warnings under
+`-W error`, coverage 97.4% → 97.6%, TCE 74.8% → 75.1%, and forced 9 corrections. Execution found
+two defects in the plan itself, not just in the skill's prose it was writing: Task 4 wrote
+`hooks/scripts/tests/test_orc_code_skill.py` pinning the unbuilt-marker placeholder text that
+Task 7 then had to remove and replace once the run was real; and the Plugin-Discovery Procedure's
+"a fresh session is needed" claim was itself wrong — the Desktop session that installed the
+plugin picked it up with no restart, corrected to "check first, fresh session as the fallback."
+Three defects in `orc-test` itself, found during the quality-mode run, are recorded on this entry
+and left for a later entry, not created here: in a `src/`-layout project with no `__init__.py`,
+coverage's denominator silently drops the files nothing imports; `analyze`'s survivor line numbers
+are relative to the function rather than the file, so `generate` cannot navigate by them; and a
+whole-project `analyze`'s wall clock is dominated by one `mutmut show` subprocess per survivor.
+The one open thread is #5's note (added the same day, above): the plugin's `map`/`extract-rules`
+cover the structure-and-rules half of `/orc-data`'s ask but not environment facts, ownership, or
+the SME answers the plugin scatters across its own files with no single place to add one; #5
+stays open.
