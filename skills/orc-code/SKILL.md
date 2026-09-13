@@ -121,7 +121,7 @@ Task 8 of the v18 plan settles: it holds only if EAS Build in fact requires Reac
 
 | Type | Scope ticked | Default | Alternatives | Knowledge |
 |---|---|---|---|---|
-| App | one or more desktops, nothing else | Python | Java + Spring + JavaFX; C# / .NET only when Windows is the sole platform | *no skill yet — research first* |
+| App | one or more desktops, nothing else | Python | Java + Spring + JavaFX; C# / .NET only when Windows is the sole platform | `skills/stack-python-desktop/SKILL.md` — read it in full before scaffolding |
 | App | Android only | Kotlin + Jetpack Compose | Java *(stub — existing codebases only)* | `skills/stack-android-native/SKILL.md` — read it in full before scaffolding |
 | App | iOS only | Swift + SwiftUI | Objective-C *(stub — existing codebases only)* | `skills/stack-ios-native/SKILL.md` — same; needs a Mac or a cloud Mac to build |
 | App | Android + iOS, nothing else | React Native *(pending pass 11)* | Flutter; Kotlin Multiplatform | *no skill yet — research first*; Flutter: `skills/stack-flutter/SKILL.md` |
