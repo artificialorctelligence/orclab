@@ -2950,3 +2950,30 @@ extract-rules phase and may be partly covered by the plugin; check before buildi
 
 Scope boundary: this does not build a migration engine — that is the plugin's — and does not
 touch `/orc-code`'s new-project or add-feature flows.
+
+**Quality mode, first real run (2026-09-13):** on a scratch clone of Orcshot (`git clone
+~/projects/orcshot` into the scratchpad; never pushed, deleted at the end), through
+`skills/orc-code/SKILL.md`'s `### Quality mode` as written, by a subagent (Task 6 of the v19
+plan). Before → after: ruff findings 376 → 0 (code-discipline's four rules 58 → 0 — PLR1702 41,
+PLR0915 17, E722 0, S110 0; the other 318 were ruff 0.16's defaults, 222 of them safe autofixes
+and 96 by hand); coverage 77.9% → 78.3% (4308/5531 → 4349/5553 lines, gate 80 still failing);
+TCE 75.6% → 76.3% (8347/11035 → 8509/11151, gate 70 passing); test-lint 7 → 1; tests
+1260 → 1277; suite green after every file. For the four rules, 38 functions reshaped by hand
+across 18 modules (21 of the 58 findings in the 6200-line `editor_window.py`); the 96 remaining
+default findings were one-line fixes at their sites; 12 commits in the clone. Four
+things the skill text had wrong, corrected the same day in `SKILL.md`: (1) a fresh clone is not
+the developer's checkout — the suite reported 10 collection errors because `import orcshot`
+resolved to the machine's installed `.deb` copy, not `src/`; the project's own documented install
+comes before the gate, now step 0; (2) step 1 wrote the lint config but not the mutation config,
+so `analyze` said "TCE not measurable" — `[tool.mutmut]` is written and committed the same way;
+(3) "suite green after every file" proves nothing for the 17 of 85 source files the suite never
+imports (GTK windows, 31 of the 58 findings) — the fix there is limited to a mechanical move
+checked by ruff's undefined-name rules and an import, and the commit says so; (4) the coverage
+gate's remaining gap is entirely in those files, which another round of `generate` cannot close.
+Three `orc-test` findings from the same run, for their own entries or a Task-8 pass, not fixed
+here: pytest-cov's lcov omits source files nothing imported, so Orclab's coverage denominator
+(5531 lines) silently excludes those 17 files; `analyze`'s survivor line numbers are relative to
+the function, not the file (it reads `mutmut show`'s per-function diff), so `generate` cannot
+navigate by them; and ~75% of a whole-project `analyze`'s wall clock (35 of 45 minutes) is one
+`mutmut show` subprocess per survivor. Full report:
+`.superpowers/sdd/2026-09-13-orclab-v19-orc-code-refactor/task-6-report.md`.

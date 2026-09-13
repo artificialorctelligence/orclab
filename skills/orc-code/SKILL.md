@@ -97,18 +97,34 @@ cheaper than.
 ### Quality mode
 
 The procedure that brought Orclab's own scripts from 190 findings to zero on 2026-09-13
-(BACKLOG #40), in the order that worked. Each step's output is the next step's input.
+(BACKLOG #40), in the order that worked, and Orcshot from 376 to zero the same day (#41). Each
+step's output is the next step's input.
 
+0. **The checkout can run its own suite.** `/orc-test run` must be green *in this checkout*
+   before anything is measured — and on a checkout that is not the developer's own (a fresh
+   clone, a worktree) that means doing the project's documented install first (its README's
+   venv and `pip install -e`, or the stack's equivalent) and running `/orc-test` with that
+   interpreter. Found 2026-09-13: a clone of Orcshot reported 10 collection errors because
+   `import orcshot` resolved to the machine's installed `.deb` copy, not `src/`. That is not a
+   red suite; it is the wrong interpreter. A suite that is red *with* the right interpreter is
+   fixed first, and that is `generate`'s step 1, not this mode's.
 1. **The stack's lint config is present, or is written first.** Detect the language(s) the way
    `/orc-test detect` does. For each, the matching `stack-*` skill's section
    `## Lint — where code-discipline lands` names the config file and its contents. If the
    project already has that file, use it as it is — a project's own settings win, and this mode
    does not edit them. If not, write that section's config verbatim, tell the user the project
-   has just adopted `code-discipline`, and commit the config on its own.
+   has just adopted `code-discipline`, and commit the config on its own. **The same for the
+   mutation config** `orc-test`'s `languages/<lang>.md` names (`[tool.mutmut]` for Python):
+   without it `analyze` reports "TCE not measurable", step 2 has no TCE and step 3.3 has no
+   survivors to work from. Its own commit, like the lint config.
 2. **Baseline, in numbers.** The linter over the whole tree (the stack section's command —
    `ruff check .`, `oxlint .`, `./gradlew detekt`, and so on) and `/orc-test analyze` on the
-   same path. Write down: findings by rule, coverage, TCE, test-lint count. This is the "before";
-   the report at the end is measured against it.
+   same path. Write down: findings by rule, coverage, TCE, test-lint count, and **which source
+   files the suite never imports** — the coverage report's file list against the tree. This is
+   the "before"; the report at the end is measured against it. A first `analyze` on a real
+   project is long (Orcshot: 26k mutants, ~10 min of mutmut and ~35 min of one `mutmut show`
+   per survivor) — start it, then read the findings while it runs; nothing may be edited until
+   its mutation run has finished.
 3. **Fix, in this order, with the suite green after every file:**
    1. The linter's **safe autofixes only** — `ruff check --fix`, `oxlint --fix` — and never `--unsafe-fixes`
       or `--fix-suggestions`: on 2026-09-13 the unsafe set turned two
@@ -120,12 +136,20 @@ The procedure that brought Orclab's own scripts from 190 findings to zero on 202
       Warnings: fix what the warning names. `code-discipline` is the reference for what each
       fix looks like. A change that needs a test the suite does not have gets that test first
       (`test-discipline` rule 2). Run the suite after each file; commit per module.
+      **For a file the suite never imports** (step 2's list — on Orcshot, 17 of 85 files and
+      31 of the 58 findings, GTK windows whose own docstrings say they have no headless test),
+      a green suite proves nothing about the change. There the fix is limited to a mechanical
+      move — the block into a named helper, verbatim, its free variables as parameters — and
+      the net is the linter's undefined-name rules plus an import of the module; the commit
+      says so. Do those files last, and never rewrite logic in them under this mode.
    3. **`/orc-test generate`** for what the baseline `analyze` listed — surviving mutants,
       uncovered code, test-lint findings — under `generate`'s own rules: deletions are proposed
       as a list, never done unasked.
 4. **before → after, every number**, in the shape `generate` reports: findings by rule,
    coverage, TCE, lint. If a gate still fails: say which, and ask — "Another round?" — and
-   wait. Never say "clean" without the second `analyze`.
+   wait. If the gap is in the files step 2 listed as never imported, say that too: another
+   round of `generate` cannot close it, and whether those files get a live-driven test is the
+   user's decision, not this mode's. Never say "clean" without the second `analyze`.
 
 Two things this mode refuses. It does not apply unsafe autofixes (above). And it does not add an
 `ignore` list to the linter config to make the number fall: a rule the project's own config
