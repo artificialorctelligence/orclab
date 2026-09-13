@@ -37,6 +37,16 @@ def test_quality_mode_is_the_dogfood_procedure_in_order():
     assert marks == sorted(marks)
 
 
+def test_quality_mode_keeps_what_the_orcshot_run_bought():
+    q = TEXT[TEXT.index("### Quality mode"):TEXT.index("### Migration mode")]
+    for phrase in ["0. **The checkout can run its own suite.**", "venv `bin` first on `PATH`",
+                   "[tool.mutmut]", "For a file the suite never imports",
+                   "a green suite proves nothing about the change",
+                   "fixed by hand first", "When something goes wrong"]:
+        assert phrase in q, phrase
+    assert q.index("The checkout can run its own suite") < q.index("## Lint")
+
+
 def test_migration_mode_adds_stack_tests_worktree_and_gate():
     m = TEXT[TEXT.index("### Migration mode"):TEXT.index("## Plugin-Discovery Procedure")]
     assert "Run once for real on 2026-09-13" in m and "see BACKLOG #41" in m
@@ -44,7 +54,12 @@ def test_migration_mode_adds_stack_tests_worktree_and_gate():
                    "characterization", "/orc-test analyze", "/orc-test generate",
                    "before any `modernize-", "legacy/", "analysis/", "modernized/",
                    "worktree", "/orc-test run", "no lower than", "modernize-status",
-                   "modernize-preflight"]:
+                   "modernize-preflight",
+                   # the plugin sequence the first run learned: brief needs three inputs, and
+                   # uplift's delta catalog comes before brief
+                   "`brief` reads", "are not optional between `assess` and `brief`",
+                   "`extract-rules`, `uplift` Step 3 (delta catalog), `brief`, `uplift`",
+                   "fixed by hand first"]:
         assert phrase in m, phrase
 
 

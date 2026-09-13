@@ -2991,7 +2991,7 @@ so `analyze` said "TCE not measurable" — `[tool.mutmut]` is written and commit
 imports (GTK windows, 31 of the 58 findings) — the fix there is limited to a mechanical move
 checked by ruff's undefined-name rules and an import, and the commit says so; (4) the coverage
 gate's remaining gap is entirely in those files, which another round of `generate` cannot close.
-Three `orc-test` findings from the same run, for their own entries or a Task-8 pass, not fixed
+Three `orc-test` findings from the same run, tracked as #42, not fixed
 here: in Orcshot's src-layout, orc-test's `--cov=.` did not walk into the never-imported files
 — coverage.py only lists unexecuted files in directories that have an `__init__.py`, and `src/`
 has none, so the lcov held the 68 files something imported and Orclab's coverage denominator
@@ -3063,7 +3063,7 @@ Task 7 then had to remove and replace once the run was real; and the Plugin-Disc
 "a fresh session is needed" claim was itself wrong — the Desktop session that installed the
 plugin picked it up with no restart, corrected to "check first, fresh session as the fallback."
 Three defects in `orc-test` itself, found during the quality-mode run, are recorded on this entry
-and left for a later entry, not created here: in a `src/`-layout project with no `__init__.py`,
+and tracked as #42: in a `src/`-layout project with no `__init__.py`,
 coverage's denominator silently drops the files nothing imports; `analyze`'s survivor line numbers
 are relative to the function rather than the file, so `generate` cannot navigate by them; and a
 whole-project `analyze`'s wall clock is dominated by one `mutmut show` subprocess per survivor.

@@ -68,6 +68,20 @@ The order matters; each step's output is the next step's input.
    coverage, TCE, lint. If a gate still fails, say so and ask about another round; never claim
    "clean" without the second `analyze`.
 
+**Corrected at first real use (2026-09-13):** the Orcshot run (BACKLOG #41) added three things
+to the four steps above, and the skill carries them. A **step 0** — the checkout can run its own
+suite: on a checkout that is not the developer's own, the project's documented install comes
+first and `/orc-test` runs with the project's own venv `bin` first on `PATH`, the only venv with
+pytest in it — because a fresh clone of Orcshot reported 10 collection errors when
+`import orcshot` resolved to the machine's installed `.deb` copy, and looked red when it was
+not. Step 1 writes **the mutation config alongside the lint config** (`[tool.mutmut]` for
+Python, its own commit) — without it `analyze` said "TCE not measurable" and step 2 had no
+baseline TCE. And a **never-imported-files rule** in step 3.2: a green suite proves nothing for
+a file the suite never imports (17 of Orcshot's 85, GTK windows with no headless test), so there
+the fix is limited to a mechanical move checked by the linter's undefined-name rules and an
+import, done last, and a coverage gap left in those files is not another round's work — whether
+they get a live-driven test is the user's decision.
+
 Two things the mode refuses. It does not apply unsafe autofixes — the dogfood showed
 `lines.extend((...))` for two `append`s and eight red tests. And it does not add an `ignore`
 list to the linter config to make the number go down: a rule the project's own config enables
@@ -102,8 +116,10 @@ brief records why it lands elsewhere instead of being corrected.
 against tests that do not exist, so the gate has a precondition:
 
 1. **Before any migration step**, `/orc-test analyze` on the source project. If it reports
-   tests red, a language with no runnable suite, or coverage under the gate, the first work is
-   `/orc-test generate` *on the old code* — characterization tests that pin what it does today.
+   tests red, the suite is fixed by hand first (`orc-test`'s own rule: `generate` is not offered
+   on a red suite). If it reports a language with no runnable suite, or coverage under the gate,
+   the first work is `/orc-test generate` *on the old code* — characterization tests that pin
+   what it does today.
    The plugin's `extract-rules` documents the business rules; the tests are what make them
    executable. This step is not optional and is not the plugin's: it is the reason the gate can
    exist.
@@ -178,16 +194,20 @@ release has gone through this" honesty the `orc-package` ingredients carry.
 
 ## How it is verified
 
-- **Quality mode** is verified on Orcshot or the next real Python/TypeScript project: baseline,
-  fixes, before → after, suite green — the dogfood repeated through the command instead of by
-  hand, and the numbers recorded in the commit.
+- **Quality mode** was verified once, live, on a scratch clone of Orcshot on 2026-09-13
+  (BACKLOG #41): baseline, fixes, before → after, suite green after every file — the dogfood
+  repeated through the command instead of by hand. ruff findings 376 → 0; coverage
+  77.9% → 78.3%, the remaining gap entirely in the 17 files the suite never imports; TCE
+  75.6% → 76.3%; 12 commits in the scratch clone, discarded. The three corrections are in §2.
 - **Migration mode** was verified once, live, per §3(d) on 2026-09-13: the plugin installed,
   itsdangerous 1.1.0 taken through the full sequence to Python 3.12 in a scratch clone laid out
   the plugin's way, exit gate passed, and the spec and skill corrected (§3 (a), (c), (d)). The
   skill's migration section now opens with that run instead of "no migration has gone through
   this yet".
 - **Availability branch**: with the plugin uninstalled, `/orc-code refactor "port to Kotlin"`
-  prints the install command and stops — confirmed by Task 4's prose test and by running the flow once with the plugin uninstalled. Before this plan, discovery would have found the marketplace copy and gone on without the agents.
+  prints the install command and stops — confirmed by Task 4's prose test and by running the
+  flow once with the plugin uninstalled. Before this plan, discovery would have found the
+  marketplace copy and gone on without the agents.
 
 ## Sources, checked 2026-09-13
 
@@ -198,6 +218,7 @@ release has gone through this" honesty the `orc-package` ingredients carry.
   uplift,harden,status}.md` (the `legacy/$1` / `analysis/$1` / `modernized/$1` layout;
   `preflight` and `brief`'s optional `[target-stack]`, `transform`'s required `<target-stack>`;
   `uplift`'s "one test suite on both runtimes").
-- `~/.claude/plugins/installed_plugins.json` — `code-modernization` absent.
+- `~/.claude/plugins/installed_plugins.json` — `code-modernization` absent (installed later the
+  same day; see §3(d)).
 - BACKLOG #40's resolution and the five dogfood commits of 2026-09-13 (the quality procedure and
   the unsafe-autofix lesson).

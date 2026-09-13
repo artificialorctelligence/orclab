@@ -110,7 +110,8 @@ step's output is the next step's input.
    scratch venv of 2026-09-13: "8 failed", no pytest in it). Found 2026-09-13: a clone of Orcshot reported 10 collection errors because
    `import orcshot` resolved to the machine's installed `.deb` copy, not `src/`. That is not a
    red suite; it is the wrong interpreter. A suite that is red *with* the right interpreter is
-   fixed first, and that is `generate`'s step 1, not this mode's.
+   fixed by hand first — `orc-test`'s own "When something goes wrong" rule: `generate` is not
+   offered on a red suite — and that is not this mode's work either.
 1. **The stack's lint config is present, or is written first.** Detect the language(s) the way
    `/orc-test detect` does. For each, the matching `stack-*` skill's section
    `## Lint — where code-discipline lands` names the config file and its contents. If the
@@ -183,7 +184,7 @@ subtree.
    `code-modernization:<agent>` through the Agent tool and that is how "spawn the test-engineer
    subagent" in one of the plugin's own command files is carried out. The plugin's manifest
    carries no `version`; `~/.claude/plugins/installed_plugins.json` records `"unknown"` — cite
-   the cache directory's commit id instead.
+   the cache directory name instead.
 2. **Decide the target the way a new project is decided.** Ask the New-Project Flow's two
    questions — type, and the platforms ticked — for the *target*, and take the Defaults Table's
    row. That row's `stack-*` skill is the migration's constraint: its toolchain versions, its
@@ -200,10 +201,12 @@ subtree.
    install the stack skill's named version first (`uv python install <version>`, or pyenv) and
    fall back to the machine's interpreter only if that fails — and say which happened in the
    target-stack line.
-3. **Tests before any `modernize-*` command runs.** `/orc-test analyze` on the source project.
-   If the suite is red, a language has no runnable suite, or coverage is under the gate, the
-   first work is `/orc-test generate` *on the old code* — characterization tests that pin what
-   it does today, under `test-discipline`. The plugin's `extract-rules` will document the
+3. **Tests before any `modernize-*` command runs.** `/orc-test analyze` on the source project,
+   with quality mode's step 0 interpreter rule, so the baseline and step 6's gate are measured
+   the same way. If the suite is red, it is fixed by hand first (`orc-test`'s own rule: `generate`
+   is not offered on a red suite). If a language has no runnable suite, or coverage is under the
+   gate, the first work is `/orc-test generate` *on the old code* — characterization tests that
+   pin what it does today, under `test-discipline`. The plugin's `extract-rules` will document the
    business rules; these tests are what make them executable, and without them the gate in step
    6 has nothing to measure. Record the baseline: coverage, TCE, test count. This step is not
    optional and it is not the plugin's. Two things the first run added: **run the suite with
@@ -258,10 +261,11 @@ subtree.
    catalog — expected, not a defect.
 6. **Exit gate.** Copy the plugin's output back over the checkout as the branch's content —
    `modernized/<name>-uplifted/` for an uplift (not `modernized/<name>/`, which is
-   `transform`'s), excluding its `.venv`, `.git`, `mutants` and `UPLIFT_NOTES.md` — and the
-   brief, rule catalogue, delta catalogue and uplift notes from `analysis/<name>/` into
-   `docs/`. Then `/orc-test run` must be green on the migrated code, and `/orc-test analyze`
-   must report coverage and TCE **no lower than** step 3's baseline. If either fails, the
+   `transform`'s), excluding its `.venv`, `.git`, `mutants` and the `UPLIFT_NOTES.md` the plugin
+   writes there — and the brief, rule catalogue, delta catalogue and `PLAYBOOK.md` from
+   `analysis/<name>/`, plus those uplift notes, into `docs/`. Then `/orc-test run` must be green
+   on the migrated code, and `/orc-test analyze` must report coverage and TCE **no lower than**
+   step 3's baseline. If either fails, the
    migration is not done: say which, and what the plugin's `status` shows, and stop. "Done" is
    not said before this gate.
 7. **Report** in reader terms: what moved, what the old suite proved, the numbers before and
