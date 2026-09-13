@@ -53,7 +53,7 @@ here, in files under `ios/`; it is only the build that needs a Mac.
 
 | Path | What |
 |---|---|
-| `pubspec.yaml` | Dependencies, assets, and **`version: 1.0.0+1`** — the single source of the app's version. `1.0.0` becomes Android `versionName` and iOS `CFBundleShortVersionString`; `+1` becomes `versionCode` and `CFBundleVersion`. Both stores require the build number to increase on every upload. `/orc-version` should bump this line. |
+| `pubspec.yaml` | Dependencies, assets, and **`version: 1.0.0+1`** — the single source of the app's version. `1.0.0` becomes Android `versionName` and iOS `CFBundleShortVersionString`; `+1` becomes `versionCode` and `CFBundleVersion`. Both stores require the build number to increase on every upload. `/orc-version` does not edit this file yet (its `versionfiles.py` handles `pyproject.toml`, `debian/changelog` and the plugin manifests — BACKLOG #6); bump it by hand and check it before every upload. |
 | `lib/main.dart`, `lib/` | The app. |
 | `test/`, `integration_test/` | `flutter test` unit/widget tests; integration tests run on a device or emulator. |
 | `analysis_options.yaml` | Lints; `flutter_lints` is the default package. `flutter analyze` is the lint command. |
@@ -367,7 +367,7 @@ changes where it lands, this table changes.
 | 64-bit | `flutter build appbundle` includes arm64-v8a by default. | Default; nothing to do. |
 | Signed with the upload key | `signingConfigs.release` in `android/app/build.gradle.kts` reading `android/key.properties` (the Flutter deployment doc's exact snippet). | `key.properties` exists, is git-ignored (`git check-ignore android/key.properties`), and a release build does not say "signed with debug key". |
 | `applicationId` = Play package name | `defaultConfig.applicationId` in `android/app/build.gradle.kts`. Set with `--org` at create time; changing it later means a new app on Play. | matches the Play ingredient's `__PACKAGE__` |
-| Version code increases every upload | `pubspec.yaml` `version: x.y.z+N` — bump `N`. | Play refuses a reused `versionCode`; `/orc-version` should refuse a bump that leaves `+N` unchanged. |
+| Version code increases every upload | `pubspec.yaml` `version: x.y.z+N` — bump `N`. | Play refuses a reused `versionCode`; the `/orc-version` handler, when written (BACKLOG #6), must refuse a bump that leaves `+N` unchanged. |
 | Data safety form is truthful | Not a file — but the answer is decided by which plugins you add. Any plugin that sends data off-device (analytics, crash reporting, ads) makes the form non-empty. Read each plugin's README before adding it, and keep a list. | `flutter pub deps --style=compact` lists them; answer the form from that list. |
 | Account deletion in-app + web | App code (`lib/`) and a public web page. Only if the app creates accounts. | — |
 | Permissions declared | `android/app/src/main/AndroidManifest.xml` `<uses-permission>`. Plugins merge their own in; the merged manifest is what Play sees. | `build/app/intermediates/merged_manifests/release/AndroidManifest.xml` after a build, or the App Bundle Explorer in Play Console. |

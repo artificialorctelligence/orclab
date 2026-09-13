@@ -179,8 +179,21 @@ my-skill/
 ## Before any answer that says what to do next, show what it rests on
 
 **The trigger is the situation, not the intent.** You are about to produce something that ranks,
-sequences, chooses between options, names something, judges whether something is ready, or says
-what to work on next — **whether or not anyone asked you a question.**
+sequences, chooses between options, names something, judges whether something is ready, says
+what to work on next — **or states what an Orclab component does**, in a shipped skill or
+anywhere else — **whether or not anyone asked you a question.**
+
+**A claim about Orclab's own code is a claim about code, not internal knowledge.** v18's stack
+skills carry a "confirmed live" stamp on every sentence about Google Play, and five of them say
+"`/orc-version` edits these" about version files `versionfiles.py`'s `KNOWN_FORMATS` has never
+held (found 2026-09-13 while reading BACKLOG #6). The store claims were treated as evidence
+questions and the component claim as something the writer already knew. Same pass for both: open
+the component's code, cite what makes the sentence true, and if it is not true yet, write "does
+not yet" and the backlog number. The rule fires at *write* time; the use-time half — open the thing
+before acting on a description of it — is what surfaced this, and direflail's instruction from the
+same day is the general form: **before doing something, make sure what you are about to act on is
+current, then do it.** That is not "re-verify everything"; the trigger is a description — a skill,
+a doc, a plan, an entry — and a thing it can have drifted from.
 
 **Judge the claim, not the container.** A report that ends by proposing an order is covered by
 that ending, even though the rest of it reports. The unit is the claim someone would act on, not

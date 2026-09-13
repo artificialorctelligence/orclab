@@ -291,7 +291,7 @@ to be built from scratch — the same "wrap, don't reinvent" instinct already ap
 being a thin wrapper (same shape as `/orc-code refactor`) rather than new logic. Then a fresh
 `superpowers:brainstorming` pass for whatever gap remains.
 
-## #6: Per-language manifest version detection/sync for /orc-version — deferred, same reasoning as #4 (PARTIALLY ADDRESSED 2026-09-07 — still open for the formats it names)
+## #6: Per-language manifest version detection/sync for /orc-version — deferred, same reasoning as #4 (PARTIALLY ADDRESSED 2026-09-07 — still open for the formats it names) (UPDATED 2026-09-13 — re-scoped from pom/package.json/Cargo to the version files of Orclab's own stacks; two-number model needed)
 
 Raised by direflail (2026-09-05) while designing `/orc-version` (see
 `docs/superpowers/specs/2026-09-05-orclab-v3-orc-version-orc-help-design.md`): when Orclab is
@@ -334,6 +334,29 @@ when a real project here needs one. The cost is now much lower than when this en
 read/write pair plus its entry in `KNOWN_FORMATS`, not a new mechanism. The first-touch
 "suggest a starting version from what's already there" half of the original ask is also still
 unbuilt.
+
+**Update 2026-09-13 — re-scoped, because the formats that matter changed under it.** No project
+here uses `pom.xml`, `package.json` or `Cargo.toml` as its version source. v18's nine stack skills
+do name what their projects use, and seven of them told a consuming project that `/orc-version`
+already edits it — Flutter's `pubspec.yaml` `version: x.y.z+N`, Android's `versionCode`/
+`versionName` in `build.gradle.kts`, iOS's `MARKETING_VERSION`/`CURRENT_PROJECT_VERSION` in the
+pbxproj, Expo's `app.json`, Godot's `export_presets.cfg` `version/code`/`version/name`, Unity's
+`ProjectSettings.asset` `bundleVersion`/`AndroidBundleVersionCode`, KMP's two apps. It edits none:
+`versionfiles.py`'s `KNOWN_FORMATS` is still `[PYPROJECT, PLUGIN_JSON, MARKETPLACE_JSON,
+DEBIAN_CHANGELOG]`. The seven sentences now say "does not edit this file yet … BACKLOG #6; bump it
+by hand and check it before every upload" — a skill that misdescribes a shipped command is fixed
+before the command is. `CLAUDE.md`'s "show what it rests on" section now names this case: a claim
+about an Orclab component is a claim about code and gets the same pass as a claim about a store.
+
+**What the handlers need that the mechanism lacks:** every store-facing format above carries
+*two* numbers — the human version string and a build/version code the store refuses to see
+reused. `versionfiles.py` has a one-version model. So the first stack handler brings the model
+change with it: `write_version` takes (or derives) the build number, `verify_consistency` checks
+both, and a bump that leaves the build number unchanged is refused — the stack skills already
+promise that refusal. The entry's own rule still holds: one format at a time, when a real project
+on that stack reaches a release; Flutter's single `version:` line is the likeliest and easiest
+first case. The first-touch "suggest a starting version from what's already there" half remains
+unbuilt too.
 
 ## #7: Distribution-channel download/install metrics — carried over from Orcshot #186, direflail wants Orclab to own this eventually (PARTIALLY ADDRESSED 2026-09-10 — Launchpad and Flathub confirmed, Snap blocked until a snap exists)
 

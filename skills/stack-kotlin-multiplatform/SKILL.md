@@ -207,7 +207,7 @@ lands* holds for `androidApp/` — target SDK, signing, `applicationId`, version
 for `iosApp/`. Two seams: the Xcode script phase signs the Kotlin framework (*"Handles the code
 signing process of the embedded framework"*, direct-integration page), and a required-reason API a
 multiplatform library calls on iOS goes in the *app's* `PrivacyInfo.xcprivacy` (Kotlin's docs have a
-*Privacy manifest for iOS apps* page). Versions stay one per app; `/orc-version` bumps both.
+*Privacy manifest for iOS apps* page). Versions stay one per app, and `/orc-version` edits neither yet (BACKLOG #6) — bump both by hand.
 
 ## Sources (live on 2026-09-12)
 
