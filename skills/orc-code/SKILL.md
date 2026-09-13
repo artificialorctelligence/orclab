@@ -143,4 +143,4 @@ ask directly in the New-Project Flow's step 3 instead of guessing. A row's **Kno
 names the background skill that holds the stack's current toolchain, project layout, store
 rules, and the facets every stack skill answers — presence, UI, storage (v18 spec §3). When a
 row has one, its scaffold step follows that file rather than this one's generic step 5. A row
-marked *stub* or *no skill yet* is not a default to propose; it is a name to research.
+marked *stub* is not a default to propose; it is a name to research.
