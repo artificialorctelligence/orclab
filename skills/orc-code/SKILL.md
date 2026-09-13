@@ -29,15 +29,22 @@ files, etc.) — always resolve it from what was typed or by asking directly.
 Ask these questions **one at a time**, waiting for each answer before asking the next. Skip any
 question `$ARGUMENTS` already answered.
 
-1. **Language**: "What language would you like to use?"
-2. **Project name**: "What would you like to name the project?"
-3. **Project type/platform**: "What kind of project is this — desktop, web, mobile, CLI, or
-   something else?" Once you have language + type, check the Defaults Table below:
-   - If a default exists for this combination, propose it: "For a [type] [language] app, I'd
-     default to [stack] — sound good, or would you like something different?" Use whatever they
-     confirm or substitute.
-   - If no default exists, don't propose one — just note there's no default yet and ask what
-     stack/framework they want.
+1. **Project name**: "What would you like to name the project?"
+2. **Type**: "Is this an app or a game?" (CLI tools and libraries are apps for this purpose;
+   if the answer is something else entirely, there is no default — say so and ask what stack
+   they want.)
+3. **Scope**: "Which platforms? Tick any of: Linux, Windows, Mac, Android, iOS, web." Any subset
+   is valid. Once you have type + scope, find the one row of the Defaults Table below whose
+   *Scope ticked* column matches — the rows are exact, and every subset lands on exactly one:
+   - If the row has a Default, propose it: "For a [type] on [platforms], I'd default to
+     [stack] — sound good, or would you like something different?" Name the row's alternatives
+     only if asked, or if the stack skill's own concern line applies to what the user has said.
+   - If the row's Default is a stub, or no row matches, don't propose one — say there is no
+     researched default yet and ask what stack they want. Before scaffolding with a stack that
+     has no skill, `CLAUDE.md`'s "Before the first project builds on a stack ... Orclab has
+     never met" applies: the research comes first.
+   - If the user changes scope after scaffolding ("we should add iOS"), that is the
+     Add-to-Existing Flow, not this table.
 4. **Starting point**: "Would you like a minimal example, a basic scaffold with common features,
    or something specific — describe your use case."
 
@@ -108,17 +115,27 @@ three — don't assume only one shape.
 
 ## Defaults Table
 
-| Language | Type                     | Default stack              | Knowledge |
-|----------|--------------------------|----------------------------|-----------|
-| Java     | Desktop                  | Java + Spring + JavaFX     | — |
-| Dart     | Mobile (cross-platform)  | Flutter                    | `skills/stack-flutter/SKILL.md` — read it in full before scaffolding |
-| Kotlin   | Mobile (Android only)    | Jetpack Compose            | `skills/stack-android-native/SKILL.md` — same |
-| Swift    | Mobile (iOS only)        | SwiftUI                    | `skills/stack-ios-native/SKILL.md` — same; needs a Mac to build |
-| C#       | Game (cross-platform)    | Unity 6                    | `skills/stack-unity/SKILL.md` — same; Unity and Godot are both settled, neither preferred: ask which |
-| GDScript / C# | Game (cross-platform) | Godot 4                 | `skills/stack-godot/SKILL.md` — same; GDScript for mobile per Godot's own docs |
+Keyed by what the user ticked, not by language — the language is the answer. Families: desktop
+= Linux, Windows, Mac; mobile = Android, iOS. *(pending pass 11)* marks a default that
+Task 8 of the v18 plan settles: it holds only if EAS Build in fact requires React Native.
 
-Do not invent additional defaults beyond what's listed here — if a combination isn't in this
-table, ask directly in the New-Project Flow's step 3 instead of guessing. Add rows here only once
-a real, confirmed preference exists. A row's **Knowledge** column names the background skill that
-holds the stack's current toolchain, project layout and store rules (BACKLOG #33); when a row has
-one, its scaffold step follows that file rather than this one's generic step 5.
+| Type | Scope ticked | Default | Alternatives | Knowledge |
+|---|---|---|---|---|
+| App | one or more desktops, nothing else | Python | Java + Spring + JavaFX; C# / .NET only when Windows is the sole platform | *no skill yet — research first* |
+| App | Android only | Kotlin + Jetpack Compose | Java *(stub — existing codebases only)* | `skills/stack-android-native/SKILL.md` — read it in full before scaffolding |
+| App | iOS only | Swift + SwiftUI | Objective-C *(stub — existing codebases only)* | `skills/stack-ios-native/SKILL.md` — same; needs a Mac or a cloud Mac to build |
+| App | Android + iOS, nothing else | React Native *(pending pass 11)* | Flutter; Kotlin Multiplatform | *no skill yet — research first*; Flutter: `skills/stack-flutter/SKILL.md` |
+| App | web only | *decided by research — none yet* | — | *no skill yet — research first* |
+| App | two or more of desktop / mobile / web, iOS ticked | React Native + React web *(pending pass 11)* | Flutter; Kotlin Multiplatform + Compose Multiplatform | *no skill yet — research first* |
+| App | two or more of desktop / mobile / web, iOS not ticked | Flutter | React Native + React web; Kotlin Multiplatform + Compose Multiplatform | `skills/stack-flutter/SKILL.md` — same |
+| Game | desktops only | Godot 4 | Unity 6 | `skills/stack-godot/SKILL.md`, `skills/stack-unity/SKILL.md` — read the chosen one in full; neither is preferred over the other, ask which |
+| Game | mobile only | Godot 4 | Unity 6 | same |
+| Game | desktop + mobile | Godot 4 | Unity 6 | same |
+| Game | web, alone or with others | Godot 4 *(stub — web export not researched)* | — | `skills/stack-godot/SKILL.md` has no web section yet |
+
+Do not invent additional defaults beyond what's listed here — if a scope isn't in this table,
+ask directly in the New-Project Flow's step 3 instead of guessing. A row's **Knowledge** column
+names the background skill that holds the stack's current toolchain, project layout, store
+rules, and the facets every stack skill answers — presence, UI, storage (v18 spec §3). When a
+row has one, its scaffold step follows that file rather than this one's generic step 5. A row
+marked *stub* or *no skill yet* is not a default to propose; it is a name to research.
