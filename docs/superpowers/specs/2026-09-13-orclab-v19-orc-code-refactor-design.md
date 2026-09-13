@@ -85,7 +85,8 @@ already exists as a real skill is to wrap it with an availability check. Orclab 
 scaffold for this?" with its own Defaults Table — the target's type and platform scope, as the
 new-project flow asks them — and the matching `stack-*` skill becomes the migration's constraint:
 its toolchain versions, its project layout, its `## Lint` config, its store-rules table. Concretely,
-the plugin's `brief` and `transform` take a free-form `[target-stack]` argument; `/orc-code`
+the plugin's `preflight` and `brief` take an optional, free-form `[target-stack]` argument, and
+`transform` requires the same free-form value as `<target-stack>`; `/orc-code`
 passes the stack skill's own naming (e.g. "Kotlin + Jetpack Compose, per Orclab's
 stack-android-native: AGP 9.x, compileSdk 36, `app/build.gradle.kts` layout") and, when the
 brief is produced, checks it against the skill's layout section before the user approves it. The
@@ -174,8 +175,9 @@ ingredients carry.
   stands).
 - `~/.claude/plugins/marketplaces/claude-plugins-official/plugins/code-modernization/`:
   `.claude-plugin/plugin.json` (description), `commands/modernize-{preflight,brief,transform,
-  uplift,harden,status}.md` (the `legacy/$1` / `analysis/$1` / `modernized/$1` layout; `brief`
-  and `transform`'s free-form `[target-stack]`; `uplift`'s "one test suite on both runtimes").
+  uplift,harden,status}.md` (the `legacy/$1` / `analysis/$1` / `modernized/$1` layout;
+  `preflight` and `brief`'s optional `[target-stack]`, `transform`'s required `<target-stack>`;
+  `uplift`'s "one test suite on both runtimes").
 - `~/.claude/plugins/installed_plugins.json` — `code-modernization` absent.
 - BACKLOG #40's resolution and the five dogfood commits of 2026-09-13 (the quality procedure and
   the unsafe-autofix lesson).

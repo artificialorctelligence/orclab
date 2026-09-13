@@ -176,11 +176,11 @@ subtree.
    [target-stack]` and on through the plugin's own sequence, reading each command file in full
    from the plugin's directory and following it exactly as if the user had typed it. The target
    stack — optional in `preflight`'s and `brief`'s own `[target-stack]`, required in
-   `transform`'s `<target-stack>` — is the stack skill's own naming, in one line: e.g. `Kotlin +
-   Jetpack Compose, per Orclab's stack-android-native: AGP
-   9.x, compileSdk 36, app/build.gradle.kts layout`. When `brief` produces its target
-   architecture, check it against the stack skill's layout section before the user approves it,
-   and correct the brief, not the result, if it lands elsewhere. A same-stack version bump goes
+   `transform`'s `<target-stack>` — is the stack skill's own naming, in one line: e.g.
+   `Kotlin + Jetpack Compose, per Orclab's stack-android-native: AGP 9.x, compileSdk 36, app/build.gradle.kts layout`.
+   When `brief` produces its target architecture, check it against the stack skill's layout
+   section before the user approves it, and correct the brief, not the result, if it lands
+   elsewhere. A same-stack version bump goes
    through `modernize-uplift <name> <source-version> <target-version>` instead of `transform`.
 6. **Exit gate.** Copy `modernized/<name>/` back over the worktree as the branch's content, and
    the brief and rule catalogue from `analysis/<name>/` into `docs/`. Then `/orc-test run` must
