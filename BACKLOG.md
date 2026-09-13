@@ -2903,3 +2903,50 @@ with guard clauses and extracted helpers (`_analyze_one`, `_gate`/`_run_leaf`, `
 "8 failed" that appeared between runs was the scratch venv holding ruff sitting first on PATH,
 so orc-test's subprocess `python3` had no pytest — my shell, not the code. `lint_on_write` now
 fires on every Python file Orclab itself writes.
+
+## #41: /orc-code refactor has two flavours — a code-quality pass and a language/version migration — and today delivers neither: the wrapped plugin is not installed, the wrapper hands over with no stack and no exit gate
+
+direflail asked on 2026-09-13 whether Orclab has a skill that refactors a codebase, in two
+flavours: (A) make the code better in place, and (B) move it to a different version of its
+language or a different language, factoring in the stack and proving everything still works.
+
+What exists, checked against the files rather than remembered: `/orc-code`'s description claims
+"refactor/migrate existing code", and its Refactor Flow "wraps the `code-modernization` plugin's
+own real workflow rather than reimplementing it" — Anthropic's plugin, whose own description is
+flavour B almost verbatim ("cross-stack rewrites, greenfield reimagining, and same-stack version
+uplifts"), with a preflight / assess / map / extract-rules / brief / (reimagine | transform |
+uplift) / harden / status pipeline. Two gaps found the same day:
+
+- The plugin is present in the `claude-plugins-official` marketplace clone on this machine but
+  **not installed** (`~/.claude/plugins/installed_plugins.json` does not list it), so
+  `/orc-code refactor` here lands on its own "not installed" branch. The wrapper has never been
+  exercised for real; CLAUDE.md's "check it's actually available, tell the user plainly if not"
+  guard exists, but nothing past it has been confirmed live.
+- The wrapper hands over completely. It does not tell the plugin which stack Orclab would choose
+  for the target, and nothing gates the result. "Factor in the stack" and "make sure everything
+  still works" — direflail's two conditions — are exactly what is missing; the plugin's `harden`
+  step is generic.
+
+Flavour A has no command at all. The pieces exist — `code-discipline` (the rules),
+`lint_on_write` (enforces them on each new write), `/orc-test analyze` + `generate` (the tests) —
+and 2026-09-13's dogfood was flavour A done by hand on Orclab's own scripts: the stack skill's
+lint config in, 190 findings to zero, 31 functions flattened, 611 tests green throughout, with one
+lesson worth carrying — the linter's *unsafe* autofixes applied wholesale made the code worse and
+broke eight tests; the rule findings are fixed by hand, per function, with the suite as the check.
+
+The decision (direflail, same day): one spec for `/orc-code refactor` with both modes. A is the
+quality pass — ensure the stack's lint config, baseline with the linter and `analyze`, fix
+autofixes → rule findings by hand → `generate`, suite green after every file, before → after for
+every number. B keeps wrapping `code-modernization` and adds Orclab's two contributions: the
+target stack comes from `/orc-code`'s own Defaults Table and its stack skill is the brief's
+constraint (the migrated project looks like one `/orc-code` would have scaffolded); and the exit
+gate is the *old* suite green on the new code, with `analyze` reporting coverage and TCE no lower
+than the baseline — which means a source project with no real suite gets `analyze` + `generate`
+on the old code *before* a line is migrated, because a port cannot be verified against tests that
+do not exist. Spec: `docs/superpowers/specs/2026-09-13-orclab-v19-orc-code-refactor-design.md`.
+
+Related: #5 (`/orc-data`, legacy-system facts during refactor work) belongs to B's map /
+extract-rules phase and may be partly covered by the plugin; check before building #5.
+
+Scope boundary: this does not build a migration engine — that is the plugin's — and does not
+touch `/orc-code`'s new-project or add-feature flows.
