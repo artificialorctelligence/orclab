@@ -117,9 +117,16 @@ branch's content once the exit gate passes. `analysis/` stays in the worktree; i
 (the brief, the rule catalogue) are copied into `docs/` on the branch. This is the part most
 likely to need correcting at first real use; the skill says so.
 
-**(d) Availability, confirmed rather than assumed.** The Plugin-Discovery Procedure stays, and
-the "not installed" message names the install command (`claude plugin install
-code-modernization@claude-plugins-official`). But the flow past that line has never run. The
+**(d) Availability, confirmed rather than assumed — and "found" is not "installed".** The
+Plugin-Discovery Procedure searches `~/.claude/plugins/marketplaces/` as well as `cache/`, so it
+finds a plugin that is merely *available* in a marketplace clone and follows its command files —
+which then say "spawn the **test-engineer** subagent", and the plugin's eight agents exist only
+once it is installed (checked 2026-09-13: the marketplace copy is present, `installed_plugins.json`
+does not list it). The procedure therefore distinguishes the two: a plugin whose root is under
+`marketplaces/` and whose name is absent from `installed_plugins.json` is *available, not
+installed*, and the flow stops with the install command (`claude plugin install
+code-modernization@claude-plugins-official`) and the note that a fresh session is needed after
+installing (`CLAUDE.md`, marketplace gotcha 4). The flow past that line has never run. The
 first task of the plan is to install the plugin here and drive the full Refactor Flow once on a
 small real project, worktree layout and exit gate included, and to correct this spec with what
 that run contradicts — the same "no release has gone through this" honesty the `orc-package`
@@ -159,7 +166,7 @@ ingredients carry.
   corrected. Until that run, the skill's migration section carries "no migration has gone
   through this yet" in its first paragraph.
 - **Availability branch**: with the plugin uninstalled, `/orc-code refactor "port to Kotlin"`
-  prints the install command and stops. That is the one path confirmed today.
+  prints the install command and stops — confirmed by Task 4's prose test and by running the flow once with the plugin uninstalled. Before this plan, discovery would have found the marketplace copy and gone on without the agents.
 
 ## Sources, checked 2026-09-13
 
