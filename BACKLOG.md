@@ -2738,3 +2738,38 @@ URLs added to Sources. Web: react.dev's heading is still "React Router (v7)" liv
 alternatives line now says so beside npm's 8.3.1. orc-test: the 14 "Task 19 of the v17 plan"
 references (seven `languages/*.md`, seven fixture READMEs) are gone; `grep -rn "v17\|Task 19"
 skills/orc-test/` is empty and its 148 tests still pass.
+
+## #40: Evaluate a found list of seven code-shape rules (linear control flow, loop ceilings, two assertions per function …) and decide whether Orclab's discipline skills should carry them
+
+direflail brought this on 2026-09-13, as a screenshot of a bulleted list found elsewhere, with the
+question "see if orclab can use it" — might help AI development. The list, transcribed verbatim:
+
+- Keep control flow linear, no more than two levels of nesting
+- Every loop gets an explicit ceiling, not "it'll never exceed N"
+- Close everything you open, on the error path too
+- One function does one job and fits on a page, about 60 lines
+- At least two assertions in every function, so it fails loudly
+- Never swallow an error, a bare `except: pass` is not handling
+- Zero compiler warnings from day one, not zero errors
+
+The source is not known; the shape closely resembles the NASA/JPL "Power of Ten" rules for
+safety-critical C (Holzmann, 2006), which have the same items — bounded loops, no recursion,
+function length, assertion density, zero warnings — restated in plain language. Whoever picks this
+up should find the real origin first (`currency-discipline`), because the answer to "should Orclab
+adopt it" differs between "a well-known rule set for flight software" and "someone's blog post".
+
+What this is asking for, in Orclab's terms: a rule that Claude follows while writing code in any
+consuming project. Orclab has one place today where such rules live — `test-discipline` (rules for
+tests, background skill) — and no equivalent for production code; the shipped `ponytail` plugin
+carries a different, partly opposing philosophy (shortest diff, "trivial one-liners need no test")
+and is not Orclab's. So the evaluation is: (1) which of the seven already fall out of existing
+skills or the model's defaults and need no rule; (2) which are genuinely worth adding, and where —
+a new `code-discipline` background skill in `test-discipline`'s shape is the obvious home, and
+`CLAUDE.md`'s "Before building anything, name what should already have covered it" applies
+before it is created; (3) which conflict with what Orclab already ships (the two-assertions rule
+against Python idiom, the 60-line rule against `ponytail`'s "fewest files"), and how that gets
+decided rather than left as two rules that disagree.
+
+Not this: rewriting any existing code to these rules, or adopting them into Orclab's own bundled
+scripts before the decision is made. This is an evaluation and a decision, and its output is
+either a skill or a line here saying why not.
