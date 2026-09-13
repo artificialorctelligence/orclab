@@ -1,7 +1,7 @@
 # JavaScript/TypeScript
 
-Researched on: 2026-09-11 (versions read from the npm registry that day). Last real run: none
-yet — the first is Task 19 of the v17 plan, on Orclab itself.
+Researched on: 2026-09-11 (versions read from the npm registry that day). Last real run: none yet —
+the first project with this language corrects it.
 
 ## Detect
 `package.json` at the root or up to two directories down.

@@ -2,4 +2,4 @@ xccov.json — from documented schema — verify on first real run.
 
 Hand-built against the documented `xcrun xccov view --report --json` output shape, not captured
 from a real tool run. Verify its shape against a real xccov report the first time one is
-actually generated (Task 19).
+actually generated.

@@ -54,8 +54,9 @@ the first tool that page names, with the one command `npm create vite@latest my-
 react-ts`. TypeScript is what react.dev types, so it is the default; `--template react` is plain
 JavaScript. **Alternatives:** *Next.js (App Router)* — *"a React framework that takes full advantage
 of React's architecture to enable full-stack React apps"*; concern that picks it: a content site that
-must render on the server (SEO, first paint), or a Node back end (below). *React Router v7* — *"can
-be paired with Vite to create a full-stack React framework"*; concern: react.dev's framework route
+must render on the server (SEO, first paint), or a Node back end (below). *React Router* — react.dev still
+heads it "React Router (v7)" (confirmed live 2026-09-12) while npm's current release is 8.3.1, above —
+*"can be paired with Vite to create a full-stack React framework"*; concern: react.dev's framework route
 wanted on top of this skill's build tool. Both need a Node server unless statically exported.
 
 **Back end: FastAPI.** The back end is the program that answers the browser's requests and owns the

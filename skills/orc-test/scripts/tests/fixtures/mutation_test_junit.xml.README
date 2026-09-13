@@ -2,4 +2,4 @@ mutation_test_junit.xml — from documented schema — verify on first real run.
 
 Hand-built against mutation_test's documented junit report format (pub.dev, 1.8.0), not captured
 from a real tool run. Verify its shape against a real mutation_test report the first time one is
-actually generated (Task 19).
+actually generated.

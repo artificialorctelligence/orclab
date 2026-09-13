@@ -1,7 +1,7 @@
 # Kotlin
 
 Researched on: 2026-09-11 (versions read from Maven Central/plugin portal that day).
-Last real run: none yet — the first is Task 19 of the v17 plan, on Orclab itself.
+Last real run: none yet — the first project with this language corrects it.
 
 ## Detect
 `build.gradle` or `build.gradle.kts` at the root or up to two directories down — same markers as

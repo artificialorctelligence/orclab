@@ -22,8 +22,8 @@ codebase producing an Android `.aab` and an iOS `.ipa`, both to be shipped — t
 stores from one source. Flutter also targets Linux, macOS, Windows and web from the same code,
 which matters when a mobile app grows a desktop sibling.
 
-Not this stack: games (Unity or Godot — their own stack skills, when written), and anything that
-must be native-only (Kotlin/Android or Swift/iOS skills, when written).
+Not this stack: games (Unity or Godot — `stack-unity`, `stack-godot`), and anything that must be
+native-only (`stack-android-native`, `stack-ios-native`).
 
 ## Toolchain, as of 2026-09-11
 
@@ -250,33 +250,49 @@ app on iOS**; the framework overview offers alert, sound and badge and nothing e
 count is the closest thing. The app must ask permission first (the plugin's
 `requestAlertPermission` / `requestBadgePermission` / `requestSoundPermission`).
 
-### Linux, Windows, macOS
+### Linux
 
-`tray_manager` is the tray on all three; nothing splits by OS version. **Linux depends on the
-desktop environment, not on Flutter**: the plugin is built on `libayatana-appindicator3` (its
-README's `apt-get install libayatana-appindicator3-dev`, confirmed live 2026-09-12), — *"a GTK
-implementation of the StatusNotifierItem Specification (SNI)"*, its own README (confirmed live
-2026-09-12) — so KDE Plasma and Cinnamon show it natively and GNOME
-needs the AppIndicator shell extension — the README says so in its own words: *"In GNOME
-desktop environment, the AppIndicator extension may be required to display the icon."* Which distro
+`tray_manager` is the tray on Linux, Windows and macOS alike; nothing splits by OS version.
+**Linux depends on the desktop environment, not on Flutter**: the plugin is built on
+`libayatana-appindicator3` (its README's `apt-get install libayatana-appindicator3-dev`, confirmed
+live 2026-09-12) — *"a GTK implementation of the StatusNotifierItem Specification (SNI)"*, its own
+README (confirmed live 2026-09-12) — so KDE Plasma and Cinnamon show it natively and GNOME needs
+the AppIndicator shell extension — the README says so in its own words: *"In GNOME desktop
+environment, the AppIndicator extension may be required to display the icon."* Which distro
 preinstalls that extension is in `skills/stack-python-desktop/SKILL.md`'s Presence section and
-holds here unchanged — same protocol. Desktop notifications come from the same
-`flutter_local_notifications`: freedesktop Desktop Notifications on Linux, toasts on Windows (no
-repeating ones; `cancel()` only when MSIX-packaged), UserNotifications on macOS — per its README
-(confirmed live 2026-09-12).
+holds here unchanged — same protocol. The concern that library carries too: its upstream
+repository is marked OBSOLETE (`stack-python-desktop`'s Sources record it), so the tray rests on
+a library that will stop moving; `nativeapi`, below, is the announced way off it. Desktop
+notifications come from the same `flutter_local_notifications`, through freedesktop Desktop
+Notifications on Linux (its README, confirmed live 2026-09-12).
+
+### Windows
+
+`tray_manager` for the notification-area icon. Notifications are Windows toasts through
+`flutter_local_notifications` — no repeating ones, and `cancel()` only when MSIX-packaged (its
+README, confirmed live 2026-09-12).
+
+### macOS
+
+`tray_manager` for the menu-bar icon. Notifications go through UserNotifications from the same
+`flutter_local_notifications`, with the permission asks the iOS section describes.
 
 Alternatives, each with the concern that would pick it: `system_tray` 2.0.3 — same three
 platforms, but last published 2023-04-19 with a Dart `<3.0.0` SDK bound, so it does not resolve
-on Dart 3.13 at all (confirmed live 2026-09-12); only if `tray_manager` breaks and its fork is
-the fix. `nativeapi` 0.2.4 (published 2026-09-12, five platforms, "Work in Progress" in its own
-README) is `tray_manager`'s announced successor — its README carries *"This plugin is being
-migrated to libnativeapi/nativeapi-flutter"* — and is the choice once it reaches 1.0 or
-`tray_manager` stops releasing; not before, at 28 likes and 2.11k downloads.
+on Dart 3.13 at all (confirmed live 2026-09-12); only if `tray_manager` breaks and a fork of
+`system_tray` is the fix. `nativeapi` 0.2.4 (published 2026-09-12, five platforms, "Work in
+Progress" in its own README) is `tray_manager`'s announced successor — its README carries *"This
+plugin is being migrated to libnativeapi/nativeapi-flutter"* — and is the choice once it reaches
+1.0 or `tray_manager` stops releasing; not before, at 28 likes and 2.11k downloads.
+
+None of the four plugins this section and `## Storage` recommend has had `## Choosing
+dependencies`' three store checks run against it; the first real build is the moment.
 
 ## UI
 
-Flutter draws its own widgets on every platform; the UI framework is Flutter itself, and the
-choice is only which widget set. **Default: Material 3 in a `MaterialApp`, with the `.adaptive()`
+No project has been built with these facets yet; the first one corrects them. Flutter draws its
+own widgets on every platform; the UI framework is Flutter itself, and the choice is only which
+widget set. **Default: Material 3 in a `MaterialApp`, with the `.adaptive()`
 constructors where the docs recommend them.** docs.flutter.dev (confirmed live 2026-09-12):
 *"Material 3 is the default design language of Flutter, enabling you to design and build
 beautiful, usable apps that can adapt to any platform"* — the default since 3.16. Flutter adapts
@@ -291,6 +307,9 @@ there, at the cost of looking iOS on Android. BACKLOG #2's design system transla
 frameworks above.
 
 ## Storage
+
+No project has been built with these facets yet; the first one corrects them. Storage is what the
+app keeps between launches: saved data and config.
 
 **Saved data: `sqflite` 2.4.4** (published 2026-09-10; Android, iOS, macOS — confirmed live
 2026-09-12): SQLite, one file, no server, plain SQL; the file lives under `getDatabasesPath()` —
@@ -362,7 +381,7 @@ records no preference until direflail has one. Local storage is decided — see 
 ## Games
 
 Not this stack. A Flutter app that grows a game is a Unity or Godot project embedded or beside it;
-that is the game stacks' concern when they are written.
+that is `stack-unity`'s or `stack-godot`'s concern.
 
 ## Sources (live on 2026-09-11; facets and no-Mac builds 2026-09-12)
 

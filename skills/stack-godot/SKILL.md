@@ -11,8 +11,9 @@ editions. Godot ships a minor every ~4–6 months and patches in between; anythi
 one minor is suspect — `orclab:currency-discipline` says re-check, and "Sources" says where.
 
 **Nobody here has shipped a Godot game, and games are not in focus** (direflail, 2026-09-11).
-Thin on purpose, like `stack-unity`: verified ground to start from, the game-specific questions
-named and left open.
+Thin on purpose, like `stack-unity`: verified ground to start from, not enough to pretend the
+game-specific questions (controls, a desktop sibling) are answered. "Scope divergence" below says
+what the docs say about them; no game has tested it.
 
 ## When this is the stack
 

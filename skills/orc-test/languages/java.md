@@ -1,7 +1,7 @@
 # Java
 
 Researched on: 2026-09-11 (versions read from GitHub releases/Maven Central that day).
-Last real run: none yet — the first is Task 19 of the v17 plan, on Orclab itself.
+Last real run: none yet — the first project with this language corrects it.
 
 ## Detect
 `pom.xml`, `build.gradle` or `build.gradle.kts` at the root or up to two directories down. A

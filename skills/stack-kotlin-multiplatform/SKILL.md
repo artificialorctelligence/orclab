@@ -142,11 +142,11 @@ Multiplatform targets the JVM"* (its README, confirmed live 2026-09-12), and the
 `nativeDistributions` block builds *"self-contained, installable binaries that include all the
 necessary Java runtime components, without requiring a JDK to be installed on the target system"*
 — `.deb`/`.rpm`, `.msi`/`.exe`, `.dmg`/`.pkg`, through jpackage on JDK 17 or newer
-(native-distribution page, dated 2026-09-09). Presence is in the box: the `Tray()` composable and
-`TrayState.sendNotification()` (tray page, dated 2026-09-09) sit on `java.awt.SystemTray`
+(native-distribution page, dated 2026-08-25, confirmed live 2026-09-12). Presence is in the box: the `Tray()` composable and
+`TrayState.sendNotification()` (tray page, dated 2026-08-18, confirmed live 2026-09-12) sit on `java.awt.SystemTray`
 (`Tray.desktop.kt` on `jb-main`), so *"Not every desktop environment has a system tray"* — check
 `isTraySupported` first. Web compiles through Kotlin/Wasm, itself *"still in Beta"* (Kotlin/Wasm
-overview, dated 2026-09-10).
+overview, dated 2026-09-01, confirmed live 2026-09-12).
 
 **The concern that picks it over Flutter:** the Android app already exists in Kotlin and Jetpack
 Compose, or the team writes Kotlin — the Android half does not change, and desktop arrives Stable

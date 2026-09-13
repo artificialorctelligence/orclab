@@ -1,7 +1,7 @@
 # GDScript
 
 Researched on: 2026-09-11 (versions read from the Godot Asset Library and PyPI that day).
-Last real run: none yet — the first is Task 19 of the v17 plan, on Orclab itself.
+Last real run: none yet — the first project with this language corrects it.
 
 ## Detect
 `project.godot` at the root or up to two directories down.

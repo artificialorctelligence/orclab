@@ -2657,7 +2657,7 @@ builds on a stack or ships to a channel Orclab has never met"), not here.
 
 It was not fixed on the v18 branch because the spec (`docs/superpowers/specs/2026-09-12-orclab-v18-project-type-defaults-design.md`, §7) leaves every `orc-package` ingredient unchanged; that branch only writes stack skills and the `/orc-code` Defaults Table. The fix is one line in the ingredient's section 1 — replace "minutes are billed at 10×" with the rate-table wording the two skills use ($0.062/min macOS vs $0.006/min Linux, ≈10.3×; the included-minutes multiplier is no longer on GitHub's pages) — plus the ingredient's "checked against live sources" stamp, since that line is the only thing in it that the stack skills' 2026-09-12 fetch contradicts.
 
-## #39: v18 stack-skill polish: three wrong page dates in the KMP skill, stale game-skill openers, and the citation tidy-ups the final review parked
+## #39: v18 stack-skill polish: three wrong page dates in the KMP skill, stale game-skill openers, and the citation tidy-ups the final review parked (RESOLVED 2026-09-12)
 
 Left over from v18's final whole-branch review (2026-09-12), which allowed one fix wave and one
 re-review; these are the items ruled real but not load-bearing — none changes a default or a
@@ -2693,3 +2693,19 @@ open; none needs new research except where a live look is named.
 Ground for the ruling: `docs/superpowers/specs/2026-09-12-orclab-v18-project-type-defaults-design.md`
 §5 says each pass writes research, and the plan's subagent-driven process caps fixes at one wave
 after the final review. Nothing above moves a table row.
+
+**Resolved for real, not just tracked** (2026-09-12, worked through directly from `/orc-todo show
+39`): every item above is applied. The three KMP dates now read from each page's own
+`last-modified` footer, fetched live the same day — native-distribution 25 August, tray 18 August,
+Wasm overview 01 September 2026 (the `built-on` meta was 2026-09-09/10, confirming the earlier
+mistake). Godot's opener now points at `## Scope divergence` the way Unity's already did — Unity's
+turned out not to need the change. Flutter: the unbuilt marker now opens UI and Storage too, the
+desktop tray is split into Linux/Windows/macOS like `stack-python-desktop`, the stray comma and
+"its fork" are gone, the Linux section carries the OBSOLETE upstream concern with `nativeapi` as
+the way off it, the "when written" references name the four existing skills, and a closing
+sentence records that the four recommended plugins have not had the store checks run. iOS:
+Codemagic's spec pages are titled "Xcode 26.6.x (default)" and "Xcode 27.0.x (edge)" live, both
+URLs added to Sources. Web: react.dev's heading is still "React Router (v7)" live, and the
+alternatives line now says so beside npm's 8.3.1. orc-test: the 14 "Task 19 of the v17 plan"
+references (seven `languages/*.md`, seven fixture READMEs) are gone; `grep -rn "v17\|Task 19"
+skills/orc-test/` is empty and its 148 tests still pass.

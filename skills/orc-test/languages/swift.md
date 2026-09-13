@@ -1,7 +1,7 @@
 # Swift
 
-Researched on: 2026-09-11. Last real run: none yet — the first is Task 19 of the v17 plan, on
-Orclab itself.
+Researched on: 2026-09-11. Last real run: none yet — the first project with this language corrects
+it.
 
 ## Detect
 `Package.swift` (Swift Package Manager, runs on any OS) or an `*.xcodeproj` bundle (Xcode app
