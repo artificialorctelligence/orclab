@@ -10,9 +10,9 @@ right flow below — do this before anything else.
 
 ## Step 0: Route
 
-1. If invoked as `/orc-code refactor ...`, OR if `$ARGUMENTS` itself clearly describes a
-   language/version-migration intent (e.g. "change this Java project to do X," "migrate this to
-   Kotlin," "upgrade from .NET Framework to .NET 8," "port this to Python") — go to **Refactor
+1. If invoked as `/orc-code refactor ...`, OR if `$ARGUMENTS` itself clearly describes refactoring
+   or migrating existing code ("clean this up", "bring it up to code-discipline", "migrate this
+   to Kotlin," "upgrade from .NET Framework to .NET 8," "port this to Python") — go to **Refactor
    Flow** below. Recognize this from reading `$ARGUMENTS` the same way you'd recognize which skill
    applies to a request — don't require the literal word "refactor" if the intent is already
    clear.
@@ -78,7 +78,29 @@ This flow wraps the `feature-dev` plugin's own real workflow rather than reimple
 
 ## Refactor Flow
 
-This flow wraps the `code-modernization` plugin's own real workflow rather than reimplementing it.
+Two different jobs share this name, and they have different exit gates and different blast
+radius, so the first thing this flow does is tell them apart.
+
+### Which mode
+
+- **Quality mode** — the request changes neither the language nor its version: "clean this up",
+  "bring it up to code-discipline", "reduce the nesting in the CLI", or a bare
+  `/orc-code refactor`. The code stays where it is and gets better.
+- **Migration mode** — the request names a different language, framework or version: "port
+  this to Kotlin", "move from .NET Framework 4.8 to .NET 8", "rewrite the front end in React".
+
+If `$ARGUMENTS` could be either ("modernize this"), ask — one question, the two modes as the
+options, each with what it does in a sentence. Never guess: a quality pass that turns into a
+rewrite, or a rewrite someone wanted as a tidy-up, is the expensive mistake this question is
+cheaper than.
+
+### Quality mode
+
+(Task 3 fills this section.)
+
+### Migration mode
+
+(Task 4 fills this section.)
 
 1. Run the **Plugin-Discovery Procedure** below, searching for a plugin named `code-modernization`.
 2. **If not found**: same missing-dependency handling as the Add-to-Existing Flow above, naming
