@@ -2576,7 +2576,7 @@ The noise: mutmut mutates every string literal three ways and every keyword argu
 
 Fixing this is `/orc-test generate`'s first real use and should be its own session, per the Task 19 brief — not a side quest of v17's landing. Rerun `analyze` on the same path afterwards; the before → after is the point.
 
-## #36: GDScript has no mutation-testing tool, so /orc-test cannot measure TCE for Godot projects (UPDATED 2026-09-12 — a tool exists; re-scoped to adopting it)
+## #36: GDScript has no mutation-testing tool, so /orc-test cannot measure TCE for Godot projects (UPDATED 2026-09-12 — a tool exists; re-scoped to adopting it) (RESOLVED 2026-09-12)
 
 Found researching v17 (2026-09-11): Python, JS/TS, Java, Kotlin, C#, Dart and Swift each have at
 least one mutation tool; GDScript has none — searched GitHub, the Godot Asset Library and the
@@ -2621,6 +2621,20 @@ maintainer. Wire it as optional — `mutation_unavailable` already makes an abse
 rather than a fake number — and before resolving, actually install it and run it against a small
 gdUnit4 project headless; a README claim is not the same as it working. If it goes unmaintained,
 Godot projects fall back to exactly what they get today.
+
+**Resolved for real, not just tracked** (2026-09-12): wired exactly as the update predicted —
+`langs/gdscript.py`'s `mutation_unavailable` returns None when `gdmutant` is on PATH,
+`mutation_cmd` builds `gdmutant run <target> --project <root> --exclude 'test/*' --json … --runner
+gdunit4|gut [--tests res://test/unit] --godot $GODOT_BIN`, `mutation_parse` goes through the shared
+`stryker.py`; `languages/gdscript.md` has the Mutation section. And actually run, not read about:
+Godot 4.7.2 headless and gdUnit4 v6.1.3 were fetched into the session scratchpad, gdmutant's own
+`corpus/` sample was made a git repo, and `run.py --cwd corpus run` then `analyze` went end to end
+through `/orc-test`'s own surface — `turn_order.gd` scored 11 killed / 7 survived = 61.1%, the
+README's own figure, with the survivors listed by line and the tracked-tree guard passing. Two
+things only the run could find, both now in the language file's Caveats and in `CAVEATS`: a fresh
+checkout needs one `$GODOT_BIN --headless --import` or gdUnit4's scripts fail to parse, and the
+"mutating N files" line counted `addons/` (233 for a 6-file project) — fixed with a per-language
+`SKIP_DIRS` that `cli._source_count` now honours. Suite: 151 passed.
 
 ## #37: Correct the snap and flatpak ingredients from Orcshot's first real runs, and write ego and spices from the captured ones
 

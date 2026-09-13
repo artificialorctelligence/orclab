@@ -88,7 +88,7 @@ JS/TS      coverage 71.0% (…) ✗ (min 80)
     64.0%  src/cart.js
            TCE 78.0% ✓    lint: 0 findings
 GDScript   coverage 92.0% (…) ✓
-           TCE not measurable — no mutation tool exists for GDScript (checked 2026-09-11)
+           TCE not measurable — gdmutant not installed — pip install 'gdmutant==0.1.*'
 ```
 
 Every surviving mutant is a concrete defect no test caught, with its file, line and what changed.
@@ -182,5 +182,6 @@ One rule: say what, show the command, stop that language, continue the others.
   (nothing that rewrites tests runs unattended). Not built until the four subcommands settle.
 - Kotlin via Arcmutate, Dart's `mutation_test`, Swift's Muter: spec'd from research, corrected on
   first real use — each `languages/<lang>.md` carries a "Last real run" line.
-- GDScript mutation: no tool exists (BACKLOG entry). `languages/gdscript.md` gets a row if one
-  appears.
+- GDScript mutation via gdmutant (0.1.x, one maintainer): run for real once, on gdmutant's own
+  sample project (2026-09-12), never yet on a project of ours — `languages/gdscript.md`'s Caveats
+  carry what that run found.

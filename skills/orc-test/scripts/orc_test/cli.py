@@ -147,8 +147,8 @@ def cmd_coverage(args):
 
 def _source_count(d, mod, target):
     base = pathlib.Path(d) / (target or ".")
-    return sum(1 for p in base.rglob(f"*{mod.SOURCE_EXT}")
-               if not detect.SKIP_DIRS & set(p.relative_to(d).parts))
+    skip = detect.SKIP_DIRS | getattr(mod, "SKIP_DIRS", set())   # the language's own vendored dirs
+    return sum(1 for p in base.rglob(f"*{mod.SOURCE_EXT}") if not skip & set(p.relative_to(d).parts))
 
 
 def _dirty(root, sandbox):
