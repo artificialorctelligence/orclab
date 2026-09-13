@@ -116,17 +116,20 @@ three — don't assume only one shape.
 ## Defaults Table
 
 Keyed by what the user ticked, not by language — the language is the answer. Families: desktop
-= Linux, Windows, Mac; mobile = Android, iOS. *(pending pass 11)* marks a default that
-Task 8 of the v18 plan settles: it holds only if EAS Build in fact requires React Native.
+= Linux, Windows, Mac; mobile = Android, iOS. The iOS-ticked rows default to Flutter because
+building for iOS from Linux does not force React Native: EAS Build alone does (its prerequisite is
+*"A React Native Android or iOS project"*, docs.expo.dev/build/setup, 2026-09-12), but Codemagic's
+Flutter quick-start covers *"build versioning, code signing and publishing"* for iOS on its free
+500 macOS minutes a month — see `stack-flutter`'s "Building without a Mac".
 
 | Type | Scope ticked | Default | Alternatives | Knowledge |
 |---|---|---|---|---|
 | App | one or more desktops, nothing else | Python | Java + Spring + JavaFX; C# / .NET only when Windows is the sole platform | `skills/stack-python-desktop/SKILL.md` — read it in full before scaffolding |
 | App | Android only | Kotlin + Jetpack Compose | Java *(stub — existing codebases only)* | `skills/stack-android-native/SKILL.md` — read it in full before scaffolding |
 | App | iOS only | Swift + SwiftUI | Objective-C *(stub — existing codebases only)* | `skills/stack-ios-native/SKILL.md` — same; needs a Mac or a cloud Mac to build |
-| App | Android + iOS, nothing else | React Native *(pending pass 11)* | Flutter; Kotlin Multiplatform | *no skill yet — research first*; Flutter: `skills/stack-flutter/SKILL.md` |
+| App | Android + iOS, nothing else | Flutter | React Native; Kotlin Multiplatform | `skills/stack-flutter/SKILL.md` — same; iOS builds without a Mac are in its "Building without a Mac" |
 | App | web only | *decided by research — none yet* | — | *no skill yet — research first* |
-| App | two or more of desktop / mobile / web, iOS ticked | React Native + React web *(pending pass 11)* | Flutter; Kotlin Multiplatform + Compose Multiplatform | *no skill yet — research first* |
+| App | two or more of desktop / mobile / web, iOS ticked | Flutter | React Native + React web; Kotlin Multiplatform + Compose Multiplatform | `skills/stack-flutter/SKILL.md` — same |
 | App | two or more of desktop / mobile / web, iOS not ticked | Flutter | React Native + React web; Kotlin Multiplatform + Compose Multiplatform | `skills/stack-flutter/SKILL.md` — same |
 | Game | desktops only | Godot 4 | Unity 6 | `skills/stack-godot/SKILL.md`, `skills/stack-unity/SKILL.md` — read the chosen one in full; neither is preferred over the other, ask which |
 | Game | mobile only | Godot 4 | Unity 6 | same |

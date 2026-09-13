@@ -32,7 +32,8 @@ is a rewrite, not a port.
 Linux (swift.org ships 6.3.3 for it), and that is enough to compile and test a pure-Swift
 *package* — business logic, no UI — but there is no iOS SDK for Linux and never has been. From
 this machine, an iOS project can be *edited* and its package layer *tested*; producing an `.ipa`
-happens on a Mac at hand or a cloud Mac. The App Store ingredient
+happens on a Mac at hand or a cloud Mac (named under "Building without a Mac" below). The App
+Store ingredient
 (`skills/orc-package/ingredients/app-store`) carries that choice as its `local` / `cloud`
 question; this skill does not repeat it.
 
@@ -84,6 +85,49 @@ itself (then the ingredient's `action:` is this command and there is no separate
 older method name `app-store` still works but is deprecated. Confirm the exported filename with
 `ls` after the first run rather than trusting this file. `swift test` at the root of a local
 package runs its Swift Testing suite on any platform, Linux included.
+
+### Building without a Mac
+
+Apple's toolchain runs only on macOS, and this project *is* Xcode — there is no `xcodebuild` for
+Linux and never has been. From this machine the Swift package layer can be edited and tested, but
+the archive and the `.ipa` have to be produced on a Mac somewhere, so a Linux developer rents one
+by the minute from a build service. Every service needs the same two things from you: a paid
+Apple Developer Program membership, and an **App Store Connect API key** (App Store Connect →
+Users and Access → Integrations) so it can talk to Apple on your behalf. They differ in whether
+they generate the distribution certificate and provisioning profile, or expect you to supply them.
+
+**Default: Codemagic** (confirmed live 2026-09-12) — the same default as `stack-flutter`, for the
+same reasons. Its native-iOS quick-start: *"This guide will illustrate all of the necessary steps
+to successfully build and publish a native iOS app with Codemagic. It will cover the basic steps
+such as build versioning, code signing and publishing."* The build step is Codemagic's
+`xcode-project build-ipa --workspace "$CM_BUILD_DIR/$XCODE_WORKSPACE" --scheme "$XCODE_SCHEME"`
+(a wrapper over the `archive` + `-exportArchive` pair above) on `instance_type: mac_mini_m2`, with
+Xcode 26.6 the default and 27.0 available as `edge`. Signing: add the API key in Team settings and
+*"you can also generate a new Apple Development or Apple Distribution certificate"* there — the
+private key never touches this machine — then `ios_signing: distribution_type: app_store` +
+`bundle_identifier:` in `codemagic.yaml` fetches the matching profile, and
+`xcode-project use-profiles` applies it before the build. Upload: `publishing: app_store_connect:`
+with the same key. Cost: *"500 free minutes per month on macOS M2 machines on a personal
+account"*, reset on the 1st; beyond that **$0.095/minute** on M2, $0.114 on M4 (no free minutes
+on a Team). The App Store ingredient's `cloud` shape is written for this.
+
+Alternatives (each confirmed live 2026-09-12), with the one thing that would make you reach for it:
+
+- **Apple Xcode Cloud** — Apple's own, 25 compute hours/month included with the membership, and
+  the natural home for a pure Xcode project. Concern: *"To get started, configure a workflow in
+  Xcode"* — the first setup happens inside Xcode, so it needs a Mac once; with one at hand, even
+  borrowed, prefer it over Codemagic for this stack.
+- **GitHub Actions macOS runner** — already there if the repo is on GitHub; `macos-latest` is
+  macOS 26 arm64 with Xcode 26.6 default and 27 on the `xcode-27` preview label. Concern:
+  **signing is yours to script** — GitHub's guide has you export the certificate (`.p12`) and
+  profile, base64 them into secrets and import into the runner's keychain; nothing is generated
+  for you. Cost: **$0.062/minute** against $0.006 for Linux. GitHub's pages once documented a 10x
+  multiplier on included minutes for macOS; the current pages give only the rate table, so
+  whether the 2,000 free minutes deplete at the macOS rate is not stated (checked 2026-09-12,
+  public repos are free either way).
+- **EAS Build (Expo)** — not an option: its prerequisite is *"A React Native Android or iOS
+  project"* and its pipeline runs `npm install` and `fastlane gym` in `ios/`; a plain Xcode
+  project has no seat there.
 
 ## Presence
 
@@ -226,7 +270,7 @@ choices; no preference recorded until direflail has one. (Persistence moved to *
 Not this stack. An iOS game is Unity or Godot, which produce their own Xcode project; the App
 Store ingredient applies to it unchanged, including the privacy manifest and the Mac.
 
-## Sources (live on 2026-09-11; facets 2026-09-12)
+## Sources (live on 2026-09-11; facets and no-Mac builds 2026-09-12)
 
 - Current releases: `https://developer.apple.com/news/releases/`; Xcode 27 and 26 release notes
   under `https://developer.apple.com/documentation/xcode-release-notes/`
@@ -242,4 +286,5 @@ Store ingredient applies to it unchanged, including the privacy manifest and the
 - Store rules themselves: the App Store ingredient under `skills/orc-package/ingredients/app-store`, with its own sources.
 - Facets (2026-09-12; every `developer.apple.com/documentation/...` and `/design/human-interface-guidelines/...` page was read through its JSON form, `/tutorials/data/` + `.json`, because the HTML is script-rendered) — presence: `https://developer.apple.com/design/human-interface-guidelines/status-bars`, `https://developer.apple.com/design/human-interface-guidelines/notifications`, `https://developer.apple.com/design/human-interface-guidelines/live-activities`, `https://developer.apple.com/documentation/usernotifications`, `.../usernotifications/asking-permission-to-use-notifications`, `.../usernotifications/declaring-your-actionable-notification-types`, `.../usernotifications/handling-notifications-and-notification-related-actions`, `https://developer.apple.com/documentation/activitykit`, `.../activitykit/displaying-live-data-with-live-activities`, `https://developer.apple.com/documentation/updates/activitykit`, `.../updates/usernotifications`
 - Facets — UI: `https://developer.apple.com/documentation/swiftui`, `https://developer.apple.com/documentation/uikit`, `.../updates/swiftui`, `.../updates/uikit`, `.../swiftui/uiviewrepresentable`, `.../swiftui/uiviewcontrollerrepresentable`, `.../swiftui/uihostingcontroller`, `.../uikit/uistatusbarstyle`
+- Building without a Mac (2026-09-12) — Codemagic: `https://docs.codemagic.io/yaml-quick-start/building-a-native-ios-app/`, `https://docs.codemagic.io/yaml-code-signing/signing-ios/`, `https://docs.codemagic.io/yaml-publishing/app-store-connect/`, `https://docs.codemagic.io/billing/pricing/`; Xcode Cloud: `https://developer.apple.com/xcode-cloud/`; GitHub Actions: `https://docs.github.com/en/actions/reference/runners/github-hosted-runners`, `https://docs.github.com/en/billing/managing-billing-for-your-products/about-billing-for-github-actions`, `https://docs.github.com/en/billing/reference/actions-runner-pricing`, `https://docs.github.com/en/actions/how-tos/deploy/deploy-to-third-party-platforms/sign-xcode-applications`, image contents `https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md` and `https://github.com/actions/runner-images/blob/main/README.md`; EAS (why it is not an option): `https://docs.expo.dev/build/setup/`, `https://docs.expo.dev/build/introduction/`, `https://docs.expo.dev/build-reference/limitations/`, `https://docs.expo.dev/build-reference/ios-builds/`
 - Facets — storage: `https://developer.apple.com/documentation/swiftdata`, `.../swiftdata/preserving-your-apps-model-data-across-launches`, `.../swiftdata/modelconfiguration`, `.../swiftdata/modelconfiguration/url`, `.../updates/swiftdata`, `https://developer.apple.com/documentation/coredata`, `https://developer.apple.com/documentation/foundation/userdefaults`, `.../swiftui/appstorage`, `https://developer.apple.com/documentation/foundation/optimizing-your-app-s-data-for-icloud-backup`, and the archived `https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/FileSystemOverview/FileSystemOverview.html` for the container layout

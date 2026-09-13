@@ -83,6 +83,50 @@ default (R8 on Android); `--split-debug-info=<dir>` keeps symbols for crash repo
 Coverage, mutation testing and test lint for this language: `skills/orc-test/languages/dart.md` —
 `/orc-test` reads it.
 
+### Building without a Mac
+
+Apple's toolchain runs only on macOS: `flutter build ipa` is Xcode underneath, and there is no iOS
+SDK for Linux. A developer on this machine can write, analyze and test the whole app, and build
+Android here, but the `.ipa` has to be produced on a Mac somewhere — so a Linux developer rents one
+by the minute from a build service. What each service needs from you is the same: a paid Apple
+Developer Program membership, and an **App Store Connect API key** (App Store Connect → Users and
+Access → Integrations) so the service can talk to Apple on your behalf. The distribution
+certificate and provisioning profile are what differ: the default below generates them; GitHub
+Actions expects you to hand them over.
+
+**Default: Codemagic** (confirmed live 2026-09-12). Its Flutter quick-start is the whole path in
+one file: *"This guide will illustrate all of the necessary steps to successfully build and
+publish a Flutter app with Codemagic. It will cover the basic steps such as build versioning, code
+signing and publishing."* — and the build step is the same `flutter build ipa --release
+--export-options-plist=...` as above, on `instance_type: mac_mini_m2`. Signing: put the API key
+in Codemagic's Team settings and *"you can also generate a new Apple Development or Apple
+Distribution certificate"* there — the private key never touches this machine — then
+`ios_signing: distribution_type: app_store` + `bundle_identifier:` in `codemagic.yaml` fetches the
+matching profile from Apple, and `xcode-project use-profiles` applies it before the build.
+Upload: `publishing: app_store_connect:` with the same key (`submit_to_testflight` /
+`submit_to_app_store`). Cost: *"500 free minutes per month on macOS M2 machines on a personal
+account"*, reset on the 1st; beyond that **$0.095/minute** on M2, $0.114 on M4 (free minutes are
+not available on a Team). Flutter's own iOS deployment doc points here too (Sources). The App
+Store ingredient's `cloud` shape is written for this.
+
+Alternatives (each confirmed live 2026-09-12), with the one thing that would make you reach for it:
+
+- **GitHub Actions macOS runner** — already there if the repo is on GitHub; `macos-latest` is macOS
+  26 arm64 with Xcode 26.6 default and 27 on the `xcode-27` preview label. Concern: **signing is
+  yours to script** — GitHub's own guide has you export the certificate (`.p12`) and profile,
+  base64 them into secrets and import into the runner's keychain; nothing is generated for you.
+  And cost: macOS is **$0.062/minute** against $0.006 for Linux. GitHub's pages once documented a
+  10x multiplier on included minutes for macOS; the current pages give only the rate table, so
+  whether the 2,000 free minutes deplete at the macOS rate is not stated (checked 2026-09-12,
+  public repos are free either way).
+- **Apple Xcode Cloud** — 25 compute hours/month come with the membership. Concern: *"To get
+  started, configure a workflow in Xcode"* — the first setup happens inside Xcode, so it needs a
+  Mac once, which is the problem this section exists for.
+- **EAS Build (Expo)** — not an option: its prerequisite is *"A React Native Android or iOS
+  project"* and its pipeline runs `npm install` and `fastlane gym` in `ios/`. A Flutter project
+  has no seat there. (Its intro's *"any native project, whether or not you use Expo"* means bare
+  React Native — the next sentence names only React Native's CLIs.)
+
 ## Presence
 
 Presence is how the app stays visible and reachable when it is not in front. On a phone that is
@@ -233,7 +277,7 @@ records no preference until direflail has one. Local storage is decided — see 
 Not this stack. A Flutter app that grows a game is a Unity or Godot project embedded or beside it;
 that is the game stacks' concern when they are written.
 
-## Sources (live on 2026-09-11; facets 2026-09-12)
+## Sources (live on 2026-09-11; facets and no-Mac builds 2026-09-12)
 
 - Current release and Dart version: `https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json`
 - Android defaults: `https://raw.githubusercontent.com/flutter/flutter/stable/packages/flutter_tools/gradle/src/main/kotlin/FlutterExtension.kt`
@@ -248,4 +292,5 @@ that is the game stacks' concern when they are written.
 - Facets (2026-09-12) — notifications: `https://pub.dev/packages/flutter_local_notifications` (+ `/versions`, and `https://pub.dev/api/packages/flutter_local_notifications` for exact dates), README and CHANGELOG at `https://raw.githubusercontent.com/MaikuB/flutter_local_notifications/master/flutter_local_notifications/README.md`, `.../CHANGELOG.md`, `.../android/build.gradle`; Android: `https://developer.android.com/develop/ui/compose/notifications` (where `.../develop/ui/views/notifications` redirects), `https://developer.android.com/develop/ui/compose/notifications/create-notification` (where `.../views/notifications/build-notification` redirects); Apple: `https://developer.apple.com/documentation/usernotifications`, `https://developer.apple.com/documentation/usernotifications/declaring-your-actionable-notification-types` (read via `developer.apple.com/tutorials/data/documentation/usernotifications.json` — the HTML page is script-rendered)
 - Facets — tray: `https://pub.dev/packages/tray_manager` (+ `/versions`, `/changelog`), `https://raw.githubusercontent.com/leanflutter/tray_manager/main/README.md`; `https://pub.dev/packages/system_tray` (+ `/versions`); `https://pub.dev/packages/nativeapi`; `https://github.com/AyatanaIndicators/libayatana-appindicator`; exact dates and SDK bounds from `https://pub.dev/api/packages/<name>`
 - Facets — UI: `https://docs.flutter.dev/ui/widgets/material`, `https://docs.flutter.dev/ui/widgets/cupertino`, `https://docs.flutter.dev/ui/adaptive-responsive/platform-adaptations`
+- Building without a Mac (2026-09-12) — Codemagic: `https://docs.codemagic.io/yaml-quick-start/building-a-flutter-app/`, `https://docs.codemagic.io/yaml-code-signing/signing-ios/`, `https://docs.codemagic.io/yaml-publishing/app-store-connect/`, `https://docs.codemagic.io/billing/pricing/`; GitHub Actions: `https://docs.github.com/en/actions/reference/runners/github-hosted-runners`, `https://docs.github.com/en/billing/managing-billing-for-your-products/about-billing-for-github-actions`, `https://docs.github.com/en/billing/reference/actions-runner-pricing`, `https://docs.github.com/en/actions/how-tos/deploy/deploy-to-third-party-platforms/sign-xcode-applications`, image contents `https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md` and `https://github.com/actions/runner-images/blob/main/README.md`; Xcode Cloud: `https://developer.apple.com/xcode-cloud/`; EAS (why it is not an option): `https://docs.expo.dev/build/setup/`, `https://docs.expo.dev/build/introduction/`, `https://docs.expo.dev/build-reference/limitations/`, `https://docs.expo.dev/build-reference/ios-builds/`
 - Facets — storage: `https://pub.dev/packages/sqflite`, `https://raw.githubusercontent.com/tekartik/sqflite/master/sqflite/README.md`, `https://pub.dev/packages/sqflite_common_ffi`, `https://pub.dev/packages/drift`, `https://drift.simonbinder.eu/setup/`, `https://drift.simonbinder.eu/platforms/`, `https://pub.dev/packages/shared_preferences`, `https://raw.githubusercontent.com/flutter/packages/main/packages/shared_preferences/shared_preferences/README.md`
