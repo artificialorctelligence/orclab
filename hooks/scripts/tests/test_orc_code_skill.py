@@ -39,7 +39,7 @@ def test_quality_mode_is_the_dogfood_procedure_in_order():
 
 def test_migration_mode_adds_stack_tests_worktree_and_gate():
     m = TEXT[TEXT.index("### Migration mode"):TEXT.index("## Plugin-Discovery Procedure")]
-    assert "No migration has gone through this yet; the first one corrects it." in m
+    assert "Run once for real on 2026-09-13" in m and "see BACKLOG #41" in m
     for phrase in ["Defaults Table", "stack-*", "[target-stack]",
                    "characterization", "/orc-test analyze", "/orc-test generate",
                    "before any `modernize-", "legacy/", "analysis/", "modernized/",

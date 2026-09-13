@@ -194,9 +194,11 @@ subtree.
    modernization", and its critic treats a layout change as a finding. The stack skill's layout
    and lint block are the first items of the quality-mode pass that follows the uplift, and the
    brief says so in its target-architecture section rather than pretending the uplift will do it.
-   Where the machine's interpreter is older than the skill's current version (2026-09-13: only
-   3.12 installed, the skill names 3.14), the gate has to run on a real runtime — the target is
-   the one that exists, and the target-stack line says why.
+   On 2026-09-13 the target was Python 3.12 because that was the only interpreter present
+   (the skill names 3.14) and installing a newer one was not attempted. A future run should
+   install the stack skill's named version first (`uv python install <version>`, or pyenv) and
+   fall back to the machine's interpreter only if that fails — and say which happened in the
+   target-stack line.
 3. **Tests before any `modernize-*` command runs.** `/orc-test analyze` on the source project.
    If the suite is red, a language has no runnable suite, or coverage is under the gate, the
    first work is `/orc-test generate` *on the old code* — characterization tests that pin what
