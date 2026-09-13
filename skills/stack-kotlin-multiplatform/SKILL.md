@@ -127,6 +127,33 @@ release lands *"usually 1–3 months"* after the Jetpack Compose it tracks. Choo
 codebase outweighs native feel — usually a desktop or web target on the same row. BACKLOG #2's
 design system translates into the frameworks above.
 
+## Compose Multiplatform beyond mobile
+
+A project that ticks phones plus a desktop or a website is choosing between one drawn UI on every
+platform and a native UI per platform; on the two cross-family rows of `/orc-code`'s Defaults
+Table this stack is the alternative that keeps everything in Kotlin — the shared module below,
+Compose Multiplatform drawing every screen — and Flutter is the default (the comparison lives in
+`stack-flutter`'s `## Beyond mobile — desktop and web`). kotlinlang.org's supported-platforms page
+(now dated 2026-09-09, confirmed live 2026-09-12) rates the UI framework per target — *"Android
+Stable iOS Stable Desktop (JVM) Stable Web based on Kotlin/Wasm Beta"* — and defines the words:
+Stable means *"you can use it even in the most conservative of scenarios"*, Beta *"It's almost done,
+so user feedback is especially important now."* **Desktop is a JVM program**: *"Compose
+Multiplatform targets the JVM"* (its README, confirmed live 2026-09-12), and the Gradle plugin's
+`nativeDistributions` block builds *"self-contained, installable binaries that include all the
+necessary Java runtime components, without requiring a JDK to be installed on the target system"*
+— `.deb`/`.rpm`, `.msi`/`.exe`, `.dmg`/`.pkg`, through jpackage on JDK 17 or newer
+(native-distribution page, dated 2026-09-09). Presence is in the box: the `Tray()` composable and
+`TrayState.sendNotification()` (tray page, dated 2026-09-09) sit on `java.awt.SystemTray`
+(`Tray.desktop.kt` on `jb-main`), so *"Not every desktop environment has a system tray"* — check
+`isTraySupported` first. Web compiles through Kotlin/Wasm, itself *"still in Beta"* (Kotlin/Wasm
+overview, dated 2026-09-10).
+
+**The concern that picks it over Flutter:** the Android app already exists in Kotlin and Jetpack
+Compose, or the team writes Kotlin — the Android half does not change, and desktop arrives Stable
+with installers and a tray and no plugin to vet. What the project accepts: a web tick lands on a
+Beta target, and the iOS half still needs a Mac (Codemagic, above). With no Kotlin in the
+building, the row's default stands.
+
 ## Storage
 
 Storage is what the app keeps between launches: records (a database) and settings (config); both
@@ -165,5 +192,6 @@ multiplatform library calls on iOS goes in the *app's* `PrivacyInfo.xcprivacy` (
 - Toolchain: `https://kotlinlang.org/docs/multiplatform/multiplatform-compatibility-guide.html`, `https://kotlinlang.org/docs/releases.html`, `https://kotlinlang.org/docs/multiplatform/quickstart.html`, `https://kotlinlang.org/docs/multiplatform/recommended-ides.html`, `https://blog.jetbrains.com/kotlin/2025/02/kotlin-multiplatform-tooling-shifting-gears/` (Fleet)
 - Layout, tests and iOS consumption: `https://kotlinlang.org/docs/multiplatform/multiplatform-discover-project.html`, `https://kotlinlang.org/docs/multiplatform/multiplatform-run-tests.html`, `https://kotlinlang.org/docs/multiplatform/multiplatform-privacy-manifest.html`, `https://kotlinlang.org/docs/multiplatform/multiplatform-create-first-app.html`, `https://kotlinlang.org/docs/multiplatform/multiplatform-ios-integration-overview.html`, `https://kotlinlang.org/docs/multiplatform/multiplatform-direct-integration.html`, `https://kotlinlang.org/docs/multiplatform/multiplatform-project-configuration.html`
 - UI: `https://kotlinlang.org/docs/multiplatform/supported-platforms.html`, `https://kotlinlang.org/docs/multiplatform/compose-multiplatform-and-jetpack-compose.html`, `https://kotlinlang.org/docs/multiplatform/compose-compatibility-and-versioning.html`
+- Beyond mobile (2026-09-12): `https://kotlinlang.org/docs/multiplatform/compose-native-distribution.html`, `https://kotlinlang.org/docs/multiplatform/compose-desktop-tray.html`, `https://kotlinlang.org/docs/wasm-overview.html`, `https://raw.githubusercontent.com/JetBrains/compose-multiplatform/master/README.md`, `https://raw.githubusercontent.com/JetBrains/compose-multiplatform-core/jb-main/compose/ui/ui/src/desktopMain/kotlin/androidx/compose/ui/window/Tray.desktop.kt`
 - Storage: `https://kotlinlang.org/docs/multiplatform/multiplatform-ktor-sqldelight.html`, `https://sqldelight.github.io/sqldelight/latest/`, `https://api.github.com/repos/sqldelight/sqldelight/releases/latest`, `https://raw.githubusercontent.com/russhwolf/multiplatform-settings/main/README.md`, `https://api.github.com/repos/russhwolf/multiplatform-settings/releases/latest`
 - Building without a Mac: `https://docs.codemagic.io/yaml-quick-start/building-a-kmm-app/`. Store rules themselves: the two native skills' tables and `skills/orc-package/ingredients/`.

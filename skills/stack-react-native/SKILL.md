@@ -111,6 +111,24 @@ supports Linux and macOS"*, the `react-native-skia` org, not Shopify's drawing l
 commit on 2023-03-24 (confirmed live 2026-09-12). A Linux sibling is the web build, or the desktop
 row's own stack.
 
+### Against Flutter for a cross-family project
+
+A cross-family project is choosing between one codebase that draws the same screens everywhere,
+or native phone widgets beside a real website. A project that ticks phones plus a website, or
+phones plus a desktop, is choosing between Flutter drawing the same screens on every one of them
+and React drawing a real website beside native phone widgets. Both cross-family rows of `/orc-code`'s Defaults Table default to Flutter; the comparison
+and the concern lines live in `stack-flutter`'s `## Beyond mobile — desktop and web`. The concern
+from this side, in one line: **the web tick is a website, not a phone app in a browser** — Flutter's
+own web FAQ (confirmed live 2026-09-12) says its output *"doesn't align with what search engines
+need to properly index"* and tells you to write landing, marketing and help pages in HTML beside
+the app, where this stack's web half is React DOM (`react-native-web` above, or the web-only row's
+React + Vite), with the web-only row's own concern still applying: a content site that must render
+on the server (SEO, first paint) moves from Vite to Next.js — see `stack-web`'s `## The stack
+decision`. The honest desktop answer, restated: Windows
+and macOS are a bare RN project per OS trailing RN by three to six minors, and **Linux desktop has
+no maintained React Native target** — a Linux tick is served by the web build or not at all, which
+is what keeps Flutter the default whenever Linux is ticked.
+
 ## Presence
 
 Presence is how the app stays visible and reachable when it is not in front: on a phone a
@@ -179,4 +197,5 @@ native project — so each check runs on the generated file, after `npx expo pre
 - Expo docs (each also read as `.md`): `https://docs.expo.dev/versions/latest`, `/guides/new-architecture`, `/get-started/create-a-project`, `/get-started/start-developing`, `/workflow/continuous-native-generation` (`/workflow/prebuild` is a 404), `/guides/local-app-development`, `/guides/local-app-production`, `/build-reference/apk`, `/build-reference/app-versions`, `/app-signing/local-credentials`, `/develop/unit-testing`, `/workflow/web`, `/guides/publishing-websites`, `/guides/dom-components`, `/guides/monorepos`, `/router/introduction`, `/versions/latest/sdk/notifications`, `/versions/latest/sdk/sqlite`, `/versions/latest/sdk/async-storage`, `/versions/latest/config/app`, `/guides/apple-privacy`, `/versions/latest/sdk/build-properties`; `https://expo.dev/changelog/sdk-57`
 - Expo source on `sdk-57`: `templates/expo-template-default` (`app.json`, `gitignore`, `package.json`, `src/`), `templates/expo-template-bare-minimum/{ios/Podfile,android/app/build.gradle,android/gradle.properties}`, `packages/expo-modules-autolinking/.../ExpoRootProjectPlugin.kt`, `packages/expo-sqlite/{android/src/main/java/expo/modules/sqlite/SQLiteModule.kt,ios/SQLiteModule.swift}` — all under `https://raw.githubusercontent.com/expo/expo/sdk-57/`
 - Desktop and web: `https://necolas.github.io/react-native-web/docs/`, `https://microsoft.github.io/react-native-windows/docs/getting-started`, `.../docs/rnw-dependencies`, `https://raw.githubusercontent.com/microsoft/react-native-macos/main/README.md`, `https://raw.githubusercontent.com/react-native-async-storage/async-storage/main/README.md`, `https://api.github.com/repos/react-native-skia/react-native-skia/commits`; Notifee: `https://notifee.app/react-native/docs/overview`, `.../docs/android/styles`, `https://registry.npmjs.org/@notifee/react-native`, `https://api.github.com/repos/invertase/notifee/commits`
+- Against Flutter (2026-09-12): `https://docs.flutter.dev/platform-integration/web/faq`
 - EAS: `https://docs.expo.dev/build/setup.md`, `/submit/ios.md`, and `stack-flutter`'s `### Building without a Mac` with Task 8's report (`/build/setup`, `/app-signing/managed-credentials`, `expo.dev/pricing`); store rules: the Play and App Store ingredients under `skills/orc-package/ingredients/`.

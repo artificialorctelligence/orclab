@@ -120,7 +120,9 @@ Keyed by what the user ticked, not by language — the language is the answer. F
 building for iOS from Linux does not force React Native: EAS Build alone does (its prerequisite is
 *"A React Native Android or iOS project"*, docs.expo.dev/build/setup, 2026-09-12), but Codemagic's
 Flutter quick-start covers *"build versioning, code signing and publishing"* for iOS on its free
-500 macOS minutes a month — see `stack-flutter`'s "Building without a Mac".
+500 macOS minutes a month — see `stack-flutter`'s "Building without a Mac". The two cross-family
+rows' concern lines — what would move a project from Flutter to either alternative — live in
+`stack-flutter`'s "Beyond mobile — desktop and web".
 
 | Type | Scope ticked | Default | Alternatives | Knowledge |
 |---|---|---|---|---|

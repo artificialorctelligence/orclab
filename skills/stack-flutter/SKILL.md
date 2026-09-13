@@ -127,6 +127,93 @@ Alternatives (each confirmed live 2026-09-12), with the one thing that would mak
   has no seat there. (Its intro's *"any native project, whether or not you use Expo"* means bare
   React Native — the next sentence names only React Native's CLIs.)
 
+## Beyond mobile — desktop and web
+
+A project that ticks two families — a phone app that must also be a desktop program, or a
+website, or both — is choosing between one codebase that draws the same screens everywhere and
+two or three codebases that each use the platform's own widgets. Flutter is the first kind on all
+five targets and is the `/orc-code` default on both cross-family rows; this section says how good
+each non-phone target actually is, from Flutter's own docs, then the one concern that would move
+a project to each alternative.
+
+**Desktop.** docs.flutter.dev's desktop page (dated 2026-07-31, confirmed live 2026-09-12):
+*"Flutter provides support for compiling a native Windows, macOS, or Linux desktop app."* The
+supported-platforms page (2026-08-12) grades desktop no differently from mobile — Windows 10–11,
+macOS 12–26, Debian 10–13 and Ubuntu 20.04–24.04 LTS are all *"Supported: The platforms and
+versions that the Flutter team supports"*, Debian 12 and Ubuntu 22.04 CI-tested on every commit;
+neither page calls desktop beta. **On Linux the app is a GTK 3 program**: the Linux setup page
+(2026-09-10) installs `libgtk-3-dev`, the build page (2026-06-08) says a target machine needs
+`libgtk-3-0`, and the engine's `fl_view.h` on `stable` reads *"#FlView is a GTK widget that is
+capable of displaying a Flutter application"* (all confirmed live 2026-09-12) — GTK owns the
+window, Flutter paints inside it. That is why the Linux tray answer in `## Presence` holds
+unchanged: `tray_manager`'s `libayatana-appindicator3` is itself GTK 3, so its
+GNOME-needs-the-extension caveat is the whole Linux caveat. Release path: `flutter build linux
+--release` gives a `bundle/` directory, and the docs' only Linux distribution guide is the Snap
+Store (`deployment/linux`, 2026-07-31); a `.deb` is the packaging ingredient's job, not Flutter's.
+
+**Web.** Flutter paints the page itself rather than building it out of HTML. Two renderers do
+that — **CanvasKit** for the JavaScript build, **skwasm** for `flutter build web --wasm` — and
+they are the only two: `flutter_tools`' `WebRendererMode` on `stable` has exactly those members,
+`defaultForJs = canvaskit`, `defaultForWasm = skwasm` (confirmed live 2026-09-12). The HTML
+renderer is gone, and the docs page that described the choice was deleted on 2026-07-23 (*"remove
+obsolete renderers page"*); the overview it redirects to says only *"Using a combination of DOM,
+Canvas, and WebAssembly"*. What web is for, per that overview (2026-07-23): *"Single Page
+Application ... Existing mobile applications"*; what it is not for: *"Not every HTML scenario is
+ideally suited for Flutter at this time. For example, text-rich, flow-based, static content such
+as blog articles benefit from the document-centric model that the web is built around, rather
+than the app-centric services that a UI framework like Flutter can deliver."* The web FAQ
+(2026-08-04) is plainer on search — *"application output doesn't align with what search engines
+need to properly index"* — and its remedy is to split the product: *"consider separating your
+primary application experience (created in Flutter), from your landing page, marketing content,
+and help content (created using search engine optimized HTML)."* Text is painted too: *"Flutter
+widgets are not selectable by default"* (`SelectionArea` API docs, confirmed live 2026-09-12) —
+wrap a screen in `SelectionArea` or select-and-copy does nothing on it. The Wasm build needs two
+HTTP headers (`Cross-Origin-Embedder-Policy`, `Cross-Origin-Opener-Policy`) to run multithreaded
+and *"can't run on the iOS version of any browser"* (wasm page, 2026-08-18); the JavaScript build
+is the one that runs everywhere.
+
+### The two cross-family rows
+
+Both rows keep Flutter as the default because it is the only one of the three stacks whose every
+target its own vendor rates Supported or Stable — React Native has no maintained Linux desktop,
+and Compose Multiplatform's web is Beta. The concern that moves a project off it, one per
+alternative:
+
+- **React Native + React web** (`stack-react-native`, `## React web and desktop`) — choose it
+  when the web tick is a website: pages people find through search, read, select from and link
+  to. Its web half is React DOM, the web-only row's own stack, so the FAQ's Flutter-plus-HTML
+  split above never happens, and the phones get native widgets. What your project gives up: Linux
+  desktop (nothing maintained), and Windows and macOS become a bare RN project per OS that trails
+  RN by three to six minors.
+- **Kotlin Multiplatform + Compose Multiplatform** (`stack-kotlin-multiplatform`, `## Compose
+  Multiplatform beyond mobile`) — choose it when the Android app already exists in Kotlin and
+  Jetpack Compose, or the team writes Kotlin: the Android half stays as it is, and desktop
+  arrives Stable as a JVM app with a tray built in and self-contained `.deb`/`.msi`/`.dmg`
+  installers. What your project gives up: a web tick lands on a Beta target, and the iOS half
+  needs a Mac exactly as Flutter's does.
+
+**Which to live in, iOS ticked — what the sources imply.** The Mac question is the same for all
+three (Codemagic here and for KMP, EAS or Codemagic for RN), so the row turns on the other tick.
+If it is web, the docs above make a Flutter web build an application in a canvas whose indexable
+pages are written in HTML beside it — one Dart app plus a small HTML site; React Native + React
+web is one TypeScript codebase whose website is the same React DOM the web-only row already
+builds, with the web-only row's own concern still applying: a content site that must render on
+the server (SEO, first paint) moves from Vite to Next.js — see `stack-web`'s `## The stack
+decision`. If the other tick is desktop with Linux in it, Flutter is the only
+one of the three with a maintained Linux answer. The default stays Flutter because it is the one
+stack that covers every combination the row can hold; the RN line above is the one that fires
+most often, whenever the web tick means a website.
+
+**Which to live in, iOS not ticked — what the sources imply.** Android plus desktop, web or
+both, and no Mac anywhere. Android plus desktop with no web is a close call: Flutter is one
+toolchain and one new language (Dart) with every target Supported; Compose Multiplatform's
+Android half is the very Jetpack Compose `stack-android-native` already uses, its desktop is
+Stable with a tray and installers in the box, and its cost is Gradle and the JVM. The selection
+rule keeps Flutter only because CMP is a second toolchain on top of the Android one — unless that
+Android toolchain is already there, which is the concern line. Add a web tick and it stops being
+close: CMP's web is Beta, so it is Flutter (canvas app plus HTML pages) or React Native (a real
+site, no Linux).
+
 ## Presence
 
 Presence is how the app stays visible and reachable when it is not in front. On a phone that is
@@ -293,4 +380,5 @@ that is the game stacks' concern when they are written.
 - Facets — tray: `https://pub.dev/packages/tray_manager` (+ `/versions`, `/changelog`), `https://raw.githubusercontent.com/leanflutter/tray_manager/main/README.md`; `https://pub.dev/packages/system_tray` (+ `/versions`); `https://pub.dev/packages/nativeapi`; `https://github.com/AyatanaIndicators/libayatana-appindicator`; exact dates and SDK bounds from `https://pub.dev/api/packages/<name>`
 - Facets — UI: `https://docs.flutter.dev/ui/widgets/material`, `https://docs.flutter.dev/ui/widgets/cupertino`, `https://docs.flutter.dev/ui/adaptive-responsive/platform-adaptations`
 - Building without a Mac (2026-09-12) — Codemagic: `https://docs.codemagic.io/yaml-quick-start/building-a-flutter-app/`, `https://docs.codemagic.io/yaml-code-signing/signing-ios/`, `https://docs.codemagic.io/yaml-publishing/app-store-connect/`, `https://docs.codemagic.io/billing/pricing/`; GitHub Actions: `https://docs.github.com/en/actions/reference/runners/github-hosted-runners`, `https://docs.github.com/en/billing/managing-billing-for-your-products/about-billing-for-github-actions`, `https://docs.github.com/en/billing/reference/actions-runner-pricing`, `https://docs.github.com/en/actions/how-tos/deploy/deploy-to-third-party-platforms/sign-xcode-applications`, image contents `https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md` and `https://github.com/actions/runner-images/blob/main/README.md`; Xcode Cloud: `https://developer.apple.com/xcode-cloud/`; EAS (why it is not an option): `https://docs.expo.dev/build/setup/`, `https://docs.expo.dev/build/introduction/`, `https://docs.expo.dev/build-reference/limitations/`, `https://docs.expo.dev/build-reference/ios-builds/`
+- Beyond mobile (2026-09-12) — desktop: `https://docs.flutter.dev/platform-integration/desktop`, `https://docs.flutter.dev/platform-integration/linux/setup`, `https://docs.flutter.dev/platform-integration/linux/building`, `https://docs.flutter.dev/deployment/linux`, the embedder header `https://raw.githubusercontent.com/flutter/flutter/stable/engine/src/flutter/shell/platform/linux/public/flutter_linux/fl_view.h`; web: `https://docs.flutter.dev/platform-integration/web`, `https://docs.flutter.dev/platform-integration/web/faq`, `https://docs.flutter.dev/platform-integration/web/wasm`, `https://docs.flutter.dev/platform-integration/web/initialization`, renderer defaults in `https://raw.githubusercontent.com/flutter/flutter/stable/packages/flutter_tools/lib/src/web/compile.dart`, the renderers-page removal via `https://api.github.com/repos/flutter/website/commits?path=sites/docs/src/content/platform-integration/web/renderers.md`, `https://api.flutter.dev/flutter/material/SelectionArea-class.html`
 - Facets — storage: `https://pub.dev/packages/sqflite`, `https://raw.githubusercontent.com/tekartik/sqflite/master/sqflite/README.md`, `https://pub.dev/packages/sqflite_common_ffi`, `https://pub.dev/packages/drift`, `https://drift.simonbinder.eu/setup/`, `https://drift.simonbinder.eu/platforms/`, `https://pub.dev/packages/shared_preferences`, `https://raw.githubusercontent.com/flutter/packages/main/packages/shared_preferences/shared_preferences/README.md`
