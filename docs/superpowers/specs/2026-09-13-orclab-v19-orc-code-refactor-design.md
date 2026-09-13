@@ -91,7 +91,12 @@ passes the stack skill's own naming (e.g. "Kotlin + Jetpack Compose, per Orclab'
 stack-android-native: AGP 9.x, compileSdk 36, `app/build.gradle.kts` layout") and, when the
 brief is produced, checks it against the skill's layout section before the user approves it. The
 migrated project should look like one `/orc-code` would have scaffolded; a brief that lands
-elsewhere is corrected before `transform` runs, not after.
+elsewhere is corrected before `transform` runs, not after. **Corrected at first real use
+(2026-09-13):** this holds for `transform`. `uplift` takes `<source-version> <target-version>`,
+never sees the stack line, and its own rule is "smallest diff that builds; defer all optional
+modernization" — so for a same-stack bump only the toolchain version is the target, the stack
+skill's layout and lint block are the first items of the quality-mode pass that follows, and the
+brief records why it lands elsewhere instead of being corrected.
 
 **(b) "Still works" means the old suite passes on the new code.** A port cannot be verified
 against tests that do not exist, so the gate has a precondition:
@@ -115,8 +120,19 @@ addresses the source as `legacy/<system-dir>` and writes to `analysis/<system-di
 worktrees`, as every Orclab build does) laid out the plugin's way — the project checked out or
 symlinked as `legacy/<name>` — and brings `modernized/<name>/` back into the real tree as the
 branch's content once the exit gate passes. `analysis/` stays in the worktree; its useful parts
-(the brief, the rule catalogue) are copied into `docs/` on the branch. This is the part most
-likely to need correcting at first real use; the skill says so.
+(the brief, the rule catalogue) are copied into `docs/` on the branch. This was the part most
+likely to need correcting at first real use, and it needed two corrections (2026-09-13, itsdangerous
+1.1.0): the symlink points up into the tree that holds `.orclab/modernize/`, so every walk that
+follows symlinks loops and has to prune `.orclab`, `.venv`, `mutants`, `.git`; and `uplift`'s own
+seeding command, `cp -r legacy/<name> modernized/<name>-uplifted`, copies the *symlink* — followed
+literally, "in place under `modernized/`" is the real tree. The working copy is seeded with
+`rsync` from `readlink -f` and gets its own venv (the checkout's editable install points at the
+checkout's `src/`). The shape itself — scratch dir inside the checkout, symlink, `analysis/` and
+`modernized/` under `.orclab/` — held. Two more facts the run added: `uplift` writes
+`modernized/<name>-uplifted/`, not `modernized/<name>/`; and `brief` refuses to run without
+`map`'s `topology.json`, `extract-rules`' `BUSINESS_RULES.md` and, for an uplift, the
+`DELTA_CATALOG.md` that `uplift`'s Step 3 produces — so the sequence is `status`, `preflight`,
+`assess`, `map`, `extract-rules`, delta catalog, `brief`, `uplift`, and the skill now says so.
 
 **(d) Availability, confirmed rather than assumed — and "found" is not "installed".** The
 Plugin-Discovery Procedure searches `~/.claude/plugins/marketplaces/` as well as `cache/`, so it
@@ -126,12 +142,15 @@ once it is installed (checked 2026-09-13: the marketplace copy is present, `inst
 does not list it). The procedure therefore distinguishes the two: a plugin whose root is under
 `marketplaces/` and whose name is absent from `installed_plugins.json` is *available, not
 installed*, and the flow stops with the install command (`claude plugin install
-code-modernization@claude-plugins-official`) and the note that a fresh session is needed after
-installing (`CLAUDE.md`, marketplace gotcha 4). The flow past that line has never run. The
-first task of the plan is to install the plugin here and drive the full Refactor Flow once on a
-small real project, worktree layout and exit gate included, and to correct this spec with what
-that run contradicts — the same "no release has gone through this" honesty the `orc-package`
-ingredients carry.
+code-modernization@claude-plugins-official`). The note that a fresh session is needed after
+installing (`CLAUDE.md`, marketplace gotcha 4) was contradicted on 2026-09-13: the Desktop session
+that installed the plugin saw its agents and skills at once, so the procedure now says check
+first, fresh session as the fallback. The flow past that line ran once, on 2026-09-13
+(BACKLOG #41): itsdangerous 1.1.0 through `status`, `preflight`, `assess`, `map`,
+`extract-rules`, the delta catalog, `brief` and `uplift` to Python 3.12 (the machine's only
+interpreter; 3.13 was the plan's target), exit gate passed — 423 green, coverage 97.4% → 97.6%,
+TCE 74.8% → 75.1% — and this spec and the skill corrected with what it contradicted, the same "no
+release has gone through this" honesty the `orc-package` ingredients carry.
 
 ### 4. What is *not* built
 
@@ -162,10 +181,11 @@ ingredients carry.
 - **Quality mode** is verified on Orcshot or the next real Python/TypeScript project: baseline,
   fixes, before → after, suite green — the dogfood repeated through the command instead of by
   hand, and the numbers recorded in the commit.
-- **Migration mode** is verified once, live, per §3(d): the plugin installed, a small real project
-  taken through preflight → brief → transform (or uplift) → exit gate in a worktree, and the spec
-  corrected. Until that run, the skill's migration section carries "no migration has gone
-  through this yet" in its first paragraph.
+- **Migration mode** was verified once, live, per §3(d) on 2026-09-13: the plugin installed,
+  itsdangerous 1.1.0 taken through the full sequence to Python 3.12 in a scratch clone laid out
+  the plugin's way, exit gate passed, and the spec and skill corrected (§3 (a), (c), (d)). The
+  skill's migration section now opens with that run instead of "no migration has gone through
+  this yet".
 - **Availability branch**: with the plugin uninstalled, `/orc-code refactor "port to Kotlin"`
   prints the install command and stops — confirmed by Task 4's prose test and by running the flow once with the plugin uninstalled. Before this plan, discovery would have found the marketplace copy and gone on without the agents.
 

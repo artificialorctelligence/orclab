@@ -291,6 +291,26 @@ to be built from scratch — the same "wrap, don't reinvent" instinct already ap
 being a thin wrapper (same shape as `/orc-code refactor`) rather than new logic. Then a fresh
 `superpowers:brainstorming` pass for whatever gap remains.
 
+**Note 2026-09-13 (v19):** both commands were run for real on itsdangerous 1.1.0 (#41). `map`
+writes a one-off `extract_topology.py` and from it `topology.json` — every module with its LOC
+and file, grouped into domains, every import/dispatch edge, entry points, dead-end candidates,
+3–7 architect observations, and 2–4 persona flows in business language — plus the plugin's
+interactive `TOPOLOGY.html` viewer and three Mermaid diagrams. `extract-rules` writes
+`BUSINESS_RULES.md`: one card per rule (category, priority, `file:line`, plain English,
+Given/When/Then, parameters, edge cases, suspected defect, confidence and the exact SME question
+when below High) with a summary table and an SME-confirmation section, and `DATA_OBJECTS.md`
+(entities, fields, which rules consume them, wire formats). On a 1k-line library that was 26
+rules and 8 SME questions, every citation checked against the source. Does this cover #5's ask?
+**For the structure-and-rules half, yes** — this is the "information about the system being
+refactored, organized to support moving it" #5 describes, and it lands in `analysis/<name>/`
+under `.orclab/modernize/` with the brief copying the useful parts into `docs/`. What it does
+not cover: anything learned *about* the system that is not in its source — environment facts,
+who owns what, why a decision was made, the SME's answers to those 8 questions — which the
+plugin scatters across `PREFLIGHT.md`'s Check 0 answers, `PLAYBOOK.md`'s "environment facts"
+and the brief's open questions, with no single place and no way to add a fact between commands.
+If `/orc-data` is built, that residue is its scope: a wrapper over `map`/`extract-rules` for the
+source-derived half, plus one file for the human-derived half. Stays open.
+
 ## #6: Per-language manifest version detection/sync for /orc-version — deferred, same reasoning as #4 (PARTIALLY ADDRESSED 2026-09-07 — still open for the formats it names) (UPDATED 2026-09-13 — re-scoped from pom/package.json/Cargo to the version files of Orclab's own stacks; two-number model needed)
 
 Raised by direflail (2026-09-05) while designing `/orc-version` (see
@@ -2980,3 +3000,49 @@ the function, not the file (it reads `mutmut show`'s per-function diff), so `gen
 navigate by them; and ~75% of a whole-project `analyze`'s wall clock (35 of 45 minutes) is one
 `mutmut show` subprocess per survivor. Full report:
 `.superpowers/sdd/2026-09-13-orclab-v19-orc-code-refactor/task-6-report.md`.
+
+**Migration mode, first real run (2026-09-13):** subject `pallets/itsdangerous` at tag 1.1.0
+(2018; pure Python, 1,075 source lines, 417 pytest tests, declares Python 2.7/3.4+), cloned into
+the scratchpad, uplifted to **Python 3.12** — not the plan's 3.13, because `/usr/bin/python3.12`
+is the only interpreter on the machine and the exit gate has to run on a real runtime; the
+target-stack line handed to the plugin said so. Plugin: `code-modernization@claude-plugins-official`,
+installed by Task 7's Step 1; its manifest has no `version` and `installed_plugins.json` records
+`"unknown"` — the cache directory is `f0dce59fec06`. Contrary to CLAUDE.md's marketplace gotcha
+4, the Desktop session that installed it saw its agents and skills without a restart. Baseline
+on 3.12 before any change: 417 green (with 107 `datetime.utcfromtimestamp` DeprecationWarnings;
+97 tests red under `-W error`), coverage 97.4%, TCE 74.8% (602/805) once `[tool.mutmut]` was
+written, as quality mode's step 0 says. Every command file read in full from the installed copy
+and followed: `status` (nothing yet); `preflight` (asked its five Check 0 questions of the human
+— answered from the run's context; found no source runtime, no `pyupgrade`, standalone repo:
+Ready-with-gaps); `assess` (no `scc`/`cloc`, `find`+`wc` fallback; two `legacy-analyst` and one
+`security-auditor` agents in parallel → `ASSESSMENT.md`, `ARCHITECTURE.mmd`; the auditor
+reproduced a High, CWE-502 in `loads_unsafe`, that no uplift touches); `map` (a 90-line
+`extract_topology.py` over the package's imports and MRO → `topology.json`, `TOPOLOGY.html` from
+the plugin's template, three `.mmd`); `extract-rules` (no Workflow tool in this client, so Method
+B: three `business-rules-extractor` agents → 26 rule cards in `BUSINESS_RULES.md`, 8 needing SME
+answers, `DATA_OBJECTS.md`); `uplift` Step 3 first, because `brief` refuses without it
+(`version-delta-analyst` → `DELTA_CATALOG.md`: nine deltas, one Judgment call on the path —
+naive vs aware datetimes — verdict "minimal-diff uplift"); `brief` (`MODERNIZATION_BRIEF.md`,
+three S-sized phases, approval block signed by this task's standing instruction, not a person);
+`uplift` (`BASELINE.md` as the target-only oracle; `test-engineer` added six characterization
+tests at the delta sites, the two for DELTA-001 deliberately without freezegun under
+`TZ=America/New_York` because freezegun hides the wrong fix; pilot = the whole package: two
+lines changed in `timed.py`/`jws.py`, then metadata and tox/Travis; `PLAYBOOK.md`,
+`UPLIFT_NOTES.md`). Uplift diff: 8 files, +118/−66, six lines in `src/`. **Exit gate passed:**
+423 green (417 old + 6 new; 0 warnings under `-W error`), coverage 97.4% → 97.6%, TCE 74.8% →
+75.1% (609/811). Not run: `harden` (assess's security section stands in). Not done: DELTA-005
+(pre-commit pins, unverifiable offline), DELTA-002 (Sphinx pins, docs out of scope), DELTA-006
+(deleting the Py2 shims — behaviour-identical, smaller diff wins), and the stack skill's
+`[project]`/ruff layout, which `uplift`'s own minimal-diff rule defers to the quality pass. What
+the skill was corrected to say (`skills/orc-code/SKILL.md` `### Migration mode`, spec §3 (a),
+(c), (d)): the discovery step's fresh-session claim is now "check first, fresh session as
+fallback"; step 3 also runs the suite with deprecation warnings as errors (a green suite hid
+every runtime delta) and copies `analyze.json` aside; step 4's symlink layout held but any walk
+following symlinks loops, and `uplift`'s literal `cp -r legacy/<name> …` copies the symlink —
+seed with `rsync` from `readlink -f`, and the working copy needs its own venv; step 5 names the
+real sequence (`brief` needs `map`, `extract-rules` and the delta catalog first), preflight's
+five human questions, the absent Workflow tool, the plugin's own human gates, and that `status`
+flags the brief stale after every pilot; step 6 copies `modernized/<name>-uplifted/` (not
+`modernized/<name>/`) back; for an uplift only the toolchain version is the target, not the
+stack skill's layout. Full report:
+`.superpowers/sdd/2026-09-13-orclab-v19-orc-code-refactor/task-7-report.md`.

@@ -164,7 +164,9 @@ are not this mode's. Name them as a follow-up if they show; do not act on them h
 
 ### Migration mode
 
-No migration has gone through this yet; the first one corrects it.
+Run once for real on 2026-09-13: itsdangerous 1.1.0 uplifted to Python 3.12 — see BACKLOG #41.
+That run is where every correction below comes from; the gate passed (423 tests green, coverage
+97.4% → 97.6%, TCE 74.8% → 75.1%).
 
 The engine is Anthropic's `code-modernization` plugin — its preflight → assess → map →
 extract-rules → brief → (transform per module | uplift for a same-stack version bump) → harden
@@ -177,27 +179,51 @@ subtree.
    including the case where a marketplace clone holds a copy — stop with the install command
    the procedure gives. Do not follow a marketplace copy's commands: they spawn the plugin's own
    subagents (`test-engineer`, `architecture-critic`, …), which exist only once it is installed,
-   and the run would degrade silently at the first spawn.
+   and the run would degrade silently at the first spawn. Installed, the agents are reachable as
+   `code-modernization:<agent>` through the Agent tool and that is how "spawn the test-engineer
+   subagent" in a command file is carried out. The plugin's manifest carries no `version`;
+   `installed_plugins.json` records `"unknown"` — cite the cache directory's commit id instead.
 2. **Decide the target the way a new project is decided.** Ask the New-Project Flow's two
    questions — type, and the platforms ticked — for the *target*, and take the Defaults Table's
    row. That row's `stack-*` skill is the migration's constraint: its toolchain versions, its
    project layout, its `## Lint — where code-discipline lands` config, its store-rules table.
    Read it in full now. If the row is a stub or there is no row, `CLAUDE.md`'s "Before the first
    project builds on a stack … Orclab has never met" applies: the research comes first, and this
-   flow stops until it exists.
+   flow stops until it exists. **For a same-stack version bump only the toolchain version is
+   the target**: `uplift`'s own rule is "smallest diff that builds; defer all optional
+   modernization", and its critic treats a layout change as a finding. The stack skill's layout
+   and lint block are the first items of the quality-mode pass that follows the uplift, and the
+   brief says so in its target-architecture section rather than pretending the uplift will do it.
+   Where the machine's interpreter is older than the skill's current version (2026-09-13: only
+   3.12 installed, the skill names 3.14), the gate has to run on a real runtime — the target is
+   the one that exists, and the target-stack line says why.
 3. **Tests before any `modernize-*` command runs.** `/orc-test analyze` on the source project.
    If the suite is red, a language has no runnable suite, or coverage is under the gate, the
    first work is `/orc-test generate` *on the old code* — characterization tests that pin what
    it does today, under `test-discipline`. The plugin's `extract-rules` will document the
    business rules; these tests are what make them executable, and without them the gate in step
    6 has nothing to measure. Record the baseline: coverage, TCE, test count. This step is not
-   optional and it is not the plugin's.
-4. **Lay out a worktree the plugin's way.** Every `modernize-*` command addresses the source as
-   `legacy/<name>` and writes to `analysis/<name>/` and `modernized/<name>/`. Create a worktree
-   for the branch (`superpowers:using-git-worktrees`), and inside it a scratch directory —
-   `.orclab/modernize/` — holding `legacy/<name>` as a symlink to the worktree root, so the
-   plugin reads the real files and its `analysis/` and `modernized/` land under `.orclab/` where
-   nothing else looks. Run every plugin command from `.orclab/modernize/`.
+   optional and it is not the plugin's. Two things the first run added: **run the suite with
+   deprecation warnings promoted to errors as well** (`python -W error::DeprecationWarning -m
+   pytest` for Python) — itsdangerous was 417/417 green on the target and every runtime delta it
+   had was hiding in 107 warnings, 97 tests red under `-W error`; and **copy
+   `.orclab/test/analyze.json` aside**, because step 6's `analyze` overwrites it and the
+   comparison needs both.
+4. **Lay out a scratch directory the plugin's way.** Every `modernize-*` command addresses the
+   source as `legacy/<name>` and writes to `analysis/<name>/` and `modernized/<name>/`. Inside
+   the checkout (a worktree via `superpowers:using-git-worktrees`, or a scratch clone), create
+   `.orclab/modernize/` holding `legacy/<name>` as a symlink to the checkout root, add
+   `.orclab/` to `.gitignore`, and run every plugin command from `.orclab/modernize/`. This
+   survived contact with two corrections. The symlink points *up* into the tree that contains
+   it, so **any walk that follows symlinks loops** — every `find -L`, every subagent prompt,
+   prunes `.orclab`, `.venv`, `mutants` and `.git`. And **`uplift`'s own seeding command,
+   `cp -r legacy/<name> modernized/<name>-uplifted`, copies the symlink, not the tree** (GNU
+   `cp -r` does not dereference a command-line link): followed literally, "editing in place
+   under `modernized/`" edits the real files. Seed with
+   `rsync -a --exclude .venv --exclude .orclab --exclude mutants … "$(readlink -f legacy/<name>)/" modernized/<name>-uplifted/`
+   and give the working copy **its own venv** — the checkout's venv has the package installed
+   editable from the checkout's `src/`, so a suite run in the copy with that venv tests the
+   wrong tree (`python -c "import <pkg>; print(<pkg>.__file__)"` is the check).
 5. **Hand over, with the stack as the brief's constraint.** `modernize-status <name>` first; if
    it reports prior work, continue from there, otherwise `modernize-preflight <name>
    [target-stack]` and on through the plugin's own sequence, reading each command file in full
@@ -207,15 +233,38 @@ subtree.
    `Kotlin + Jetpack Compose, per Orclab's stack-android-native: AGP 9.x, compileSdk 36, app/build.gradle.kts layout`.
    When `brief` produces its target architecture, check it against the stack skill's layout
    section before the user approves it, and correct the brief, not the result, if it lands
-   elsewhere. A same-stack version bump goes
-   through `modernize-uplift <name> <source-version> <target-version>` instead of `transform`.
-6. **Exit gate.** Copy `modernized/<name>/` back over the worktree as the branch's content, and
-   the brief and rule catalogue from `analysis/<name>/` into `docs/`. Then `/orc-test run` must
-   be green on the migrated code, and `/orc-test analyze` must report coverage and TCE
-   **no lower than** step 3's baseline. If either fails, the migration is not done: say which, and
-   what the plugin's `status` shows, and stop. "Done" is not said before this gate.
+   elsewhere — or, for an uplift, record in the brief why it lands elsewhere (step 2). A
+   same-stack version bump goes through `modernize-uplift <name> <source-version>
+   <target-version>` instead of `transform`; it takes versions, not a stack line, and never
+   sees the target-stack line at all.
+
+   What "the plugin's own sequence" is, learned by running it: **`brief` reads
+   `ASSESSMENT.md`, `topology.json` and `BUSINESS_RULES.md` and stops if any is missing**, so
+   `map` and `extract-rules` are not optional between `assess` and `brief`; and for an uplift it
+   also requires `DELTA_CATALOG.md`, which is `uplift`'s Step 3, run before `brief` and reused
+   by `uplift` afterwards. The order that works: `status`, `preflight`, `assess`, `map`,
+   `extract-rules`, `uplift` Step 3 (delta catalog), `brief`, `uplift`. Three more facts of the
+   handover: `preflight`'s Check 0 asks the human five questions (scope, local build, bespoke
+   build machinery, prior attempts, off-limits) — put them to the user and record the answers
+   verbatim, `brief` reads them; the plugin's "Workflow tool" paths do not exist in this client
+   and every command's stated fallback (direct subagents through the Agent tool) is what runs;
+   and the plugin has human gates of its own — `brief`'s approval block, `uplift`'s Step 2 plan
+   and Step 5a pilot review — where "as if the user had typed it" means stopping and showing,
+   not signing on the user's behalf. `status` at the start reports nothing; run again after the
+   pilot it flags the brief stale, because the pilot appends what it learned to the delta
+   catalog — expected, not a defect.
+6. **Exit gate.** Copy the plugin's output back over the checkout as the branch's content —
+   `modernized/<name>-uplifted/` for an uplift (not `modernized/<name>/`, which is
+   `transform`'s), excluding its `.venv`, `.git`, `mutants` and `UPLIFT_NOTES.md` — and the
+   brief, rule catalogue, delta catalogue and uplift notes from `analysis/<name>/` into
+   `docs/`. Then `/orc-test run` must be green on the migrated code, and `/orc-test analyze`
+   must report coverage and TCE **no lower than** step 3's baseline. If either fails, the
+   migration is not done: say which, and what the plugin's `status` shows, and stop. "Done" is
+   not said before this gate.
 7. **Report** in reader terms: what moved, what the old suite proved, the numbers before and
-   after, and what `harden` found.
+   after, and what `harden` found — or, if `harden` did not run, what `assess`'s security
+   section found, which on the first run was a High (CWE-502 in `loads_unsafe`) that no uplift
+   touches and the report has to say so.
 
 ## Plugin-Discovery Procedure
 
@@ -235,9 +284,10 @@ Given a plugin name to find (e.g. `feature-dev`, `code-modernization`):
    agents they spawn are not registered, so treat it as not installed.
 5. If no match is found, or the match is available but not installed, stop and tell the user
    plainly, with the command: `claude plugin install code-modernization@claude-plugins-official`
-   (or the plugin's own name and marketplace) — and that a **fresh session** is needed after
-   installing; a plugin installed mid-conversation is not visible to the session that installed
-   it (`CLAUDE.md`, marketplace gotcha 4, confirmed on both Desktop and the CLI).
+   (or the plugin's own name and marketplace). On 2026-09-13 (Desktop) the installing session
+   picked the plugin up itself — its agents and skills were announced with no restart — so
+   check for them first; if they are not visible, a fresh session is the fallback
+   (`CLAUDE.md`, marketplace gotcha 4, which recorded the older behaviour on 2026-09-06).
 
 Real install layouts you may encounter (all three have been directly observed): a versioned cache
 path (`.../cache/<marketplace>/<plugin-name>/<version>/`), a nested marketplace path
