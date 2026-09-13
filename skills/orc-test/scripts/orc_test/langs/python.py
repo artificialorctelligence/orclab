@@ -12,6 +12,7 @@ import importlib.util
 import os
 import pathlib
 import re
+import shutil
 import tomllib
 
 from .. import lcov
@@ -102,8 +103,28 @@ def mutation_cwd(root, target):
     return _mutmut_config(root, target) or pathlib.Path(root)
 
 
+def _drop_cache_if_tests_changed(cwd):
+    """mutmut's cache (mutants/) is keyed by source-function hash only: a test written to kill a
+    survivor changes nothing it hashes, so the next run reports the old verdicts and `generate`'s
+    after-number equals its before-number (BACKLOG #35, 2026-09-13). If any test file is newer
+    than the cache, the whole directory goes and the run is full — the verdicts (*.meta) cannot
+    go alone; without them beside the copied sources mutmut finds 0 mutants."""
+    mutants = pathlib.Path(cwd) / "mutants"
+    metas = list(mutants.rglob("*.meta"))
+    if not metas:
+        return
+    cached = min(m.stat().st_mtime for m in metas)
+    tests = (p for p in pathlib.Path(cwd).rglob("*.py")
+             if "mutants" not in p.parts and (p.name.startswith("test_") or p.name == "conftest.py"))
+    # ponytail: any newer test file drops the whole cache; per-function invalidation via
+    # mutmut-stats.json's tests_by_mangled_function_name if a full rerun ever hurts
+    if any(p.stat().st_mtime > cached for p in tests):
+        shutil.rmtree(mutants)
+
+
 def mutation_cmd(root, target, out):
     # mutmut takes its paths from pyproject.toml (see CAVEATS); `root` here is mutation_cwd().
+    _drop_cache_if_tests_changed(root)
     return ["python3", "-m", "mutmut", "run"]
 
 

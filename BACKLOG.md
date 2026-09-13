@@ -2571,7 +2571,7 @@ the counter was set back to 39/61 by hand, since `.git/orclab/` is untracked). T
 warning python.md carries is now in `languages/gdscript.md` too, whose first real run landed
 2026-09-12 (#36); the other six still wait for theirs.
 
-## #35: orc-todo's tests run the code but do not pin it: TCE 68.6%, the specific gaps (UPDATED 2026-09-13 — #34 closed, clean before-number is 69.4%; `generate` is the next step)
+## #35: orc-todo's tests run the code but do not pin it: TCE 68.6%, the specific gaps (UPDATED 2026-09-13 — #34 closed, clean before-number is 69.4%; `generate` is the next step) (RESOLVED 2026-09-13)
 
 Found 2026-09-12 by the first real `/orc-test analyze skills/orc-todo/scripts` (v17, Task 19): coverage 95.3%, TCE 68.6% — 637 of 928 mutants killed, 291 survived, gate 70. Coverage is high and the score is just under the gate, which is the shape `analyze` exists to expose: the lines run, the assertions do not pin them. The survivors list (in `.orclab/test/analyze.json` after a run; the numbers are in `skills/orc-test/languages/python.md`) sorts into real gaps and noise.
 
@@ -2598,6 +2598,27 @@ then reported **TCE 69.4%**, tree untouched — that, not 68.6%, is the before-n
 `/orc-test generate` against that run's `.orclab/test/analyze.json`, working the gap list above
 (lane delete/current, lock exit codes, list with an in-progress lane, whitespace normalisation,
 timeout propagation, `required=True`), then `analyze` again for the after-number.
+
+**Resolved for real, not just tracked** (2026-09-13, `/orc-test generate`'s first real use):
+**TCE 69.4% → 82.3%** (gate 70), coverage 91.8% → 96.1%, suite 68 → 78 tests, all green. Ten
+tests, one per gap above: `lane current`/`lane delete` through the parser with the lane file read
+back after each step and `-` clearing; `list` with nothing open; `lock status` on a dead pid with
+an hour-old start (exit 0, "NOT running", the age) and on a live one with no start ("unknown
+age"); bare `orc-todo`/`lane`/`lock` exiting 2; `remove` pinned byte-for-byte around the seam
+with trailing spaces kept; `insert` exact about the seam, the body's own trailing spaces, and the
+first of two anchors; `lock_info`'s `started`/`age_seconds`/pid-1 alive; `NotAGitRepo` naming
+the directory; `allocate(timeout=0.3)` raising in under 3s while the lock is held. Two proven red
+by hand before the run (the `-` clear planted as `item = args.item`; `timeout` dropped from
+`held()` — the test waited the full 10s and failed on time), then the mutation run did the rest.
+
+One defect in the cycle itself, found because the second `analyze` returned 69.4% verbatim:
+mutmut's cache hashes source functions only, so new tests never invalidate it and `generate`'s
+after-number is its before-number on every Python project. `langs/python.py`'s `mutation_cmd`
+now drops `mutants/` when any test file is newer than the cached verdicts (the verdict files
+cannot go alone — mutmut then reports 0 mutants; that was tried). Unit-tested both ways, and
+checked live: a rerun with tests unchanged kept the six `.meta` files and reported 82.3% again.
+`languages/python.md` records it. The remaining 17.7% is the string-literal noise the entry
+already names — not chased.
 
 ## #36: GDScript has no mutation-testing tool, so /orc-test cannot measure TCE for Godot projects (UPDATED 2026-09-12 — a tool exists; re-scoped to adopting it) (RESOLVED 2026-09-12)
 

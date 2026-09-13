@@ -74,3 +74,16 @@ def test_scan_max_ignores_a_heading_quoted_in_a_fenced_example():
     # A phantom high-water mark never reissues a number - it silently skips to 100.
     text = "## #7: real\n\n```\n## #99: an example of the format\n```\n"
     assert scan_max(text, BACKLOG) == 7
+
+
+def test_insert_is_exact_about_the_seam_and_keeps_the_bodys_own_trailing_spaces():
+    text = "# V\n\n## Scenario 1: a\n\nsteps\n\n\n## Recording the result\n\nnote it.\n"
+    out = insert(text, VERIFICATION, "## Scenario 2: b\n\nsteps  \n\n\n")
+    assert out == ("# V\n\n## Scenario 1: a\n\nsteps\n\n## Scenario 2: b\n\nsteps  \n\n"
+                   "## Recording the result\n\nnote it.\n")
+
+
+def test_insert_goes_before_the_first_anchor_when_the_heading_repeats():
+    text = "# V\n\n## Recording the result\n\nfirst\n\n## Recording the result\n\nsecond\n"
+    out = insert(text, VERIFICATION, "## Scenario 1: a\n\nsteps\n")
+    assert out.startswith("# V\n\n## Scenario 1: a\n\nsteps\n\n## Recording the result\n\nfirst\n")

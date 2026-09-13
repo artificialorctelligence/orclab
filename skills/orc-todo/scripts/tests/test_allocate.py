@@ -184,3 +184,15 @@ def test_a_branch_only_scenario_is_not_reissued_when_the_counter_is_lost(tmp_pat
     (wt / "VERIFICATION.md").write_text("# V\n\n## Scenario 3: old\n\nx\n\n## Scenario 9: branch only\n\nz\n")
     state.write_counters({}, repo)
     assert alloc.allocate("verification", "next", "b", cwd=wt) == 10
+
+
+def test_allocate_honours_its_own_timeout_and_the_missing_file_message_names_it(tmp_path):
+    import time
+    repo = make_repo(tmp_path)
+    with state.held("someone else", cwd=repo):
+        t = time.monotonic()
+        with pytest.raises(state.LockUnavailable):
+            alloc.allocate("backlog", "t", "b", cwd=repo, timeout=0.3)
+        assert time.monotonic() - t < 3          # the default is 10s; the argument must reach held()
+    with pytest.raises(alloc.ResourceMissing, match="VERIFICATION.md"):
+        alloc.allocate("verification", "t", "b", cwd=repo)

@@ -214,3 +214,74 @@ def test_a_project_with_no_backlog_is_told_so_and_none_is_created(tmp_path, caps
     assert code == 1
     assert "BACKLOG.md" in out
     assert not (tmp_path / "BACKLOG.md").exists()
+
+
+def test_lane_current_and_delete_through_the_cli(tmp_path, capsys):
+    """`lane current` / `lane delete` had never been sent through the parser: the lane file is
+    read back after each step, because the printed line echoes the argument, not the file."""
+    repo = make_repo(tmp_path)
+    run(["lane", "create", "B", "v13,v14"], repo, capsys)
+    code, out = run(["lane", "current", "B", "v13"], repo, capsys)
+    assert code == 0 and "B: in progress on v13" in out
+    assert lanes.read_lanes(repo)["B"]["current"] == "v13"
+    assert "  B: v13, v14 (in progress: v13)" in run(["lane", "list"], repo, capsys)[1]
+    assert "  B: v13, v14 (in progress: v13)" in run(["list"], repo, capsys)[1]
+    code, out = run(["lane", "current", "B", "-"], repo, capsys)      # `-` clears it
+    assert code == 0 and "B: idle" in out
+    assert lanes.read_lanes(repo)["B"]["current"] is None
+    assert "in progress" not in run(["list"], repo, capsys)[1]
+    code, out = run(["lane", "current", "B", "v99"], repo, capsys)
+    assert code == 1 and "v99" in out
+    code, out = run(["lane", "delete", "B"], repo, capsys)
+    assert code == 0 and "deleted lane B" in out
+    assert lanes.read_lanes(repo) == {}
+    assert "no lanes" in run(["lane", "list"], repo, capsys)[1]
+    code, out = run(["lane", "delete", "B"], repo, capsys)
+    assert code == 1 and "no lane named 'B'" in out
+
+
+def test_list_with_nothing_open_says_so(tmp_path, capsys):
+    repo = make_repo(tmp_path)
+    (repo / "BACKLOG.md").write_text("# Backlog\n\n## #12: a closed one (RESOLVED 2026-09-07)\n\nprose\n")
+    code, out = run(["list"], repo, capsys)
+    assert code == 0 and out.strip() == "no open entries"
+
+
+def test_lock_status_distinguishes_a_stale_holder_from_a_running_one(tmp_path, capsys):
+    import datetime
+    import json
+    repo = make_repo(tmp_path)
+    state.shared_dir(repo)
+    gone = subprocess.Popen(["true"]); gone.wait()                     # a pid that has exited
+    started = (datetime.datetime.now().astimezone() - datetime.timedelta(hours=1)).isoformat()
+    state.lock_path(repo).write_text(json.dumps(
+        {"pid": gone.pid, "started": started, "description": "allocating a backlog number"}))
+    code, out = run(["lock", "status"], repo, capsys)
+    assert code == 0
+    assert f"lock held by pid {gone.pid} (NOT running - apparently stale), 36" in out
+    assert "worth investigating before clearing" in out
+    state.lock_path(repo).write_text(json.dumps({"pid": __import__("os").getpid(), "description": "me"}))
+    code, out = run(["lock", "status"], repo, capsys)
+    assert code == 0
+    assert "(running), unknown age: me" in out and "investigating" not in out
+
+
+def test_a_bare_command_or_bare_lane_or_lock_is_a_usage_error(tmp_path):
+    import pytest
+    for argv in ([], ["lane"], ["lock"]):
+        with pytest.raises(SystemExit) as e:
+            main(["--cwd", str(tmp_path), *argv])
+        assert e.value.code == 2
+
+
+def test_remove_keeps_trailing_spaces_and_collapses_only_newlines(tmp_path, capsys):
+    """The cut normalises blank lines around the seam and nothing else: trailing spaces on a
+    neighbour's last line are that entry's own bytes."""
+    repo = make_repo(tmp_path)
+    (repo / "BACKLOG.md").write_text(
+        "# Backlog\n\n## #7: an open one\n\nprose   \n\n\n\n## #12: gone\n\nx\n\n## #22: last\n\nmore  \n\n\n")
+    assert run(["remove", "12"], repo, capsys)[0] == 0
+    assert (repo / "BACKLOG.md").read_text() == \
+        "# Backlog\n\n## #7: an open one\n\nprose   \n\n## #22: last\n\nmore  \n"
+    assert run(["remove", "22"], repo, capsys)[0] == 0
+    assert (repo / "BACKLOG.md").read_text() == "# Backlog\n\n## #7: an open one\n\nprose   \n"

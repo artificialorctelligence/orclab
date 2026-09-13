@@ -179,3 +179,21 @@ def test_results_asks_mutmut_for_every_mutant_not_just_the_unkilled(monkeypatch,
     monkeypatch.setattr(py, "run", lambda cmd, cwd: seen.append(cmd) or type("R", (), {"stdout": ""})())
     py._results(tmp_path)
     assert seen == [["python3", "-m", "mutmut", "results", "--all", "true"]]
+
+
+def test_mutation_cmd_drops_cached_verdicts_when_a_test_is_newer_than_them(tmp_path):
+    """mutmut's cache hashes source functions only; a new test must force a full rerun or
+    `generate`'s after-number is the before-number (BACKLOG #35)."""
+    import os
+    meta = tmp_path / "mutants" / "pkg" / "mod.py.meta"
+    meta.parent.mkdir(parents=True)
+    meta.write_text("{}")
+    test = tmp_path / "tests" / "test_mod.py"
+    test.parent.mkdir()
+    test.write_text("def test_x(): pass\n")
+    os.utime(test, (1_700_000_000, 1_700_000_000))     # tests older than the cache: keep it
+    assert py.mutation_cmd(tmp_path, None, tmp_path) == ["python3", "-m", "mutmut", "run"]
+    assert meta.exists()
+    os.utime(meta, (1_600_000_000, 1_600_000_000))     # now the test is newer: verdicts go
+    py.mutation_cmd(tmp_path, None, tmp_path)
+    assert not meta.exists()

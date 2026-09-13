@@ -113,3 +113,25 @@ def test_counters_round_trip_and_default_to_empty(tmp_path):
     assert state.read_counters(repo) == {}
     state.write_counters({"BACKLOG.md": 25}, repo)
     assert state.read_counters(repo) == {"BACKLOG.md": 25}
+
+
+def test_lock_info_reports_the_holders_start_and_age(tmp_path):
+    import datetime
+    import json
+    repo = make_repo(tmp_path)
+    state.shared_dir(repo)
+    started = (datetime.datetime.now().astimezone() - datetime.timedelta(minutes=5)).isoformat()
+    state.lock_path(repo).write_text(json.dumps({"pid": 1, "started": started, "description": "d"}))
+    info = state.lock_info(repo)
+    assert info["started"] == started and info["description"] == "d"
+    assert 299 < info["age_seconds"] < 330
+    assert info["alive"] is True          # pid 1 is init: os.kill raises PermissionError, not "gone"
+    state.lock_path(repo).write_text(json.dumps({"pid": 1, "started": "yesterday"}))
+    assert state.lock_info(repo)["age_seconds"] is None
+
+
+def test_not_a_git_repo_names_the_directory(tmp_path):
+    with pytest.raises(state.NotAGitRepo, match=str(tmp_path)):
+        state.git_common_dir(tmp_path)
+    with pytest.raises(state.NotAGitRepo, match=str(tmp_path)):
+        state.invoking_root(tmp_path)

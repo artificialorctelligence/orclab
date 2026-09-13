@@ -57,7 +57,12 @@ per mutant: `<key>: killed|survived|timeout|suspicious|skipped|no tests|not chec
 `--all true` mutmut 3.7 lists only the *non-killed* ones, which would read as a 0% score) and
 `python3 -m mutmut show <key>` for each survivor's diff. `killed` and `timeout` count as caught,
 `survived` as a survivor; the rest are not counted. Incremental: mutmut caches per function hash
-in `mutants/`; only changed functions re-run. Alternative, not used: cosmic-ray 8.7.0.
+in `mutants/`; only changed functions re-run. **That hash covers the source only, not the tests**
+— found 2026-09-13 when `generate`'s second `analyze` on orc-todo returned the before-number
+(69.4%) verbatim after ten new tests; mutmut 3.7 has no `--force`. `mutation_cmd` now removes
+`mutants/` outright when any `test_*.py` or `conftest.py` under the config's directory is newer
+than the cached verdicts (`*.meta`) — the verdicts cannot go alone; without them beside the
+copied sources mutmut reports 0 mutants. Alternative, not used: cosmic-ray 8.7.0.
 
 **Where mutmut runs matters.** It copies `source_paths` into `mutants/`, then runs pytest
 in-process from *inside* `mutants/` with `mutants/` (and `mutants/src`, `mutants/source`) put
