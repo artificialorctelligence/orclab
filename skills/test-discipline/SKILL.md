@@ -70,3 +70,4 @@ neighbour cannot cover for the file you actually changed.
 - Not a coverage target for the whole repo — that is `/orc-test coverage` with no path.
 - Not the place that says how a language's tools are invoked — that is `languages/<lang>.md`.
 - Not a substitute for reading the code. Read the code before writing the test.
+- Not about the code under test — `code-discipline` is the matching rule set for that.

@@ -2770,7 +2770,7 @@ alternatives line now says so beside npm's 8.3.1. orc-test: the 14 "Task 19 of t
 references (seven `languages/*.md`, seven fixture READMEs) are gone; `grep -rn "v17\|Task 19"
 skills/orc-test/` is empty and its 148 tests still pass.
 
-## #40: Evaluate a found list of seven code-shape rules (linear control flow, loop ceilings, two assertions per function …) and decide whether Orclab's discipline skills should carry them
+## #40: Evaluate a found list of seven code-shape rules (linear control flow, loop ceilings, two assertions per function …) and decide whether Orclab's discipline skills should carry them (UPDATED 2026-09-13 — evaluated and adopted; `code-discipline` shipped; re-scoped to the lint configs and the hook)
 
 direflail brought this on 2026-09-13, as a screenshot of a bulleted list found elsewhere, with the
 question "see if orclab can use it" — might help AI development. The list, transcribed verbatim:
@@ -2804,3 +2804,39 @@ decided rather than left as two rules that disagree.
 Not this: rewriting any existing code to these rules, or adopting them into Orclab's own bundled
 scripts before the decision is made. This is an evaluation and a decision, and its output is
 either a skill or a line here saying why not.
+
+**Update 2026-09-13 — evaluated against primary sources; the decision is "adopt all seven, one
+restated", and the first layer is shipped.** The list's own wording is not findable (two searches
+on its most distinctive phrases return nothing) — a paraphrase, not a published list. Five rules
+are Holzmann's "Power of Ten" (JPL, 2006; `spinroot.com/gerard/pdf/P10.pdf`), the nesting limit
+is Martin's *Clean Code* ("one or two"; Linux says three), and "close what you open" / "never
+swallow" are the resource and exception idioms Holzmann's C had no need of. The one that does not
+transfer literally is the assertion density: in his C an assertion is a shipped check with "an
+explicit recovery action"; in every one of Orclab's seven stack languages the `assert` keyword is
+debug-only (each verified against its own docs — Python `-O`, Kotlin `-ea`, Swift `-O`, Dart
+production, C# `[Conditional("DEBUG")]`, GDScript release), so a literal reading produces checks
+that vanish from the shipped app. Restated as "validate inputs from outside the function with a
+check that survives release; the count is not kept — TCE measures interception directly."
+
+The search this entry asked for: `skills/*/SKILL.md`, `CLAUDE.md`, `hooks/scripts/`, this file —
+nothing covered any of the seven; `orc-test`'s lint covers tests only. So a new background skill,
+`skills/code-discipline/SKILL.md`, in `test-discipline`'s shape (`user-invocable: false`, sits in
+every session), with each rule's source quoted so the next reader can judge it. `test-discipline`
+and `plugin.json` point at it. direflail's question that shaped it — "is all code written through
+/orc-code?" — no: a bug fix in chat, a subagent's task and `/orc-test generate` all write code
+without it, which is why the rules are a background skill and not a section of `/orc-code`.
+
+**What this entry now tracks — the two layers a prose rule cannot supply** (`CLAUDE.md`: a rule in
+a skill body fires only if read; Holzmann's rule 10 wants the checker run daily):
+
+1. **Lint configuration in what `/orc-code` scaffolds**, one stack at a time: nesting depth,
+   function length, empty catch, and warnings-as-errors, each in that stack's native tool — ruff
+   + pyright, ESLint (`max-depth`, `max-lines-per-function`, `no-empty`), detekt, SwiftLint,
+   Dart analyzer, the C# analyzers, gdlint + `project.godot` warning severities. Each `stack-*`
+   skill's toolchain section says where the switch lands; the "confirmed live" stamp per
+   `currency-discipline`. The first project on a stack is the moment, per `CLAUDE.md`'s "before
+   the first project builds on a stack".
+2. **A `PostToolUse` hook on `Edit`/`Write`** in `hooks/hooks.json`, in `model_floor.py`'s shape,
+   that runs the project's configured linter on the file just written and reports findings —
+   mechanical, every write, subagents included. Only worth building once (1) gives it something
+   to run; a hook with no config behind it is `/orc-test`'s "lint: not run" in a new place.
