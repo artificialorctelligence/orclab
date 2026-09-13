@@ -1,6 +1,6 @@
 # Ingredient: Apple App Store
 
-**Researched against Apple's live pages on 2026-09-11; no release has gone through this yet.**
+**Researched against Apple's live pages on 2026-09-11 (GitHub's runner pricing 2026-09-12); no release has gone through this yet.**
 Every command below is documented by its vendor and none has been run by anyone here — including
 the bundled script, which was written from Apple's API reference and has never been pointed at a
 real team. The first real release will find something wrong; correct the file (that is what
@@ -30,8 +30,9 @@ Built on: **macOS only.** Producing an `.ipa` requires Xcode, and since **2026-0
 be built with **Xcode 26 and the iOS 26 SDK**. There is no Linux path for the build. The upload
 and everything after it can happen from anywhere — the API is plain HTTPS — but the artifact
 cannot. Without a Mac at hand, the real options are a cloud Mac: Codemagic (free tier; can generate
-signing on your behalf), GitHub Actions macOS runners (minutes are billed at 10×), Bitrise, or
-Apple's Xcode Cloud. That choice is the `local` / `cloud` question in the table, and it changes the
+signing on your behalf), GitHub Actions macOS runners ($0.062/minute against $0.006 for Linux,
+about 10.3×; the 10× multiplier on included minutes GitHub once documented is no longer on its
+pages — confirmed live 2026-09-12), Bitrise, or Apple's Xcode Cloud. That choice is the `local` / `cloud` question in the table, and it changes the
 leaf's shape in section 6. It does not change anything else here.
 
 Takes: a signed **`.ipa`** — an Xcode archive exported for App Store distribution with a
