@@ -127,9 +127,9 @@ Flutter quick-start covers *"build versioning, code signing and publishing"* for
 | App | one or more desktops, nothing else | Python | Java + Spring + JavaFX; C# / .NET only when Windows is the sole platform | `skills/stack-python-desktop/SKILL.md` — read it in full before scaffolding |
 | App | Android only | Kotlin + Jetpack Compose | Java *(stub — existing codebases only)* | `skills/stack-android-native/SKILL.md` — read it in full before scaffolding |
 | App | iOS only | Swift + SwiftUI | Objective-C *(stub — existing codebases only)* | `skills/stack-ios-native/SKILL.md` — same; needs a Mac or a cloud Mac to build |
-| App | Android + iOS, nothing else | Flutter | React Native; Kotlin Multiplatform | `skills/stack-flutter/SKILL.md` — same; iOS builds without a Mac are in its "Building without a Mac"; KMP: `skills/stack-kotlin-multiplatform/SKILL.md` |
+| App | Android + iOS, nothing else | Flutter | React Native; Kotlin Multiplatform | `skills/stack-flutter/SKILL.md` — same; iOS builds without a Mac are in its "Building without a Mac"; RN: `skills/stack-react-native/SKILL.md`; KMP: `skills/stack-kotlin-multiplatform/SKILL.md` |
 | App | web only | *decided by research — none yet* | — | *no skill yet — research first* |
-| App | two or more of desktop / mobile / web, iOS ticked | Flutter | React Native + React web; Kotlin Multiplatform + Compose Multiplatform | `skills/stack-flutter/SKILL.md` — same; KMP: `skills/stack-kotlin-multiplatform/SKILL.md` |
+| App | two or more of desktop / mobile / web, iOS ticked | Flutter | React Native + React web; Kotlin Multiplatform + Compose Multiplatform | `skills/stack-flutter/SKILL.md` — same; RN: `skills/stack-react-native/SKILL.md`; KMP: `skills/stack-kotlin-multiplatform/SKILL.md` |
 | App | two or more of desktop / mobile / web, iOS not ticked | Flutter | React Native + React web; Kotlin Multiplatform + Compose Multiplatform | `skills/stack-flutter/SKILL.md` — same |
 | Game | desktops only | Godot 4 | Unity 6 | `skills/stack-godot/SKILL.md`, `skills/stack-unity/SKILL.md` — read the chosen one in full; neither is preferred over the other, ask which |
 | Game | mobile only | Godot 4 | Unity 6 | same |
