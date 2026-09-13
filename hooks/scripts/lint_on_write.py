@@ -107,7 +107,7 @@ def main():
         if found is None:
             return 0
         root, argv = found
-        cp = subprocess.run(argv, cwd=root, capture_output=True, text=True, timeout=TIMEOUT)
+        cp = subprocess.run(argv, check=False, cwd=root, capture_output=True, text=True, timeout=TIMEOUT)
         if cp.returncode == 0:
             return 0
         lines = (cp.stdout + cp.stderr).strip().splitlines()
@@ -116,8 +116,8 @@ def main():
               f"code-discipline's checkable rules, from the project's own config. Set {OFF}=1 to disable.\n"
               f"{report}", file=sys.stderr)
         return 2
-    except Exception:
-        return 0  # fail open, always
+    except Exception:  # noqa: BLE001 - fail open, always: a hook that wedges every write is worse than a missed warning
+        return 0
 
 
 if __name__ == "__main__":

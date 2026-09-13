@@ -30,7 +30,7 @@ def instantiate(tmp_path):
 
 def test_usage_runs_and_names_both_modes(tmp_path):
     script = instantiate(tmp_path)
-    out = subprocess.run([sys.executable, str(script)], capture_output=True, text=True,
+    out = subprocess.run([sys.executable, str(script)], check=False, capture_output=True, text=True,
                          env={"HOME": str(tmp_path), "PATH": "/usr/bin:/bin"})
     # exit 2 = usage; it may also be a PyJWT ImportError (exit 1) on a machine without it -
     # both prove the file is valid Python and neither reaches the network.

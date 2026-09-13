@@ -46,7 +46,7 @@ def test_coverage_denominator_excludes_the_tests_themselves(tmp_path, capsys):
     repo = make_repo(tmp_path)
     _src(repo, "def clamp(x, lo, hi):\n    if x < lo:\n        return lo\n"
                "    if x > hi:\n        return hi\n    return x\n")
-    code, out = run(["coverage"], repo, capsys)        # --cov=. would count tests/ too
+    _code, out = run(["coverage"], repo, capsys)        # --cov=. would count tests/ too
     assert "(4/6 lines)" in out and "tests/" not in out
 
 
@@ -72,5 +72,5 @@ def test_coverage_unavailable_never_calls_coverage_cmd_or_parse(tmp_path, capsys
     m.coverage_cmd = lambda root, t, out: (_ for _ in ()).throw(AssertionError("should not run"))
     m.coverage_parse = lambda root, out: (_ for _ in ()).throw(AssertionError("should not run"))
     monkeypatch.setattr(langs, "ALL", [m])
-    code, out = run(["coverage"], make_repo(tmp_path), capsys)
+    code, _out = run(["coverage"], make_repo(tmp_path), capsys)
     assert code == 0

@@ -27,7 +27,7 @@ def test_no_subcommand_means_run(tmp_path, capsys):
 
 
 def test_green_suite_with_counts_does_not_print_the_output_tail(tmp_path, capsys):
-    code, out = run(["run"], make_repo(tmp_path), capsys)
+    _code, out = run(["run"], make_repo(tmp_path), capsys)
     assert out.count("1 passed") == 1        # the summary line only, not pytest's own output too
 
 
@@ -86,7 +86,7 @@ def test_missing_tool_skips_language_with_install_line(tmp_path, capsys, monkeyp
 def test_declared_command_wins(tmp_path, capsys):
     repo = make_repo(tmp_path)
     (repo / "Makefile").write_text("test:\n\t@echo make-ran\n")
-    code, out = run(["run"], repo, capsys)
+    _code, out = run(["run"], repo, capsys)
     assert "$ make test" in out and "make-ran" in out
 
 

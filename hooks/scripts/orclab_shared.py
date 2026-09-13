@@ -19,7 +19,7 @@ ENTRY_RE = re.compile(r"^\+(## (?:#(\d+)|Scenario (\d+)): .*)$", re.MULTILINE)
 def git(args, cwd=None):
     """Run git, returning stdout, or None if git failed for any reason at all."""
     try:
-        out = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, timeout=5)
+        out = subprocess.run(["git", *args], check=False, cwd=cwd, capture_output=True, text=True, timeout=5)
     except (OSError, subprocess.SubprocessError):
         return None
     return out.stdout if out.returncode == 0 else None

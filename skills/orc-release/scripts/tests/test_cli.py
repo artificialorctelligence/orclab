@@ -93,7 +93,7 @@ def test_complete_records_irreversibility_from_the_document(tmp_path):
     root = setup_project(tmp_path)
     main(["--root", root, "start", "0.2.0"])
     main(["--root", root, "complete", "2"])
-    entry = [c for c in load_state(root)["completed"] if c["number"] == 2][0]
+    entry = next(c for c in load_state(root)["completed"] if c["number"] == 2)
     assert entry["irreversible"] is True
 
 
@@ -382,7 +382,7 @@ def test_version_verify_passes_against_the_release_target_once_set(tmp_path):
 
 
 def test_a_subcommand_run_from_a_subdirectory_still_finds_the_document(tmp_path, monkeypatch, capsys):
-    root = setup_project(tmp_path)
+    setup_project(tmp_path)
     (tmp_path / ".git").mkdir()
     sub = tmp_path / "src" / "deep"
     sub.mkdir(parents=True)

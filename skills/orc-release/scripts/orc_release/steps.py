@@ -155,10 +155,7 @@ def crossref_warning(steps):
 
 def _is_in_fenced_block(pos, fenced_regions):
     """Check if a position is inside any fenced block."""
-    for start, end in fenced_regions:
-        if start <= pos < end:
-            return True
-    return False
+    return any(start <= pos < end for start, end in fenced_regions)
 
 
 @dataclass

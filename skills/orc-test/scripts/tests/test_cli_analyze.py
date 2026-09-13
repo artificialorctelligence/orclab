@@ -9,7 +9,7 @@ from tests.helpers import fake, make_repo, run
 
 def test_analyze_lint_not_run_is_a_reason_not_a_count(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr(langs, "ALL", [fake(Mutation(9, 10, []), lint="eslint not configured")])
-    code, out = run(["analyze"], make_repo(tmp_path), capsys)
+    _code, out = run(["analyze"], make_repo(tmp_path), capsys)
     assert "lint: not run — eslint not configured" in out
 
 
@@ -27,14 +27,14 @@ def test_analyze_all_gates_and_result_file(tmp_path, capsys, monkeypatch):
 
 def test_analyze_unavailable_mutation_is_words_not_a_number(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr(langs, "ALL", [fake(unavailable="no mutation tool exists for Fake")])
-    code, out = run(["analyze"], make_repo(tmp_path), capsys)
+    _code, out = run(["analyze"], make_repo(tmp_path), capsys)
     assert "TCE not measurable — no mutation tool exists for Fake" in out
     assert "TCE 0" not in out
 
 
 def test_analyze_no_mutation_flag(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr(langs, "ALL", [fake(Mutation(9, 10, []))])
-    code, out = run(["analyze", "--no-mutation"], make_repo(tmp_path), capsys)
+    _code, out = run(["analyze", "--no-mutation"], make_repo(tmp_path), capsys)
     assert "TCE skipped" in out and "$ true" in out
 
 
@@ -43,7 +43,7 @@ def test_analyze_announces_size_on_whole_repo(tmp_path, capsys, monkeypatch):
     for i in range(3):
         (repo / f"m{i}.py").write_text("x = 1\n")
     monkeypatch.setattr(langs, "ALL", [fake(Mutation(9, 10, []))])
-    code, out = run(["analyze"], repo, capsys)
+    _code, out = run(["analyze"], repo, capsys)
     assert "mutating 4 files" in out    # 3 modules + tests/test_ok.py; first run, no cache yet
 
 
@@ -51,7 +51,7 @@ def test_analyze_no_mutants_is_words_not_a_fabricated_zero_and_shows_the_tool_ou
     m = fake(Mutation(0, 0, []))
     m.mutation_cmd = lambda root, t, out: ["bash", "-c", "echo 'BadTestExecutionCommandsException: no tests'"]
     monkeypatch.setattr(langs, "ALL", [m])
-    code, out = run(["analyze"], make_repo(tmp_path), capsys)
+    _code, out = run(["analyze"], make_repo(tmp_path), capsys)
     assert "TCE not measurable — mutation tool produced no mutants" in out
     assert "BadTestExecutionCommandsException" in out     # the tool's own error, not hidden
     assert "TCE 0" not in out
@@ -81,7 +81,7 @@ def test_mutation_run_that_dirties_the_tree_is_reported_not_scored(tmp_path, cap
     m = fake(Mutation(9, 10, []))
     m.mutation_cmd = lambda root, t, out: ["bash", "-c", "echo x >> tracked.txt; mkdir -p mutants; touch mutants/ok"]
     monkeypatch.setattr(langs, "ALL", [m])
-    code, out = run(["analyze"], repo, capsys)
+    _code, out = run(["analyze"], repo, capsys)
     assert "$ git status --porcelain" in out
     assert "mutation run changed tracked files outside its sandbox: tracked.txt — the suite writes" in out
     assert "BACKLOG #34" in out
@@ -125,7 +125,7 @@ def test_mutation_run_that_rewrites_a_committed_file_with_no_sandbox_is_not_meas
     m = fake(Mutation(9, 10, []))
     m.mutation_cmd = lambda root, t, out: ["bash", "-c", "echo '{\"x\":1}' > reports/stryker-incremental.json"]
     monkeypatch.setattr(langs, "ALL", [m])
-    code, out = run(["analyze"], repo, capsys)
+    _code, out = run(["analyze"], repo, capsys)
     assert "mutation run changed tracked files outside its sandbox: reports/stryker-incremental.json" in out
     assert "TCE not measurable — mutation run modified the working tree — see above" in out
 
@@ -144,7 +144,7 @@ def test_mutation_run_that_creates_an_untracked_file_is_scored(tmp_path, capsys,
 def test_analyze_writes_result_file_even_when_every_language_fails_tests(tmp_path, capsys, monkeypatch):
     repo = make_repo(tmp_path)
     monkeypatch.setattr(langs, "ALL", [fake(test_cmd=["false"])])
-    code, out = run(["analyze"], repo, capsys)
+    _code, _out = run(["analyze"], repo, capsys)
     data = json.loads((repo / ".orclab" / "test" / "analyze.json").read_text())
     assert data["languages"] == {}
 
@@ -165,5 +165,5 @@ def test_analyze_rebases_survivors_from_a_sub_project_to_the_root(tmp_path, caps
     (repo / "skills" / "x" / "scripts").mkdir(parents=True)
     m.mutation_cwd = lambda root, target: pathlib.Path(root) / "skills" / "x" / "scripts"
     monkeypatch.setattr(langs, "ALL", [m])
-    code, out = run(["analyze"], repo, capsys)
+    _code, out = run(["analyze"], repo, capsys)
     assert "skills/x/scripts/pkg/a.py:2  x <= 1" in out

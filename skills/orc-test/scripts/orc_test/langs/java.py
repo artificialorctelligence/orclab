@@ -17,8 +17,8 @@ TOOLS = {
     "mvn": "install Maven (https://maven.apache.org)",
     "gradle": "install Gradle (https://gradle.org), or commit the wrapper (./gradlew)",
 }
-CAVEATS = ["Gradle projects must apply the `jacoco` plugin (and `pitest` for TCE) themselves; "
-           "Maven needs nothing in the pom for coverage, only the pitest-junit5-plugin dependency for TCE."]
+CAVEATS = [("Gradle projects must apply the `jacoco` plugin (and `pitest` for TCE) themselves; "
+           "Maven needs nothing in the pom for coverage, only the pitest-junit5-plugin dependency for TCE.")]
 SANDBOX = {"target", "build", ".gradle"}   # Maven/Gradle/Pitest/JaCoCo build output
 
 _JACOCO = "org.jacoco:jacoco-maven-plugin"
@@ -120,8 +120,8 @@ def lint(root, target, out):
         return "PMD not installed — https://pmd.github.io (`pmd check` with the unit-test rules)"
     tests = pathlib.Path(root) / _test_dir(target)
     cp = run(["pmd", "check", "-d", str(tests), "-f", "json", "--no-progress", "-R",
-              "category/java/bestpractices.xml/UnitTestShouldIncludeAssert,"
-              "category/java/bestpractices.xml/UnitTestContainsTooManyAsserts"], cwd=root)
+              ("category/java/bestpractices.xml/UnitTestShouldIncludeAssert,"
+              "category/java/bestpractices.xml/UnitTestContainsTooManyAsserts")], cwd=root)
     try:
         data = json.loads(cp.stdout[cp.stdout.index("{"):])
     except ValueError:

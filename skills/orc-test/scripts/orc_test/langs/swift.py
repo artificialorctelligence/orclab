@@ -16,8 +16,8 @@ MARKERS = ["Package.swift", "*.xcodeproj/project.pbxproj"]
 TOOLS = {"swift": "install Swift (https://swift.org/install) — Xcode on a Mac",
          "xcodebuild": "install Xcode on a Mac (xcodebuild ships with it); a .xcodeproj cannot "
                         "be built or tested from Linux"}
-CAVEATS = ["Muter has two open bugs (muter#307, #310, 2026) where SPM projects score 0%; treat "
-           "a 0% TCE on an SPM package as the bug until a real run says otherwise.",
+CAVEATS = [("Muter has two open bugs (muter#307, #310, 2026) where SPM projects score 0%; treat "
+           "a 0% TCE on an SPM package as the bug until a real run says otherwise."),
            "Muter's per-mutant detail is not parsed yet — survivors are listed per file."]
 SANDBOX = {".build"}   # SPM build output
 
@@ -26,9 +26,9 @@ def _xcodeproj(root):
     """First .xcodeproj bundle at root, one, or two directories down (skipping SKIP_DIRS)."""
     root = pathlib.Path(root)
     for pattern in ("*.xcodeproj", "*/*.xcodeproj", "*/*/*.xcodeproj"):
-        for p in sorted(root.glob(pattern)):
-            if not (SKIP_DIRS & set(p.relative_to(root).parts)):
-                return p
+        hit = next((p for p in sorted(root.glob(pattern)) if not (SKIP_DIRS & set(p.relative_to(root).parts))), None)
+        if hit:
+            return hit
     return None
 
 
@@ -87,10 +87,10 @@ def _parse_xccov(path, root):
         for f in data["data"][0].get("files", []):
             lines = f["summary"]["lines"]
             files[_relativise(f["filename"], root)] = (int(lines["covered"]), int(lines["count"]))
-    else:                # xcodebuild + `xcrun xccov view --report --json`
-        for target in data.get("targets", [data]):
-            for f in target.get("files", []):
-                files[_relativise(f["path"], root)] = (int(f["coveredLines"]), int(f["executableLines"]))
+        return Coverage(sum(c for c, _ in files.values()), sum(t for _, t in files.values()), files)
+    # xcodebuild + `xcrun xccov view --report --json`
+    for f in (f for target in data.get("targets", [data]) for f in target.get("files", [])):
+        files[_relativise(f["path"], root)] = (int(f["coveredLines"]), int(f["executableLines"]))
     return Coverage(sum(c for c, _ in files.values()), sum(t for _, t in files.values()), files)
 
 

@@ -93,7 +93,7 @@ def test_allocation_fails_cleanly_when_the_lock_is_held(tmp_path):
 def _child(repo, title, out):
     try:
         out.put(alloc.allocate("backlog", title, "body", cwd=repo, timeout=30.0))
-    except Exception as e:  # surface it rather than hanging the parent on an empty queue
+    except Exception as e:  # noqa: BLE001 - surface it rather than hanging the parent on an empty queue
         out.put(f"ERROR {e!r}")
 
 
@@ -192,5 +192,5 @@ def test_allocate_honours_its_own_timeout_and_the_missing_file_message_names_it(
         with pytest.raises(state.LockUnavailable):
             alloc.allocate("backlog", "t", "b", cwd=repo, timeout=0.3)
         assert time.monotonic() - t < 3          # the default is 10s; the argument must reach held()
-    with pytest.raises(alloc.ResourceMissing, match="VERIFICATION.md"):
+    with pytest.raises(alloc.ResourceMissing, match=r"VERIFICATION\.md"):
         alloc.allocate("verification", "t", "b", cwd=repo)

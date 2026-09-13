@@ -23,13 +23,12 @@ def _field_label(value):
 
 def open_source(root):
     root = pathlib.Path(root)
-    for name in ("LICENSE", "LICENSE.md", "LICENSE.txt", "LICENCE", "LICENCE.md", "LICENCE.txt", "COPYING"):
-        p = root / name
-        if p.exists():
-            text = p.read_text(errors="replace")
-            for label, pat in _PATTERNS:
-                if re.search(pat, text, re.IGNORECASE):
-                    return label
+    names = ("LICENSE", "LICENSE.md", "LICENSE.txt", "LICENCE", "LICENCE.md", "LICENCE.txt", "COPYING")
+    for p in (root / n for n in names if (root / n).exists()):
+        text = p.read_text(errors="replace")
+        label = next((label for label, pat in _PATTERNS if re.search(pat, text, re.IGNORECASE)), None)
+        if label:
+            return label
     pkg = root / "package.json"
     if pkg.exists():
         try:

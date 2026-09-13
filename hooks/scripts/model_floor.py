@@ -74,8 +74,7 @@ def main():
             },
             sys.stdout,
         )
-    except Exception:
-        # Fail open, always - same reasoning as secret_guard.
+    except Exception:  # noqa: BLE001 - fail open, always: same reasoning as secret_guard
         return 0
     return 0
 

@@ -21,7 +21,7 @@ def make_repo(tmp_path, dirty):
 
 def guard(command, repo):
     payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
-    out = subprocess.run([sys.executable, GUARD], input=payload, capture_output=True,
+    out = subprocess.run([sys.executable, GUARD], check=False, input=payload, capture_output=True,
                          text=True, cwd=str(repo))
     assert out.returncode == 0, "a hook must never wedge the shell"
     return json.loads(out.stdout) if out.stdout.strip() else None
@@ -129,7 +129,7 @@ def test_the_decision_is_deny_since_ask_is_not_a_documented_value(tmp_path):
 def test_a_non_bash_tool_is_ignored(tmp_path):
     repo = make_repo(tmp_path, dirty=True)
     payload = json.dumps({"tool_name": "Read", "tool_input": {"file_path": "x"}})
-    out = subprocess.run([sys.executable, GUARD], input=payload, capture_output=True,
+    out = subprocess.run([sys.executable, GUARD], check=False, input=payload, capture_output=True,
                          text=True, cwd=str(repo))
     assert out.returncode == 0 and not out.stdout.strip()
 
@@ -149,13 +149,13 @@ def test_a_worktree_is_not_denied_for_the_main_checkouts_uncommitted_entry(tmp_p
 
 def test_outside_a_git_repo_it_fails_open(tmp_path):
     payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": "git reset --hard"}})
-    out = subprocess.run([sys.executable, GUARD], input=payload, capture_output=True,
+    out = subprocess.run([sys.executable, GUARD], check=False, input=payload, capture_output=True,
                          text=True, cwd=str(tmp_path))
     assert out.returncode == 0 and not out.stdout.strip()
 
 
 def test_garbage_on_stdin_fails_open(tmp_path):
-    out = subprocess.run([sys.executable, GUARD], input="{not json",
+    out = subprocess.run([sys.executable, GUARD], check=False, input="{not json",
                          capture_output=True, text=True, cwd=str(tmp_path))
     assert out.returncode == 0 and not out.stdout.strip()
 

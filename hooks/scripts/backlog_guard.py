@@ -112,8 +112,8 @@ def main():
                 },
                 sys.stdout,
             )
-    except Exception:
-        return 0  # fail open, always
+    except Exception:  # noqa: BLE001 - fail open, always: a wedged guard is worse than a missed one
+        return 0
     return 0
 
 

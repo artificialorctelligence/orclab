@@ -36,8 +36,8 @@ TEMPLATE_SUFFIX = re.compile(r"\.(example|sample|template|dist|tpl)\b")
 RULES = [
     (
         re.compile(r"\bgh\s+auth\s+token\b"),
-        "`gh auth token` prints the token itself. Use `gh auth status` (self-masks) to check "
-        "auth, or capture it: TOK=$(gh auth token).",
+        ("`gh auth token` prints the token itself. Use `gh auth status` (self-masks) to check "
+        "auth, or capture it: TOK=$(gh auth token)."),
         None,
     ),
     (
@@ -45,8 +45,8 @@ RULES = [
             r"\b(op\s+read|vault\s+(kv\s+get|read)|pass\s+show|keyring\s+get"
             r"|secret-tool\s+lookup)\b"
         ),
-        "This reads a secret manager and prints the secret. Capture it instead: "
-        "SECRET=$(<the same command>), then use $SECRET without echoing it.",
+        ("This reads a secret manager and prints the secret. Capture it instead: "
+        "SECRET=$(<the same command>), then use $SECRET without echoing it."),
         None,
     ),
     (
@@ -56,9 +56,9 @@ RULES = [
     ),
     (
         re.compile(r"(^|[;&|]\s*)(env|printenv)\s*($|[|;&>])"),
-        "A bare `env`/`printenv` dumps every variable, including any credentials. For a "
+        ("A bare `env`/`printenv` dumps every variable, including any credentials. For a "
         "comparison use keys only: env | sed -E 's/=.*//'. For one variable, test presence: "
-        '[ -n "$VAR" ] && echo set.',
+        '[ -n "$VAR" ] && echo set.'),
         KEYS_ONLY,
     ),
     (
@@ -68,9 +68,9 @@ RULES = [
             r"|\bid_rsa\b|\bid_ecdsa\b|\bid_ed25519\b|\.pem\b|\.p12\b|\.pfx\b"
             r"|service[-_]account[^\s;&|]*\.json)"
         ),
-        "This file commonly holds live credentials. Redact on read instead: "
+        ("This file commonly holds live credentials. Redact on read instead: "
         "sed -E 's/((token|secret|password|api[_-]?key)[[:space:]]*[:=][[:space:]]*).*/"
-        "\\1<redacted>/I' <file>",
+        "\\1<redacted>/I' <file>"),
         None,
     ),
     (
@@ -78,14 +78,14 @@ RULES = [
             r"\b(echo|printf)\b[^;&|]*\$\{?\w*"
             r"(TOKEN|SECRET|PASSWORD|PASSWD|API_?KEY|PRIVATE_KEY|CREDENTIAL|ACCESS_KEY)\w*\}?"
         ),
-        "Echoing a credential variable puts it in the transcript permanently. To confirm it is "
-        'set without revealing it: [ -n "$VAR" ] && echo set.',
+        ("Echoing a credential variable puts it in the transcript permanently. To confirm it is "
+        'set without revealing it: [ -n "$VAR" ] && echo set.'),
         None,
     ),
     (
         re.compile(r"\bkubectl\s+get\s+secrets?\b[^;&|]*-o[= ]\s*(yaml|json)\b"),
-        "This prints secret material (base64 is not redaction). Read the one key you need and "
-        "capture it, rather than dumping the object.",
+        ("This prints secret material (base64 is not redaction). Read the one key you need and "
+        "capture it, rather than dumping the object."),
         None,
     ),
     (
@@ -105,7 +105,7 @@ def _is_captured(command, match):
     # ponytail: prefix/suffix inspection, not real shell parsing. Misses exotic forms
     # (process substitution, nested eval); upgrade to an AST parser only if that shows up.
     before = command[: match.start()].rstrip()
-    if before.endswith("$(") or before.endswith("`"):
+    if before.endswith(("$(", "`")):
         return True
     # Must be a *stdout* redirect to a file. `2>&1` and `2>/dev/null` leave stdout on screen,
     # so the fd digit and the `>&` form are both excluded — the real 2026-09-07 leak ended in
@@ -149,7 +149,7 @@ def main():
                 },
                 sys.stdout,
             )
-    except Exception:
+    except Exception:  # noqa: BLE001 - fail open, always; the reason is below
         # Fail open, always. A guard that wedges every Bash call is worse than the leak it
         # prevents, and exit 0 with no output leaves the normal permission flow untouched.
         return 0

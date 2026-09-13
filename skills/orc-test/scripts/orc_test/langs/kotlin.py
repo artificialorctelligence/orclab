@@ -36,16 +36,16 @@ def CAVEATS_FOR(root):
     build = _find_build_gradle(root)
     arcmutate = build is not None and "arcmutate" in build.read_text()
     if label and arcmutate:
-        return [f"TCE via Pitest + Arcmutate's Kotlin plugin (free for open source; this project "
+        return [(f"TCE via Pitest + Arcmutate's Kotlin plugin (free for open source; this project "
                 f"declares {label}). Arcmutate filters the junk mutants plain Pitest "
-                "produces on Kotlin bytecode."]
+                "produces on Kotlin bytecode.")]
     if label:
-        return [f"TCE is approximate (plain Pitest); this project declares {label}, so Arcmutate's "
+        return [(f"TCE is approximate (plain Pitest); this project declares {label}, so Arcmutate's "
                 "Kotlin plugin is free — add com.arcmutate:pitest-kotlin-plugin to the build to "
-                "filter the junk mutants plain Pitest produces on Kotlin bytecode."]
-    return ["TCE is approximate: plain Pitest on Kotlin bytecode reports junk mutants from compiler-"
+                "filter the junk mutants plain Pitest produces on Kotlin bytecode.")]
+    return [("TCE is approximate: plain Pitest on Kotlin bytecode reports junk mutants from compiler-"
             "generated code. Arcmutate's Kotlin plugin fixes that but needs an open-source licence, "
-            "and this project does not declare one."]
+            "and this project does not declare one.")]
 
 
 def _gradle(root):

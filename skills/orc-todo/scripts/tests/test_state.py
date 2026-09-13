@@ -48,10 +48,9 @@ def test_the_lock_is_acquired_and_released(tmp_path):
 
 def test_a_second_holder_times_out_and_names_the_first(tmp_path):
     repo = make_repo(tmp_path)
-    with state.held("first holder", cwd=repo):
-        with pytest.raises(state.LockUnavailable) as e:
-            with state.held("second", cwd=repo, timeout=0.5, poll=0.1):
-                pass
+    with state.held("first holder", cwd=repo), pytest.raises(state.LockUnavailable) as e, \
+            state.held("second", cwd=repo, timeout=0.5, poll=0.1):
+        pass
     assert e.value.info["description"] == "first holder"
     assert e.value.info["pid"] == os.getpid()
 
@@ -81,9 +80,8 @@ def test_a_dead_holder_is_reported_as_not_alive_but_never_removed(tmp_path):
     info = state.lock_info(repo)
     assert info["alive"] is False
     assert info["description"] == "ghost"
-    with pytest.raises(state.LockUnavailable):
-        with state.held("mine", cwd=repo, timeout=0.3, poll=0.1):
-            pass
+    with pytest.raises(state.LockUnavailable), state.held("mine", cwd=repo, timeout=0.3, poll=0.1):
+        pass
     assert state.lock_path(repo).exists(), "a stale lock must never be auto-cleared"
 
 

@@ -9,7 +9,7 @@ FLOOR = str(pathlib.Path(__file__).resolve().parent.parent / "model_floor.py")
 def run(tool_input, tool_name="Agent", env=None):
     """The hook's stdout for one dispatch, parsed - or None when it said nothing."""
     out = subprocess.run(
-        [sys.executable, FLOOR],
+        [sys.executable, FLOOR], check=False,
         input=json.dumps({"tool_name": tool_name, "tool_input": tool_input}),
         capture_output=True, text=True, env=env,
     )
@@ -81,7 +81,7 @@ def test_the_off_switch_disables_it(tmp_path):
 
 
 def test_malformed_input_fails_open_rather_than_wedging_every_subagent(tmp_path):
-    out = subprocess.run([sys.executable, FLOOR], input="not json",
+    out = subprocess.run([sys.executable, FLOOR], check=False, input="not json",
                          capture_output=True, text=True)
     assert out.returncode == 0
     assert out.stdout.strip() == ""

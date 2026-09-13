@@ -21,6 +21,17 @@ _PYTEST_SUMMARY = re.compile(r"(\d+) passed|(\d+) failed|(\d+) error")
 _SANDBOX = {".orclab"}
 
 
+def _target_under(m, d, root, path):
+    """The user's root-relative path as `d`-relative, or None when it is not under `d`."""
+    if path is None:
+        return None
+    target = os.path.relpath(root / path, d)
+    if target.startswith(".."):
+        print(f"{m.LABEL}: {path} is not under {d.relative_to(root)}/ — running on all of it")
+        return None
+    return target
+
+
 def _resolve(args):
     """(project root, config, [(module, dir, target)]). `dir` is where the language's marker
     sits — every tool runs from there — while reports and `.orclab/test/` stay at the root."""
@@ -36,16 +47,11 @@ def _resolve(args):
     usable = []
     for m, d in found:
         gone = m.missing(d)
+        for tool in gone:
+            print(f"{m.LABEL}: missing {tool} — {m.TOOLS[tool]} — skipped")
         if gone:
-            for tool in gone:
-                print(f"{m.LABEL}: missing {tool} — {m.TOOLS[tool]} — skipped")
             continue
-        target = None
-        if path is not None:
-            target = os.path.relpath(root / path, d)     # the user's path is root-relative
-            if target.startswith(".."):
-                print(f"{m.LABEL}: {path} is not under {d.relative_to(root)}/ — running on all of it")
-                target = None
+        target = _target_under(m, d, root, path)
         usable.append((m, d, target))
     return root, cfg, usable
 
@@ -83,14 +89,14 @@ def _run_tests(mod, d, target, cfg):
 
 
 def cmd_detect(args):
-    root, cfg, usable = _resolve(args)
+    _root, cfg, usable = _resolve(args)
     for m, d, target in usable:
         print(f"  {m.LABEL}: test command {' '.join(_test_cmd(d, m, target, cfg))}")
     return 0
 
 
 def cmd_run(args):
-    root, cfg, usable = _resolve(args)
+    _root, cfg, usable = _resolve(args)
     failed = False
     lines = []
     for m, d, target in usable:
@@ -118,8 +124,8 @@ def _coverage(mod, d, target, out):
 
 def _coverage_block(mod, cov, threshold, out):
     ok = cov.percent >= threshold
-    lines = [f"{mod.LABEL:<10} coverage {cov.percent}% ({cov.covered}/{cov.total} lines) "
-             f"{'✓' if ok else '✗ (min ' + str(threshold) + ')'}"]
+    lines = [(f"{mod.LABEL:<10} coverage {cov.percent}% ({cov.covered}/{cov.total} lines) "
+             f"{'✓' if ok else '✗ (min ' + str(threshold) + ')'}")]
     for path, pct in cov.under(threshold):
         lines.append(f"    {pct:5.1f}%  {path}")
     html = out / "html"
@@ -198,48 +204,54 @@ def _tce_line(tce, threshold):
     return f"TCE {tce['score']}% {'✓' if ok else '✗ (min ' + str(threshold) + ')'}"
 
 
+def _analyze_one(m, root, d, target, cfg, no_mutation, failed_gates):
+    """One language's coverage, TCE and lint: its analyze.json entry and its printed block.
+    (None, None) when coverage could not be measured because the tests were red."""
+    out = _out(root, m)
+    sub = d.relative_to(root)
+    cov = _coverage(m, d, target, out)
+    if cov is None:
+        return None, None
+    tce = {"skipped": True} if no_mutation else _mutation(m, root, d, target, out)
+    lint = m.lint(d, target, out)
+    lint_note = lint if isinstance(lint, str) else None
+    lint = [] if lint_note else lint
+    if isinstance(cov, dict):   # not measurable — words, not a gate failure
+        cov_result = cov
+        cov_line = f"{m.LABEL:<10} coverage not measurable — {cov['unavailable']}"
+    else:
+        cov_result = {"percent": cov.percent, "under": cov.under(cfg["coverage"])}
+        cov_line = _coverage_block(m, cov, cfg["coverage"], out)
+        if cov.percent < cfg["coverage"]:
+            failed_gates.add("coverage")
+    if "score" in tce and tce["score"] < cfg["tce"]:
+        failed_gates.add("tce")
+    entry = {"coverage": cov_result, "tce": tce,
+             "lint": [[str(sub / f.file), f.line, f.message] for f in lint], "lint_note": lint_note}
+    lint_txt = f"not run — {lint_note}" if lint_note else f"{len(lint)} finding{'s' if len(lint) != 1 else ''}"
+    lines = [cov_line, f"{'':<10} {_tce_line(tce, cfg['tce'])}    lint: {lint_txt}"]
+    lines += [f"    survived  {s[0]}:{s[1]}  {s[2]}" for s in tce.get("survivors", [])]
+    lines += [f"    lint      {sub / f.file}:{f.line}  {f.message}" for f in lint]
+    lines += [f"    note: {c}" for c in (m.CAVEATS_FOR(d) if hasattr(m, "CAVEATS_FOR") else m.CAVEATS)]
+    return entry, "\n".join(lines)
+
+
 def cmd_analyze(args):
     result = {"when": int(time.time()), "target": args.path, "languages": {}}
     failed_gates, blocks = set(), []
     root, cfg, usable = _resolve(args)
     for m, d, target in usable:
-        out = _out(root, m)
-        sub = d.relative_to(root)
         ok, _ = _run_tests(m, d, target, cfg)
         if not ok:
             print(f"{m.LABEL}: tests failed; nothing measured")
             failed_gates.add("tests")
             continue
-        cov = _coverage(m, d, target, out)
-        if cov is None:
+        entry, block = _analyze_one(m, root, d, target, cfg, args.no_mutation, failed_gates)
+        if entry is None:
             failed_gates.add("tests")
             continue
-        tce = {"skipped": True} if args.no_mutation else _mutation(m, root, d, target, out)
-        lint = m.lint(d, target, out)
-        lint_note = lint if isinstance(lint, str) else None
-        lint = [] if lint_note else lint
-        if isinstance(cov, dict):   # not measurable — words, not a gate failure
-            cov_result = cov
-            cov_line = f"{m.LABEL:<10} coverage not measurable — {cov['unavailable']}"
-        else:
-            cov_result = {"percent": cov.percent, "under": cov.under(cfg["coverage"])}
-            cov_line = _coverage_block(m, cov, cfg["coverage"], out)
-            if cov.percent < cfg["coverage"]:
-                failed_gates.add("coverage")
-        if "score" in tce and tce["score"] < cfg["tce"]:
-            failed_gates.add("tce")
-        result["languages"][m.KEY] = {
-            "coverage": cov_result,
-            "tce": tce, "lint": [[str(sub / f.file), f.line, f.message] for f in lint], "lint_note": lint_note}
-        lint_txt = f"not run — {lint_note}" if lint_note else f"{len(lint)} finding{'s' if len(lint) != 1 else ''}"
-        lines = [cov_line, f"{'':<10} {_tce_line(tce, cfg['tce'])}    lint: {lint_txt}"]
-        for s in tce.get("survivors", []):
-            lines.append(f"    survived  {s[0]}:{s[1]}  {s[2]}")
-        for f in lint:
-            lines.append(f"    lint      {sub / f.file}:{f.line}  {f.message}")
-        for c in (m.CAVEATS_FOR(d) if hasattr(m, "CAVEATS_FOR") else m.CAVEATS):
-            lines.append(f"    note: {c}")
-        blocks.append("\n".join(lines))
+        result["languages"][m.KEY] = entry
+        blocks.append(block)
     if usable:
         out_path = pathlib.Path(root) / ".orclab" / "test" / "analyze.json"
         out_path.parent.mkdir(parents=True, exist_ok=True)

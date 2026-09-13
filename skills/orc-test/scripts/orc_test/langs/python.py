@@ -28,8 +28,8 @@ MARKERS = ["pyproject.toml", "setup.py", "setup.cfg"]
 TOOLS = {"pytest": "pip install pytest", "pytest_cov": "pip install pytest-cov"}
 CAVEATS = [
     "mutmut writes its cache and a copy of the tests to mutants/; add it to .gitignore.",
-    "mutmut runs from the nearest pyproject.toml with [tool.mutmut] at or above the path and"
-    " mutates that file's source_paths; a path narrows only by picking which config runs.",
+    ("mutmut runs from the nearest pyproject.toml with [tool.mutmut] at or above the path and"
+    " mutates that file's source_paths; a path narrows only by picking which config runs."),
 ]
 SANDBOX = {"mutants", ".coverage", "__pycache__", ".pytest_cache"}   # mutmut/pytest-cov's own scratch
 
@@ -166,10 +166,9 @@ def _survivor(root, key):
             file = raw[4:].strip()
         elif (h := _HUNK.match(raw)):
             line, context = int(h.group(1)), 0
-        elif raw.startswith("-") and not raw.startswith("---"):
-            if context is not None:   # first removed line only; a multi-line statement has several
-                line += context
-                context = None        # frozen: the mutated line is found
+        elif raw.startswith("-") and not raw.startswith("---") and context is not None:
+            line += context           # first removed line only; a multi-line statement has several
+            context = None            # frozen: the mutated line is found
         elif raw.startswith("+") and not raw.startswith("+++"):
             change = raw[1:].strip()
             break
@@ -217,9 +216,8 @@ def _scan(path, rel):
             out.append(Finding(str(rel), skip.lineno, f"skipped: {node.name}"))
         if not any(isinstance(n, ast.Assert) or _is_assert_call(n) for n in body):
             out.append(Finding(str(rel), node.lineno, f"no assertion in {node.name}"))
-        for n in body:
-            if isinstance(n, ast.Call) and _dotted(n.func).endswith("sleep"):
-                out.append(Finding(str(rel), n.lineno, f"sleep in {node.name}"))
+        out += [Finding(str(rel), n.lineno, f"sleep in {node.name}")
+                for n in body if isinstance(n, ast.Call) and _dotted(n.func).endswith("sleep")]
     return out
 
 

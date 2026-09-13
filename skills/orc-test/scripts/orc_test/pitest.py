@@ -25,8 +25,6 @@ def parse(path):
         elif status in _ALIVE:
             total += 1
             pkg = m.findtext("mutatedClass", "").rsplit(".", 1)[0].replace(".", "/")
-            desc = m.findtext("description", "")
-            if status == "NO_COVERAGE":
-                desc += " (no test reaches it)"
+            desc = m.findtext("description", "") + (" (no test reaches it)" if status == "NO_COVERAGE" else "")
             survivors.append(Survivor(f"{pkg}/{m.findtext('sourceFile')}", int(m.findtext("lineNumber", "0")), desc))
     return Mutation(killed, total, survivors)

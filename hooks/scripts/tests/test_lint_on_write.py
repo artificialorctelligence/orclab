@@ -21,7 +21,7 @@ def run(file_path, tool_name="Write", bin_dir=None, env_extra=None):
     env = dict(os.environ, **(env_extra or {}))
     if bin_dir is not None:
         env["PATH"] = f"{bin_dir}:{env['PATH']}"
-    return subprocess.run([sys.executable, HOOK],
+    return subprocess.run([sys.executable, HOOK], check=False,
                           input=json.dumps({"tool_name": tool_name, "tool_input": {"file_path": str(file_path)}}),
                           capture_output=True, text=True, env=env)
 

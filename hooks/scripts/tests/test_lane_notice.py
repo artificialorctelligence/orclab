@@ -7,7 +7,7 @@ NOTICE = str(pathlib.Path(__file__).resolve().parent.parent / "lane_notice.py")
 
 
 def notice(repo):
-    out = subprocess.run([sys.executable, NOTICE], input=json.dumps({"hook_event_name": "SessionStart"}),
+    out = subprocess.run([sys.executable, NOTICE], check=False, input=json.dumps({"hook_event_name": "SessionStart"}),
                          capture_output=True, text=True, cwd=str(repo))
     assert out.returncode == 0
     return out.stdout
@@ -64,6 +64,6 @@ def test_a_corrupt_lane_file_speaks_up_rather_than_going_silent(tmp_path):
 
 
 def test_outside_a_git_repo_it_says_nothing_and_exits_clean(tmp_path):
-    out = subprocess.run([sys.executable, NOTICE], input="{}", capture_output=True,
+    out = subprocess.run([sys.executable, NOTICE], check=False, input="{}", capture_output=True,
                          text=True, cwd=str(tmp_path))
     assert out.returncode == 0 and out.stdout.strip() == ""

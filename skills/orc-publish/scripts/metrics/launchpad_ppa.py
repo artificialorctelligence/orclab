@@ -93,12 +93,12 @@ def report(counts):
     lines = []
     for (package, version), total in sorted(by_version.items()):
         lines.append(f"  {package} {version}: {total}")
-    lines.append(f"total: {sum(by_version.values())} across {len(counts)} publications")
-    lines.append(
-        "note: Launchpad counts .deb fetches per (version, series, architecture) publication, "
-        "not installs and not people - mirrors and indexers are included, which is why "
-        "architectures with no plausible users still report downloads."
-    )
+    lines += [
+        f"total: {sum(by_version.values())} across {len(counts)} publications",
+        ("note: Launchpad counts .deb fetches per (version, series, architecture) publication, "
+         "not installs and not people - mirrors and indexers are included, which is why "
+         "architectures with no plausible users still report downloads."),
+    ]
     return "\n".join(lines)
 
 

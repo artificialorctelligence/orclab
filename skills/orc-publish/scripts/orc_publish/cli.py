@@ -119,8 +119,7 @@ def _preflight_plan_lines(leaf, default_timeout):
     if leaf.preflight:
         result = _preflight_plan_result(leaf, default_timeout)
         refused = result not in (PLAN_CLEAN, PLAN_DEFERRED)
-        lines.append(f"  preflight: {', '.join(leaf.preflight)}")
-        lines.append(f"  preflight result: {result}")
+        lines += [f"  preflight: {', '.join(leaf.preflight)}", f"  preflight result: {result}"]
     warning = action_shape_warning(leaf)
     if warning:
         lines.append(f"  warning: {warning}")
@@ -144,8 +143,8 @@ def plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS, command_key="action"):
     for leaf in leaves:
         command = leaf.command(command_key)
         if command:
-            lines.append(f"{leaf.dotted_path}: {command}")
-            lines.append(f"  timeout: {effective_timeout(leaf, default_timeout)}s")
+            lines += [f"{leaf.dotted_path}: {command}",
+                      f"  timeout: {effective_timeout(leaf, default_timeout)}s"]
             if command_key == GATED_COMMAND_KEY:
                 more, leaf_refused = _preflight_plan_lines(leaf, default_timeout)
                 lines.extend(more)
@@ -493,8 +492,8 @@ def format_confirm_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
     lines = []
     for leaf in leaves:
         if leaf.confirm_command:
-            lines.append(f"{leaf.dotted_path}: {leaf.confirm_command}")
-            lines.append(f"  timeout: {effective_timeout(leaf, default_timeout)}s")
+            lines += [f"{leaf.dotted_path}: {leaf.confirm_command}",
+                      f"  timeout: {effective_timeout(leaf, default_timeout)}s"]
         elif leaf.confirm_url:
             lines.append(f"{leaf.dotted_path}: (needs a human) {leaf.confirm_url}")
         else:

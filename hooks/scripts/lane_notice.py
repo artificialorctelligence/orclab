@@ -8,6 +8,7 @@ the lane record consulted without anyone remembering to.
 Silent unless there is something to say. A hook that speaks every session gets tuned out.
 """
 
+import contextlib
 import json
 import pathlib
 import sys
@@ -55,14 +56,12 @@ def notice():
 
 
 def main():
-    try:
-        json.load(sys.stdin)
-    except Exception:
-        pass
+    with contextlib.suppress(ValueError, OSError):
+        json.load(sys.stdin)   # drain the payload; nothing in it is needed
     try:
         text = notice()
-    except Exception:
-        return 0  # fail open
+    except Exception:  # noqa: BLE001 - fail open: a session-start hook must never block the session
+        return 0
     if text:
         print(text)
     return 0

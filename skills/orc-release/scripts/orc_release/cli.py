@@ -237,7 +237,7 @@ def cmd_abort(root, _args):
     state = _require_state(root)
     if state is None:
         return 1
-    text, steps = _load_doc(root)
+    _text, steps = _load_doc(root)
     marked = {s.number for s in (steps or []) if s.is_irreversible}
     completed = state.get("completed", [])
 
@@ -361,7 +361,7 @@ def cmd_version_verify(root, _args):
     # cursor knows the target, which is the whole reason it records it.
     state = st.load_state(root)
     if state is not None and versions:
-        found = sorted(set(versions.values()))[0]
+        found = min(set(versions.values()))
         if found != state["version"]:
             print(
                 f"error: version files agree on {found}, but this release targets "

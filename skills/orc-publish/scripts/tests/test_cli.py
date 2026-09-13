@@ -160,7 +160,7 @@ def test_execute_plan_surfaces_successful_stdout_in_the_result(tmp_path):
     )
     leaves = build_plan(root, [])
     results = execute_plan(leaves)
-    leaf, status, detail = results[0]
+    _leaf, status, detail = results[0]
     assert status == "success"
     assert "hello-from-a" in detail
 
@@ -221,7 +221,7 @@ def test_execute_plan_details_an_action_less_leaf_as_not_yet_actionable(tmp_path
     root = load_tree(write_yaml(tmp_path, "channels.yaml", "placeholder: {}"))
     leaves = build_plan(root, [])
     results = execute_plan(leaves)
-    leaf, status, detail = results[0]
+    _leaf, status, detail = results[0]
     assert status == "not attempted"
     assert detail == "known channel, not yet actionable"
 
@@ -254,7 +254,7 @@ def test_execute_plan_reports_a_hanging_action_as_timed_out(tmp_path):
     )
     leaves = build_plan(root, [])
     results = execute_plan(leaves)
-    leaf, status, detail = results[0]
+    _leaf, status, detail = results[0]
     assert status == "timed out"
     assert "timed out after 1s" in detail
     # "sleep 5" produces no output at all, so "no output captured" is honest here - it's a
@@ -274,7 +274,7 @@ def test_execute_plan_surfaces_output_captured_before_a_timeout(tmp_path):
         )
     )
     results = execute_plan(build_plan(root, []))
-    leaf, status, detail = results[0]
+    _leaf, status, detail = results[0]
     assert status == "timed out"
     assert "timed out after 1s" in detail
     assert "hello" in detail
@@ -371,7 +371,7 @@ def test_execute_plan_kills_the_whole_process_group_on_timeout(tmp_path):
     started = time.monotonic()
     results = execute_plan(build_plan(root, []))
     elapsed = time.monotonic() - started
-    leaf, status, detail = results[0]
+    _leaf, status, _detail = results[0]
     assert status == "timed out"
 
     assert_process_gone(int(pidfile.read_text()))
@@ -531,7 +531,7 @@ def test_a_failing_prepare_fails_the_leaf_and_the_action_never_runs(tmp_path):
             f'  action: "touch {tmp_path}/published"\n',
         )
     )
-    leaf, status, detail = execute_plan(build_plan(root, []))[0]
+    _leaf, status, detail = execute_plan(build_plan(root, []))[0]
     assert status == "failed"
     assert "build-broke" in detail
     assert not (tmp_path / "published").exists()
@@ -546,7 +546,7 @@ def test_a_prepare_that_hangs_times_out_and_the_action_never_runs(tmp_path):
             f'  action: "touch {tmp_path}/published"\n',
         )
     )
-    leaf, status, detail = execute_plan(build_plan(root, []))[0]
+    _leaf, status, detail = execute_plan(build_plan(root, []))[0]
     assert status == "timed out"
     assert "prepare" in detail
     assert not (tmp_path / "published").exists()
@@ -567,7 +567,7 @@ def test_a_dirty_artifact_refuses_and_the_action_never_runs(tmp_path):
             f'  action: "touch {tmp_path}/published"\n',
         )
     )
-    leaf, status, detail = execute_plan(build_plan(root, []))[0]
+    _leaf, status, detail = execute_plan(build_plan(root, []))[0]
     assert status == "refused"
     assert "no-vcs" in detail
     assert not (tmp_path / "published").exists()
@@ -601,7 +601,7 @@ def test_a_missing_artifact_refuses(tmp_path):
             '  action: "true"\n',
         )
     )
-    leaf, status, detail = execute_plan(build_plan(root, []))[0]
+    _leaf, status, detail = execute_plan(build_plan(root, []))[0]
     assert status == "refused"
     assert "not found" in detail
 
@@ -616,7 +616,7 @@ def test_an_unreadable_format_refuses_naming_the_format_not_a_rule(tmp_path):
             '  action: "true"\n',
         )
     )
-    leaf, status, detail = execute_plan(build_plan(root, []))[0]
+    _leaf, status, detail = execute_plan(build_plan(root, []))[0]
     assert status == "refused"
     assert "unsupported" in detail.lower()
     assert "no-vcs" not in detail
@@ -631,14 +631,14 @@ def test_an_unknown_rule_name_refuses(tmp_path):
             '  action: "true"\n',
         )
     )
-    leaf, status, detail = execute_plan(build_plan(root, []))[0]
+    _leaf, status, detail = execute_plan(build_plan(root, []))[0]
     assert status == "refused"
     assert "no-such-rule" in detail
 
 
 def test_preflight_with_no_artifact_refuses(tmp_path):
     root = load_tree(_leaf_yaml(tmp_path, '  preflight: [no-vcs]\n  action: "true"\n'))
-    leaf, status, detail = execute_plan(build_plan(root, []))[0]
+    _leaf, status, detail = execute_plan(build_plan(root, []))[0]
     assert status == "refused"
     assert detail == "preflight is declared but no artifact: is set - nothing to inspect"
 
@@ -1079,7 +1079,7 @@ def test_the_action_path_still_refuses_that_same_leaf(tmp_path):
             """,
         )
     )
-    leaf, status, detail = execute_plan(build_plan(root, ["ppa.noble"]))[0]
+    _leaf, status, detail = execute_plan(build_plan(root, ["ppa.noble"]))[0]
     assert status == "refused"
     assert "artifact not found" in detail
 

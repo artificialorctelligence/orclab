@@ -220,7 +220,7 @@ def test_write_changelog_is_idempotent_for_the_same_version(tmp_path):
 def test_write_changelog_produces_a_parseable_signature_line(tmp_path):
     p = write(tmp_path, "debian/changelog", CHANGELOG)
     write_version(str(tmp_path), "debian/changelog", "0.3.0", body="* New.")
-    sig = [line for line in p.read_text().splitlines() if line.startswith(" -- ")][0]
+    sig = next(line for line in p.read_text().splitlines() if line.startswith(" -- "))
     # Exactly one leading space, then "-- name <email>", then TWO spaces, then the date.
     assert re.match(r"^ -- .+ <.+>  \w{3}, \d{2} \w{3} \d{4} \d{2}:\d{2}:\d{2} [+-]\d{4}$", sig)
 

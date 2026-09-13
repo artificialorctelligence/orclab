@@ -13,8 +13,8 @@ LABEL = "C#"
 SOURCE_EXT = ".cs"
 MARKERS = ["*.csproj", "*.sln"]
 TOOLS = {"dotnet": "install the .NET SDK (https://dotnet.microsoft.com/download)"}
-CAVEATS = ["Stryker.NET 5.0.0 targets .NET 10; on an older SDK pin 4.16.0 "
-           "(dotnet tool install -g dotnet-stryker --version 4.16.0)."]
+CAVEATS = [("Stryker.NET 5.0.0 targets .NET 10; on an older SDK pin 4.16.0 "
+           "(dotnet tool install -g dotnet-stryker --version 4.16.0).")]
 SANDBOX = {".orclab", "StrykerOutput", "bin", "obj"}   # coverlet/Stryker.NET/dotnet build output
 
 _COLLECT = "--collect:XPlat Code Coverage"

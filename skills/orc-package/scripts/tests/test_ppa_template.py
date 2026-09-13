@@ -34,7 +34,7 @@ def run(script, *args, home, extra_env=None):
     env = {"HOME": str(home), "PATH": "/usr/bin:/bin"}
     env.update(extra_env or {})
     return subprocess.run(
-        [sys.executable, "-S", str(script), *args],
+        [sys.executable, "-S", str(script), *args], check=False,
         capture_output=True, text=True, env=env,
     )
 
