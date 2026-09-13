@@ -118,6 +118,30 @@ it first. Both are in the Qt for Python deployment table as cross-platform optio
 Coverage, mutation testing and test lint for this language: `skills/orc-test/languages/python.md`
 — `/orc-test` reads it.
 
+## Lint — where code-discipline lands
+
+`code-discipline`'s checkable rules — nesting, function length, swallowed errors, zero warnings —
+in `pyproject.toml`, confirmed 2026-09-13 against ruff 0.16.7's and pyright 1.1.414's own docs:
+
+```toml
+[tool.ruff]
+preview = true                      # PLR1702 has been a preview rule since 0.1.15
+[tool.ruff.lint]
+extend-select = ["PLR1702", "PLR0915", "E722", "S110"]
+[tool.ruff.lint.pylint]
+max-nested-blocks = 2               # ruff's default is 5
+max-statements = 50                 # ruff's default; statements, not lines — about a printed page
+[tool.pyright]
+typeCheckingMode = "strict"         # default is "standard"
+```
+
+`PLR1702` too-many-nested-blocks, `PLR0915` too-many-statements, `E722` bare-except (on by
+default), `S110` try-except-pass (*"consider logging the exception"*). Python has no compiler
+warnings: ruff and pyright *are* the analyzer, both exit non-zero on a finding, and that is the
+warnings-as-errors switch; `python -W error` in the test command promotes the runtime
+`DeprecationWarning`s. Rules 2, 3 and 5 (loop exits, closing on the error path, checks that
+survive release) have no linter — they are reviewed, not linted.
+
 ## Presence
 
 The tray icon is how a desktop app stays visible and reachable when none of its windows is in
@@ -237,6 +261,7 @@ Direct download of the `.exe`/`.app` is a channel with no store rules at all.
 
 ## Sources (live on 2026-09-12)
 
+- Lint — where code-discipline lands (2026-09-13): `https://docs.astral.sh/ruff/rules/`, `https://docs.astral.sh/ruff/settings/`, `https://raw.githubusercontent.com/microsoft/pyright/main/docs/configuration.md`; versions from `https://pypi.org/pypi/<name>/json`
 - Python: `https://www.python.org/downloads/`; tkinter docs `https://docs.python.org/3/library/tkinter.html`; sqlite3 docs `https://docs.python.org/3/library/sqlite3.html`; What's New 3.13/3.14 `https://docs.python.org/3/whatsnew/3.13.html`, `.../3.14.html`; bundled Tk/SQLite `https://raw.githubusercontent.com/python/cpython/3.14/PCbuild/get_externals.bat`, `.../3.14/Mac/BuildScript/build-installer.py`; macOS notes `https://docs.python.org/3/using/mac.html`
 - PySide6: `https://pypi.org/project/PySide6/` (+ `/pypi/PySide6/json` for wheel tags); getting started `https://doc.qt.io/qtforpython-6/gettingstarted.html`, FAQ `https://doc.qt.io/qtforpython-6/faq/whatisqt.html`; deployment `https://doc.qt.io/qtforpython-6/deployment/index.html`, `.../deployment-pyside6-deploy.html`, `.../deployment-pyinstaller.html`, `.../deployment-briefcase.html`; Qt 6.11 platforms `https://doc.qt.io/qt-6/supported-platforms.html`; `https://doc.qt.io/qt-6/qsystemtrayicon.html`; `https://doc.qt.io/qt-6/qstyle.html`; LGPL `https://doc.qt.io/qt-6/lgpl.html`, `https://www.qt.io/qt-licensing`
 - GTK / PyGObject: `https://pypi.org/project/PyGObject/`; `https://pygobject.gnome.org/getting_started.html`; `https://www.gtk.org/docs/installations/windows/`, `.../macos/`, `https://www.gtk.org/docs/language-bindings/python/`; `https://docs.gtk.org/gtk4/` (4.23.4 docs; 4.24.0 tagged 2026-09-11 per GitLab releases API), `https://docs.gtk.org/gtk3/class.StatusIcon.html`, `https://docs.gtk.org/gtk4/migrating-3to4.html`; GTK licence `https://gitlab.gnome.org/GNOME/gtk/-/raw/main/COPYING`; AppIndicator libraries `https://github.com/AyatanaIndicators/libayatana-appindicator` (marked OBSOLETE), `https://github.com/AyatanaIndicators/libayatana-appindicator-glib`

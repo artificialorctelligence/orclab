@@ -132,6 +132,24 @@ and macOS are a bare RN project per OS trailing RN by three to six minors, and *
 no maintained React Native target** — a Linux tick is served by the web build or not at all, which
 is what keeps Flutter the default whenever Linux is ticked.
 
+## Lint — where code-discipline lands
+
+Expo's template lints with ESLint through `eslint-config-expo` (`npx expo lint`); the three
+rules go in `eslint.config.js`, confirmed 2026-09-13 against ESLint 10.10.0's rule docs:
+
+```js
+rules: {
+  "max-depth": ["error", 2],                                         // default 4
+  "max-lines-per-function": ["error", { max: 60, skipBlankLines: true, skipComments: true }],  // default 50
+  "no-empty": ["error", { allowEmptyCatch: false }],                 // a commented catch still passes
+}
+```
+
+`no-empty` exempts a block that *"contains a comment"* — that is `code-discipline` rule 6's
+"named, commented suppression"; `allowEmptyCatch: false` refuses only the bare one. Every rule at
+`"error"`, and `eslint --max-warnings 0` for the CLI; typescript-eslint 8.70.0's
+`strictTypeChecked` config is the type-level equivalent. Rules 2, 3 and 5 are reviewed, not linted.
+
 ## Presence
 
 Presence is how the app stays visible and reachable when it is not in front: on a phone a
@@ -195,6 +213,7 @@ native project — so each check runs on the generated file, after `npx expo pre
 
 ## Sources (live on 2026-09-12)
 
+- Lint — where code-discipline lands (2026-09-13): `https://raw.githubusercontent.com/eslint/eslint/main/docs/src/rules/{max-depth,max-lines-per-function,no-empty}.md`; versions from `https://registry.npmjs.org/<name>/latest`
 - Versions: `https://registry.npmjs.org/<pkg>` for `react-native`, `expo`, `react-native-web`, `react-native-windows`, `react-native-macos`, `expo-notifications`, `expo-sqlite`, `expo-router`, `jest-expo`, `@react-native-async-storage/async-storage`; `https://nodejs.org/dist/index.json`; `https://raw.githubusercontent.com/expo/expo/sdk-57/packages/expo/bundledNativeModules.json`
 - React Native: `https://reactnative.dev/` (front page), `/docs/environment-setup`, `/docs/getting-started-without-a-framework`, `/docs/intro-react-native-components`, `/docs/platform-specific-code`, `/docs/out-of-tree-platforms`, `/blog` (0.87 2026-08-11, 0.82 2025-10-08, 0.80 2025-06-12), `/blog/2026/08/11/react-native-0.87`, `/blog/2025/01/21/version-0.77` (16 KB); `https://raw.githubusercontent.com/facebook/react-native/0.86-stable/packages/react-native/gradle/libs.versions.toml` (and `0.87-stable`)
 - Expo docs (each also read as `.md`): `https://docs.expo.dev/versions/latest`, `/guides/new-architecture`, `/get-started/create-a-project`, `/get-started/start-developing`, `/workflow/continuous-native-generation` (`/workflow/prebuild` is a 404), `/guides/local-app-development`, `/guides/local-app-production`, `/build-reference/apk`, `/build-reference/app-versions`, `/app-signing/local-credentials`, `/develop/unit-testing`, `/workflow/web`, `/guides/publishing-websites`, `/guides/dom-components`, `/guides/monorepos`, `/router/introduction`, `/versions/latest/sdk/notifications`, `/versions/latest/sdk/sqlite`, `/versions/latest/sdk/async-storage`, `/versions/latest/config/app`, `/guides/apple-privacy`, `/versions/latest/sdk/build-properties`; `https://expo.dev/changelog/sdk-57`

@@ -130,6 +130,29 @@ Alternatives (each confirmed live 2026-09-12), with the one thing that would mak
   project"* and its pipeline runs `npm install` and `fastlane gym` in `ios/`; a plain Xcode
   project has no seat there.
 
+## Lint — where code-discipline lands
+
+SwiftLint 0.65.1 (`brew install swiftlint`; a build phase in Xcode or `swiftlint lint` in CI).
+Its defaults are close already, confirmed 2026-09-13 in its rule sources:
+
+```yaml
+# .swiftlint.yml
+nesting:
+  function_level: { warning: 2, error: 2 }         # default is warning-only at 2, no error level
+function_body_length: { warning: 60, error: 60 }   # default warning 50 / error 100
+custom_rules:
+  empty_catch:               # SwiftLint has no built-in empty-catch rule
+    regex: 'catch\s*\{\s*\}'
+    message: "an empty catch swallows the error — handle it, or name and comment the suppression"
+    severity: error
+```
+
+Warnings-as-errors is the compiler's: `-warnings-as-errors` (`swiftc`'s `Options.td`), set in
+Xcode as `SWIFT_TREAT_WARNINGS_AS_ERRORS = YES` in the build settings (default `NO` — Apple's
+`Swift.xcspec` in swift-build, confirmed 2026-09-13). Rules 2, 3 and 5 (`defer`, `precondition`
+over `assert` — the Assert.swift docs say *"To check for invalid usage in Release builds, see
+precondition"*) are reviewed, not linted.
+
 ## Presence
 
 No project has been built with these facets yet; the first one corrects them. Presence is how
@@ -273,6 +296,7 @@ Store ingredient applies to it unchanged, including the privacy manifest and the
 
 ## Sources (live on 2026-09-11; facets and no-Mac builds 2026-09-12)
 
+- Lint — where code-discipline lands (2026-09-13): `https://raw.githubusercontent.com/realm/SwiftLint/main/Source/SwiftLintBuiltInRules/Rules/{Metrics/NestingRule,RuleConfigurations/NestingConfiguration,Metrics/FunctionBodyLengthRule}.swift`, `.../Models/BuiltInRules.swift` (no empty-catch rule), `https://raw.githubusercontent.com/swiftlang/swift/main/include/swift/Option/Options.td` (`-warnings-as-errors`), `https://raw.githubusercontent.com/swiftlang/swift-build/main/Sources/SWBUniversalPlatform/Specs/Swift.xcspec`, `https://raw.githubusercontent.com/swiftlang/swift/main/stdlib/public/core/Assert.swift`
 - Current releases: `https://developer.apple.com/news/releases/`; Xcode 27 and 26 release notes
   under `https://developer.apple.com/documentation/xcode-release-notes/`
 - App Store minimum Xcode: `https://developer.apple.com/news/upcoming-requirements/`

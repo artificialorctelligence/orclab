@@ -117,6 +117,50 @@ Tests: Vitest — *"a next generation testing framework powered by Vite"*, readi
 pytest with FastAPI's `TestClient` (*"the testing functions are normal `def`, not `async def`"*).
 Coverage, mutation and test lint: `skills/orc-test/languages/javascript.md` and `python.md`.
 
+## Lint — where code-discipline lands
+
+The template ships `.oxlintrc.json` and `npm run lint` is `oxlint` (oxlint 1.82.0; the three rules
+are its ports of ESLint's, confirmed 2026-09-13 in `oxc_linter/src/rules/eslint/`). Add:
+
+```json
+"rules": {
+  "max-depth": ["error", { "max": 2 }],
+  "max-lines-per-function": ["error", { "max": 60, "skipBlankLines": true, "skipComments": true }],
+  "no-empty": ["error", { "allowEmptyCatch": false }]
+}
+```
+
+ESLint's own defaults, which oxlint mirrors: `max-depth` 4, `max-lines-per-function` 50, and
+`no-empty` exempts a `catch` that *"contains a comment"* — that exemption is `code-discipline`
+rule 6's "named, commented suppression", so keep it; `allowEmptyCatch: false` only refuses the
+*uncommented* one. Every rule at `"error"` — a linter has no separate warnings-as-errors switch,
+and `oxlint --deny-warnings` is the CLI form. TypeScript has errors only; `"strict": true` in
+`tsconfig` is already set by the template. Rules 2, 3 and 5 are reviewed, not linted.
+
+### The FastAPI back end
+
+The same rules for the Python half, in `pyproject.toml` — confirmed 2026-09-13 against ruff
+0.16.7's and pyright 1.1.414's own docs:
+
+```toml
+[tool.ruff]
+preview = true                      # PLR1702 has been a preview rule since 0.1.15
+[tool.ruff.lint]
+extend-select = ["PLR1702", "PLR0915", "E722", "S110"]
+[tool.ruff.lint.pylint]
+max-nested-blocks = 2               # ruff's default is 5
+max-statements = 50                 # ruff's default; statements, not lines — about a printed page
+[tool.pyright]
+typeCheckingMode = "strict"         # default is "standard"
+```
+
+`PLR1702` too-many-nested-blocks, `PLR0915` too-many-statements, `E722` bare-except (on by
+default), `S110` try-except-pass (*"consider logging the exception"*). Python has no compiler
+warnings: ruff and pyright *are* the analyzer, both exit non-zero on a finding, and that is the
+warnings-as-errors switch; `python -W error` in the test command promotes the runtime
+`DeprecationWarning`s. Rules 2, 3 and 5 (loop exits, closing on the error path, checks that
+survive release) have no linter — they are reviewed, not linted.
+
 ## Presence
 
 Presence is how the app reaches the person when its tab is not in front — or is closed. A web page
@@ -175,6 +219,7 @@ are deliberately parked (v18 spec §6); no default here.
 
 ## Sources (live on 2026-09-12)
 
+- Lint — where code-discipline lands (2026-09-13): `https://raw.githubusercontent.com/oxc-project/oxc/main/crates/oxc_linter/src/rules/eslint/{max_depth,max_lines_per_function,no_empty}.rs`, `.../apps/oxlint/src/command/lint.rs` (`--deny-warnings`), `https://raw.githubusercontent.com/vitejs/vite/main/packages/create-vite/template-react-ts/_oxlintrc.json`; ESLint defaults `https://raw.githubusercontent.com/eslint/eslint/main/docs/src/rules/{max-depth,max-lines-per-function,no-empty}.md`; `https://docs.astral.sh/ruff/rules/`, `https://docs.astral.sh/ruff/settings/`, `https://raw.githubusercontent.com/microsoft/pyright/main/docs/configuration.md`; versions from `https://pypi.org/pypi/<name>/json`
 - Versions: `https://registry.npmjs.org/<pkg>` for `react`, `vite`, `create-vite`, `vitest`, `next`, `react-router`, `jest`; `https://nodejs.org/dist/index.json`; `https://pypi.org/pypi/<pkg>/json` for `fastapi`, `django`, `uvicorn`, `sqlmodel`, `sqlalchemy`, `pytest`; `https://www.python.org/downloads/`; `https://react.dev/versions`
 - React: `https://react.dev/learn/creating-a-react-app`, `/learn/build-a-react-app-from-scratch`, `/learn` (Quick Start), `/learn/thinking-in-react`
 - Vite: `https://vite.dev/guide/`, `/config/server-options`, `/guide/static-deploy`; template files via `https://api.github.com/repos/vitejs/vite/contents/packages/create-vite/template-react-ts` and `https://raw.githubusercontent.com/vitejs/vite/main/packages/create-vite/template-react-ts/{package.json,_gitignore}`; `https://vitest.dev/guide/`

@@ -80,8 +80,9 @@ stack, confirmed against each toolchain's docs 2026-09-13: Kotlin `allWarningsAs
 C# `<TreatWarningsAsErrors>`; Swift `-warnings-as-errors`; Dart `analysis_options.yaml` severity
 overrides; GDScript `debug/gdscript/warnings/*` in `project.godot` (0 ignore, 1 warn, 2 error);
 JS/TS ESLint rules at `error`; Python has no compiler warnings — ruff and pyright are the
-analyzer, `-W error` for the runtime ones. Each `stack-*` skill says where the switch lands in
-its scaffold as that stack's first project sets it.
+analyzer, `-W error` for the runtime ones. Each `stack-*` skill's `## Lint — where code-discipline lands` section has the config: the
+switch, plus the linter rules for nesting, function length and swallowed errors where that
+language's tooling has them (Dart and GDScript have no free nesting/length rule — said there).
 
 ## What this is not
 

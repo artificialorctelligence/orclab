@@ -102,6 +102,30 @@ runs the same `xcode-project build-ipa` inside `iosApp/`. Coverage, mutation tes
 `skills/orc-test/languages/kotlin.md` (shared module, Android app) and
 `skills/orc-test/languages/swift.md` (iOS app) — `/orc-test` reads them.
 
+## Lint — where code-discipline lands
+
+Kotlin's own switch is in the Gradle build; the shape rules are detekt's (v1.23.8), whose default
+config already carries all four, confirmed 2026-09-13 against `default-detekt-config.yml`:
+
+```kotlin
+// build.gradle.kts
+kotlin { compilerOptions { allWarningsAsErrors.set(true) } }   // "Report an error if there are any warnings"
+```
+
+```yaml
+# config/detekt/detekt.yml
+complexity:
+  NestedBlockDepth: { active: true, allowedDepth: 2 }   # detekt's default is 4
+  LongMethod: { active: true, allowedLines: 60 }         # detekt's default, kept
+exceptions:
+  EmptyCatchBlock: { active: true }        # exempts `_`, `ignore*`, `expected*` names — the named suppression
+  SwallowedException: { active: true }     # a caught exception neither rethrown nor used
+```
+
+Apply the detekt Gradle plugin and `./gradlew detekt` joins the check before any build. Rules 2,
+3 and 5 (loop exits, `use {}` on the error path, `require`/`check` over `assert`) are reviewed,
+not linted.
+
 ## Presence
 
 Presence is how the app stays visible and reachable when it is not in front — a notification on
@@ -187,6 +211,7 @@ multiplatform library calls on iOS goes in the *app's* `PrivacyInfo.xcprivacy` (
 
 ## Sources (live on 2026-09-12)
 
+- Lint — where code-discipline lands (2026-09-13): `https://raw.githubusercontent.com/detekt/detekt/main/detekt-core/src/main/resources/default-detekt-config.yml`, `https://kotlinlang.org/docs/gradle-compiler-options.html` (`allWarningsAsErrors`); detekt release from the GitHub releases API
 - Google's status and library table: `https://developer.android.com/kotlin/multiplatform`; Room 3 releases: `https://developer.android.com/jetpack/androidx/releases/room3`; add to an existing project: `https://developer.android.com/kotlin/multiplatform/migrate`; Room: `https://developer.android.com/kotlin/multiplatform/room`; DataStore: `https://developer.android.com/kotlin/multiplatform/datastore`
 - Migration guide (day-one answer): `https://kotlinlang.org/docs/multiplatform/multiplatform-integrate-in-existing-app.html`
 - Toolchain: `https://kotlinlang.org/docs/multiplatform/multiplatform-compatibility-guide.html`, `https://kotlinlang.org/docs/releases.html`, `https://kotlinlang.org/docs/multiplatform/quickstart.html`, `https://kotlinlang.org/docs/multiplatform/recommended-ides.html`, `https://blog.jetbrains.com/kotlin/2025/02/kotlin-multiplatform-tooling-shifting-gears/` (Fleet)

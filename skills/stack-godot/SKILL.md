@@ -68,6 +68,29 @@ Coverage, mutation testing and test lint for this language: GDScript:
 `skills/orc-test/languages/gdscript.md`; C#: `skills/orc-test/languages/csharp.md` — `/orc-test`
 reads them.
 
+## Lint — where code-discipline lands (GDScript)
+
+gdlint (gdtoolkit 4.5.0) checks names, `max-returns` (6), `max-public-methods` (20),
+`function-arguments-number` (10), `max-file-lines` (1000) and `max-line-length` (100); its config
+lists `max-nested-blocks` and `max-statements` as **commented-out, unimplemented** keys — confirmed
+2026-09-13 in `gdtoolkit/linter/__init__.py`. So nesting and function length are reviewed, not
+linted, in GDScript; GDScript has no `try`/`catch`, so rule 6 is "check the return of what can
+fail" and has no lint either. What GDScript does have is the engine's own warning system — 49
+per-warning severities in `project.godot`, `0` ignore / `1` warn / `2` error:
+
+```ini
+[debug]
+gdscript/warnings/enable=true
+gdscript/warnings/unused_variable=2
+gdscript/warnings/unused_parameter=2
+gdscript/warnings/untyped_declaration=2      # the one that makes the type checker bite
+gdscript/warnings/return_value_discarded=2   # rule 6's nearest lint: a discarded Error return
+```
+
+`gdlint .` in the check before any export; a `2` severity fails the editor's parse, headless too.
+The .NET edition's C# follows `stack-unity`'s section. Rules 2, 3 and 5 (`assert` is *"only
+executed in debug builds"* — `push_error` and return) are reviewed.
+
 ## Presence
 
 Not researched; unlikely to be needed.
@@ -210,6 +233,7 @@ default; arm64 if a Pi 5 could run it) and ship.
 
 ## Sources (live on 2026-09-11; facets 2026-09-12)
 
+- Lint — where code-discipline lands (2026-09-13): `https://raw.githubusercontent.com/Scony/godot-gdscript-toolkit/master/gdtoolkit/linter/__init__.py` (`max-nested-blocks`/`max-statements` commented out), `https://pypi.org/pypi/gdtoolkit/json`, `https://docs.godotengine.org/en/stable/classes/class_projectsettings.html` (`debug/gdscript/warnings/*`), `https://docs.godotengine.org/en/stable/classes/class_@gdscript.html` (`assert`); C# as in `stack-unity`
 - Download / current version: `https://godotengine.org/download/linux/`
 - Exporting for Android: `https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_android.html`;
   Android preset options: `https://docs.godotengine.org/en/stable/classes/class_editorexportplatformandroid.html`

@@ -84,6 +84,30 @@ traces are readable.
 Coverage, mutation testing and test lint for this language: `skills/orc-test/languages/kotlin.md`
 — `/orc-test` reads it.
 
+## Lint — where code-discipline lands
+
+Kotlin's own switch is in the Gradle build; the shape rules are detekt's (v1.23.8), whose default
+config already carries all four, confirmed 2026-09-13 against `default-detekt-config.yml`:
+
+```kotlin
+// build.gradle.kts
+kotlin { compilerOptions { allWarningsAsErrors.set(true) } }   // "Report an error if there are any warnings"
+```
+
+```yaml
+# config/detekt/detekt.yml
+complexity:
+  NestedBlockDepth: { active: true, allowedDepth: 2 }   # detekt's default is 4
+  LongMethod: { active: true, allowedLines: 60 }         # detekt's default, kept
+exceptions:
+  EmptyCatchBlock: { active: true }        # exempts `_`, `ignore*`, `expected*` names — the named suppression
+  SwallowedException: { active: true }     # a caught exception neither rethrown nor used
+```
+
+Apply the detekt Gradle plugin and `./gradlew detekt` joins the check before any build. Rules 2,
+3 and 5 (loop exits, `use {}` on the error path, `require`/`check` over `assert`) are reviewed,
+not linted.
+
 ## Presence
 
 No project has been built with these facets yet; the first one corrects them. Presence is how
@@ -228,6 +252,7 @@ own Gradle export; the Play ingredient applies to it unchanged.
 
 ## Sources (live on 2026-09-11; facets 2026-09-12)
 
+- Lint — where code-discipline lands (2026-09-13): `https://raw.githubusercontent.com/detekt/detekt/main/detekt-core/src/main/resources/default-detekt-config.yml`, `https://kotlinlang.org/docs/gradle-compiler-options.html` (`allWarningsAsErrors`); detekt release from the GitHub releases API
 - Android Studio current release: `https://developer.android.com/studio`
 - AGP 9.4.0 requirements: `https://developer.android.com/build/releases/gradle-plugin`
 - Compose BOM mapping: `https://developer.android.com/develop/ui/compose/bom/bom-mapping`;

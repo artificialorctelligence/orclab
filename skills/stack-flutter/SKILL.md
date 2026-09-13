@@ -214,6 +214,28 @@ Android toolchain is already there, which is the concern line. Add a web tick an
 close: CMP's web is Beta, so it is Flutter (canvas app plus HTML pages) or React Native (a real
 site, no Linux).
 
+## Lint — where code-discipline lands
+
+Dart's analyzer has one of the four: `empty_catches` (*"AVOID empty catch blocks… a comment
+should be provided"*), already on in `package:lints` 6.1.0's `core` set that `flutter_lints`
+extends — confirmed 2026-09-13. There is **no nesting-depth or function-length rule in the free
+linter** (dart_code_metrics, which had both, went commercial); those two are reviewed, not linted,
+and that is a real gap this stack carries. Warnings-as-errors is in `analysis_options.yaml`:
+
+```yaml
+analyzer:
+  errors:
+    empty_catches: error
+    unused_import: error         # promote each warning you meet; there is no global switch
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+```
+
+`flutter analyze --fatal-infos` in the check before any build fails on anything at all. Rules
+2, 3 and 5 (`assert` is *"ignored"* in production — throw an `ArgumentError`) are reviewed.
+
 ## Presence
 
 Presence is how the app stays visible and reachable when it is not in front. On a phone that is
@@ -385,6 +407,7 @@ that is `stack-unity`'s or `stack-godot`'s concern.
 
 ## Sources (live on 2026-09-11; facets and no-Mac builds 2026-09-12)
 
+- Lint — where code-discipline lands (2026-09-13): `https://dart.dev/tools/linter-rules/empty_catches`, `https://dart.dev/tools/linter-rules/all` (no nesting/length rule), `https://raw.githubusercontent.com/dart-lang/core/main/pkgs/lints/lib/core.yaml`, `https://dart.dev/tools/analysis`, `https://raw.githubusercontent.com/flutter/flutter/stable/packages/flutter_tools/lib/src/commands/analyze.dart` (`--fatal-infos`), `https://dart.dev/language/error-handling`
 - Current release and Dart version: `https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json`
 - Android defaults: `https://raw.githubusercontent.com/flutter/flutter/stable/packages/flutter_tools/gradle/src/main/kotlin/FlutterExtension.kt`
 - App template contents (no `PrivacyInfo.xcprivacy` under `templates/app/ios.tmpl/Runner`; plugin templates have one): `https://github.com/flutter/flutter/tree/stable/packages/flutter_tools/templates`

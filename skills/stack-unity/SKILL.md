@@ -67,6 +67,43 @@ applies (`xcodebuild archive` / `-exportArchive`, or Xcode by hand). The Unity-g
 Coverage, mutation testing and test lint for this language: `skills/orc-test/languages/csharp.md`
 — `/orc-test` reads it.
 
+## Lint — where code-discipline lands
+
+C#'s switch is in the project file, and the four shape rules are SonarAnalyzer.CSharp's
+(10.34.0, a NuGet analyzer package; the rules are parametrised and **off** in its default profile,
+so each is enabled by hand) — confirmed 2026-09-13 in `sonar-dotnet`'s rule sources:
+
+```xml
+<!-- .csproj -->
+<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+<PackageReference Include="SonarAnalyzer.CSharp" Version="10.34.0.3385" PrivateAssets="all" />
+<ItemGroup><AdditionalFiles Include="SonarLint.xml" /></ItemGroup>
+```
+
+```ini
+# .editorconfig
+dotnet_diagnostic.S134.severity = error    # control flow nested too deeply (default max 3)
+dotnet_diagnostic.S138.severity = error    # functions should not have too many lines (default 80)
+dotnet_diagnostic.S108.severity = error    # nested blocks of code should not be left empty
+dotnet_diagnostic.S2486.severity = error   # generic exceptions should not be ignored
+dotnet_diagnostic.CA1031.severity = warning  # do not catch general exception types (Roslyn, ships with the SDK)
+```
+
+The two thresholds are rule *parameters*, and `.editorconfig` cannot set those — the analyzer
+reads them from a `SonarLint.xml` passed as an `AdditionalFiles` item
+(`SonarAnalyzer.Core/Configuration/ParameterLoader.cs`):
+
+```xml
+<AnalysisInput><Rules>
+  <Rule><Key>S134</Key><Parameters><Parameter><Key>maximumNestingLevel</Key><Value>2</Value></Parameter></Parameters></Rule>
+  <Rule><Key>S138</Key><Parameters><Parameter><Key>max</Key><Value>60</Value></Parameter></Parameters></Rule>
+</Rules></AnalysisInput>
+```
+
+Rules 2, 3 and 5 (`using`, `ArgumentException` over `Debug.Assert`, which is
+`[Conditional("DEBUG")]`) are reviewed, not linted.
+
 ## Presence
 
 Not researched; unlikely to be needed.
@@ -219,6 +256,7 @@ the window is decorated *"across various compositors"* under Wayland; no signing
 
 ## Sources (live on 2026-09-11; facets 2026-09-12)
 
+- Lint — where code-discipline lands (2026-09-13): `https://raw.githubusercontent.com/SonarSource/sonar-dotnet/master/analyzers/rspec/cs/S{134,138,108,2486}.json`, `.../analyzers/src/SonarAnalyzer.Core/Rules/{FunctionNestingDepthBase,MethodsShouldNotHaveTooManyLinesBase}.cs` (defaults 3 and 80), `.../Configuration/ParameterLoader.cs` (parameters from `SonarLint.xml`), `https://api.nuget.org/v3-flatcontainer/sonaranalyzer.csharp/index.json`, `https://raw.githubusercontent.com/dotnet/docs/main/docs/fundamentals/code-analysis/quality-rules/ca1031.md`, `https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/compiler-options/errors-warnings`, `https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.debug.assert`
 - Current editor: `https://unity.com/releases/editor/whats-new`
 - Pricing and Personal threshold: `https://unity.com/pricing`; Runtime Fee cancellation:
   `https://unity.com/blog/unity-is-canceling-the-runtime-fee`
