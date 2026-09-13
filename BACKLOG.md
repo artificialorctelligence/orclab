@@ -2571,7 +2571,7 @@ the counter was set back to 39/61 by hand, since `.git/orclab/` is untracked). T
 warning python.md carries is now in `languages/gdscript.md` too, whose first real run landed
 2026-09-12 (#36); the other six still wait for theirs.
 
-## #35: orc-todo's tests run the code but do not pin it: TCE 68.6%, the specific gaps
+## #35: orc-todo's tests run the code but do not pin it: TCE 68.6%, the specific gaps (UPDATED 2026-09-13 — #34 closed, clean before-number is 69.4%; `generate` is the next step)
 
 Found 2026-09-12 by the first real `/orc-test analyze skills/orc-todo/scripts` (v17, Task 19): coverage 95.3%, TCE 68.6% — 637 of 928 mutants killed, 291 survived, gate 70. Coverage is high and the score is just under the gate, which is the shape `analyze` exists to expose: the lines run, the assertions do not pin them. The survivors list (in `.orclab/test/analyze.json` after a run; the numbers are in `skills/orc-test/languages/python.md`) sorts into real gaps and noise.
 
@@ -2588,6 +2588,16 @@ The real gaps, by what a test would have to do:
 The noise: mutmut mutates every string literal three ways and every keyword argument to `None`, so `cli.py`'s messages (172 of the 291) and the `held(...)` lock descriptions are survivors that no test should chase; read the list for branch, comparison and argument mutations.
 
 Fixing this is `/orc-test generate`'s first real use and should be its own session, per the Task 19 brief — not a side quest of v17's landing. Rerun `analyze` on the same path afterwards; the before → after is the point.
+
+**Update 2026-09-13 — where this stands.** #34 is closed (the fixture is in
+`skills/orc-todo/scripts/tests/conftest.py`, where mutmut's copy carries it — its first home,
+`scripts/conftest.py`, was never copied and the first analyze after it rewrote the real files one
+more time; restored, counter reset to 40/61). The first clean `analyze skills/orc-todo/scripts`
+then reported **TCE 69.4%**, tree untouched — that, not 68.6%, is the before-number for the
+`generate` pass, since the forty `cwd → None` survivors died for free as predicted. Next step is
+`/orc-test generate` against that run's `.orclab/test/analyze.json`, working the gap list above
+(lane delete/current, lock exit codes, list with an in-progress lane, whitespace normalisation,
+timeout propagation, `required=True`), then `analyze` again for the after-number.
 
 ## #36: GDScript has no mutation-testing tool, so /orc-test cannot measure TCE for Godot projects (UPDATED 2026-09-12 — a tool exists; re-scoped to adopting it) (RESOLVED 2026-09-12)
 
