@@ -150,6 +150,12 @@ before → after for every number. That is the second `analyze` of the cycle. If
 fails, ask — `"Coverage 76% (was 61%), TCE 68% (was 44%). Another round?"` — and wait. It
 **never starts a third round** on its own.
 
+**`generate` is also the first step of a migration.** `/orc-code refactor`'s migration mode
+runs `analyze` on the *old* code before any migration command, and where the suite is red,
+absent or under the gate, runs `generate` there first — characterization tests that pin what
+the code does today, so the migrated code can be measured against them. The same `analyze` is
+that mode's exit gate: coverage and TCE no lower than the baseline, on the new code.
+
 **Everything it writes is uncommitted.** Committing is the user's step, so they can read the
 new tests first. `/orc-git commit` is the way.
 

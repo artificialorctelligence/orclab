@@ -54,3 +54,8 @@ def test_discovery_tells_available_from_installed():
                    "claude plugin install code-modernization@claude-plugins-official",
                    "fresh session"]:
         assert phrase in d, phrase
+
+
+def test_code_discipline_names_the_quality_mode():
+    cd = (ROOT / "skills" / "code-discipline" / "SKILL.md").read_text()
+    assert "`/orc-code refactor`'s quality mode" in cd
