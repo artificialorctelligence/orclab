@@ -16,16 +16,21 @@ named and left open.
 
 ## When this is the stack
 
-direflail's choice, with Unity, for **cross-platform games including mobile** (BACKLOG #4,
-2026-09-11); neither preferred yet. Godot is **MIT-licensed, free, no account, no revenue
-threshold** — the whole engine is a ~150 MB executable. Smaller ecosystem than Unity; native
-Linux editor that is a first-class platform, not a port. Two languages:
+`/orc-code`'s **default for every game scope** — desktop, mobile, or both — with Unity
+(`stack-unity`) the alternative, chosen when the larger ecosystem or its platform SDK integrations
+(ads, IAP, analytics) are what the game needs (v18 spec §2, 2026-09-12). Godot is **MIT-licensed,
+free, no account, no revenue threshold** — the whole engine is a ~150 MB executable. Smaller
+ecosystem than Unity; native Linux editor that is a first-class platform, not a port. Two
+languages:
 
 - **GDScript** — Godot's own Python-like language; the default and the one every tutorial uses.
   Exports to every platform including web.
 - **C#** — the .NET edition. Desktop is solid; **Android and iOS are marked experimental** in
   Godot's own docs, and **web export is not supported** for C# at all. For a mobile game in
   Godot today, GDScript is the lower-risk choice; this is not a decision, it is what the docs say.
+
+Web export exists in Godot but is not researched here — the Game / web row is a stub; research
+before the first browser game.
 
 ## Toolchain, as of 2026-09-11
 
@@ -62,6 +67,59 @@ Coverage, mutation testing and test lint for this language: GDScript:
 `skills/orc-test/languages/gdscript.md`; C#: `skills/orc-test/languages/csharp.md` — `/orc-test`
 reads them.
 
+## Presence
+
+Not researched; unlikely to be needed.
+
+## UI
+
+No project has been built with these facets yet; the first one corrects them. The UI is the menus,
+HUD and dialogs the player reads and taps, as distinct from the game world. In Godot there is one
+way to build it: **Control nodes** — *"Like everything else in Godot, the user interface is built
+using nodes, specifically Control nodes"*, content ones (Buttons, Labels, LineEdits) inside layout
+ones (BoxContainers, MarginContainers, ScrollContainers, TabContainers, Popups); a `Control`
+*"adapts its position and size based on its parent control"* (confirmed live 2026-09-12, *User
+interface (UI)* and the `Control` class page). The docs name no alternative; the one node that
+looks like one, `TouchScreenButton`, says of itself *"If you want to create menus or user
+interfaces, you may want to use Button nodes instead"* (confirmed live 2026-09-12). **Theming is
+a `Theme` resource**: *"The skinning system is driven by the Theme resource"*; set it project-wide
+in **GUI > Theme > Custom** (`gui/theme/custom`), or on the root Control of one branch — themes
+*"propagate from parent controls to their children"*, so a font size or a colourblind palette is
+changed in one place (confirmed live 2026-09-12, *Introduction to GUI skinning*). BACKLOG #2's
+design system translates into the frameworks above.
+
+## Storage
+
+No project has been built with these facets yet; the first one corrects them. Storage is what the
+game keeps on the device between runs: settings, and saved progress. Both go under **`user://`** —
+the project's own files under `res://` *"will likely be read-only"* once exported, while `user://`
+*"is created automatically and guaranteed to be writable to, even in an exported project"*
+(confirmed live 2026-09-12, *File paths in Godot projects*). Where it is, per OS — that page for
+desktop, `OS.get_user_data_dir()` for the rest (confirmed live 2026-09-12): Linux
+`~/.local/share/godot/app_userdata/[project_name]`, Windows
+`%APPDATA%\Godot\app_userdata\[project_name]`, macOS
+`~/Library/Application Support/Godot/app_userdata/[project_name]`; Android and iOS *"a sandboxed
+directory in either internal or external storage, depending on the user's configuration"* (the
+file-paths page says only that on mobile it *"is not accessible by other applications"*); Web *"a
+virtual directory managed by the browser"*. So by default a shipped game's saves sit under a
+`Godot/` folder, and renaming the project loses them (*"you will no longer be able to access
+existing data in user:// unless you rename the old folder"*, `ProjectSettings` page). **Alternative:
+`application/config/use_custom_user_dir = true`** (desktop only) puts them at
+`~/.local/share/[project_name]` and equivalents — only for that concern, and decided before the
+first release, because flipping it afterwards strands existing saves the same way a rename does.
+External databases are out of scope for this skill.
+
+**Config, and small saves: `ConfigFile`** — *"a helper class to handle INI-style files"*:
+`set_value(section, key, value)`, then `config.save("user://scores.cfg")`; `save_encrypted_pass`
+for a file the player should not hand-edit (confirmed live 2026-09-12, `ConfigFile` class page).
+**SQLite only via an addon**, and only when there are rows to query: **Godot-SQLite** by 2shady4u
+— the Asset Library lists 4.7 (2026-01-16), GitHub's latest release is v4.9 (2026-08-09)
+(confirmed live 2026-09-12). Its concern: a GDExtension with a native binary per platform (*"Mac OS
+X (universal), Linux, Windows, Android (arm64), iOS (arm64), HTML5"*), so the Android one falls
+under the 16 KB row in the store table, and a database bundled in `res://` must be copied to
+`user://` on mobile before it can be written (*"have to be copied to the `user://`-folder in its
+entirety"*, its README).
+
 ## Where each store rule lands
 
 The store ingredients (`skills/orc-package/ingredients/play`, `.../app-store`) state the rules.
@@ -81,17 +139,75 @@ The store ingredients (`skills/orc-package/ingredients/play`, `.../app-store`) s
 | App Store: usage strings | `privacy/camera_usage_description`, `microphone_usage_description`, `photolibrary_usage_description` (+ `_localized`). | exported `Info.plist` |
 | Both: privacy policy in-app, account deletion, login rules | Game code. | — |
 
-## What games change — named, not answered
+## Scope divergence
 
-Same open questions as `stack-unity`, same honest state. Godot's mechanism for one game with
-different controls per device is the **InputMap** (Project Settings → Input Map): actions
-(`jump`, `move_left`) bound to touch, keys and gamepad, queried as actions in code; on-screen
-touch controls are `TouchScreenButton` nodes shown only on mobile. Designing input as actions from
-day one is what makes a desktop sibling possible; which actions, and whether a desktop build ships
-at all, is the game's decision. Desktop distribution is Steam, itch.io, or the Linux channels
-Orclab already knows.
+No project has been built with these facets yet; the first one corrects them. Scope divergence is
+what happens when one game ships on a phone and on a desktop: some differences the engine keeps
+apart for you in a setting, and some you have to design differently — a thumb is not a mouse, a
+portrait phone is not a 16:9 monitor, a phone GPU is not a desktop one. Which actions a game has,
+and whether a desktop build ships at all, stays the game's decision; desktop distribution is Steam,
+itch.io, or the Linux channels Orclab already knows.
 
-## Sources (live on 2026-09-11)
+**What the engine keeps per platform.** One **export preset** per platform in `export_presets.cfg`
+— *"The default options are often enough to export, so tweaking them is usually not necessary"*
+(confirmed live 2026-09-12, *Exporting projects*). **Feature tags** — `OS.has_feature("android")`,
+`"ios"`, `"linux"`, `"macos"`, `"windows"`, `"mobile"`, `"pc"`, `"web"`, case-sensitive and
+*"immutable"* (a web export on a phone is `web_android`, not `mobile`); a project setting takes a
+per-tag value by suffix (`some/setting.android`), read with
+`ProjectSettings.get_setting_with_override` — plain `get_setting` ignores it — which is how the
+renderer below is already switched (confirmed live 2026-09-12, *Feature tags*). The **InputMap**
+(Project Settings → Input Map): actions (`jump`, `move_left`) bound to touch, keys and gamepad,
+queried as actions in code; on-screen touch controls are `TouchScreenButton` nodes shown only on
+mobile. Designing input as actions from day one is what makes a desktop sibling possible
+(`https://docs.godotengine.org/en/stable/tutorials/inputs/inputevent.html`, confirmed live
+2026-09-12).
+
+**Input.** Actions once: *"Godot makes it possible to support both keyboard and controller input
+without having to write separate code paths"* — the exception the docs flag is mouse versus
+controller for a look-around, which *"will require different code paths"* (confirmed live
+2026-09-12, *Controllers, gamepads, and joysticks*). Touch: `TouchScreenButton` is for gameplay
+(*"such as a unit you have to touch to move"*, multitouch built in); its `action` fires an InputMap
+action and `visibility_mode = VISIBILITY_TOUCHSCREEN_ONLY` hides it on desktop. Menus stay
+`Button`s — `input_devices/pointing/emulate_mouse_from_touch` is `true` by default, so a tap is a
+click. `VirtualJoystick` (a Control) drives four actions from a thumb, but has no touchscreen-only
+mode: hiding it on desktop is your own `OS.has_feature("mobile")` check (confirmed live
+2026-09-12, both class pages and `ProjectSettings`).
+
+**UI scaling and aspect ratio** — *Multiple resolutions* (confirmed live 2026-09-12). A base size
+(`display/window/size/viewport_width` / `_height`), a **stretch mode** — `disabled` (default,
+*"One unit in the scene corresponds to one pixel"*), `canvas_items` (rendered at the real
+resolution), `viewport` (rendered at the base size, then scaled) — and a **stretch aspect**:
+`ignore`, `keep` (black bars), `keep_width`, `keep_height`, `expand` (*"keep neither the base width
+nor height"*). The page's recommendations: **desktop, non-pixel-art** 1920×1080, `canvas_items`,
+`expand`; **desktop, pixel art** 640×360, `viewport`, `keep` (or `expand`), scale mode `integer`;
+**mobile landscape** 1280×720, `canvas_items`, `expand`; **mobile portrait** 720×1280 plus
+**Display > Window > Handheld > Orientation** = `portrait` (it *"does not flip the project
+resolution's width and height automatically"*, `ProjectSettings` page), `canvas_items`, `expand`. Always *"Configure Control
+nodes' anchors to snap to the correct corners"*; a 1080p base on mobile wants **GUI > Theme >
+Default Theme Scale** 1.5–2.0; a square base (720×720) serves both orientations, a 4:3 one
+(1280×960) tablets and foldables.
+
+**Performance: the renderer.** Three, on one project setting: **Forward+** (*"suited for desktop
+platforms only"*, the default there), **Mobile** (*"suited for mobile and desktop platforms"*, the
+default on mobile via `rendering/renderer/rendering_method.mobile = "mobile"`), **Compatibility**
+(OpenGL; default and *"the only choice"* on web, and for *"older mobile devices, or older desktop
+devices"* or hardware without Vulkan). The docs' rule: Forward+ for desktop 3D wanting *"the most
+advanced rendering features"*; Mobile for *"newer mobile devices"*; Compatibility for a 2D game or
+*"the best performance possible on all devices"* (confirmed live 2026-09-12, *Overview of
+renderers* and `ProjectSettings`). One game, two renderers, is what the `.mobile` override is for;
+switching *"may require some manual tweaks"* to lighting and environment.
+
+**Per-platform desktop differences** (each export page, confirmed live 2026-09-12). **macOS**:
+*"By default, macOS will run only applications that are signed and notarized"*; notarizing needs
+an Apple Developer ID certificate; from Linux the tool is `rcodesign` (Editor Settings → Export →
+macOS), from a Mac Xcode's `codesign` / `notarytool`; without a certificate, ad-hoc signing with
+notarization disabled *"will make running an exported app easier for the end users"*. **Windows**:
+*"Godot is capable of automatic code signing on export"* — `SignTool.exe` on Windows or
+`osslsigncode` elsewhere, a certificate, the preset's Code Signing section; nothing says it is
+required. **Linux**: the export page says nothing about signing; pick an architecture (x86_64
+default; arm64 if a Pi 5 could run it) and ship.
+
+## Sources (live on 2026-09-11; facets 2026-09-12)
 
 - Download / current version: `https://godotengine.org/download/linux/`
 - Exporting for Android: `https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_android.html`;
@@ -102,3 +218,6 @@ Orclab already knows.
 - C# platform support: `https://docs.godotengine.org/en/stable/tutorials/scripting/c_sharp/index.html`
 - 16 KB support: `https://github.com/godotengine/godot/pull/106358`
 - Store rules themselves: the Play and App Store ingredients under `skills/orc-package/ingredients/`.
+- Facets (2026-09-12) — UI: `https://docs.godotengine.org/en/stable/tutorials/ui/index.html`, `https://docs.godotengine.org/en/stable/classes/class_control.html`, `https://docs.godotengine.org/en/stable/tutorials/ui/gui_skinning.html`, `https://docs.godotengine.org/en/stable/classes/class_theme.html`
+- Facets — storage: `https://docs.godotengine.org/en/stable/tutorials/io/data_paths.html`, `https://docs.godotengine.org/en/stable/classes/class_configfile.html`, `https://docs.godotengine.org/en/stable/classes/class_os.html` (`get_user_data_dir`, `has_feature`), `https://docs.godotengine.org/en/stable/classes/class_projectsettings.html` (`use_custom_user_dir`, `rendering_method.mobile`, `emulate_mouse_from_touch`, `gui/theme/custom`), `https://godotengine.org/asset-library/asset/1686` (Godot-SQLite), `https://github.com/2shady4u/godot-sqlite`
+- Scope divergence: `https://docs.godotengine.org/en/stable/tutorials/export/feature_tags.html`, `https://docs.godotengine.org/en/stable/tutorials/inputs/inputevent.html`, `https://docs.godotengine.org/en/stable/tutorials/inputs/controllers_gamepads_joysticks.html`, `https://docs.godotengine.org/en/stable/classes/class_touchscreenbutton.html`, `https://docs.godotengine.org/en/stable/classes/class_virtualjoystick.html`, `https://docs.godotengine.org/en/stable/tutorials/rendering/multiple_resolutions.html`, `https://docs.godotengine.org/en/stable/tutorials/rendering/renderers.html`, `https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_macos.html`, `https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_windows.html`, `https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_linux.html`, `https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_web.html` (read only to confirm the stub: C# *"cannot be exported to the web"*)

@@ -22,7 +22,9 @@ instead of it. Right when the app is Apple-only, or needs what Flutter's plugins
 (a new system framework, widgets, App Intents, watchOS/visionOS). Apple's own words: *"SwiftUI
 helps you build great-looking apps across all Apple platforms with the power of Swift"* and it
 *"is designed to work alongside UIKit and AppKit"* — UIKit is the older toolkit, reached from
-SwiftUI when a control is missing, not the starting point for a new app.
+SwiftUI when a control is missing, not the starting point for a new app. Swift has no Android
+path. If Android is plausible later, start from the Android + iOS row instead — moving to it later
+is a rewrite, not a port.
 
 ## The Mac requirement, stated once
 
@@ -30,7 +32,8 @@ SwiftUI when a control is missing, not the starting point for a new app.
 Linux (swift.org ships 6.3.3 for it), and that is enough to compile and test a pure-Swift
 *package* — business logic, no UI — but there is no iOS SDK for Linux and never has been. From
 this machine, an iOS project can be *edited* and its package layer *tested*; producing an `.ipa`
-happens on a Mac at hand or a cloud Mac. The App Store ingredient
+happens on a Mac at hand or a cloud Mac (named under "Building without a Mac" below). The App
+Store ingredient
 (`skills/orc-package/ingredients/app-store`) carries that choice as its `local` / `cloud`
 question; this skill does not repeat it.
 
@@ -45,7 +48,7 @@ question; this skill does not repeat it.
 | Concurrency | Swift concurrency — `async`/`await`, actors, `@MainActor` for UI | Swift 6 language |
 | Testing | **Swift Testing** (`import Testing`, `@Test`, `#expect`) for unit tests — Apple's current framework, integrated with SwiftPM; XCTest remains for UI tests (`XCUIApplication`). Coverage, mutation testing and test lint for this language: `skills/orc-test/languages/swift.md` — `/orc-test` reads it. | developer.apple.com/documentation/testing |
 | Dependencies | Swift Package Manager, in Xcode (File → Add Package Dependencies) or `Package.swift`. CocoaPods is not for new projects — its registry goes read-only 2026-12-02 | Flutter's SwiftPM page records the CocoaPods date; Apple docs for SwiftPM |
-| Persistence | SwiftData (Apple's current, Swift-native layer over Core Data) when local persistence is needed; not a default, a choice | Apple docs |
+| Persistence | SwiftData (Apple's current, Swift-native layer over Core Data) — the default under *Storage* below | developer.apple.com/documentation/swiftdata |
 | Signing | Xcode's *Automatically manage signing* with the team selected; Xcode uses cloud-managed certificates | Xcode distribution docs |
 
 Install (on the Mac): Xcode from the Mac App Store, then `xcode-select --install`, then
@@ -83,6 +86,155 @@ older method name `app-store` still works but is deprecated. Confirm the exporte
 `ls` after the first run rather than trusting this file. `swift test` at the root of a local
 package runs its Swift Testing suite on any platform, Linux included.
 
+### Building without a Mac
+
+Apple's toolchain runs only on macOS, and this project *is* Xcode — there is no `xcodebuild` for
+Linux and never has been. From this machine the Swift package layer can be edited and tested, but
+the archive and the `.ipa` have to be produced on a Mac somewhere, so a Linux developer rents one
+by the minute from a build service. Every service needs the same two things from you: a paid
+Apple Developer Program membership, and an **App Store Connect API key** (App Store Connect →
+Users and Access → Integrations) so it can talk to Apple on your behalf. They differ in whether
+they generate the distribution certificate and provisioning profile, or expect you to supply them.
+
+**Default: Codemagic** (confirmed live 2026-09-12) — the same default as `stack-flutter`, for the
+same reasons. Its native-iOS quick-start: *"This guide will illustrate all of the necessary steps
+to successfully build and publish a native iOS app with Codemagic. It will cover the basic steps
+such as build versioning, code signing and publishing."* The build step is Codemagic's
+`xcode-project build-ipa --workspace "$CM_BUILD_DIR/$XCODE_WORKSPACE" --scheme "$XCODE_SCHEME"`
+(a wrapper over the `archive` + `-exportArchive` pair above) on `instance_type: mac_mini_m2`, with
+Xcode 26.6 the default and 27.0 available as `edge`. Signing: add the API key in Team settings and
+*"you can also generate a new Apple Development or Apple Distribution certificate"* there — the
+private key never touches this machine — then `ios_signing: distribution_type: app_store` +
+`bundle_identifier:` in `codemagic.yaml` fetches the matching profile, and
+`xcode-project use-profiles` applies it before the build. Upload: `publishing: app_store_connect:`
+with the same key. Cost: *"500 free minutes per month on macOS M2 machines on a personal
+account"*, reset on the 1st; beyond that **$0.095/minute** on M2, $0.114 on M4 (no free minutes
+on a Team). The App Store ingredient's `cloud` shape is written for this.
+
+Alternatives (each confirmed live 2026-09-12), with the one thing that would make you reach for it:
+
+- **Apple Xcode Cloud** — Apple's own, 25 compute hours/month included with the membership, and
+  the natural home for a pure Xcode project. Concern: *"To get started, configure a workflow in
+  Xcode"* — the first setup happens inside Xcode, so it needs a Mac once; with one at hand, even
+  borrowed, prefer it over Codemagic for this stack.
+- **GitHub Actions macOS runner** — already there if the repo is on GitHub; `macos-latest` is
+  macOS 26 arm64 with Xcode 26.6 default and 27 on the `xcode-27` preview label. Concern:
+  **signing is yours to script** — GitHub's guide has you export the certificate (`.p12`) and
+  profile, base64 them into secrets and import into the runner's keychain; nothing is generated
+  for you. Cost: **$0.062/minute** against $0.006 for Linux. GitHub's pages once documented a 10x
+  multiplier on included minutes for macOS; the current pages give only the rate table, so
+  whether the 2,000 free minutes deplete at the macOS rate is not stated (checked 2026-09-12,
+  public repos are free either way).
+- **EAS Build (Expo)** — not an option: its prerequisite is *"A React Native Android or iOS
+  project"* and its pipeline runs `npm install` and `fastlane gym` in `ios/`; a plain Xcode
+  project has no seat there.
+
+## Presence
+
+No project has been built with these facets yet; the first one corrects them. Presence is how
+the app stays visible and reachable when it is not in front. **iOS has no app-owned status-bar
+icon.** The strip at the top of the screen is the system's: the Human Interface Guidelines say it
+*"displays information about the device's current state, like the time, cellular carrier, and
+battery level"*, and the developer documentation it points to is `UIStatusBarStyle` and
+`preferredStatusBarStyle` — an app can restyle or hide the bar, never put anything in it
+(confirmed live 2026-09-12). So an iOS app is present in two ways: a notification the user acts
+on, and — for something ongoing — a Live Activity.
+
+**Notifications: the `UserNotifications` framework.** Apple: notifications *"communicate important
+information to users of your app, regardless of whether your app is running"*; each one *"can
+display an alert, play a sound, or badge the app's icon"*, generated *"locally from your app or
+remotely from a server that you manage"* through APNs (confirmed live 2026-09-12). The HIG names
+the shapes: *"A banner or view on a Lock Screen, Home Screen"*, *"A badge on an app icon"*, *"An
+item in Notification Center"*. Nothing shows until the user agrees: call
+`UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])`, in
+context rather than at first launch — *"Subsequent authorization requests don't prompt the
+person"*, so the first answer stands; the `.provisional` option delivers quietly to Notification
+Center only, on trial, with Keep / Turn Off buttons (confirmed live 2026-09-12). A local
+notification is `UNMutableNotificationContent` plus a time, calendar or location trigger in a
+`UNNotificationRequest`; delivery *"isn't guaranteed"*.
+
+What the user can do without opening the app — **actions via categories** (confirmed live
+2026-09-12, *Declaring your actionable notification types*): *"Actionable notifications let the
+user respond to a delivered notification without launching the corresponding app. Other
+notifications display information in a notification interface, but the user's only course of
+action is to launch the app."* Register `UNNotificationCategory` objects at launch with
+`setNotificationCategories`, each holding `UNNotificationAction` buttons; put the category's
+identifier in the content's `categoryIdentifier` (or the `category` key of a push payload). A
+`UNTextInputNotificationAction` shows *"an editable text field"* — reply without opening the app.
+Tapping a button *"forwards the selected action to your app, without bringing the app to the
+foreground"*, handled in `UNUserNotificationCenterDelegate` (*Handling notifications and
+notification-related actions*, confirmed live 2026-09-12). Remote (push) notifications add the
+*APS Environment* entitlement, listed on the framework page; local ones need nothing beyond the
+permission.
+
+**The nearest persistent presence: a Live Activity (`ActivityKit`, iOS 16.1+).** The framework
+page (confirmed live 2026-09-12): Live Activities are *"a rich, interactive, and highly glanceable
+way for people to keep track of an event or activity over several hours"*; on iPhone and iPad one
+*"appears on the Lock Screen, in the Dynamic Island, and on the Home Screen"*, and also on a paired
+Apple Watch's Smart Stack, a paired Mac's menu bar and CarPlay; *"visionOS doesn't support Live
+Activities."* Its *Displaying live data with Live Activities* article (confirmed live 2026-09-12)
+does not name which iPhones have a Dynamic Island — on *"devices that don't support the Dynamic
+Island"* the Lock Screen presentation appears as a banner instead. The UI is
+SwiftUI inside a widget extension (`ActivityConfiguration`, a Lock Screen view plus compact,
+minimal and expanded Dynamic Island views — all required); the app starts, updates and ends it
+with `Activity`, or a server does by ActivityKit push; `NSSupportsLiveActivities = YES` in the
+target's Info. Buttons and toggles let people *"perform essential functionality without launching
+your app"*. Limits: *"active for up to eight hours"*, at most 12 on the Lock Screen; its own
+sandbox, *"can't access the network or receive location updates"*; 4 KB of data. Reach for it only
+when there is a real ongoing thing to track — a timer, an order, a game; otherwise a notification.
+
+## UI
+
+No project has been built with these facets yet; the first one corrects them. The UI is what the
+user sees and touches; on iOS the choice is which of Apple's two toolkits draws it. **Default:
+SwiftUI** — the toolchain row above; *"Declare the user interface and behavior for your app on
+every platform"*, actively updated (its updates page's latest section is June 2026, Liquid Glass)
+(confirmed live 2026-09-12 on `developer.apple.com/documentation/swiftui`). **Alternative: UIKit**
+— also current (its own June 2026 updates section; iOS 2.0+, not deprecated) — only for an
+existing UIKit codebase being extended rather than rewritten, or a specific control SwiftUI lacks.
+The two mix per view, never per project: Apple's UIKit page says *"you can place UIKit views and
+view controllers inside SwiftUI views, and vice versa"* — `UIViewRepresentable` wraps a `UIView`
+into SwiftUI (*"a wrapper for a UIKit view that you use to integrate that view into your SwiftUI
+view hierarchy"*), `UIViewControllerRepresentable` a view controller, and `UIHostingController`
+goes the other way (confirmed live 2026-09-12). BACKLOG #2's design system translates into the
+frameworks above.
+
+## Storage
+
+No project has been built with these facets yet; the first one corrects them. Storage is what the
+app keeps on the device between launches: records the user creates (a database) and settings
+(config). Everything below lives inside the app's own sandboxed data container — Apple's (archived,
+still the only page naming the layout) file-system guide: *"an iOS app's interactions with the file
+system are limited to the directories inside the app's sandbox directory"*, with `Documents/` for
+user-visible files, `Library/Application Support` and `Library/Caches` for the app's own, `tmp/`
+for scratch; the current backup page confirms `/tmp` and `/Library/Caches` are purged and excluded
+from iCloud Backup and anything else *"may"* be included (confirmed live 2026-09-12). External
+databases are out of scope for this skill.
+
+**Saved data: SwiftData (`import SwiftData`, iOS 17+).** Apple: *"Combining Core Data's proven
+persistence technology and Swift's modern concurrency features, SwiftData enables you to add
+persistence to your app quickly, with minimal code and no external dependencies"* — `@Model` on a
+class, `ModelContainer` via `.modelContainer(for:)` at the top of the view tree, `ModelContext` to
+insert and delete, `@Query` in a view; still moving (June 2026: `sectionBy` queries, `Codable`
+attributes, `ResultsObserver`) (confirmed live 2026-09-12). Where the file sits: the docs give
+`ModelConfiguration.url` — *"the on-disk location of the schema's persistent storage"* — but do not
+name the default path; assume the app container and pass a `url` when it matters. **Alternative:
+Core Data** — the layer SwiftData sits on, iOS 3.0+, not deprecated — only for an existing Core
+Data model being extended, Objective-C sources, or a UIKit screen that wants Core Data's *"data
+sources for table and collection views"*; the SwiftData framework page lists *Adopting SwiftData
+for a Core Data app* for the move (confirmed live 2026-09-12).
+
+**Config: `UserDefaults`** (Foundation; SwiftUI's `@AppStorage` *"reflects a value from
+`UserDefaults`"* into a view). Apple: *"a persistent store for app-specific and system-wide
+settings"* — property-list types only; *"stores defaults
+locally on the current device"*, *"in an unencrypted format"*, included in device backups;
+*"Don't store personal or sensitive information as settings"* — that is the Keychain; and *"Don't
+access the files of the defaults database directly"* (confirmed live 2026-09-12). Two hooks into
+the store table below: reading `UserDefaults` is a required-reason API, so
+`NSPrivacyAccessedAPITypes` in `PrivacyInfo.xcprivacy` must list it with a reason; and it is
+device-local — cross-device settings are `NSUbiquitousKeyValueStore`, not decided here. Neither is
+for records: a settings screen's toggles go here, anything with rows goes to SwiftData.
+
 ## Where each App Store rule lands
 
 The App Store ingredient states the rules and owns them. This table is the other half.
@@ -109,16 +261,16 @@ their own and never miss an SDK deadline. For a third-party package: does it shi
 what does it send off-device. `orclab:currency-discipline` applies to every version pin in
 `Package.resolved`; Xcode's *Update to Latest Package Versions* is the tool.
 
-**Deliberately not decided here**: networking beyond `URLSession`, persistence (SwiftData vs
-plain files vs SQLite), backend, analytics. Project choices; no preference recorded until
-direflail has one.
+**Deliberately not decided here**: networking beyond `URLSession`, backend, analytics. Project
+choices; no preference recorded until direflail has one. (Persistence moved to *Storage* above,
+2026-09-12.)
 
 ## Games
 
 Not this stack. An iOS game is Unity or Godot, which produce their own Xcode project; the App
 Store ingredient applies to it unchanged, including the privacy manifest and the Mac.
 
-## Sources (live on 2026-09-11)
+## Sources (live on 2026-09-11; facets and no-Mac builds 2026-09-12)
 
 - Current releases: `https://developer.apple.com/news/releases/`; Xcode 27 and 26 release notes
   under `https://developer.apple.com/documentation/xcode-release-notes/`
@@ -132,3 +284,7 @@ Store ingredient applies to it unchanged, including the privacy manifest and the
 - Distribution: `https://developer.apple.com/documentation/xcode/distributing-your-app-for-beta-testing-and-releases`;
   `-exportArchive` with `destination = upload`: Apple's *Archive export files* help page
 - Store rules themselves: the App Store ingredient under `skills/orc-package/ingredients/app-store`, with its own sources.
+- Facets (2026-09-12; every `developer.apple.com/documentation/...` and `/design/human-interface-guidelines/...` page was read through its JSON form, `/tutorials/data/` + `.json`, because the HTML is script-rendered) — presence: `https://developer.apple.com/design/human-interface-guidelines/status-bars`, `https://developer.apple.com/design/human-interface-guidelines/notifications`, `https://developer.apple.com/design/human-interface-guidelines/live-activities`, `https://developer.apple.com/documentation/usernotifications`, `.../usernotifications/asking-permission-to-use-notifications`, `.../usernotifications/declaring-your-actionable-notification-types`, `.../usernotifications/handling-notifications-and-notification-related-actions`, `https://developer.apple.com/documentation/activitykit`, `.../activitykit/displaying-live-data-with-live-activities`, `https://developer.apple.com/documentation/updates/activitykit`, `.../updates/usernotifications`
+- Facets — UI: `https://developer.apple.com/documentation/swiftui`, `https://developer.apple.com/documentation/uikit`, `.../updates/swiftui`, `.../updates/uikit`, `.../swiftui/uiviewrepresentable`, `.../swiftui/uiviewcontrollerrepresentable`, `.../swiftui/uihostingcontroller`, `.../uikit/uistatusbarstyle`
+- Building without a Mac (2026-09-12) — Codemagic: `https://docs.codemagic.io/yaml-quick-start/building-a-native-ios-app/`, `https://docs.codemagic.io/yaml-code-signing/signing-ios/`, `https://docs.codemagic.io/yaml-publishing/app-store-connect/`, `https://docs.codemagic.io/billing/pricing/`; Xcode Cloud: `https://developer.apple.com/xcode-cloud/`; GitHub Actions: `https://docs.github.com/en/actions/reference/runners/github-hosted-runners`, `https://docs.github.com/en/billing/managing-billing-for-your-products/about-billing-for-github-actions`, `https://docs.github.com/en/billing/reference/actions-runner-pricing`, `https://docs.github.com/en/actions/how-tos/deploy/deploy-to-third-party-platforms/sign-xcode-applications`, image contents `https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md` and `https://github.com/actions/runner-images/blob/main/README.md`; EAS (why it is not an option): `https://docs.expo.dev/build/setup/`, `https://docs.expo.dev/build/introduction/`, `https://docs.expo.dev/build-reference/limitations/`, `https://docs.expo.dev/build-reference/ios-builds/`
+- Facets — storage: `https://developer.apple.com/documentation/swiftdata`, `.../swiftdata/preserving-your-apps-model-data-across-launches`, `.../swiftdata/modelconfiguration`, `.../swiftdata/modelconfiguration/url`, `.../updates/swiftdata`, `https://developer.apple.com/documentation/coredata`, `https://developer.apple.com/documentation/foundation/userdefaults`, `.../swiftui/appstorage`, `https://developer.apple.com/documentation/foundation/optimizing-your-app-s-data-for-icloud-backup`, and the archived `https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/FileSystemOverview/FileSystemOverview.html` for the container layout
