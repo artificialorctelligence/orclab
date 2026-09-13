@@ -156,14 +156,9 @@ class Node:
         for segment in path_segments:
             if node.is_leaf:
                 return None
-            match = None
-            for name, child in node.children():
-                if name == segment:
-                    match = child
-                    break
-            if match is None:
+            node = next((child for name, child in node.children() if name == segment), None)
+            if node is None:
                 return None
-            node = match
         return node
 
 

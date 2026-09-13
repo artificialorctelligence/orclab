@@ -70,14 +70,18 @@ def _archive_entries(path):
     the one exception this function promises to raise.
     """
     try:
-        if tarfile.is_tarfile(path):
-            with tarfile.open(path) as tf:
-                return tf.getnames()
-        if zipfile.is_zipfile(path):
-            with zipfile.ZipFile(path) as zf:
-                return zf.namelist()
+        return _entries(path)
     except (OSError, EOFError, tarfile.TarError, zipfile.BadZipFile) as e:
         raise UnsupportedArchive(str(path)) from e
+
+
+def _entries(path):
+    if tarfile.is_tarfile(path):
+        with tarfile.open(path) as tf:
+            return tf.getnames()
+    if zipfile.is_zipfile(path):
+        with zipfile.ZipFile(path) as zf:
+            return zf.namelist()
     raise UnsupportedArchive(str(path))
 
 

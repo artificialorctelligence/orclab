@@ -45,14 +45,9 @@ def resolve_selection(root, tokens):
     included = {}
     excluded = {}
     for token in tokens:
-        if token.startswith("!"):
-            node = resolve_token(root, token[1:])
-            for leaf in node.leaves():
-                excluded[leaf.dotted_path] = leaf
-        else:
-            node = resolve_token(root, token)
-            for leaf in node.leaves():
-                included[leaf.dotted_path] = leaf
+        bucket = excluded if token.startswith("!") else included
+        node = resolve_token(root, token[1:] if token.startswith("!") else token)
+        bucket.update((leaf.dotted_path, leaf) for leaf in node.leaves())
 
     result = {path: leaf for path, leaf in included.items() if path not in excluded}
     return sorted(result.values(), key=lambda n: n.dotted_path)

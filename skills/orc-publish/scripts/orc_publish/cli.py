@@ -68,20 +68,16 @@ def build_plan(channel_root, tokens):
 def action_shape_warning(leaf):
     """Warn when one action both builds and irreversibly publishes, so no gate can run between."""
     action = leaf.action or ""
-    for publish in PUBLISH_VERBS:
-        # rfind, not find: an action can publish, build, then publish again. Comparing the
-        # *last* publish against the *first* build tests every pair at once - if any publish
-        # follows any build, the last one follows the first one too. See BACKLOG #23.
-        at = action.rfind(publish)
-        if at == -1:
-            continue
-        for build in BUILD_VERBS:
-            built = action.find(build)
-            if built != -1 and built < at:
-                return (
-                    "action builds and irreversibly publishes in one command - no gate can run "
-                    "between them. Split the build into prepare: to enable preflight."
-                )
+    # rfind, not find: an action can publish, build, then publish again. Comparing the
+    # *last* publish against the *first* build tests every pair at once - if any publish
+    # follows any build, the last one follows the first one too. See BACKLOG #23.
+    publishes = [at for at in (action.rfind(p) for p in PUBLISH_VERBS) if at != -1]
+    builds = [at for at in (action.find(b) for b in BUILD_VERBS) if at != -1]
+    if publishes and builds and min(builds) < max(publishes):
+        return (
+            "action builds and irreversibly publishes in one command - no gate can run "
+            "between them. Split the build into prepare: to enable preflight."
+        )
     return None
 
 
@@ -142,19 +138,17 @@ def plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS, command_key="action"):
     lines, refused = [], False
     for leaf in leaves:
         command = leaf.command(command_key)
-        if command:
+        if not command:
+            lines.append(f"{leaf.dotted_path}: ({NOT_SET[command_key]})")
+        else:
             lines += [f"{leaf.dotted_path}: {command}",
                       f"  timeout: {effective_timeout(leaf, default_timeout)}s"]
-            if command_key == GATED_COMMAND_KEY:
-                more, leaf_refused = _preflight_plan_lines(leaf, default_timeout)
-                lines.extend(more)
-                refused = refused or leaf_refused
-        else:
-            lines.append(f"{leaf.dotted_path}: ({NOT_SET[command_key]})")
-        for req in leaf.requirements:
-            lines.append(f"  requirement: {req}")
-        for issue in leaf.issues:
-            lines.append(f"  issue: {issue}")
+        if command and command_key == GATED_COMMAND_KEY:
+            more, leaf_refused = _preflight_plan_lines(leaf, default_timeout)
+            lines.extend(more)
+            refused = refused or leaf_refused
+        lines += [f"  requirement: {req}" for req in leaf.requirements]
+        lines += [f"  issue: {issue}" for issue in leaf.issues]
     return "\n".join(lines), refused
 
 
@@ -196,11 +190,10 @@ def command_error(leaves):
     claims, and a publish is irreversible, so stopping before anything runs beats publishing
     the siblings and re-publishing them after the typo is fixed. See BACKLOG #29.
     """
-    for leaf in leaves:
-        for key in ("action", "metrics", "prepare"):
-            value = leaf.command(key)
-            if value is not None and not isinstance(value, str):
-                return f"{leaf.dotted_path}: {key} must be a command string, got {value!r}"
+    checks = ((leaf, key, leaf.command(key)) for leaf in leaves for key in ("action", "metrics", "prepare"))
+    for leaf, key, value in checks:
+        if value is not None and not isinstance(value, str):
+            return f"{leaf.dotted_path}: {key} must be a command string, got {value!r}"
     return None
 
 
@@ -212,20 +205,24 @@ def confirm_error(leaves):
     an answer to "did this land" that nobody supplied.
     """
     for leaf in leaves:
-        value = leaf.confirm
-        if value is None:
-            continue
-        if not isinstance(value, dict):
-            return (
-                f"{leaf.dotted_path}: confirm must be a mapping with `command` and/or `url`, "
-                f"got {value!r}"
-            )
-        if not leaf.confirm_command and not leaf.confirm_url:
-            return f"{leaf.dotted_path}: confirm must declare `command`, `url`, or both"
-        for key in ("command", "url"):
-            sub = value.get(key)
-            if sub is not None and not isinstance(sub, str):
-                return f"{leaf.dotted_path}: confirm.{key} must be a string, got {sub!r}"
+        problem = _confirm_problem(leaf)
+        if problem:
+            return f"{leaf.dotted_path}: {problem}"
+    return None
+
+
+def _confirm_problem(leaf):
+    value = leaf.confirm
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        return f"confirm must be a mapping with `command` and/or `url`, got {value!r}"
+    if not leaf.confirm_command and not leaf.confirm_url:
+        return "confirm must declare `command`, `url`, or both"
+    for key in ("command", "url"):
+        sub = value.get(key)
+        if sub is not None and not isinstance(sub, str):
+            return f"confirm.{key} must be a string, got {sub!r}"
     return None
 
 
@@ -287,17 +284,21 @@ def _run(command, limit):
         try:
             stdout, stderr = proc.communicate(timeout=limit)
         except BaseException:
-            # Unconditional, not just on timeout: the same start_new_session that lets
-            # the group be killed also means a Ctrl-C on this process no longer reaches
-            # the action, so an interrupt would orphan exactly what the group kill
-            # exists to catch. TimeoutExpired is a BaseException and is still re-raised
-            # below, so the timeout path is unchanged. wait(), not communicate(): an
-            # escaped grandchild can still hold the pipes open.
-            with contextlib.suppress(ProcessLookupError):
-                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-            proc.wait()
+            _kill_group(proc)
             raise
         return proc.returncode, stdout, stderr
+
+
+def _kill_group(proc):
+    """Kill the action's whole process group and reap it. Called on *any* exception, not just
+    a timeout: the same start_new_session that lets the group be killed also means a Ctrl-C
+    on this process no longer reaches the action, so an interrupt would orphan exactly what
+    the group kill exists to catch. TimeoutExpired is a BaseException and is re-raised by the
+    caller, so the timeout path is unchanged. wait(), not communicate(): an escaped grandchild
+    can still hold the pipes open."""
+    with contextlib.suppress(ProcessLookupError):
+        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+    proc.wait()
 
 
 def expand_path(expr, timeout):
@@ -407,67 +408,63 @@ def execute_plan(
         if not command:
             results.append((leaf, "not attempted", NOT_SET[command_key]))
             continue
-
-        if command_key == GATED_COMMAND_KEY:
-            if leaf.prepare:
-                prepare_limit = effective_timeout(leaf, default_timeout)
-                try:
-                    rc, _out, err = _run(leaf.prepare, prepare_limit)
-                except subprocess.TimeoutExpired:
-                    results.append(
-                        (leaf, "timed out", f"prepare timed out after {prepare_limit}s")
-                    )
-                    continue
-                if rc != 0:
-                    results.append(
-                        (leaf, "failed", (err or "").strip() or f"prepare exited {rc}")
-                    )
-                    continue
-
-            refusal = preflight_refusal(leaf, default_timeout)
-            if refusal and not allow_preflight_failure:
-                results.append((leaf, "refused", refusal))
-                continue
-            if refusal:
-                print(f"warning: {leaf.dotted_path}: {refusal}", flush=True)
-
-        limit = effective_timeout(leaf, default_timeout)
-        try:
-            returncode, stdout, stderr = _run(command, limit)
-            if returncode != 0:
-                raise subprocess.CalledProcessError(
-                    returncode, command, output=stdout, stderr=stderr
-                )
-            detail = (stdout or "").strip()
-            if command_key == GATED_COMMAND_KEY and leaf.confirm:
-                results.append((leaf, "accepted", _accepted_detail(leaf, detail)))
-            else:
-                results.append((leaf, "success", detail))
-        except subprocess.TimeoutExpired as e:
-            # TimeoutExpired does carry whatever was captured before the timeout - but as
-            # undecoded bytes despite text=True, because the exception is built from the raw
-            # buffers before the text wrapper ever sees them. A stream that produced nothing
-            # comes back as None, not b"". See BACKLOG #15. The stdin clause stays either way:
-            # without it an operator has no reason to suspect stdin at all.
-            captured = "\n".join(filter(None, [_decode(e.stdout), _decode(e.stderr)]))
-            if captured:
-                # Actionable sentence first, captured output last. A real action's capture is a
-                # wall of build log, and a stdin hint stranded under its final line reads as
-                # part of that output rather than as the tool talking.
-                detail = (
-                    f"timed out after {limit}s - the action may be waiting on stdin. "
-                    f"Output captured before it hung:\n{captured}"
-                )
-            else:
-                detail = (
-                    f"timed out after {limit}s - no output captured, "
-                    "the action may be waiting on stdin"
-                )
-            results.append((leaf, "timed out", detail))
-        except subprocess.CalledProcessError as e:
-            detail = (e.stderr or "").strip() or str(e)
-            results.append((leaf, "failed", detail))
+        gated = command_key == GATED_COMMAND_KEY
+        stopped = _gate(leaf, default_timeout, allow_preflight_failure) if gated else None
+        if stopped:
+            results.append(stopped)
+            continue
+        results.append(_run_leaf(leaf, command, effective_timeout(leaf, default_timeout), gated))
     return results
+
+
+def _gate(leaf, default_timeout, allow_preflight_failure):
+    """prepare -> inspect, before an action runs. The result tuple that stops the leaf, or
+    None when the action may proceed (a tolerated preflight failure is printed, not returned)."""
+    if leaf.prepare:
+        prepare_limit = effective_timeout(leaf, default_timeout)
+        try:
+            rc, _out, err = _run(leaf.prepare, prepare_limit)
+        except subprocess.TimeoutExpired:
+            return leaf, "timed out", f"prepare timed out after {prepare_limit}s"
+        if rc != 0:
+            return leaf, "failed", (err or "").strip() or f"prepare exited {rc}"
+    refusal = preflight_refusal(leaf, default_timeout)
+    if refusal and not allow_preflight_failure:
+        return leaf, "refused", refusal
+    if refusal:
+        print(f"warning: {leaf.dotted_path}: {refusal}", flush=True)
+    return None
+
+
+def _run_leaf(leaf, command, limit, gated):
+    """One leaf's command, as its result tuple - success/accepted, failed, or timed out."""
+    try:
+        returncode, stdout, stderr = _run(command, limit)
+    except subprocess.TimeoutExpired as e:
+        return leaf, "timed out", _timeout_detail(e, limit)
+    if returncode != 0:
+        err = subprocess.CalledProcessError(returncode, command, output=stdout, stderr=stderr)
+        return leaf, "failed", (stderr or "").strip() or str(err)
+    detail = (stdout or "").strip()
+    if gated and leaf.confirm:
+        return leaf, "accepted", _accepted_detail(leaf, detail)
+    return leaf, "success", detail
+
+
+def _timeout_detail(e, limit):
+    # TimeoutExpired does carry whatever was captured before the timeout - but as
+    # undecoded bytes despite text=True, because the exception is built from the raw
+    # buffers before the text wrapper ever sees them. A stream that produced nothing
+    # comes back as None, not b"". See BACKLOG #15. The stdin clause stays either way:
+    # without it an operator has no reason to suspect stdin at all.
+    captured = "\n".join(filter(None, [_decode(e.stdout), _decode(e.stderr)]))
+    if not captured:
+        return f"timed out after {limit}s - no output captured, the action may be waiting on stdin"
+    # Actionable sentence first, captured output last. A real action's capture is a
+    # wall of build log, and a stdin hint stranded under its final line reads as
+    # part of that output rather than as the tool talking.
+    return (f"timed out after {limit}s - the action may be waiting on stdin. "
+            f"Output captured before it hung:\n{captured}")
 
 
 def format_summary(results):
@@ -519,11 +516,11 @@ def confirm_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
     results = []
     for leaf in leaves:
         command = leaf.confirm_command
+        if not command and leaf.confirm_url:
+            results.append((leaf, "needs a human", leaf.confirm_url))
+            continue
         if not command:
-            if leaf.confirm_url:
-                results.append((leaf, "needs a human", leaf.confirm_url))
-            else:
-                results.append((leaf, "no confirm declared", NO_CONFIRM))
+            results.append((leaf, "no confirm declared", NO_CONFIRM))
             continue
 
         # Built once and applied on every path below, timeout included - a hung check is
@@ -536,9 +533,7 @@ def confirm_plan(leaves, default_timeout=DEFAULT_TIMEOUT_SECONDS):
             returncode, stdout, stderr = _run(command, limit)
         except subprocess.TimeoutExpired as e:
             captured = "\n".join(filter(None, [_decode(e.stdout), _decode(e.stderr)]))
-            detail = f"confirm timed out after {limit}s"
-            if captured:
-                detail += f"\n{captured}"
+            detail = f"confirm timed out after {limit}s" + (f"\n{captured}" if captured else "")
             detail = "\n".join(filter(None, [detail, see_url]))
             results.append((leaf, "not confirmed", detail))
             continue
@@ -560,8 +555,7 @@ def scripts_dir():
     return str(pathlib.Path(__file__).resolve().parent.parent)
 
 
-def main(argv=None):
-    os.environ["ORC_PUBLISH_SCRIPTS"] = scripts_dir()
+def _build_parser():
     parser = argparse.ArgumentParser(prog="orc-publish")
     parser.add_argument("selection", nargs="*")
     parser.add_argument("--for", dest="for_distro")
@@ -582,72 +576,65 @@ def main(argv=None):
     parser.add_argument("--distro", default=".orclab/publish/distro.yaml")
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_SECONDS)
     parser.add_argument("--allow-preflight-failure", action="store_true")
-    args = parser.parse_args(argv)
+    return parser
 
+
+def _error(message):
+    print(f"error: {message}", file=sys.stderr, flush=True)
+    return 1
+
+
+def _args_error(args):
+    """The first thing wrong with the flags as a message, or None."""
     if is_bad_timeout(args.timeout):
-        print(
-            "error: --timeout must be a positive whole number of seconds, "
-            f"got {args.timeout!r}",
-            file=sys.stderr,
-            flush=True,
-        )
-        return 1
-
+        return f"--timeout must be a positive whole number of seconds, got {args.timeout!r}"
     if args.confirm and (args.dry_run or args.metrics):
         other = "--dry-run" if args.dry_run else "--metrics"
-        print(
-            f"error: --confirm cannot be combined with {other} - --confirm is its own mode "
-            "and publishes nothing. Run them separately.",
-            file=sys.stderr,
-            flush=True,
-        )
-        return 1
+        return (f"--confirm cannot be combined with {other} - --confirm is its own mode "
+                "and publishes nothing. Run them separately.")
+    return None
 
-    if args.for_distro:
-        if args.selection:
-            print(
-                "note: selection tokens are ignored when --for is used",
-                file=sys.stderr,
-                flush=True,
-            )
-        try:
-            distro_root = load_tree(args.distro)
-        except (FileNotFoundError, yaml.YAMLError) as e:
-            print(f"error: could not load {args.distro}: {e}", file=sys.stderr, flush=True)
-            return 1
-        try:
-            print(run_for(distro_root, args.for_distro), flush=True)
-        except SelectionError as e:
-            print(f"error: {e}", file=sys.stderr, flush=True)
-            return 1
-        return 0
 
+def _main_for(args):
+    """`--for <distro>`: print the run-for plan from distro.yaml; selection tokens are ignored."""
+    if args.selection:
+        print("note: selection tokens are ignored when --for is used", file=sys.stderr, flush=True)
+    try:
+        distro_root = load_tree(args.distro)
+    except (FileNotFoundError, yaml.YAMLError) as e:
+        return _error(f"could not load {args.distro}: {e}")
+    try:
+        print(run_for(distro_root, args.for_distro), flush=True)
+    except SelectionError as e:
+        return _error(str(e))
+    return 0
+
+
+def _load_leaves(args):
+    """The selected leaves, validated - or an error message when anything about them is unusable."""
     try:
         channel_root = load_tree(args.channels)
     except (FileNotFoundError, yaml.YAMLError) as e:
-        print(f"error: could not load {args.channels}: {e}", file=sys.stderr, flush=True)
-        return 1
-
+        return None, f"could not load {args.channels}: {e}"
     try:
         leaves = build_plan(channel_root, args.selection)
     except SelectionError as e:
-        print(f"error: {e}", file=sys.stderr, flush=True)
-        return 1
+        return None, str(e)
+    problem = timeout_error(leaves) or confirm_error(leaves) or command_error(leaves)
+    return (None, problem) if problem else (leaves, None)
 
-    bad_timeout = timeout_error(leaves)
-    if bad_timeout:
-        print(f"error: {bad_timeout}", file=sys.stderr, flush=True)
-        return 1
 
-    bad_confirm = confirm_error(leaves)
-    if bad_confirm:
-        print(f"error: {bad_confirm}", file=sys.stderr, flush=True)
-        return 1
-
-    bad_command = command_error(leaves)
-    if bad_command:
-        print(f"error: {bad_command}", file=sys.stderr, flush=True)
-        return 1
+def main(argv=None):
+    os.environ["ORC_PUBLISH_SCRIPTS"] = scripts_dir()
+    args = _build_parser().parse_args(argv)
+    problem = _args_error(args)
+    if problem:
+        return _error(problem)
+    if args.for_distro:
+        return _main_for(args)
+    leaves, problem = _load_leaves(args)
+    if problem:
+        return _error(problem)
 
     if args.confirm:
         print(format_confirm_plan(leaves, default_timeout=args.timeout), flush=True)
@@ -658,10 +645,8 @@ def main(argv=None):
     command_key = "metrics" if args.metrics else "action"
     text, refused = plan(leaves, default_timeout=args.timeout, command_key=command_key)
     print(text, flush=True)
-
     if args.dry_run:
         return 1 if refused else 0
-
     results = execute_plan(
         leaves,
         default_timeout=args.timeout,

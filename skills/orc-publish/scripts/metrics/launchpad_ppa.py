@@ -135,10 +135,10 @@ def main(argv=None):
 
     label = f"ppa:{args.ppa}" + (f" ({args.series})" if args.series else "")
     print(label)
-    if args.per_publication:
-        for key, count in sorted(counts.items()):
-            if count:
-                print("  {} {} {}/{}: {}".format(*key, count))
+    per_publication = sorted(counts.items()) if args.per_publication else []
+    for key, count in per_publication:
+        if count:
+            print("  {} {} {}/{}: {}".format(*key, count))
     print(report(counts))
     return 0
 
