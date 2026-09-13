@@ -106,18 +106,17 @@ def cmd_remove(args):
     path = _backlog_path(args.cwd)
     with state.held(f"removing #{args.number}", cwd=args.cwd):
         text = _read_backlog(args.cwd)
-        for m in _headings(_HEADING, text):
-            if int(m.group(1)) != args.number:
-                continue
-            start = m.start()
-            after = next((x for x in _headings(_NEXT_SECTION, text) if x.start() > start), None)
-            end = after.start() if after else len(text)
-            state.atomic_write(
-                path, (text[:start].rstrip("\n") + "\n\n" + text[end:]).rstrip("\n") + "\n")
-            print(f"removed #{args.number}; nothing renumbered, and #{args.number} is never reissued")
-            return 0
-    print(f"error: no entry #{args.number}", file=sys.stderr)
-    return 1
+        m = next((m for m in _headings(_HEADING, text) if int(m.group(1)) == args.number), None)
+        if m is None:
+            print(f"error: no entry #{args.number}", file=sys.stderr)
+            return 1
+        start = m.start()
+        after = next((x for x in _headings(_NEXT_SECTION, text) if x.start() > start), None)
+        end = after.start() if after else len(text)
+        state.atomic_write(
+            path, (text[:start].rstrip("\n") + "\n\n" + text[end:]).rstrip("\n") + "\n")
+    print(f"removed #{args.number}; nothing renumbered, and #{args.number} is never reissued")
+    return 0
 
 
 def cmd_lane(args):

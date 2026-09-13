@@ -146,16 +146,7 @@ def held(description, cwd=None, timeout=10.0, poll=0.2):
         try:
             fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
         except FileExistsError:
-            if time.monotonic() >= deadline:
-                info = lock_info(cwd)
-                stale = info and not info["alive"]
-                raise LockUnavailable(
-                    ("lock appears stale - held by a process that is gone. "
-                     "Investigate before clearing: /orc-todo lock status"
-                     if stale else "lock is held by a running process"),
-                    info,
-                )
-            time.sleep(poll)
+            _wait_or_raise(deadline, poll, cwd)
             continue
         try:
             os.write(fd, payload.encode())
@@ -167,6 +158,22 @@ def held(description, cwd=None, timeout=10.0, poll=0.2):
     finally:
         with contextlib.suppress(FileNotFoundError):
             path.unlink()
+
+
+def _wait_or_raise(deadline, poll, cwd):
+    """One poll interval while the lock is held by someone else - or, past the deadline, the
+    error naming the holder. A stale holder is named, never removed."""
+    if time.monotonic() < deadline:
+        time.sleep(poll)
+        return
+    info = lock_info(cwd)
+    stale = info and not info["alive"]
+    raise LockUnavailable(
+        ("lock appears stale - held by a process that is gone. "
+         "Investigate before clearing: /orc-todo lock status"
+         if stale else "lock is held by a running process"),
+        info,
+    )
 
 
 def clear_lock(cwd=None):

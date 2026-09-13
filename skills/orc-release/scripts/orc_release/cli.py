@@ -242,26 +242,7 @@ def cmd_abort(root, _args):
     completed = state.get("completed", [])
 
     if state.get("previous_version"):
-        rolled_back = []
-        failed = []
-        for rel in vf.detect(root):
-            if rel == vf.DEBIAN_CHANGELOG:
-                continue  # a prepended entry is removed by hand; never rewrite history blindly
-            try:
-                vf.write_version(root, rel, state["previous_version"])
-                rolled_back.append(rel)
-            except (ValueError, OSError) as e:
-                failed.append((rel, str(e)))
-        # Never claim a rollback that did not happen - report exactly what succeeded and what
-        # didn't, with the real error, rather than one blanket success line covering both.
-        if rolled_back:
-            print(
-                f"Rolled back to {state['previous_version']}: " + ", ".join(rolled_back)
-            )
-        for rel, err in failed:
-            print(f"NOT rolled back - {rel}: {err}")
-        if not rolled_back and not failed:
-            print("No version files needed rolling back.")
+        _roll_back_versions(root, state["previous_version"])
 
     if completed and not marked:
         print(
@@ -293,20 +274,46 @@ def cmd_abort(root, _args):
     # Abort's rollback is deliberately partial (a prepended changelog entry is never rewritten
     # blindly), so it can leave the project's own version-verify reporting a broken state. Saying
     # "rolled back" and stopping there hides that; name the disagreement and the real versions.
-    try:
-        ok, versions = vf.verify_consistency(root)
-    except (OSError, ValueError) as e:
-        print(f"Could not check whether the version files agree ({e}) - check them by hand.")
-    else:
-        if not ok:
-            print("The project's version files now DISAGREE - clean this up by hand:")
-            for rel, v in sorted(versions.items()):
-                print(f"  {rel}: {v}")
+    _report_version_disagreement(root)
     for note in leftovers:
         print(f"Note: {note}")
     st.clear_state(root)
     print("Release aborted; state cleared.")
     return 0
+
+
+def _roll_back_versions(root, previous):
+    """Put `previous` back into every version file except debian/changelog (a prepended entry is
+    removed by hand; never rewrite history blindly). Never claims a rollback that did not
+    happen - reports exactly what succeeded and what did not, with the real error."""
+    rolled_back, failed = [], []
+    for rel in vf.detect(root):
+        if rel == vf.DEBIAN_CHANGELOG:
+            continue
+        try:
+            vf.write_version(root, rel, previous)
+            rolled_back.append(rel)
+        except (ValueError, OSError) as e:
+            failed.append((rel, str(e)))
+    if rolled_back:
+        print(f"Rolled back to {previous}: " + ", ".join(rolled_back))
+    for rel, err in failed:
+        print(f"NOT rolled back - {rel}: {err}")
+    if not rolled_back and not failed:
+        print("No version files needed rolling back.")
+
+
+def _report_version_disagreement(root):
+    try:
+        ok, versions = vf.verify_consistency(root)
+    except (OSError, ValueError) as e:
+        print(f"Could not check whether the version files agree ({e}) - check them by hand.")
+        return
+    if ok:
+        return
+    print("The project's version files now DISAGREE - clean this up by hand:")
+    for rel, v in sorted(versions.items()):
+        print(f"  {rel}: {v}")
 
 
 def cmd_version_set(root, args):

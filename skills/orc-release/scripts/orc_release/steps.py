@@ -56,13 +56,12 @@ def _scan_fences(text):
     pos = 0
     for lineno, line in enumerate(text.splitlines(keepends=True), start=1):
         m = _FENCE_LINE.match(line)
-        if m:
-            marker = m.group(1)
-            if open_start is None:
-                open_start, open_marker, open_line = pos, marker, lineno
-            elif marker[0] == open_marker[0] and len(marker) >= len(open_marker):
-                regions.append((open_start, pos + len(line)))
-                open_start = None
+        marker = m.group(1) if m else None
+        if marker and open_start is None:
+            open_start, open_marker, open_line = pos, marker, lineno
+        elif marker and marker[0] == open_marker[0] and len(marker) >= len(open_marker):
+            regions.append((open_start, pos + len(line)))
+            open_start = None
         pos += len(line)
     if open_start is not None:
         # Unterminated fence: everything after it is code as far as markdown is concerned, so
@@ -137,13 +136,8 @@ def crossref_warning(steps):
         return None
     numbers = {s.number for s in steps}
     highest = max(numbers)
-    bad = []
-    for step in steps:
-        body = _strip_fenced(step.body)
-        for match in _CROSSREF.finditer(body):
-            target = int(match.group(1))
-            if target != step.number and target > highest:
-                bad.append((step.number, target))
+    refs = ((step.number, int(m.group(1))) for step in steps for m in _CROSSREF.finditer(_strip_fenced(step.body)))
+    bad = [(n, target) for n, target in refs if target != n and target > highest]
     if not bad:
         return None
     detail = ", ".join(f"step {s} references step {t}" for s, t in bad)
@@ -187,11 +181,8 @@ def parse_steps(text):
     for m in step_matches:
         body_start = m.end()
         # Find next ## heading that's not in a fenced block, or use end of text
-        body_end = len(text)
-        for heading_match in _ANY_HEADING.finditer(text, body_start):
-            if not _is_in_fenced_block(heading_match.start(), fenced_regions):
-                body_end = heading_match.start()
-                break
+        body_end = next((h.start() for h in _ANY_HEADING.finditer(text, body_start)
+                         if not _is_in_fenced_block(h.start(), fenced_regions)), len(text))
 
         body = text[body_start:body_end].strip()
 
