@@ -26,7 +26,12 @@ project uses.
 If the same app must also ship on iOS, the honest answers are Flutter (`stack-flutter`) or
 Kotlin Multiplatform for shared logic with a native SwiftUI front end — Google calls KMP *"stable
 and production-ready"* for **business logic**, and does *not* say that of Compose Multiplatform's
-iOS UI. Neither KMP nor CMP is a decided stack here.
+iOS UI. Kotlin Multiplatform is the decided path to iOS from here —
+`skills/stack-kotlin-multiplatform/SKILL.md`. **Start KMP-shaped on day one** (confirmed live
+2026-09-12): keep the business logic in its own Gradle module that imports nothing from `android.*`
+or `java.*`; kotlinlang.org's *Make your Android application work on iOS* guide then makes the move
+one wizard (*Kotlin Multiplatform Shared Module*) and one package move into `commonMain`, with each
+Android-only import the only thing to rewrite.
 
 ## Toolchain, as of 2026-09-11
 
