@@ -96,7 +96,44 @@ cheaper than.
 
 ### Quality mode
 
-(Task 3 fills this section.)
+The procedure that brought Orclab's own scripts from 190 findings to zero on 2026-09-13
+(BACKLOG #40), in the order that worked. Each step's output is the next step's input.
+
+1. **The stack's lint config is present, or is written first.** Detect the language(s) the way
+   `/orc-test detect` does. For each, the matching `stack-*` skill's section
+   `## Lint — where code-discipline lands` names the config file and its contents. If the
+   project already has that file, use it as it is — a project's own settings win, and this mode
+   does not edit them. If not, write that section's config verbatim, tell the user the project
+   has just adopted `code-discipline`, and commit the config on its own.
+2. **Baseline, in numbers.** The linter over the whole tree (the stack section's command —
+   `ruff check .`, `oxlint .`, `./gradlew detekt`, and so on) and `/orc-test analyze` on the
+   same path. Write down: findings by rule, coverage, TCE, test-lint count. This is the "before";
+   the report at the end is measured against it.
+3. **Fix, in this order, with the suite green after every file:**
+   1. The linter's **safe autofixes only** — `ruff check --fix`, `oxlint --fix` — and never `--unsafe-fixes`
+      or `--fix-suggestions`: on 2026-09-13 the unsafe set turned two
+      `append`s into `lines.extend((…))` and broke eight tests. Run the suite. Commit.
+   2. **The rule findings, by hand, one function at a time.** Nesting depth: a guard clause
+      that returns early, or the inner block extracted into a helper with a name. Function
+      length: split at the seam the code already has (a comment that says "now do X" is the
+      seam). Swallowed errors: handle it, or a *named, commented* suppression at that one site.
+      Warnings: fix what the warning names. `code-discipline` is the reference for what each
+      fix looks like. A change that needs a test the suite does not have gets that test first
+      (`test-discipline` rule 2). Run the suite after each file; commit per module.
+   3. **`/orc-test generate`** for what the baseline `analyze` listed — surviving mutants,
+      uncovered code, test-lint findings — under `generate`'s own rules: deletions are proposed
+      as a list, never done unasked.
+4. **before → after, every number**, in the shape `generate` reports: findings by rule,
+   coverage, TCE, lint. If a gate still fails: say which, and ask — "Another round?" — and
+   wait. Never say "clean" without the second `analyze`.
+
+Two things this mode refuses. It does not apply unsafe autofixes (above). And it does not add an
+`ignore` list to the linter config to make the number fall: a rule the project's own config
+enables is either fixed or suppressed at the one site with a reason — `code-discipline` rule 7,
+"applies even in cases where the analyzer gives an erroneous warning".
+
+Architecture opinions — whether the code is over-engineered, whether a module should exist —
+are not this mode's. Name them as a follow-up if they show; do not act on them here.
 
 ### Migration mode
 
