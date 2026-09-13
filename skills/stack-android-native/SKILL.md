@@ -212,7 +212,7 @@ table is the other half.
 Google Maven (`google()`) and Maven Central (`mavenCentral()`) are the repositories; every
 version belongs in `gradle/libs.versions.toml`. **Jetpack (`androidx.*`) first** — it is
 Google's own library set and the architecture guide is written against it: `lifecycle-viewmodel-
-compose`, `navigation-compose`, `room`, `datastore`, `hilt`. Before adding a library with native
+compose`, `navigation-compose`, `room3`, `datastore`, `hilt`. Before adding a library with native
 code, apply the 16 KB check above after the build. `orclab:currency-discipline` applies to every
 version; Android Studio's "Upgrade Assistant" and `./gradlew dependencyUpdates` (a plugin) are
 the tools.

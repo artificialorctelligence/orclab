@@ -16,10 +16,12 @@ named and left open.
 
 ## When this is the stack
 
-direflail's choice, with Unity, for **cross-platform games including mobile** (BACKLOG #4,
-2026-09-11); neither preferred yet. Godot is **MIT-licensed, free, no account, no revenue
-threshold** — the whole engine is a ~150 MB executable. Smaller ecosystem than Unity; native
-Linux editor that is a first-class platform, not a port. Two languages:
+`/orc-code`'s **default for every game scope** — desktop, mobile, or both — with Unity
+(`stack-unity`) the alternative, chosen when the larger ecosystem or its platform SDK integrations
+(ads, IAP, analytics) are what the game needs (v18 spec §2, 2026-09-12). Godot is **MIT-licensed,
+free, no account, no revenue threshold** — the whole engine is a ~150 MB executable. Smaller
+ecosystem than Unity; native Linux editor that is a first-class platform, not a port. Two
+languages:
 
 - **GDScript** — Godot's own Python-like language; the default and the one every tutorial uses.
   Exports to every platform including web.

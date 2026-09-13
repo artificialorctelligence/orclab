@@ -17,11 +17,11 @@ are answered. "Scope divergence" below says what the docs say about them; no gam
 
 ## When this is the stack
 
-direflail's choice, with Godot, for **cross-platform games including mobile** (BACKLOG #4,
-2026-09-11). Neither is preferred over the other yet. Unity is the larger ecosystem — more
-packages, more platform SDK integrations (ads, IAP, analytics), more hiring — and is C#. Godot
-(`stack-godot`) is smaller, open source, GDScript or C#. A game that must ship on both stores is
-fine in either; the store ingredients apply to both unchanged.
+The **alternative** on every game row of `/orc-code`'s Defaults Table — Godot (`stack-godot`) is
+the default for desktop, mobile, or both — chosen when the concern below applies (v18 spec §2,
+2026-09-12). Unity is the larger ecosystem — more packages, more platform SDK integrations (ads,
+IAP, analytics), more hiring — and is C#. Godot is smaller, open source, GDScript or C#. A game
+that must ship on both stores is fine in either; the store ingredients apply to both unchanged.
 
 **Licensing, because it is the question people have about Unity.** Unity Personal is free for
 individuals and organisations under **US$200K** revenue or funding in the prior 12 months; Pro is

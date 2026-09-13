@@ -132,8 +132,8 @@ rows' concern lines — what would move a project from Flutter to either alterna
 | App | Android + iOS, nothing else | Flutter | React Native; Kotlin Multiplatform | `skills/stack-flutter/SKILL.md` — same; iOS builds without a Mac are in its "Building without a Mac"; RN: `skills/stack-react-native/SKILL.md`; KMP: `skills/stack-kotlin-multiplatform/SKILL.md` |
 | App | web only | React (Vite, TypeScript) + FastAPI | Next.js (front, or Node back end); Django | `skills/stack-web/SKILL.md` — read it in full before scaffolding |
 | App | two or more of desktop / mobile / web, iOS ticked | Flutter | React Native + React web; Kotlin Multiplatform + Compose Multiplatform | `skills/stack-flutter/SKILL.md` — same; RN: `skills/stack-react-native/SKILL.md`; KMP: `skills/stack-kotlin-multiplatform/SKILL.md` |
-| App | two or more of desktop / mobile / web, iOS not ticked | Flutter | React Native + React web; Kotlin Multiplatform + Compose Multiplatform | `skills/stack-flutter/SKILL.md` — same |
-| Game | desktops only | Godot 4 | Unity 6 | `skills/stack-godot/SKILL.md`, `skills/stack-unity/SKILL.md` — read the chosen one in full; neither is preferred over the other, ask which |
+| App | two or more of desktop / mobile / web, iOS not ticked | Flutter | React Native + React web; Kotlin Multiplatform + Compose Multiplatform | `skills/stack-flutter/SKILL.md` — same; RN: `skills/stack-react-native/SKILL.md`; KMP: `skills/stack-kotlin-multiplatform/SKILL.md` |
+| Game | desktops only | Godot 4 | Unity 6 | `skills/stack-godot/SKILL.md` — read it in full before scaffolding; Unity: `skills/stack-unity/SKILL.md` |
 | Game | mobile only | Godot 4 | Unity 6 | same |
 | Game | desktop + mobile | Godot 4 | Unity 6 | same |
 | Game | web, alone or with others | Godot 4 *(stub — web export not researched)* | — | `skills/stack-godot/SKILL.md` has no web section yet |

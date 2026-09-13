@@ -16,9 +16,10 @@ React Native is a way to write a phone app in JavaScript or TypeScript using Rea
 component model as a React website — where each `<View>` or `<Text>` becomes the phone's own native
 widget rather than a drawing of one. It is the **alternative** on two rows of `/orc-code`'s Defaults
 Table: *Android + iOS, nothing else* and *two or more of desktop / mobile / web, iOS ticked*, where
-Flutter is the default (Task 8: EAS Build takes only React Native projects, but Codemagic builds and
-signs Flutter for iOS, so iOS-from-Linux does not force this stack). The concern that moves a project
-here: **the team already writes React, or the web target is a real website** — *"React primitives
+Flutter is the default (`stack-flutter`'s `### Building without a Mac`: EAS Build takes only React
+Native projects, but Codemagic builds and signs Flutter for iOS, so iOS-from-Linux does not force
+this stack). The concern that moves a project here: **the team already writes React, or the web
+target is a real website** — *"React primitives
 render to native platform UI, meaning your app uses the same native platform APIs other apps do"*
 (reactnative.dev front page, confirmed live 2026-09-12), and the web half is plain React DOM, where
 Flutter paints its own canvas everywhere. Not this stack: games (Godot, Unity), anything native-only.
@@ -76,11 +77,14 @@ Connect API key), are in `stack-flutter`'s `### Building without a Mac`. **Here 
 Build**, the one service that skill rules out for Flutter, for the same reason: its prerequisite is
 *"A React Native Android or iOS project"* (that skill's finding, from `docs.expo.dev/build/setup`).
 `npx eas-cli@latest login`, `build:configure`, then `eas build --platform ios` (the setup page,
-2026-09-03) builds in Expo's cloud with generated credentials (*"EAS Build can generate and manage
-Android keystores, iOS provisioning profiles and distribution certificates"* — Task 8's report);
-`eas submit` uploads with the API key and *"works on macOS, Linux, and Windows"* (`/submit/ios`).
-Free: 15 iOS and 15 Android builds a month, then $2–4 per iOS build (Task 8's report). Concern that
-picks Codemagic instead: a `codemagic.yaml` already in the repo — it has a React Native quick-start.
+2026-09-03) builds in Expo's cloud with generated credentials — the keystore and distribution
+certificate included: *"When you run `eas build`, you will be prompted to generate credentials if
+you have not done so already … Where needed, they will be stored on EAS servers"*
+(`docs.expo.dev/app-signing/managed-credentials`, confirmed live 2026-09-12); `eas submit` uploads
+with the API key and *"works on macOS, Linux, and Windows"* (`/submit/ios`). Free plan: *"15
+Android and 15 iOS builds"* a month, then a flat rate per build — iOS **$2** on a medium worker,
+**$4** on a large one (`expo.dev/pricing`, confirmed live 2026-09-12). Concern that picks Codemagic
+instead: a `codemagic.yaml` already in the repo — it has a React Native quick-start.
 
 ## React web and desktop
 
@@ -113,10 +117,9 @@ row's own stack.
 
 ### Against Flutter for a cross-family project
 
-A cross-family project is choosing between one codebase that draws the same screens everywhere,
-or native phone widgets beside a real website. A project that ticks phones plus a website, or
-phones plus a desktop, is choosing between Flutter drawing the same screens on every one of them
-and React drawing a real website beside native phone widgets. Both cross-family rows of `/orc-code`'s Defaults Table default to Flutter; the comparison
+A cross-family project — phones plus a website, or phones plus a desktop — is choosing between
+Flutter drawing the same screens on every one of them and React drawing a real website beside
+native phone widgets. Both cross-family rows of `/orc-code`'s Defaults Table default to Flutter; the comparison
 and the concern lines live in `stack-flutter`'s `## Beyond mobile — desktop and web`. The concern
 from this side, in one line: **the web tick is a website, not a phone app in a browser** — Flutter's
 own web FAQ (confirmed live 2026-09-12) says its output *"doesn't align with what search engines
@@ -198,4 +201,4 @@ native project — so each check runs on the generated file, after `npx expo pre
 - Expo source on `sdk-57`: `templates/expo-template-default` (`app.json`, `gitignore`, `package.json`, `src/`), `templates/expo-template-bare-minimum/{ios/Podfile,android/app/build.gradle,android/gradle.properties}`, `packages/expo-modules-autolinking/.../ExpoRootProjectPlugin.kt`, `packages/expo-sqlite/{android/src/main/java/expo/modules/sqlite/SQLiteModule.kt,ios/SQLiteModule.swift}` — all under `https://raw.githubusercontent.com/expo/expo/sdk-57/`
 - Desktop and web: `https://necolas.github.io/react-native-web/docs/`, `https://microsoft.github.io/react-native-windows/docs/getting-started`, `.../docs/rnw-dependencies`, `https://raw.githubusercontent.com/microsoft/react-native-macos/main/README.md`, `https://raw.githubusercontent.com/react-native-async-storage/async-storage/main/README.md`, `https://api.github.com/repos/react-native-skia/react-native-skia/commits`; Notifee: `https://notifee.app/react-native/docs/overview`, `.../docs/android/styles`, `https://registry.npmjs.org/@notifee/react-native`, `https://api.github.com/repos/invertase/notifee/commits`
 - Against Flutter (2026-09-12): `https://docs.flutter.dev/platform-integration/web/faq`
-- EAS: `https://docs.expo.dev/build/setup.md`, `/submit/ios.md`, and `stack-flutter`'s `### Building without a Mac` with Task 8's report (`/build/setup`, `/app-signing/managed-credentials`, `expo.dev/pricing`); store rules: the Play and App Store ingredients under `skills/orc-package/ingredients/`.
+- EAS: `https://docs.expo.dev/build/setup.md`, `/submit/ios.md`, `/app-signing/managed-credentials.md`, `https://expo.dev/pricing` (all 2026-09-12), and `stack-flutter`'s `### Building without a Mac`; store rules: the Play and App Store ingredients under `skills/orc-package/ingredients/`.

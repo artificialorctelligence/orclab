@@ -59,10 +59,10 @@ be paired with Vite to create a full-stack React framework"*; concern: react.dev
 wanted on top of this skill's build tool. Both need a Node server unless statically exported.
 
 **Back end: FastAPI.** The back end is the program that answers the browser's requests and owns the
-data. The candidates are Python and Node, and the one concern that decides between them is stated in
-Orclab's own spec: *a Python back end shares nothing with a React front end but keeps direflail in
-the language they know; a Node back end shares the language with the front end.* By the selection
-rule — the easiest option that works — Python wins because FastAPI's own docs show every piece of
+data. The candidates are Python and Node, and the concern that decides it is Orclab's own: a Python
+back end shares nothing with a React front end but keeps the developer in the language they already
+know; a Node back end shares the language with the front end. By the selection rule — the easiest
+option that works — Python wins because FastAPI's own docs show every piece of
 this stack on a first-party page: serving the built React app (*"This is useful for frontend tools
 that generate static files, like React with Vite"*, `app.frontend("/", directory="dist")`), the
 database (*"SQLModel … was made by the same author of FastAPI to be the perfect match"*, SQLite in
@@ -170,7 +170,7 @@ serving `web/dist` and the API on one port; FastAPI's deployment page lists what
 certificate, and a service manager. Static hosting — Vite: *"You may deploy this `dist` folder to any
 of your preferred platforms"* (GitHub Pages, Netlify, Cloudflare, …) — is only for a front end with no
 back end, or whose API is at another origin (then CORS is the back end's job). Containers (Docker)
-are BACKLOG #4's open exploration, not decided here.
+are deliberately parked (v18 spec §6); no default here.
 
 ## Sources (live on 2026-09-12)
 

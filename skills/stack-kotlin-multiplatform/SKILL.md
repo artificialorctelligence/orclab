@@ -134,7 +134,7 @@ platform and a native UI per platform; on the two cross-family rows of `/orc-cod
 Table this stack is the alternative that keeps everything in Kotlin — the shared module below,
 Compose Multiplatform drawing every screen — and Flutter is the default (the comparison lives in
 `stack-flutter`'s `## Beyond mobile — desktop and web`). kotlinlang.org's supported-platforms page
-(now dated 2026-09-09, confirmed live 2026-09-12) rates the UI framework per target — *"Android
+(dated 2025-09-10, confirmed live 2026-09-12) rates the UI framework per target — *"Android
 Stable iOS Stable Desktop (JVM) Stable Web based on Kotlin/Wasm Beta"* — and defines the words:
 Stable means *"you can use it even in the most conservative of scenarios"*, Beta *"It's almost done,
 so user feedback is especially important now."* **Desktop is a JVM program**: *"Compose
