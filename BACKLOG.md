@@ -2955,8 +2955,9 @@ touch `/orc-code`'s new-project or add-feature flows.
 ~/projects/orcshot` into the scratchpad; never pushed, deleted at the end), through
 `skills/orc-code/SKILL.md`'s `### Quality mode` as written, by a subagent (Task 6 of the v19
 plan). Before → after: ruff findings 376 → 0 (code-discipline's four rules 58 → 0 — PLR1702 41,
-PLR0915 17, E722 0, S110 0; the other 318 were ruff 0.16's defaults, 222 of them safe autofixes
-and 96 by hand); coverage 77.9% → 78.3% (4308/5531 → 4349/5553 lines, gate 80 still failing);
+PLR0915 17, E722 0, S110 0; the other 318 were ruff 0.16's defaults — the baseline marked 186 of
+them safe-fixable, and `ruff check --fix` fixed 222, because a fix exposes further fixable
+findings and ruff iterates until none remain; the last 96 by hand); coverage 77.9% → 78.3% (4308/5531 → 4349/5553 lines, gate 80 still failing);
 TCE 75.6% → 76.3% (8347/11035 → 8509/11151, gate 70 passing); test-lint 7 → 1; tests
 1260 → 1277; suite green after every file. For the four rules, 38 functions reshaped by hand
 across 18 modules (21 of the 58 findings in the 6200-line `editor_window.py`); the 96 remaining
@@ -2971,8 +2972,10 @@ imports (GTK windows, 31 of the 58 findings) — the fix there is limited to a m
 checked by ruff's undefined-name rules and an import, and the commit says so; (4) the coverage
 gate's remaining gap is entirely in those files, which another round of `generate` cannot close.
 Three `orc-test` findings from the same run, for their own entries or a Task-8 pass, not fixed
-here: pytest-cov's lcov omits source files nothing imported, so Orclab's coverage denominator
-(5531 lines) silently excludes those 17 files; `analyze`'s survivor line numbers are relative to
+here: in Orcshot's src-layout, orc-test's `--cov=.` did not walk into the never-imported files
+— coverage.py only lists unexecuted files in directories that have an `__init__.py`, and `src/`
+has none, so the lcov held the 68 files something imported and Orclab's coverage denominator
+(5531 lines) silently excluded the other 17; `analyze`'s survivor line numbers are relative to
 the function, not the file (it reads `mutmut show`'s per-function diff), so `generate` cannot
 navigate by them; and ~75% of a whole-project `analyze`'s wall clock (35 of 45 minutes) is one
 `mutmut show` subprocess per survivor. Full report:

@@ -104,7 +104,10 @@ step's output is the next step's input.
    before anything is measured — and on a checkout that is not the developer's own (a fresh
    clone, a worktree) that means doing the project's documented install first (its README's
    venv and `pip install -e`, or the stack's equivalent) and running `/orc-test` with that
-   interpreter. Found 2026-09-13: a clone of Orcshot reported 10 collection errors because
+   interpreter — concretely, the project's own venv `bin` first on `PATH` for the orc-test
+   commands, because `run.py` invokes a bare `python3`; and only a venv that has pytest
+   installed, since any other venv first on `PATH` breaks the runner the other way (the
+   scratch venv of 2026-09-13: "8 failed", no pytest in it). Found 2026-09-13: a clone of Orcshot reported 10 collection errors because
    `import orcshot` resolved to the machine's installed `.deb` copy, not `src/`. That is not a
    red suite; it is the wrong interpreter. A suite that is red *with* the right interpreter is
    fixed first, and that is `generate`'s step 1, not this mode's.
