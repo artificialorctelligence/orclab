@@ -2,6 +2,40 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.18.0] - 2026-09-12
+
+### Added
+- Four stack skills, each written from live-verified research with dated stamps:
+  `stack-python-desktop` (PySide6, one codebase for Linux/Windows/macOS, with an Ubuntu/Mint/Fedora
+  tray subtree), `stack-kotlin-multiplatform` (shared Kotlin logic under native Compose and SwiftUI
+  fronts), `stack-react-native` (Expo, with React web and desktop reach), and `stack-web` (React +
+  Vite + TypeScript in front, FastAPI behind, SQLite via SQLModel).
+- Three facet sections on every stack skill — presence (how the app stays reachable when not in
+  front: tray icon, status-bar icon, notifications), UI (which frameworks bind to the stack),
+  storage (database and config defaults per platform) — and a scope-divergence section on the two
+  game skills (what the engine keeps per platform, what must be designed differently for desktop
+  vs mobile).
+- `### Building without a Mac` in the iOS and Flutter skills: Codemagic as the default (500 free
+  macOS minutes/month, generates the distribution certificate from an App Store Connect API key),
+  with Xcode Cloud, GitHub Actions macOS runners and EAS Build as concern-lined alternatives.
+- A `CLAUDE.md` rule: a stack or channel Orclab has never met gets its researched, dated,
+  unproven-marked skill or ingredient before the first project builds on it — private,
+  never-released projects included.
+
+### Changed
+- `/orc-code` now asks "app or game?" and "which platforms?" instead of "what language?", and its
+  Defaults Table is keyed by that answer — eleven rows, every platform subset landing on exactly
+  one. Python for desktop; Kotlin and Swift for single-platform mobile; Flutter wherever two
+  platforms or families are ticked (React Native and Kotlin Multiplatform as alternatives, each
+  with the concern that would pick it); Godot for every game scope with Unity the alternative;
+  React + FastAPI for web only. Java, Objective-C and browser games are listed as stubs to
+  research on first use.
+- Every stack skill now names the concern that would move a project off its default, next to the
+  default — an alternative without one is treated as a defect.
+- BACKLOG #4 (undecided stacks) and #33 (researched platform knowledge) resolved; #36 re-scoped to
+  adopting gdmutant; #37 (snap/flatpak/ego/spices after Orcshot ships), #38 (App Store
+  ingredient's stale "10×" wording) and #39 (v18 polish items) opened.
+
 ## [0.17.0] - 2026-09-12
 
 ### Added
