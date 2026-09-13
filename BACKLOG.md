@@ -2950,3 +2950,46 @@ extract-rules phase and may be partly covered by the plugin; check before buildi
 
 Scope boundary: this does not build a migration engine — that is the plugin's — and does not
 touch `/orc-code`'s new-project or add-feature flows.
+
+## #42: orc-test: coverage denominator omits never-imported files in a src/ layout without __init__.py; survivor line numbers are function-relative; per-survivor `mutmut show` dominates analyze
+
+Three defects in `orc-test` itself, found on 2026-09-13 during `/orc-code refactor`'s first real
+quality-mode run on a scratch clone of Orcshot (BACKLOG #41, "Quality mode, first real run";
+full report `.superpowers/sdd/2026-09-13-orclab-v19-orc-code-refactor/task-6-report.md`). Left
+for this entry there; none is fixed yet. All three live in
+`skills/orc-test/scripts/orc_test/langs/python.py`.
+
+**The coverage denominator silently omits the files nothing imports, in a `src/` layout with no
+`__init__.py`.** Observed: Orcshot has 85 source files; 17 of them (GTK windows, no headless
+test) are imported by nothing in the suite, and `coverage.py` only lists an *unexecuted* file
+when its directory has an `__init__.py` — Orcshot's `src/` has none — so the lcov held the 68
+files something imported and Orclab's denominator (5531 lines) excluded the other 17.
+Consequence: the 80% coverage gate read a number that flattered the suite (77.9% → 78.3% on a
+denominator that was missing the least-tested fifth of the tree), and step 2's "which files the
+suite never imports" list had to be built by diffing the coverage report's file list against
+the tree by hand. Where: `coverage_parse` builds `Coverage` from the lcov alone; `coverage_cmd`
+passes `--cov=<target>` with no `source`/`--cov-config` that would make coverage.py walk
+unexecuted directories.
+
+**Survivor line numbers are function-relative, not file-relative.** Observed: `analyze`'s
+survivor list gave lines that did not point at the mutated statements; `mutmut show <key>` prints
+a diff of the *function's own source*, so the hunk header's start line is line 1 of the function,
+and `_survivor`'s "hunk start plus context lines before the first `-`" is correct within that
+diff but wrong for the file for every function not at line 1. Consequence: `generate` cannot
+navigate to a survivor by the line it is given; the file and the replacement text are right, the
+line is not. Where: `_survivor` (called per survivor from `mutation_parse`), which parses
+`mutmut show`'s output — the function's start line in the file has to come from somewhere else
+(mutmut's own metadata, or an `ast` lookup of the function name the key carries).
+
+**One `mutmut show` subprocess per survivor dominates `analyze`'s wall clock.** Observed: the
+whole-project `analyze` on Orcshot (26k mutants) took ~45 minutes, ~10 of them mutmut's own run
+and ~35 in the per-survivor `mutmut show` loop `_survivor` runs — ~75% of the total, for
+information (file, line, replacement) that mutmut has already computed once. Consequence: a
+first `analyze` on a real project is long enough that the skill now tells the user to start it
+and read the baseline findings while it waits. Where: `mutation_parse` → `_survivor` → `_show`,
+one subprocess per surviving mutant; a fix for the line-number defect above that reads mutmut's
+metadata instead of `show`'s diff would remove the loop at the same time.
+
+Scope: Python only — the other languages' `langs/*.py` read their tools' own reports and are not
+known to share any of the three. Not touched by #41's resolution, which corrected `/orc-code
+refactor`'s prose and left orc-test's code alone.
