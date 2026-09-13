@@ -89,5 +89,7 @@ language's tooling has them (Dart and GDScript have no free nesting/length rule 
 - Not a style guide — naming, formatting and import order are the formatter's job.
 - Not `test-discipline` — that is the test; this is the code the test is written against.
 - Not enforced by this file. A rule in prose fires only when it is read. The checkable ones
-  (nesting, function length, empty catch, warnings) become linter configuration in what
-  `/orc-code` scaffolds and a hook that runs it on every write — BACKLOG #40 carries both.
+  (nesting, function length, empty catch, warnings) are linter configuration — each `stack-*`
+  skill's `## Lint` section — and Orclab's `lint_on_write` hook runs the project's configured
+  linter on every `Edit`/`Write`, whoever made it, and reports what it found. No config, no run:
+  the hook carries no rules of its own. `ORCLAB_LINT_ON_WRITE_OFF=1` disables it.

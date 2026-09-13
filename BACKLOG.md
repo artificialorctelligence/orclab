@@ -2770,7 +2770,7 @@ alternatives line now says so beside npm's 8.3.1. orc-test: the 14 "Task 19 of t
 references (seven `languages/*.md`, seven fixture READMEs) are gone; `grep -rn "v17\|Task 19"
 skills/orc-test/` is empty and its 148 tests still pass.
 
-## #40: Evaluate a found list of seven code-shape rules (linear control flow, loop ceilings, two assertions per function …) and decide whether Orclab's discipline skills should carry them (UPDATED 2026-09-13 — evaluated and adopted; `code-discipline` shipped; re-scoped to the lint configs and the hook)
+## #40: Evaluate a found list of seven code-shape rules (linear control flow, loop ceilings, two assertions per function …) and decide whether Orclab's discipline skills should carry them (UPDATED 2026-09-13 — evaluated and adopted; `code-discipline` shipped; re-scoped to the lint configs and the hook) (RESOLVED 2026-09-13)
 
 direflail brought this on 2026-09-13, as a screenshot of a bulleted list found elsewhere, with the
 question "see if orclab can use it" — might help AI development. The list, transcribed verbatim:
@@ -2840,3 +2840,30 @@ a skill body fires only if read; Holzmann's rule 10 wants the checker run daily)
    that runs the project's configured linter on the file just written and reports findings —
    mechanical, every write, subagents included. Only worth building once (1) gives it something
    to run; a hook with no config behind it is `/orc-test`'s "lint: not run" in a new place.
+
+**Resolved for real, not just tracked** (2026-09-13, all three layers shipped the same day):
+
+1. `skills/code-discipline/SKILL.md` — the rules, sourced (above).
+2. A `## Lint — where code-discipline lands` section in all nine `stack-*` skills, each rule name,
+   default and switch confirmed against the tool's own sources that day (listed in each skill's
+   Sources): ruff `PLR1702`/`PLR0915`/`E722`/`S110` + pyright strict; oxlint — the Vite template's
+   actual linter, checked in `create-vite/template-react-ts` — and ESLint for Expo; detekt's four
+   rules + Kotlin `allWarningsAsErrors`; SwiftLint `nesting` (default already 2) and
+   `function_body_length`, a custom rule for empty `catch` because SwiftLint has none, and
+   `SWIFT_TREAT_WARNINGS_AS_ERRORS` from Apple's `Swift.xcspec`; Dart `empty_catches` + analyzer
+   severities, with the honest gap that the free linter has no nesting or length rule;
+   SonarAnalyzer.CSharp `S134`/`S138`/`S108`/`S2486` with the two thresholds in `SonarLint.xml`
+   (the analyzer's `ParameterLoader.cs` reads them there — `.editorconfig` cannot set them);
+   gdlint, whose `max-nested-blocks` and `max-statements` are commented out in its own config,
+   plus `project.godot`'s 49 per-warning severities.
+3. `hooks/scripts/lint_on_write.py`, `PostToolUse` on `Edit|Write|MultiEdit`: runs the project's
+   configured linter on the file just written — only when the tool is on PATH *and* its config
+   file sits between the file and the git root, so it never brings an opinion the project has
+   not adopted — and reports findings on stderr with exit 2, the documented way a PostToolUse
+   hook reaches Claude. Eight tests with a fake linter on PATH; then real: ruff 0.16.7 with the
+   Python skill's `pyproject.toml` verbatim on a file nesting five deep with a bare
+   `except: pass` — the hook reported `too-many-nested-blocks (5 > 2)`, `bare-except` and
+   `try-except-pass`, exit 2. A clean file costs 40 ms; a file with no config, 20 ms. C# is left
+   to the build (no per-file analyzer finishes in seconds), and Orclab's own scripts have no
+   `[tool.ruff]` yet, so the hook is silent on them until they adopt it — a real remaining gap:
+   Orclab does not yet dogfood its own code-discipline config.

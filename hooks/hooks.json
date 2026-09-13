@@ -37,6 +37,18 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lint_on_write.py\"",
+            "timeout": 40
+          }
+        ]
+      }
     ]
   }
 }
