@@ -137,21 +137,58 @@ are not this mode's. Name them as a follow-up if they show; do not act on them h
 
 ### Migration mode
 
-(Task 4 fills this section.)
+No migration has gone through this yet; the first one corrects it.
 
-1. Run the **Plugin-Discovery Procedure** below, searching for a plugin named `code-modernization`.
-2. **If not found**: same missing-dependency handling as the Add-to-Existing Flow above, naming
-   `code-modernization` instead.
-3. **If found**:
-   - Check whether `commands/modernize-status.md` exists in the located plugin directory. If it
-     does, read and follow it first to check whether prior modernization work already exists for
-     this project.
-   - If `modernize-status` reports existing progress, continue from whatever step it indicates.
-   - If `modernize-status` reports no prior work, isn't available, or doesn't exist in this
-     installed version, start from `commands/modernize-preflight.md` instead.
-   - Read whichever command file applies in full, and follow its instructions directly, exactly as
-     if the user had invoked that command themselves with the same `$ARGUMENTS`. Tell the user
-     plainly that you're using code-modernization's own workflow for this.
+The engine is Anthropic's `code-modernization` plugin — its preflight → assess → map →
+extract-rules → brief → (transform per module | uplift for a same-stack version bump) → harden
+→ status pipeline and its specialist agents. This flow wraps it rather than reimplementing any
+of it, and adds the three things it does not know about: which stack Orclab would choose, that
+"still works" has to be provable, and that a project is a repository rather than a `legacy/`
+subtree.
+
+1. **Find the plugin** with the Plugin-Discovery Procedure below. If it is *not installed* —
+   including the case where a marketplace clone holds a copy — stop with the install command
+   the procedure gives. Do not follow a marketplace copy's commands: they spawn the plugin's own
+   subagents (`test-engineer`, `architecture-critic`, …), which exist only once it is installed,
+   and the run would degrade silently at the first spawn.
+2. **Decide the target the way a new project is decided.** Ask the New-Project Flow's two
+   questions — type, and the platforms ticked — for the *target*, and take the Defaults Table's
+   row. That row's `stack-*` skill is the migration's constraint: its toolchain versions, its
+   project layout, its `## Lint — where code-discipline lands` config, its store-rules table.
+   Read it in full now. If the row is a stub or there is no row, `CLAUDE.md`'s "Before the first
+   project builds on a stack … Orclab has never met" applies: the research comes first, and this
+   flow stops until it exists.
+3. **Tests before any `modernize-*` command runs.** `/orc-test analyze` on the source project.
+   If the suite is red, a language has no runnable suite, or coverage is under the gate, the
+   first work is `/orc-test generate` *on the old code* — characterization tests that pin what
+   it does today, under `test-discipline`. The plugin's `extract-rules` will document the
+   business rules; these tests are what make them executable, and without them the gate in step
+   6 has nothing to measure. Record the baseline: coverage, TCE, test count. This step is not
+   optional and it is not the plugin's.
+4. **Lay out a worktree the plugin's way.** Every `modernize-*` command addresses the source as
+   `legacy/<name>` and writes to `analysis/<name>/` and `modernized/<name>/`. Create a worktree
+   for the branch (`superpowers:using-git-worktrees`), and inside it a scratch directory —
+   `.orclab/modernize/` — holding `legacy/<name>` as a symlink to the worktree root, so the
+   plugin reads the real files and its `analysis/` and `modernized/` land under `.orclab/` where
+   nothing else looks. Run every plugin command from `.orclab/modernize/`.
+5. **Hand over, with the stack as the brief's constraint.** `modernize-status <name>` first; if
+   it reports prior work, continue from there, otherwise `modernize-preflight <name>
+   [target-stack]` and on through the plugin's own sequence, reading each command file in full
+   from the plugin's directory and following it exactly as if the user had typed it. The target
+   stack — optional in `preflight`'s and `brief`'s own `[target-stack]`, required in
+   `transform`'s `<target-stack>` — is the stack skill's own naming, in one line: e.g. `Kotlin +
+   Jetpack Compose, per Orclab's stack-android-native: AGP
+   9.x, compileSdk 36, app/build.gradle.kts layout`. When `brief` produces its target
+   architecture, check it against the stack skill's layout section before the user approves it,
+   and correct the brief, not the result, if it lands elsewhere. A same-stack version bump goes
+   through `modernize-uplift <name> <source-version> <target-version>` instead of `transform`.
+6. **Exit gate.** Copy `modernized/<name>/` back over the worktree as the branch's content, and
+   the brief and rule catalogue from `analysis/<name>/` into `docs/`. Then `/orc-test run` must
+   be green on the migrated code, and `/orc-test analyze` must report coverage and TCE
+   **no lower than** step 3's baseline. If either fails, the migration is not done: say which, and
+   what the plugin's `status` shows, and stop. "Done" is not said before this gate.
+7. **Report** in reader terms: what moved, what the old suite proved, the numbers before and
+   after, and what `harden` found.
 
 ## Plugin-Discovery Procedure
 
@@ -164,7 +201,16 @@ Given a plugin name to find (e.g. `feature-dev`, `code-modernization`):
 3. The first one whose `"name"` matches the target plugin exactly is the match — its containing
    directory (the directory holding that `.claude-plugin/` folder) is the plugin's root. Use that
    root to locate the plugin's `commands/*.md` files.
-4. If no match is found under either root, the plugin is not installed.
+4. **Found is not installed.** A match whose root is under `~/.claude/plugins/marketplaces/` is
+   a marketplace *copy*; the plugin is installed only if its name appears in
+   `~/.claude/plugins/installed_plugins.json` (a `<plugin>@<marketplace>` key). Read that file.
+   A copy with no entry is *available, not installed* — its command files can be read, but the
+   agents they spawn are not registered, so treat it as not installed.
+5. If no match is found, or the match is available but not installed, stop and tell the user
+   plainly, with the command: `claude plugin install code-modernization@claude-plugins-official`
+   (or the plugin's own name and marketplace) — and that a **fresh session** is needed after
+   installing; a plugin installed mid-conversation is not visible to the session that installed
+   it (`CLAUDE.md`, marketplace gotcha 4, confirmed on both Desktop and the CLI).
 
 Real install layouts you may encounter (all three have been directly observed): a versioned cache
 path (`.../cache/<marketplace>/<plugin-name>/<version>/`), a nested marketplace path

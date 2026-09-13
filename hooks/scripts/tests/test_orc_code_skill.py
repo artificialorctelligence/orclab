@@ -35,3 +35,22 @@ def test_quality_mode_is_the_dogfood_procedure_in_order():
     marks = [q.index(p) for p in ("## Lint", "Baseline", "safe autofixes", "one function at a time",
                                    "/orc-test generate", "before → after")]
     assert marks == sorted(marks)
+
+
+def test_migration_mode_adds_stack_tests_worktree_and_gate():
+    m = TEXT[TEXT.index("### Migration mode"):TEXT.index("## Plugin-Discovery Procedure")]
+    assert "No migration has gone through this yet; the first one corrects it." in m
+    for phrase in ["Defaults Table", "stack-*", "[target-stack]",
+                   "characterization", "/orc-test analyze", "/orc-test generate",
+                   "before any `modernize-", "legacy/", "analysis/", "modernized/",
+                   "worktree", "/orc-test run", "no lower than", "modernize-status",
+                   "modernize-preflight"]:
+        assert phrase in m, phrase
+
+
+def test_discovery_tells_available_from_installed():
+    d = TEXT[TEXT.index("## Plugin-Discovery Procedure"):TEXT.index("## Defaults Table")]
+    for phrase in ["installed_plugins.json", "available, not installed",
+                   "claude plugin install code-modernization@claude-plugins-official",
+                   "fresh session"]:
+        assert phrase in d, phrase
