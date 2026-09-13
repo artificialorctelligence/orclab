@@ -74,6 +74,19 @@ def test_config_is_found_between_the_file_and_the_git_root(tmp_path):
     assert out.returncode == 2 and "F401" in out.stderr
 
 
+def test_a_pyproject_without_tool_ruff_does_not_stop_the_search(tmp_path):
+    """ruff's own discovery skips such a file; Orclab's orc-todo pyproject is mutmut-only."""
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    (tmp_path / "pyproject.toml").write_text("[tool.ruff]\n")
+    sub = tmp_path / "skills" / "x" / "scripts"
+    sub.mkdir(parents=True)
+    (sub / "pyproject.toml").write_text("[tool.mutmut]\n")
+    f = sub / "pkg.py"
+    f.write_text("x = 1\n")
+    out = run(f, bin_dir=fake_tool(tmp_path / "bin", "ruff", 1, "PLR1702 too many nested blocks"))
+    assert out.returncode == 2 and "PLR1702" in out.stderr
+
+
 def test_javascript_prefers_the_projects_own_node_modules_binary(tmp_path):
     src = project(tmp_path, ".oxlintrc.json", "{}")
     f = src / "a.ts"

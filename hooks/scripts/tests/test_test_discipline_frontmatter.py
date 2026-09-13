@@ -8,7 +8,7 @@ SKILL = ROOT / "skills" / "test-discipline" / "SKILL.md"
 
 def _frontmatter():
     text = SKILL.read_text()
-    m = re.match(r"---\n(.*?)\n---\n", text, re.S)
+    m = re.match(r"---\n(.*?)\n---\n", text, re.DOTALL)
     assert m, "SKILL.md must start with YAML frontmatter"
     return dict(line.split(":", 1) for line in m.group(1).splitlines() if ":" in line)
 
@@ -23,6 +23,6 @@ def test_is_background_only():
 def test_six_rules_and_points_at_tdd():
     text = SKILL.read_text()
     for n in range(1, 7):
-        assert re.search(rf"^## {n}\. ", text, re.M), f"rule {n} missing"
+        assert re.search(rf"^## {n}\. ", text, re.MULTILINE), f"rule {n} missing"
     assert "superpowers:test-driven-development" in text
     assert "/orc-test coverage" in text

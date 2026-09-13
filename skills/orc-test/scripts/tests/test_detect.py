@@ -4,7 +4,6 @@ import subprocess
 import types
 
 import pytest
-
 from orc_test import detect
 
 

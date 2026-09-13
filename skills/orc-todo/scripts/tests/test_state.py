@@ -3,7 +3,6 @@ import os
 import subprocess
 
 import pytest
-
 from orc_todo import state
 
 
@@ -61,16 +60,14 @@ def test_acquisition_is_atomic_not_check_then_set(tmp_path):
     """O_CREAT|O_EXCL must be what fails, not a prior existence check - two processes can both
     pass a check and both proceed."""
     repo = make_repo(tmp_path)
-    with state.held("holder", cwd=repo):
-        with pytest.raises(FileExistsError):
-            os.open(state.lock_path(repo), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    with state.held("holder", cwd=repo), pytest.raises(FileExistsError):
+        os.open(state.lock_path(repo), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
 
 
 def test_the_lock_is_released_even_when_the_body_raises(tmp_path):
     repo = make_repo(tmp_path)
-    with pytest.raises(ValueError):
-        with state.held("boom", cwd=repo):
-            raise ValueError("boom")
+    with pytest.raises(ValueError), state.held("boom", cwd=repo):
+        raise ValueError("boom")
     assert not state.lock_path(repo).exists()
 
 

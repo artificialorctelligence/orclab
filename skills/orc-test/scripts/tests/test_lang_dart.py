@@ -1,5 +1,4 @@
 import pathlib
-import shutil
 
 from orc_test.langs import dart
 from orc_test.model import Coverage, Mutation

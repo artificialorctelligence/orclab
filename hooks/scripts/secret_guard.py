@@ -128,7 +128,7 @@ def evaluate(command):
             continue
         if _is_captured(command, match):
             continue
-        return "{} {}".format(reason, DOC)
+        return f"{reason} {DOC}"
     return None
 
 

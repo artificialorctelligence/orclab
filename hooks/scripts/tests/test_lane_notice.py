@@ -1,7 +1,7 @@
 import json
+import pathlib
 import subprocess
 import sys
-import pathlib
 
 NOTICE = str(pathlib.Path(__file__).resolve().parent.parent / "lane_notice.py")
 

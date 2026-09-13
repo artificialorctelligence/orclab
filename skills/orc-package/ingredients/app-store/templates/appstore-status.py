@@ -9,10 +9,10 @@ Needs PyJWT with its crypto extra (`pip install 'PyJWT[crypto]'`). Never prints 
 Written from Apple's live API docs 2026-09-11 and never run against a real account - correct
 it on first use.
 """
-import gzip
-import io
 import csv
 import datetime as dt
+import gzip
+import io
 import json
 import sys
 import time

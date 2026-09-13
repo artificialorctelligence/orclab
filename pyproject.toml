@@ -10,3 +10,14 @@ pythonpath = [
   "skills/orc-test/scripts",
   "skills/orc-todo/scripts",
 ]
+
+# code-discipline's checkable rules, exactly as skills/stack-python-desktop/SKILL.md's Lint
+# section gives them to a consuming project (BACKLOG #40). lint_on_write runs this on every write.
+[tool.ruff]
+preview = true                      # PLR1702 has been a preview rule since 0.1.15
+extend-exclude = ["mutants", "venv", ".orclab"]
+[tool.ruff.lint]
+extend-select = ["PLR1702", "PLR0915", "E722", "S110"]
+[tool.ruff.lint.pylint]
+max-nested-blocks = 2               # ruff's default is 5
+max-statements = 50                 # ruff's default; statements, not lines — about a printed page

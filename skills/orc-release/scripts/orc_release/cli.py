@@ -16,7 +16,13 @@ import sys
 
 from . import state as st
 from . import versionfiles as vf
-from .steps import crossref_warning, doc_hash, numbering_warning, parse_steps, unclosed_fence_warning
+from .steps import (
+    crossref_warning,
+    doc_hash,
+    numbering_warning,
+    parse_steps,
+    unclosed_fence_warning,
+)
 
 DOC_NAME = "RELEASING.md"
 

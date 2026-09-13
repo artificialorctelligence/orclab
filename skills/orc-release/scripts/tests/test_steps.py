@@ -9,7 +9,6 @@ from orc_release.steps import (
     unclosed_fence_warning,
 )
 
-
 DOC_PLAIN = textwrap.dedent(
     """
     # Cutting a release

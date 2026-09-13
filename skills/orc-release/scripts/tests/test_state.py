@@ -1,7 +1,6 @@
 import json
 
 import pytest
-
 from orc_release.state import (
     STATE_PATH,
     clear_state,

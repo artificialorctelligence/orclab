@@ -12,6 +12,7 @@ This module is the single owner of version-setting - /orc-release uses it direct
 import json
 import os
 import re
+
 import tomllib
 
 PYPROJECT = "pyproject.toml"

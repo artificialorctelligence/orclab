@@ -1,7 +1,7 @@
 import json
+import pathlib
 import subprocess
 import sys
-import pathlib
 
 GUARD = str(pathlib.Path(__file__).resolve().parent.parent / "backlog_guard.py")
 

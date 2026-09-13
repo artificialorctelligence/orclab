@@ -52,21 +52,23 @@ ESLINT = ("eslint.config.js", "eslint", ["eslint"])
 NODE_BIN = "node_modules/.bin"
 
 
-def _config_dir(start, name):
-    """The nearest ancestor of `start` holding `name`, stopping at the git root (or /)."""
+def _config_dir(start, name, holds=lambda p: True):
+    """The nearest ancestor of `start` holding `name` (and passing `holds`), up to the git root."""
     d = pathlib.Path(start).resolve()
     if d.is_file():
         d = d.parent
     for parent in (d, *d.parents):
-        if (parent / name).exists():
+        if (parent / name).exists() and holds(parent / name):
             return parent
         if (parent / ".git").exists():
             break
     return None
 
 
-def _ruff_configured(root):
-    return "[tool.ruff" in (root / "pyproject.toml").read_text(errors="replace") or (root / "ruff.toml").exists()
+def _ruff_section(pyproject):
+    # ruff's own discovery skips a pyproject.toml without [tool.ruff]; a sub-project's
+    # mutmut-only pyproject must not stop the search short of the one that configures ruff
+    return "[tool.ruff" in pyproject.read_text(errors="replace")
 
 
 def command_for(path):
@@ -75,13 +77,13 @@ def command_for(path):
     if ext not in LINTERS:
         return None
     config, tool, argv = LINTERS[ext]
-    root = _config_dir(path, config)
+    root = _config_dir(path, config, _ruff_section if ext == ".py" else lambda p: True)
+    if root is None and ext == ".py":
+        root = _config_dir(path, "ruff.toml")
     if root is None and ext in (".ts", ".tsx", ".js", ".jsx"):
         config, tool, argv = ESLINT
         root = _config_dir(path, config)
     if root is None:
-        return None
-    if ext == ".py" and not _ruff_configured(root):
         return None
     local = root / NODE_BIN / tool
     if local.exists():

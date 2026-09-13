@@ -1,7 +1,5 @@
 import textwrap
 
-import pytest
-
 from orc_publish.tree import Node, load_tree
 
 

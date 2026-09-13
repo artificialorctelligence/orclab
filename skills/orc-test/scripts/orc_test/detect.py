@@ -70,6 +70,6 @@ def declared_test_cmd(root, key, cfg):
         if (data.get("scripts") or {}).get("test"):
             return ["npm", "test"]
     mk = root / "Makefile"
-    if mk.exists() and re.search(r"^test\s*:", mk.read_text(), re.M):
+    if mk.exists() and re.search(r"^test\s*:", mk.read_text(), re.MULTILINE):
         return ["make", "test"]
     return None

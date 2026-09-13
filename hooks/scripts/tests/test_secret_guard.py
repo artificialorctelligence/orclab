@@ -2,7 +2,6 @@ import io
 import json
 
 import pytest
-
 from secret_guard import ALLOW_MARKER, evaluate, main
 
 

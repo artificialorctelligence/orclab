@@ -3,7 +3,6 @@ import re
 import textwrap
 
 import pytest
-
 from orc_release.versionfiles import (
     detect,
     read_version,

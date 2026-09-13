@@ -2,10 +2,9 @@ import tarfile
 import zipfile
 
 import pytest
-
 from orc_publish.inspect import (
-    Finding,
     MAX_REPORTED,
+    Finding,
     UnsupportedArchive,
     format_findings,
     inspect_archive,

@@ -4,7 +4,6 @@ import textwrap
 from orc_release.cli import main
 from orc_release.state import STATE_PATH, load_state
 
-
 DOC = textwrap.dedent(
     """
     # Cutting a release

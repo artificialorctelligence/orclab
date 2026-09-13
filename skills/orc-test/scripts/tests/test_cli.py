@@ -1,7 +1,5 @@
 import types
 
-import pytest
-
 from orc_test import langs
 from tests.helpers import fake, make_repo, run
 

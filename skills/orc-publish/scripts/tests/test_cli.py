@@ -5,24 +5,22 @@ import textwrap
 import time
 
 import pytest
-
-from orc_publish.tree import load_tree
-from orc_publish.selection import SelectionError
 from orc_publish.cli import (
+    DEFAULT_TIMEOUT_SECONDS,
     action_shape_warning,
     build_plan,
     command_error,
-    DEFAULT_TIMEOUT_SECONDS,
     effective_timeout,
     execute_plan,
     expand_path,
     format_plan,
     format_summary,
     main,
-    preflight_refusal,
     run_for,
     timeout_error,
 )
+from orc_publish.selection import SelectionError
+from orc_publish.tree import load_tree
 
 
 def write_yaml(tmp_path, name, content):

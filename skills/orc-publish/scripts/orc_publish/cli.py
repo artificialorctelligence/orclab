@@ -27,7 +27,6 @@ from .inspect import UnsupportedArchive, format_findings, inspect_archive, unkno
 from .selection import SelectionError, resolve_selection, resolve_token
 from .tree import load_tree
 
-
 NOT_ACTIONABLE = "known channel, not yet actionable"
 NO_METRICS = "known channel, no metrics source"
 NO_CONFIRM = "synchronous channel - its publish settles when the action exits"

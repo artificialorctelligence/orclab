@@ -13,7 +13,7 @@ _PATTERNS = [
     ("BSD", r"BSD \d-Clause|Redistribution and use in source and binary forms"),
     ("ISC", r"\bISC License\b"), ("Unlicense", r"This is free and unencumbered software"),
 ]
-_FIELD = re.compile(r"(Apache-2\.0|AGPL|LGPL|GPL|MPL-2\.0|MIT|BSD|ISC|Unlicense)(-[\w.-]+)?", re.I)
+_FIELD = re.compile(r"(Apache-2\.0|AGPL|LGPL|GPL|MPL-2\.0|MIT|BSD|ISC|Unlicense)(-[\w.-]+)?", re.IGNORECASE)
 
 
 def _field_label(value):
@@ -28,7 +28,7 @@ def open_source(root):
         if p.exists():
             text = p.read_text(errors="replace")
             for label, pat in _PATTERNS:
-                if re.search(pat, text, re.I):
+                if re.search(pat, text, re.IGNORECASE):
                     return label
     pkg = root / "package.json"
     if pkg.exists():
@@ -42,7 +42,7 @@ def open_source(root):
     if py.exists():
         # ponytail: only the plain string form (license = "MIT") is read; PEP 621's table form
         # (license = { text = "MIT" }) is not parsed. Add a TOML parser if that form shows up.
-        m = re.search(r'^license\s*=\s*"([^"]+)"', py.read_text(), re.M)
+        m = re.search(r'^license\s*=\s*"([^"]+)"', py.read_text(), re.MULTILINE)
         if m and (label := _field_label(m.group(1))):
             return label
     return None

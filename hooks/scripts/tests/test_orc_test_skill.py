@@ -6,7 +6,7 @@ TEXT = (ROOT / "skills" / "orc-test" / "SKILL.md").read_text()
 
 
 def test_frontmatter_is_default_invocable():
-    fm = re.match(r"---\n(.*?)\n---\n", TEXT, re.S).group(1)
+    fm = re.match(r"---\n(.*?)\n---\n", TEXT, re.DOTALL).group(1)
     assert "name: orc-test" in fm and "disable-model-invocation" not in fm
     assert "allowed-tools: Bash(python3 *)" in fm
 

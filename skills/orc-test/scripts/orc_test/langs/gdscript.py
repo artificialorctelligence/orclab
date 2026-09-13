@@ -21,7 +21,7 @@ CAVEATS = ["A fresh checkout needs one `$GODOT_BIN --headless --import` first, o
            "gdmutant is 0.1.x from one maintainer; pin the minor (pip install 'gdmutant==0.1.*')."]
 SKIP_DIRS = {"addons"}             # gdmutant never mutates addons/; do not count them either
 SANDBOX = {".orclab", "reports"}   # gdmutant reruns gdUnit4/GUT, which write their JUnit XML under reports/
-_GDLINT = re.compile(r"^(?P<file>[^:]+):(?P<line>\d+): (?P<msg>.*)$", re.M)
+_GDLINT = re.compile(r"^(?P<file>[^:]+):(?P<line>\d+): (?P<msg>.*)$", re.MULTILINE)
 
 
 def _runner(root):

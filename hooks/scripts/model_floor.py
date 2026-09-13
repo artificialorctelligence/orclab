@@ -36,7 +36,7 @@ OFF = "ORCLAB_MODEL_FLOOR_OFF"
 
 # Families at or above the floor. Matches a bare alias ("opus") and a full id
 # ("claude-sonnet-5"), since a dispatch may legitimately use either form.
-AT_OR_ABOVE = re.compile(r"^(sonnet|opus|fable|claude-(sonnet|opus|fable)-)", re.I)
+AT_OR_ABOVE = re.compile(r"^(sonnet|opus|fable|claude-(sonnet|opus|fable)-)", re.IGNORECASE)
 
 
 def corrected(tool_input):

@@ -2,7 +2,6 @@ import multiprocessing
 import subprocess
 
 import pytest
-
 from orc_todo import allocate as alloc
 from orc_todo import state
 
@@ -87,9 +86,8 @@ def test_a_missing_resource_file_raises_rather_than_creating_one(tmp_path):
 
 def test_allocation_fails_cleanly_when_the_lock_is_held(tmp_path):
     repo = make_repo(tmp_path)
-    with state.held("someone else", cwd=repo):
-        with pytest.raises(state.LockUnavailable):
-            alloc.allocate("backlog", "t", "b", cwd=repo, timeout=0.4)
+    with state.held("someone else", cwd=repo), pytest.raises(state.LockUnavailable):
+        alloc.allocate("backlog", "t", "b", cwd=repo, timeout=0.4)
 
 
 def _child(repo, title, out):

@@ -1,7 +1,6 @@
 import subprocess
 
 import pytest
-
 from orc_todo import lanes, state
 
 

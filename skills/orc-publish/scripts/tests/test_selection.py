@@ -1,9 +1,8 @@
 import textwrap
 
 import pytest
-
-from orc_publish.tree import load_tree
 from orc_publish.selection import SelectionError, resolve_selection, resolve_token
+from orc_publish.tree import load_tree
 
 
 def write_yaml(tmp_path, name, content):
