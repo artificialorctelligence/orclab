@@ -2656,3 +2656,40 @@ builds on a stack or ships to a channel Orclab has never met"), not here.
 `skills/orc-package/ingredients/app-store/ingredient.md`, section 1 (line 33), lists the cloud-Mac options for a Linux developer and describes GitHub Actions macOS runners as "minutes are billed at 10×". That sentence reads as a fact about GitHub's current billing, and it is not one any more: the v18 stack skills, checking GitHub's pages live on 2026-09-12, found that `https://docs.github.com/en/billing/managing-billing-for-your-products/about-billing-for-github-actions` and `https://docs.github.com/en/billing/reference/actions-runner-pricing` now give only a per-minute rate table — macOS **$0.062/minute** against Linux **$0.006/minute**, a ratio of about 10.3× — and no longer document a multiplier applied to a plan's included minutes at all. Both `skills/stack-flutter/SKILL.md` (`### Building without a Mac`) and `skills/stack-ios-native/SKILL.md` (the same section) now record exactly that: "GitHub's pages once documented a 10x multiplier on included minutes for macOS; the current pages give only the rate table, so whether the 2,000 free minutes deplete at the macOS rate is not stated." So the ingredient and the two skills that point at it disagree about what GitHub says, and a reader who compares them cannot tell which is current.
 
 It was not fixed on the v18 branch because the spec (`docs/superpowers/specs/2026-09-12-orclab-v18-project-type-defaults-design.md`, §7) leaves every `orc-package` ingredient unchanged; that branch only writes stack skills and the `/orc-code` Defaults Table. The fix is one line in the ingredient's section 1 — replace "minutes are billed at 10×" with the rate-table wording the two skills use ($0.062/min macOS vs $0.006/min Linux, ≈10.3×; the included-minutes multiplier is no longer on GitHub's pages) — plus the ingredient's "checked against live sources" stamp, since that line is the only thing in it that the stack skills' 2026-09-12 fetch contradicts.
+
+## #39: v18 stack-skill polish: three wrong page dates in the KMP skill, stale game-skill openers, and the citation tidy-ups the final review parked
+
+Left over from v18's final whole-branch review (2026-09-12), which allowed one fix wave and one
+re-review; these are the items ruled real but not load-bearing — none changes a default or a
+concern line — and parked rather than opening a second wave. Each is a few minutes with the file
+open; none needs new research except where a live look is named.
+
+- `skills/stack-kotlin-multiplatform/SKILL.md` ~145–146 and ~149: three kotlinlang.org page dates
+  are the site's `built-on` build stamp, not the page's `last-modified`. Live on 2026-09-12: the
+  native-distribution page is 25 August 2026, the tray page 18 August 2026; the overview's
+  "2026-09-10" was not checked. Same mistake the fix wave corrected at ~122/137 for the
+  stability page (10 September 2025).
+- `skills/stack-godot/SKILL.md` ~13–15 and `skills/stack-unity/SKILL.md` ~13–16: the openers
+  still say the game-specific questions are "named and left open"; `## Scope divergence` now
+  answers them from the engines' docs. One sentence each.
+- `skills/stack-flutter/SKILL.md` `## Presence`: unbuilt marker only in Presence, not UI/Storage;
+  one `### Linux, Windows, macOS` heading where the sibling skills split per platform; a stray
+  comma near the libayatana line; "its fork" ambiguous near the `system_tray` concern. Also: the
+  tray default rests on `libayatana-appindicator3`, whose upstream `stack-python-desktop` ~242
+  records as marked OBSOLETE — Flutter's section does not carry that concern (`nativeapi` is
+  already named as successor). And `## Choosing dependencies` says to run three store checks
+  before adding any native plugin; the four plugins the facet sections recommend have not had
+  them run — the first real build is the moment.
+- `skills/stack-flutter/SKILL.md` ~25–26 and ~365 (pre-existing, 2026-09-11): "their own stack
+  skills, when written" for Godot/Unity/Kotlin/Swift — all four exist now.
+- `skills/stack-ios-native/SKILL.md` ~105: Codemagic "Xcode 26.6 default, 27.0 as `edge`" has no
+  URL in Sources (came from site navigation); add the machine-spec page or drop the version.
+- `skills/stack-web/SKILL.md` ~57 vs ~32: alternatives say "React Router v7" (react.dev's label)
+  while Toolchain lists 8.3.1; needs a live look at whether react.dev still says "v7".
+- `skills/orc-test/`: 14 "Task N of the v17 plan" references shipped in v17 — the same
+  SDD-number-in-shipped-text defect v18's review removed from `stack-react-native`. Out of v18's
+  scope; noted here so it is not rediscovered.
+
+Ground for the ruling: `docs/superpowers/specs/2026-09-12-orclab-v18-project-type-defaults-design.md`
+§5 says each pass writes research, and the plan's subagent-driven process caps fixes at one wave
+after the final review. Nothing above moves a table row.
