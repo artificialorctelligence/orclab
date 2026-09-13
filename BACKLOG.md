@@ -2867,3 +2867,16 @@ a skill body fires only if read; Holzmann's rule 10 wants the checker run daily)
    to the build (no per-file analyzer finishes in seconds), and Orclab's own scripts have no
    `[tool.ruff]` yet, so the hook is silent on them until they adopt it — a real remaining gap:
    Orclab does not yet dogfood its own code-discipline config.
+
+**Gap closed the same day.** The Python skill's `[tool.ruff]` block, verbatim, at Orclab's root
+`pyproject.toml`: 190 findings on first run — 44 from code-discipline's four rules (41 nesting
+sites in 31 functions, one 50+-statement `main`, one `try-except-pass`), 146 from ruff's own
+defaults, which since 0.16 are five whole categories rather than `E4/E7/E9/F` (a fact the stack
+skill now states). All 190 to zero across five commits: safe autofixes, then by hand — explicit
+`check=False` at every `subprocess.run`, the hooks' fail-open `except Exception`s marked with
+the rule's own `noqa` and reason (rule 6's named, commented suppression), 31 functions flattened
+with guard clauses and extracted helpers (`_analyze_one`, `_gate`/`_run_leaf`, `_wait_or_raise`,
+`_roll_back_versions`, orc-publish's `main` split four ways). 611 tests green throughout; the
+"8 failed" that appeared between runs was the scratch venv holding ruff sitting first on PATH,
+so orc-test's subprocess `python3` had no pytest — my shell, not the code. `lint_on_write` now
+fires on every Python file Orclab itself writes.

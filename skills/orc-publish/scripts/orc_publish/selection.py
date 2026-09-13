@@ -46,7 +46,7 @@ def resolve_selection(root, tokens):
     excluded = {}
     for token in tokens:
         bucket = excluded if token.startswith("!") else included
-        node = resolve_token(root, token[1:] if token.startswith("!") else token)
+        node = resolve_token(root, token.removeprefix("!"))
         bucket.update((leaf.dotted_path, leaf) for leaf in node.leaves())
 
     result = {path: leaf for path, leaf in included.items() if path not in excluded}

@@ -136,7 +136,11 @@ typeCheckingMode = "strict"         # default is "standard"
 ```
 
 `PLR1702` too-many-nested-blocks, `PLR0915` too-many-statements, `E722` bare-except (on by
-default), `S110` try-except-pass (*"consider logging the exception"*). Python has no compiler
+default), `S110` try-except-pass (*"consider logging the exception"*). These sit on top of ruff's
+own default set, which since 0.16 is **five whole categories** — *"correctness, suspicious,
+complexity, performance, style"*, about 800 rules (its linter doc, confirmed live 2026-09-13) —
+not the old `E4/E7/E9/F` handful; the first run on an existing codebase says so loudly (Orclab's
+own: 190 findings, 146 of them from those defaults, all fixed the same day). Python has no compiler
 warnings: ruff and pyright *are* the analyzer, both exit non-zero on a finding, and that is the
 warnings-as-errors switch; `python -W error` in the test command promotes the runtime
 `DeprecationWarning`s. Rules 2, 3 and 5 (loop exits, closing on the error path, checks that
