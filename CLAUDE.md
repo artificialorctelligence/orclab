@@ -488,6 +488,15 @@ them by pattern-matching on the symptom alone:
    version. **Always test a fresh install/update in a genuinely new session — CLI or Desktop —
    not the one used to debug or trigger the install.**
 
+   **Refinement, confirmed live 2026-09-13 (Desktop):** the above is not the whole story. In
+   the Claude Desktop client, the `code-modernization` plugin was installed with
+   `claude plugin install` and the *same session* was immediately handed its agents and
+   skills — no restart, no new chat needed. `skills/orc-code/SKILL.md`'s Plugin-Discovery
+   Procedure step 5 was corrected the same day to match: picked up by the installing session;
+   a fresh session is the fallback, not the rule. The CLI case above has not been re-checked
+   since 2026-09-06 — it may have the same fix by now, or it may not; nothing here should be
+   read as a claim either way until it is.
+
 ## Dogfooding a real project: three different things, three different rules
 
 Found dogfooding `/orc-publish` on Orcshot (2026-09-06): a session nearly ran Orcshot's own real

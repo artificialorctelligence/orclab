@@ -68,6 +68,20 @@ The order matters; each step's output is the next step's input.
    coverage, TCE, lint. If a gate still fails, say so and ask about another round; never claim
    "clean" without the second `analyze`.
 
+**Corrected at first real use (2026-09-13):** the Orcshot run (BACKLOG #41) added three things
+to the four steps above, and the skill carries them. A **step 0** — the checkout can run its own
+suite: on a checkout that is not the developer's own, the project's documented install comes
+first and `/orc-test` runs with the project's own venv `bin` first on `PATH`, the only venv with
+pytest in it — because a fresh clone of Orcshot reported 10 collection errors when
+`import orcshot` resolved to the machine's installed `.deb` copy, and looked red when it was
+not. Step 1 writes **the mutation config alongside the lint config** (`[tool.mutmut]` for
+Python, its own commit) — without it `analyze` said "TCE not measurable" and step 2 had no
+baseline TCE. And a **never-imported-files rule** in step 3.2: a green suite proves nothing for
+a file the suite never imports (17 of Orcshot's 85, GTK windows with no headless test), so there
+the fix is limited to a mechanical move checked by the linter's undefined-name rules and an
+import, done last, and a coverage gap left in those files is not another round's work — whether
+they get a live-driven test is the user's decision.
+
 Two things the mode refuses. It does not apply unsafe autofixes — the dogfood showed
 `lines.extend((...))` for two `append`s and eight red tests. And it does not add an `ignore`
 list to the linter config to make the number go down: a rule the project's own config enables
@@ -85,19 +99,27 @@ already exists as a real skill is to wrap it with an availability check. Orclab 
 scaffold for this?" with its own Defaults Table — the target's type and platform scope, as the
 new-project flow asks them — and the matching `stack-*` skill becomes the migration's constraint:
 its toolchain versions, its project layout, its `## Lint` config, its store-rules table. Concretely,
-the plugin's `brief` and `transform` take a free-form `[target-stack]` argument; `/orc-code`
+the plugin's `preflight` and `brief` take an optional, free-form `[target-stack]` argument, and
+`transform` requires the same free-form value as `<target-stack>`; `/orc-code`
 passes the stack skill's own naming (e.g. "Kotlin + Jetpack Compose, per Orclab's
 stack-android-native: AGP 9.x, compileSdk 36, `app/build.gradle.kts` layout") and, when the
 brief is produced, checks it against the skill's layout section before the user approves it. The
 migrated project should look like one `/orc-code` would have scaffolded; a brief that lands
-elsewhere is corrected before `transform` runs, not after.
+elsewhere is corrected before `transform` runs, not after. **Corrected at first real use
+(2026-09-13):** this holds for `transform`. `uplift` takes `<source-version> <target-version>`,
+never sees the stack line, and its own rule is "smallest diff that builds; defer all optional
+modernization" — so for a same-stack bump only the toolchain version is the target, the stack
+skill's layout and lint block are the first items of the quality-mode pass that follows, and the
+brief records why it lands elsewhere instead of being corrected.
 
 **(b) "Still works" means the old suite passes on the new code.** A port cannot be verified
 against tests that do not exist, so the gate has a precondition:
 
 1. **Before any migration step**, `/orc-test analyze` on the source project. If it reports
-   tests red, a language with no runnable suite, or coverage under the gate, the first work is
-   `/orc-test generate` *on the old code* — characterization tests that pin what it does today.
+   tests red, the suite is fixed by hand first (`orc-test`'s own rule: `generate` is not offered
+   on a red suite). If it reports a language with no runnable suite, or coverage under the gate,
+   the first work is `/orc-test generate` *on the old code* — characterization tests that pin
+   what it does today.
    The plugin's `extract-rules` documents the business rules; the tests are what make them
    executable. This step is not optional and is not the plugin's: it is the reason the gate can
    exist.
@@ -114,16 +136,37 @@ addresses the source as `legacy/<system-dir>` and writes to `analysis/<system-di
 worktrees`, as every Orclab build does) laid out the plugin's way — the project checked out or
 symlinked as `legacy/<name>` — and brings `modernized/<name>/` back into the real tree as the
 branch's content once the exit gate passes. `analysis/` stays in the worktree; its useful parts
-(the brief, the rule catalogue) are copied into `docs/` on the branch. This is the part most
-likely to need correcting at first real use; the skill says so.
+(the brief, the rule catalogue) are copied into `docs/` on the branch. This was the part most
+likely to need correcting at first real use, and it needed two corrections (2026-09-13, itsdangerous
+1.1.0): the symlink points up into the tree that holds `.orclab/modernize/`, so every walk that
+follows symlinks loops and has to prune `.orclab`, `.venv`, `mutants`, `.git`; and `uplift`'s own
+seeding command, `cp -r legacy/<name> modernized/<name>-uplifted`, copies the *symlink* — followed
+literally, "in place under `modernized/`" is the real tree. The working copy is seeded with
+`rsync` from `readlink -f` and gets its own venv (the checkout's editable install points at the
+checkout's `src/`). The shape itself — scratch dir inside the checkout, symlink, `analysis/` and
+`modernized/` under `.orclab/` — held. Two more facts the run added: `uplift` writes
+`modernized/<name>-uplifted/`, not `modernized/<name>/`; and `brief` refuses to run without
+`map`'s `topology.json`, `extract-rules`' `BUSINESS_RULES.md` and, for an uplift, the
+`DELTA_CATALOG.md` that `uplift`'s Step 3 produces — so the sequence is `status`, `preflight`,
+`assess`, `map`, `extract-rules`, delta catalog, `brief`, `uplift`, and the skill now says so.
 
-**(d) Availability, confirmed rather than assumed.** The Plugin-Discovery Procedure stays, and
-the "not installed" message names the install command (`claude plugin install
-code-modernization@claude-plugins-official`). But the flow past that line has never run. The
-first task of the plan is to install the plugin here and drive the full Refactor Flow once on a
-small real project, worktree layout and exit gate included, and to correct this spec with what
-that run contradicts — the same "no release has gone through this" honesty the `orc-package`
-ingredients carry.
+**(d) Availability, confirmed rather than assumed — and "found" is not "installed".** The
+Plugin-Discovery Procedure searches `~/.claude/plugins/marketplaces/` as well as `cache/`, so it
+finds a plugin that is merely *available* in a marketplace clone and follows its command files —
+which then say "spawn the **test-engineer** subagent", and the plugin's eight agents exist only
+once it is installed (checked 2026-09-13: the marketplace copy is present, `installed_plugins.json`
+does not list it). The procedure therefore distinguishes the two: a plugin whose root is under
+`marketplaces/` and whose name is absent from `installed_plugins.json` is *available, not
+installed*, and the flow stops with the install command (`claude plugin install
+code-modernization@claude-plugins-official`). The note that a fresh session is needed after
+installing (`CLAUDE.md`, marketplace gotcha 4) was contradicted on 2026-09-13: the Desktop session
+that installed the plugin saw its agents and skills at once, so the procedure now says check
+first, fresh session as the fallback. The flow past that line ran once, on 2026-09-13
+(BACKLOG #41): itsdangerous 1.1.0 through `status`, `preflight`, `assess`, `map`,
+`extract-rules`, the delta catalog, `brief` and `uplift` to Python 3.12 (the machine's only
+interpreter; 3.13 was the plan's target), exit gate passed — 423 green, coverage 97.4% → 97.6%,
+TCE 74.8% → 75.1% — and this spec and the skill corrected with what it contradicted, the same "no
+release has gone through this" honesty the `orc-package` ingredients carry.
 
 ### 4. What is *not* built
 
@@ -151,15 +194,20 @@ ingredients carry.
 
 ## How it is verified
 
-- **Quality mode** is verified on Orcshot or the next real Python/TypeScript project: baseline,
-  fixes, before → after, suite green — the dogfood repeated through the command instead of by
-  hand, and the numbers recorded in the commit.
-- **Migration mode** is verified once, live, per §3(d): the plugin installed, a small real project
-  taken through preflight → brief → transform (or uplift) → exit gate in a worktree, and the spec
-  corrected. Until that run, the skill's migration section carries "no migration has gone
-  through this yet" in its first paragraph.
+- **Quality mode** was verified once, live, on a scratch clone of Orcshot on 2026-09-13
+  (BACKLOG #41): baseline, fixes, before → after, suite green after every file — the dogfood
+  repeated through the command instead of by hand. ruff findings 376 → 0; coverage
+  77.9% → 78.3%, the remaining gap entirely in the 17 files the suite never imports; TCE
+  75.6% → 76.3%; 12 commits in the scratch clone, discarded. The three corrections are in §2.
+- **Migration mode** was verified once, live, per §3(d) on 2026-09-13: the plugin installed,
+  itsdangerous 1.1.0 taken through the full sequence to Python 3.12 in a scratch clone laid out
+  the plugin's way, exit gate passed, and the spec and skill corrected (§3 (a), (c), (d)). The
+  skill's migration section now opens with that run instead of "no migration has gone through
+  this yet".
 - **Availability branch**: with the plugin uninstalled, `/orc-code refactor "port to Kotlin"`
-  prints the install command and stops. That is the one path confirmed today.
+  prints the install command and stops — confirmed by Task 4's prose test and by running the
+  flow once with the plugin uninstalled. Before this plan, discovery would have found the
+  marketplace copy and gone on without the agents.
 
 ## Sources, checked 2026-09-13
 
@@ -167,8 +215,10 @@ ingredients carry.
   stands).
 - `~/.claude/plugins/marketplaces/claude-plugins-official/plugins/code-modernization/`:
   `.claude-plugin/plugin.json` (description), `commands/modernize-{preflight,brief,transform,
-  uplift,harden,status}.md` (the `legacy/$1` / `analysis/$1` / `modernized/$1` layout; `brief`
-  and `transform`'s free-form `[target-stack]`; `uplift`'s "one test suite on both runtimes").
-- `~/.claude/plugins/installed_plugins.json` — `code-modernization` absent.
+  uplift,harden,status}.md` (the `legacy/$1` / `analysis/$1` / `modernized/$1` layout;
+  `preflight` and `brief`'s optional `[target-stack]`, `transform`'s required `<target-stack>`;
+  `uplift`'s "one test suite on both runtimes").
+- `~/.claude/plugins/installed_plugins.json` — `code-modernization` absent (installed later the
+  same day; see §3(d)).
 - BACKLOG #40's resolution and the five dogfood commits of 2026-09-13 (the quality procedure and
   the unsafe-autofix lesson).

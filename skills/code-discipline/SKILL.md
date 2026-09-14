@@ -92,4 +92,6 @@ language's tooling has them (Dart and GDScript have no free nesting/length rule 
   (nesting, function length, empty catch, warnings) are linter configuration — each `stack-*`
   skill's `## Lint` section — and Orclab's `lint_on_write` hook runs the project's configured
   linter on every `Edit`/`Write`, whoever made it, and reports what it found. No config, no run:
-  the hook carries no rules of its own. `ORCLAB_LINT_ON_WRITE_OFF=1` disables it.
+  the hook carries no rules of its own. `ORCLAB_LINT_ON_WRITE_OFF=1` disables it. Bringing an
+  *existing* codebase up to these rules is `/orc-code refactor`'s quality mode — the same
+  config, the suite green after every file.
