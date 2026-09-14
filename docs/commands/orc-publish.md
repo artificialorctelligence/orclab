@@ -18,15 +18,18 @@ for this on its own: it only runs because you typed it yourself, or because a pr
 | `/orc-publish <selection>` | Shows you the exact plan — the **dry run** — for what would be published where, then, once you say yes to that plan, actually publishes it |
 | `/orc-publish <selection> --dry-run` | Shows the same plan on its own and stops there; nothing is published |
 | `/orc-publish <selection> --metrics` | Reads back each channel's own published download/install numbers; publishes nothing |
-| `/orc-publish <selection> --confirm` | Checks whether a publish that came back **accepted** earlier — meaning the channel took it in but hadn't yet confirmed it had landed — has landed since; publishes nothing |
+| `/orc-publish <selection> --confirm` | Checks whether a publish that came back **accepted** earlier — meaning the channel took it in but hadn't yet confirmed it had landed — has landed since, reporting one of four things: landed, not yet, needs a human (a URL to go check by eye), or nothing to confirm (the leaf was never asynchronous to begin with); publishes nothing |
 | `/orc-publish --for <path>` | Looks up what's configured for one specific thing in `distro.yaml`; read-only |
 | `/orc-publish <selection> --timeout <seconds>` | Changes how long a publish step is allowed to run before it counts as timed out (a channel can set its own limit that still wins) |
 | `/orc-publish <selection> --allow-preflight-failure` | Publishes anyway over a failed **preflight check** — the automatic checks `/orc-publish` runs against a built artifact before sending it anywhere, like making sure it doesn't contain leftover version-control files — that would normally stop it; only when you explicitly ask for this |
 
 `<selection>` names which channel(s) to act on. `channels.yaml` is organized as a tree of dotted
 paths — a **tree file** — with each specific destination at the end of one path called a **leaf**;
-`<selection>` is one or more of those paths (`!` in front of one excludes it instead). Leaving it
-out acts on everything the tree file has actionable.
+`<selection>` is one or more of those paths (`!` in front of one excludes it instead). For example,
+a project with a Linux PPA channel arranged the way the skill's own examples are (a leaf named
+after the Ubuntu series it publishes to, like `noble`) might select just that one leaf with
+`linux.ppa.noble` — the exact shape depends on how your project's own `channels.yaml` is laid out.
+Leaving `<selection>` out acts on everything the tree file has actionable.
 
 ## What it will ask you
 
@@ -52,13 +55,23 @@ out acts on everything the tree file has actionable.
   **asynchronous** — queued or opened for review rather than finished the moment the command
   returns — and `/orc-publish` reports those as accepted rather than done, with `--confirm` as how
   you check on one later.
-- Every leaf's outcome is reported exactly as it happened — succeeded, accepted but not landed
-  yet, refused (a check caught a problem before anything ran), failed (with the real error), timed
-  out, or not attempted — never smoothed over into a single "it worked" or "it's done".
-- If a leaf's own setup step already ran and built something before a check caught a problem,
-  `/orc-publish` doesn't undo that — a refusal stops the publish itself, not whatever building
-  already happened.
-- `--metrics` and `--confirm` change nothing anywhere; they only read something back.
+- Every leaf's outcome is reported exactly as it happened, as one of six words, never smoothed
+  over into a single "it worked" or "it's done":
+  - **success** — it ran and worked, with whatever real output it produced
+  - **accepted** — it went through, but hasn't been confirmed to have landed yet (see
+    `--confirm` above)
+  - **refused** — a check caught a problem before anything ran — this is also the word used for a
+    leaf whose own setup is broken, not just one whose artifact failed a check
+  - **failed** — it ran and came back with a real error
+  - **timed out** — it was still running when its time limit hit
+  - **not attempted** — there was nothing configured to run for that leaf at all
+- If a leaf's own setup step already ran and built something before a check caught a problem
+  (reported as `refused`), `/orc-publish` doesn't undo that — the refusal stops the publish
+  itself, not whatever building already happened.
+- `--metrics` and `--confirm` change nothing anywhere; they only read something back. One caveat
+  on `--metrics`: the ready-made Snap Store example Orclab ships for it has never actually been
+  run for real — no Orclab-built project has a published snap yet — so treat any number it reports
+  as unverified until someone has.
 
 ## What it will never do without asking
 
@@ -72,16 +85,14 @@ out acts on everything the tree file has actionable.
   more than one thing, it reports the problem instead of picking one for you.
 - It never attempts a channel that has no publish action configured yet — it reports that
   plainly instead of trying and failing.
-- It never runs a leaf whose own setup is broken — something misconfigured is refused by name,
-  with a plain error, rather than guessed at or left to crash; one broken leaf never stops the
-  ones that are set up correctly from running.
+- It never runs a leaf whose own setup is broken — something misconfigured is reported as
+  **refused**, by name, with a plain error, rather than guessed at or left to crash; one broken
+  leaf never stops the ones that are set up correctly from running.
 - It never paraphrases a failure away, and never reports a leaf as done unless the run actually
   confirmed it — a publish that's only accepted (queued, not yet landed) is never called finished.
 - It never adds tracking, analytics, or phone-home code to get a channel's own numbers —
   `--metrics` only relays counts a channel already publishes about itself, together with the
   honest caveat that these count fetches, not people.
-- It never runs the Snap Store's own metrics check on your behalf — that one needs the Snap
-  Store's own author login, so it's left for you to run yourself.
 - It never treats `--confirm` as a way to publish anything — it only runs each channel's own
   landed-yet check and reports an honest outcome; it also never silently drops `--dry-run` or
   `--metrics` if you combine either with `--confirm` — it refuses the combination outright instead.
