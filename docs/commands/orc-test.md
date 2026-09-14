@@ -23,7 +23,9 @@ thing `analyze` produces.
 
 Add a path after any of these (for example `/orc-test coverage src/billing`) to narrow it to one
 part of the project. Put `--cwd <project>` or `--lang <key>` before the subcommand to run against
-a different project, or restrict it to one language.
+a different project, or restrict it to one language. A project can also override the 80%/70%
+minimums, or name its own test command per language, by writing its own `.orclab/test.yaml` file —
+`/orc-test` reads that file if it's there instead of guessing.
 
 It finds the language itself, by looking for each language's own marker file (`package.json` for
 JavaScript, `pyproject.toml` for Python, and so on) at the project's root or a couple of folders
@@ -34,8 +36,9 @@ language gets every one of them run.
 
 Nothing, for `run`, `coverage`, `analyze`, and `detect` — each one runs the moment you type it. A
 first `analyze` on a real project takes a while, since planting and testing each defect one at a
-time is slow; it tells you how many files it's about to work through before it starts, but it
-doesn't stop to ask, because typing the command is already your go-ahead.
+time is slow (later runs are faster, since the tool re-checks only what changed since last time,
+where it's able to); it tells you how many files it's about to work through before it starts, but
+it doesn't stop to ask, because typing the command is already your go-ahead.
 
 For `generate`:
 - Before deleting any test, it shows you the full list of what it wants to remove and why, and
@@ -59,8 +62,6 @@ For `generate`:
   for example a `mutants/` folder and a `.coverage` file for a Python project. Orclab doesn't
   create these to track anything; they're the tool's own scratch space, and the recommendation is
   to add them to your project's `.gitignore` so they don't show up as changes in `git status`.
-- A project can override the 80%/70% minimums, or name its own test command per language, in its
-  own `.orclab/test.yaml` file — `/orc-test` reads that instead of guessing.
 
 ## What it will never do without asking
 
@@ -85,6 +86,8 @@ For `generate`:
   part of the project, re-running `analyze` first if that record is missing or the code has
   changed since — never from a hunch.
 - It will never delete a test without showing you the full list first and getting a yes.
+- It will never report a language with no tests at all as passing. An empty test suite shows up as
+  a failure, not a clean result — having no tests is itself a problem, not something to skip past.
 - If running the planted defects during `analyze` somehow leaves one of your project's own
   already-committed files changed (outside its report folders and the mutation tool's own working
   files), it won't score that run at all — it names which files changed instead, so you can fix
