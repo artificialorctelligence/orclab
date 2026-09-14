@@ -3,7 +3,6 @@
 Shape and presence only; a page saying what its command does today is a discipline, not a test."""
 
 import pathlib
-import re
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 PAGES = sorted((ROOT / "docs" / "commands").glob("*.md"))
