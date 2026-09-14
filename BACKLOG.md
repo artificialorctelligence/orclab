@@ -185,6 +185,22 @@ the web one waits for a web project.
 
 Still open; nothing is built until Orctool's slice-1 spec.
 
+**Correction, later the same day — the first slice is already in progress, in Orctool, in
+Dart.** `~/projects/orctool` is a Flutter project with a slice-1 spec and plan
+(`docs/superpowers/specs/2026-09-13-orctool-slice-1-design.md`) and ten commits, the newest
+*"Skins: OrcTheme extension, plain and console skins, Antonio (OFL)"*. What is there is this
+entry's shape without a token file: `plain` is Material 3 following the system — the unbranded
+case, base only; `console` is a set of overrides — a brand; the spec's rule *"no colour or
+radius literal lives outside `skins/`"* is the discipline tokens exist to enforce; and
+`OrcTheme`'s eight fields (`accent`, `onAccent`, `panel`, `ground`, `railRadius`, `railStripe`,
+`uppercase`, `displayFont` — what Material's theme does not carry and a brand needs to) are the
+first draft of the token vocabulary. **So the direction is the reverse of "start #2 on
+Orctool": Orctool keeps building skins in Dart, and the token format is extracted from what
+`OrcTheme` turned out to need once slice 1 lands.** Do not add a token file or a Style
+Dictionary build to Orctool ahead of that — it would be the pipeline built before the case it
+serves. The one thing to hold in Orctool meanwhile: `OrcTheme` stays "things a brand sets", with
+no per-instrument or layout value creeping in, so the extraction is clean.
+
 ## #3: Real enforcement for the discipline v1 only guides — not yet decided how (RESOLVED 2026-09-07)
 
 Raised by direflail (2026-09-04) right after v1 shipped, once it became clear that v1's three
