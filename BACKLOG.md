@@ -2723,7 +2723,7 @@ checkout needs one `$GODOT_BIN --headless --import` or gdUnit4's scripts fail to
 "mutating N files" line counted `addons/` (233 for a 6-file project) — fixed with a per-language
 `SKIP_DIRS` that `cli._source_count` now honours. Suite: 151 passed.
 
-## #37: Correct the snap and flatpak ingredients from Orcshot's first real runs, and write ego and spices from the captured ones
+## #37: Correct the snap and flatpak ingredients from Orcshot's first real runs, and write ego and spices from the captured ones (UPDATED 2026-09-13 — spices withdrawn; ego is uploaded and in review; snap's first upload is held)
 
 Split out of #33 on 2026-09-12 when that entry was resolved: #33 was a decision and a day's
 writing, and this is the one pending action it carried that has a real trigger of its own.
@@ -2751,6 +2751,41 @@ runs, starting from the leaf shapes in Orcshot's
 Scope boundary: this is Orcshot-gated ingredient maintenance only. The rule that new stacks and
 channels are researched before first use now lives in `CLAUDE.md` ("Before the first project
 builds on a stack or ships to a channel Orclab has never met"), not here.
+
+**Update 2026-09-13 — re-checked against Orcshot's own backlog; the trigger is narrower now.**
+Read Orcshot `BACKLOG.md` #198 and #205 as they stand today (Orcshot commits `49d5cd8`,
+`db75263`, both 2026-09-13):
+
+- **Spices is off the table.** #205 (2026-09-12): the Cinnamon applet was dropped — a real
+  Cinnamon panel showed the mandatory About/Remove menu items every applet carries, direflail
+  did not want them, and the applet is being replaced by an app-owned `XApp.StatusIcon`
+  (Orcshot #208). The Spices leaf, RELEASING.md step and sync script are gone from the branch.
+  There will be no PR to `linuxmint/cinnamon-spices-applets`, so there is no captured run to
+  write a `spices` ingredient from; item (2) above is `ego` only. If a later project ships a
+  Cinnamon applet, `CLAUDE.md`'s "Before the first project builds on a stack or ships to a
+  channel Orclab has never met" is what governs, not this entry.
+- **EGO has a captured run.** #205 (2026-09-12): `gnome-extensions upload --accept-tos` was run
+  for real on the GNOME 50 VM (the command does not exist on the Mint host); "Orcshot (0.4.0)"
+  sits in extensions.gnome.org's public review queue, not yet in `extension-query` results —
+  the expected pre-approval state. The `ego` ingredient can be drafted from that run once the
+  listing exists to confirm against; it is not written yet.
+- **Snap's first upload has happened and is held, as the ingredient predicted.** #198
+  (2026-09-13): the upload went up as revision 1 and is held on the `dbus` slot — the exact
+  hold `skills/orc-package/ingredients/snap/ingredient.md` line 6 and section 5 describe. The
+  declaration request on the Snapcraft forum waits on a forum account being approved by a
+  moderator. `review-tools` against the CI artifact shows exactly one `human review required`
+  line, the slot's. Nothing in the ingredient has been contradicted so far; its "verify at
+  first upload" spots past the hold (the grant, the release to a channel, `snap info`
+  confirming) are still ahead.
+- **Flathub preconditions are done; the submission waits on Orcshot's `v0.4.0` tag.** #198
+  (2026-09-13): GitHub 2FA on, `flathub/flathub` forked with the `new-pr` branch. The
+  submission PR itself is gated on the tag, which is gated on the Snap grant.
+
+**Trigger, restated:** the Snap declaration is granted and a revision is released to a channel;
+the Flathub PR is merged; EGO accepts the extension. Item (1) — correcting `snap` and `flatpak`
+— needs the first two; item (2) — writing `ego` — needs the third; item (3) — dropping the
+"no release has gone through this" markers — follows each. Still nothing Orclab-side can move
+today.
 
 ## #38: app-store ingredient still says GitHub macOS minutes are billed at 10× — wording GitHub retired; two stack skills now say otherwise (RESOLVED 2026-09-12)
 
