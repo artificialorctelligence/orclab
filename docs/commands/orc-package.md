@@ -30,9 +30,11 @@ sounded related.
 | `/orc-package <other channel name>` | If no ready-made instructions exist for that name, offers to interview you and write new ones |
 
 Of those five ready-made channels, only the Launchpad PPA one has actually been carried through a
-real release so far. The Snap Store and Flathub ones have had real registration and real checks
-run against them, but no real upload yet. The Google Play and Apple App Store ones are written
-from each store's own published rules but have not been tried against a real release at all.
+real release so far. The Snap Store one has had its account registration and login done for real,
+and the store's own review tool run locally against a real build, but no real upload yet. The
+Flathub one has had its automated checks and a sandbox test run for real, but no real account
+registration or submission at all yet. The Google Play and Apple App Store ones are written from
+each store's own published rules but have not been tried against a real release at all.
 Whichever is true for a given channel is stated up front in that channel's own instructions, so
 you always know how much to trust it before relying on it.
 
@@ -56,10 +58,10 @@ For `/orc-package <channel>`, when instructions for that channel already exist:
 For `/orc-package <channel>`, when no instructions exist for that name yet:
 - It asks whether you want to walk through setting the channel up together and have the result
   written down for reuse. If you say no, nothing happens.
-- If you say yes, it interviews you section by section about how the channel works, and for the
+- If you say yes, it interviews you section by section about how the channel works. For the
   parts about registering an account, handling credentials, and any one-time-per-app setup, it
-  insists on a real, repeatable way to check each one — an instruction nobody can ever verify
-  isn't worth writing down.
+  won't accept your answer unless you can also give it a real way to check that step actually
+  worked.
 
 ## What it changes
 
@@ -78,12 +80,13 @@ For `/orc-package <channel>`, when no instructions exist for that name yet:
 - **Files under `scripts/`**: for channels that need a helper script, adds one from a template
   — but only if a file of that name doesn't already exist there.
 - **A small settings file that lives outside your project, on your own machine** (not part of
-  the project's own files, so it never shows up in `git status`): some channels need one, for
-  something like a local reference to a signing key. When one is needed, three rules always
-  apply: it only ever gets a missing piece added to it — an existing one is never rewritten from
-  scratch; the exact content is always shown to you before it's written, and running the command
-  again afterward changes nothing; and it is never used to hold an actual secret — no password,
-  key, or passphrase is ever written into it, or printed anywhere, by this command.
+  the project's own files, so it never shows up in `git status`): none of the five channels
+  above currently need one — each says so directly in its own instructions. If a future one
+  does, three rules always apply: it can only ever hold a bare folder path or a settings line
+  with no actual secret in it, never an actual password, key, or passphrase; it only ever gets a
+  missing piece added to it — an existing one is never rewritten from scratch; and the exact
+  content is always shown to you before it's written, with running the command again afterward
+  changing nothing.
 - If you go through the interview to **capture** a brand-new channel, the result is written as a
   new ingredient into a folder on your own machine (not inside the project itself), so it's
   automatically available to every other project on that same machine too — not just this one.
