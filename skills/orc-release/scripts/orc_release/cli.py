@@ -347,8 +347,7 @@ def cmd_version_set(root, args):
         print("error: nothing was written", file=sys.stderr)
         return 1
     for rel in detected:
-        kwargs = {"body": args.changelog_body} if rel == vf.DEBIAN_CHANGELOG else {}
-        vf.write_version(root, rel, args.version, **kwargs)
+        vf.write_version(root, rel, args.version, body=args.changelog_body)   # the prose formats use it
         print(f"Set {rel} to {args.version}.")
     if vf.DEBIAN_CHANGELOG in detected:
         state = st.load_state(root)

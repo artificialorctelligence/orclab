@@ -3,15 +3,17 @@
 Deliberately per-format, not a generic "detect any manifest" abstraction: each format carries
 real syntax whose sloppy write breaks a real build. Formats are added when a real project needs
 one. Supported today: pyproject.toml, .claude-plugin/plugin.json, .claude-plugin/marketplace.json,
-and debian/changelog (see the changelog section below).
+debian/changelog and an AppStream metainfo file (see the two sections below).
 
 This module is the single owner of version-setting - /orc-release uses it directly, and
 /orc-version delegates to it rather than carrying a second implementation.
 """
 
+import datetime
 import json
 import os
 import re
+import xml.sax.saxutils
 
 import tomllib
 
@@ -19,6 +21,8 @@ PYPROJECT = "pyproject.toml"
 PLUGIN_JSON = ".claude-plugin/plugin.json"
 MARKETPLACE_JSON = ".claude-plugin/marketplace.json"
 DEBIAN_CHANGELOG = "debian/changelog"
+
+METAINFO_SUFFIXES = (".metainfo.xml", ".appdata.xml")   # AppStream: <id>.metainfo.xml, older .appdata.xml
 
 KNOWN_FORMATS = [PYPROJECT, PLUGIN_JSON, MARKETPLACE_JSON, DEBIAN_CHANGELOG]
 
@@ -36,6 +40,8 @@ def detect(root):
         if rel == PYPROJECT and "project" not in tomllib.loads(_read_text(root, rel)):
             continue
         found.append(rel)
+    # ponytail: root only, where Orcshot keeps its metainfo; walk data/ too when a project puts it there
+    found += sorted(f for f in os.listdir(root) if f.endswith(METAINFO_SUFFIXES))
     return found
 
 
@@ -61,6 +67,9 @@ def read_version(root, relpath):
         return plugins[0].get("version") if plugins else None
     if relpath == DEBIAN_CHANGELOG:
         return _changelog_current_version(_read_text(root, relpath))
+    if relpath.endswith(METAINFO_SUFFIXES):
+        m = _MI_RELEASE.search(_read_text(root, relpath))
+        return m.group("version") if m else None
     raise ValueError(f"unsupported version file format: {relpath}")
 
 
@@ -79,6 +88,8 @@ def write_version(root, relpath, version, **kwargs):
         return _write_text(root, relpath, json.dumps(data, indent=2) + "\n")
     if relpath == DEBIAN_CHANGELOG:
         return _write_changelog(root, relpath, version, **kwargs)
+    if relpath.endswith(METAINFO_SUFFIXES):
+        return _write_metainfo(root, relpath, version, **kwargs)
     raise ValueError(f"unsupported version file format: {relpath}")
 
 
@@ -186,3 +197,40 @@ def _write_changelog(root, relpath, version, body=None, debian_revision="1", **_
         f" -- {maintainer}  {email.utils.formatdate(localtime=True)}\n"
     )
     _write_text(root, relpath, entry + ("\n" + rest.lstrip("\n") if rest.strip() else ""))
+
+
+# --- AppStream metainfo -----------------------------------------------------
+#
+# The same shape as debian/changelog - a log to prepend to, newest first - and the same two
+# hazards: a re-run must not stack a second entry for one version, and the entry's own date is
+# part of the record. Why it matters: Flathub's linter fails a metainfo whose newest <release>
+# is not the built version, and Orcshot's RELEASING.md added the entry by hand and missed 0.3.0
+# (BACKLOG #6, 2026-09-13). Edited as text, not through an XML parser: a parser rewrites the
+# whole file's formatting and drops its comments on the way out.
+
+_MI_RELEASES_OPEN = re.compile(r"^(?P<indent>[ \t]*)<releases>[ \t]*\n", re.MULTILINE)
+_MI_RELEASE = re.compile(
+    r"^(?P<indent>[ \t]*)<release\b[^>]*?\bversion=\"(?P<version>[^\"]+)\"[^>]*?(?:/>|>.*?</release>)[ \t]*\n?",
+    re.MULTILINE | re.DOTALL,
+)
+
+
+def _write_metainfo(root, relpath, version, body=None, **_ignored):
+    text = _read_text(root, relpath)
+    opened = _MI_RELEASES_OPEN.search(text)
+    if not opened:
+        raise ValueError(f"{relpath} has no <releases> block to add a release to")
+    top = _MI_RELEASE.search(text, opened.end())
+    indent = top.group("indent") if top else opened.group("indent") + "  "
+    if top and top.group("version") == version:       # idempotence: replace, never stack
+        text = text[: top.start()] + text[top.end():]
+    date = datetime.date.today().isoformat()
+    bullets = [line.strip().lstrip("*-").strip() for line in (body or "").splitlines() if line.strip()]
+    if bullets:
+        items = "".join(f"{indent}      <li>{xml.sax.saxutils.escape(b)}</li>\n" for b in bullets)
+        entry = (f'{indent}<release version="{version}" date="{date}">\n'
+                 f"{indent}  <description>\n{indent}    <ul>\n{items}{indent}    </ul>\n"
+                 f"{indent}  </description>\n{indent}</release>\n")
+    else:
+        entry = f'{indent}<release version="{version}" date="{date}"/>\n'
+    _write_text(root, relpath, text[: opened.end()] + entry + text[opened.end():])

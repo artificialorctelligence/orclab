@@ -160,16 +160,19 @@ Once the new version string is determined (from either flow above):
    python3 <orclab plugin root>/skills/orc-release/scripts/run.py version-set X.Y.Z
    ```
 
-   For a project with a `debian/changelog`, pass the changelog body too (the same content
-   drafted in step 1, as Debian-style `*` bullets):
+   For a project with a `debian/changelog` or an AppStream metainfo file, pass the changelog
+   body too (the same content drafted in step 1, as Debian-style `*` bullets — the metainfo gets
+   them as a `<ul>` under the new `<release>`; without a body it gets a bare dated `<release/>`):
 
    ```bash
    python3 <...>/run.py version-set X.Y.Z --changelog-body '* What changed.'
    ```
 
    Supported formats: `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`,
-   `pyproject.toml`, `debian/changelog`. A project using none of them has no version file to
-   update; say so plainly rather than inventing one.
+   `pyproject.toml`, `debian/changelog`, and a `*.metainfo.xml` / `*.appdata.xml` at the project
+   root (Flathub's linter fails a metainfo whose newest `<release>` is not the built version).
+   A project using none of them has no version file to update; say so plainly rather than
+   inventing one.
 
    Then confirm every file agrees:
 

@@ -53,7 +53,7 @@ here, in files under `ios/`; it is only the build that needs a Mac.
 
 | Path | What |
 |---|---|
-| `pubspec.yaml` | Dependencies, assets, and **`version: 1.0.0+1`** — the single source of the app's version. `1.0.0` becomes Android `versionName` and iOS `CFBundleShortVersionString`; `+1` becomes `versionCode` and `CFBundleVersion`. Both stores require the build number to increase on every upload. `/orc-version` does not edit this file yet (its `versionfiles.py` handles `pyproject.toml`, `debian/changelog` and the plugin manifests — BACKLOG #6); bump it by hand and check it before every upload. |
+| `pubspec.yaml` | Dependencies, assets, and **`version: 1.0.0+1`** — the single source of the app's version. `1.0.0` becomes Android `versionName` and iOS `CFBundleShortVersionString`; `+1` becomes `versionCode` and `CFBundleVersion`. Both stores require the build number to increase on every upload. `/orc-version` does not edit this file yet (its `versionfiles.py` handles `pyproject.toml`, `debian/changelog`, an AppStream metainfo file and the plugin manifests — BACKLOG #6); bump it by hand and check it before every upload. |
 | `lib/main.dart`, `lib/` | The app. |
 | `test/`, `integration_test/` | `flutter test` unit/widget tests; integration tests run on a device or emulator. |
 | `analysis_options.yaml` | Lints; `flutter_lints` is the default package. `flutter analyze` is the lint command. |

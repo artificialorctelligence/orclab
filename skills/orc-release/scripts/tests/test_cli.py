@@ -440,3 +440,14 @@ def test_abort_names_the_changelog_md_entry_it_does_not_touch(tmp_path, capsys):
     main(["--root", root, "start", "0.2.0"])
     assert main(["--root", root, "abort"]) == 0
     assert "CHANGELOG.md" in capsys.readouterr().out
+
+
+def test_version_set_feeds_the_changelog_body_to_the_metainfo_too(tmp_path, capsys):
+    root = setup_project(tmp_path)
+    (tmp_path / "org.x.App.metainfo.xml").write_text(
+        "<component>\n  <releases>\n    <release version=\"0.1.0\" date=\"2026-01-01\"/>\n  </releases>\n</component>\n")
+    assert main(["--root", root, "version-set", "0.2.0", "--changelog-body", "* Ships."]) == 0
+    text = (tmp_path / "org.x.App.metainfo.xml").read_text()
+    assert '<release version="0.2.0"' in text and "<li>Ships.</li>" in text
+    assert "Set org.x.App.metainfo.xml to 0.2.0." in capsys.readouterr().out
+    assert main(["--root", root, "version-verify"]) == 0

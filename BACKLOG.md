@@ -311,7 +311,7 @@ and the brief's open questions, with no single place and no way to add a fact be
 If `/orc-data` is built, that residue is its scope: a wrapper over `map`/`extract-rules` for the
 source-derived half, plus one file for the human-derived half. Stays open.
 
-## #6: Per-language manifest version detection/sync for /orc-version — deferred, same reasoning as #4 (PARTIALLY ADDRESSED 2026-09-07 — still open for the formats it names) (UPDATED 2026-09-13 — re-scoped from pom/package.json/Cargo to the version files of Orclab's own stacks; two-number model needed)
+## #6: Per-language manifest version detection/sync for /orc-version — deferred, same reasoning as #4 (PARTIALLY ADDRESSED 2026-09-07 — still open for the formats it names) (UPDATED 2026-09-13 — re-scoped from pom/package.json/Cargo to the version files of Orclab's own stacks; two-number model needed) (UPDATED 2026-09-13 — AppStream metainfo handler shipped for Orcshot 0.4.0; the plan is three steps, this was the first)
 
 Raised by direflail (2026-09-05) while designing `/orc-version` (see
 `docs/superpowers/specs/2026-09-05-orclab-v3-orc-version-orc-help-design.md`): when Orclab is
@@ -377,6 +377,40 @@ promise that refusal. The entry's own rule still holds: one format at a time, wh
 on that stack reaches a release; Flutter's single `version:` line is the likeliest and easiest
 first case. The first-touch "suggest a starting version from what's already there" half remains
 unbuilt too.
+
+**Update 2026-09-13, later the same day — what this entry is for, and the order it gets done.**
+direflail asked, given the stack skills already say where each stack keeps its version, what #6
+is *for*. Answer, recorded so the entry cannot be mistaken for the knowledge: the stack skills say
+*where* the version lives; #6 is `/orc-version` being able to *write* it. `/orc-version` step 2
+hands off to `orc-release/scripts/run.py version-set`, which is `versionfiles.py`, so a format
+added there is picked up by the command with no other plumbing. Three steps, ordered by the real
+releases that will hit them, not by the entry's list of stacks:
+
+1. **The AppStream metainfo — done today, ahead of Orcshot's 0.4.0.** Orcshot's `RELEASING.md`
+   step 1 said to add the `<release version="X.Y.Z" date="...">` by hand and recorded that
+   0.3.0 was never added; Flathub's linter fails a metainfo whose newest release is not the
+   built version. Same shape as `debian/changelog` — prepend, never stack a duplicate on a
+   re-run, stamp the date — so `_write_metainfo` mirrors `_write_changelog`: `detect` finds a
+   `*.metainfo.xml` / `*.appdata.xml` at the root, `read_version` is the newest `<release>`,
+   `write_version` prepends one with `--changelog-body`'s bullets as a `<ul>` (or a bare
+   dated `<release/>` without a body), edited as text so the file's own formatting and
+   comments survive. `version-set` now passes the body to every format (the field formats
+   ignore it). Verified on a copy of Orcshot's real `pyproject.toml` + metainfo: `version-set
+   0.4.0` wrote both, `version-verify` agreed, `appstreamcli validate --pedantic` and Flathub's
+   own `flatpak-builder-lint appstream` both pass on the result. Nine new tests. Not done:
+   Orcshot's `RELEASING.md` step 1 still says "by hand" — it is true until Orcshot's installed
+   Orclab carries this, so it changes in an Orcshot session after the next Orclab release.
+2. **Two numbers, then `pubspec.yaml` — when Orctool reaches its store slice.** Orctool
+   (brainstormed 2026-09-13, Flutter, Android + iOS, no code yet) is the first project on any
+   of the seven stacks; its slice 5 is store onboarding, and that is the first moment a build
+   number can be checked against a real store. The model change above comes with that handler.
+3. **Each other stack's file when a project on it ships**, one at a time; the first-touch
+   "suggest a starting version" half rides along with any of them.
+
+Kept out on purpose: Orcshot's GNOME extension `metadata.json` `version-name` (already `0.4.0`
+while the app is `0.3.0`) moves on its own cadence by `RELEASING.md`'s own rule, so it is not a
+version file for `verify_consistency` — which means the check will one day need "these agree,
+that one is independent" as a per-project statement; not built until a second such file exists.
 
 ## #7: Distribution-channel download/install metrics — carried over from Orcshot #186, direflail wants Orclab to own this eventually (PARTIALLY ADDRESSED 2026-09-10 — Launchpad and Flathub confirmed, Snap blocked until a snap exists)
 

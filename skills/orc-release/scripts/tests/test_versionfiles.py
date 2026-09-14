@@ -248,3 +248,84 @@ def test_write_changelog_preserves_the_source_package_name(tmp_path):
     )
     write_version(str(tmp_path), "debian/changelog", "1.1.0", body="* y")
     assert p.read_text().startswith("someotherpkg (1.1.0-1) noble")
+
+
+# --- AppStream metainfo -----------------------------------------------------
+
+METAINFO = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <component type="desktop-application">
+      <id>org.orcshot.Orcshot</id>
+      <releases>
+        <release version="0.2.0" date="2026-08-26">
+          <description>
+            <p>Initial Flathub-ready release.</p>
+          </description>
+        </release>
+      </releases>
+    </component>
+    """
+
+
+def test_detect_finds_a_metainfo_file_at_the_root(tmp_path):
+    write(tmp_path, "org.orcshot.Orcshot.metainfo.xml", METAINFO)
+    write(tmp_path, "other.appdata.xml", METAINFO)
+    assert detect(str(tmp_path)) == ["org.orcshot.Orcshot.metainfo.xml", "other.appdata.xml"]
+
+
+def test_read_metainfo_returns_the_newest_release_or_none(tmp_path):
+    write(tmp_path, "org.orcshot.Orcshot.metainfo.xml", METAINFO)
+    assert read_version(str(tmp_path), "org.orcshot.Orcshot.metainfo.xml") == "0.2.0"
+    write(tmp_path, "empty.metainfo.xml", "<component>\n  <releases>\n  </releases>\n</component>\n")
+    assert read_version(str(tmp_path), "empty.metainfo.xml") is None
+
+
+def test_write_metainfo_prepends_a_dated_release_with_the_body_as_bullets(tmp_path):
+    p = write(tmp_path, "org.orcshot.Orcshot.metainfo.xml", METAINFO)
+    write_version(str(tmp_path), "org.orcshot.Orcshot.metainfo.xml", "0.4.0",
+                  body="* Snap & Flatpak.\n* GNOME <Shell> extension.")
+    text = p.read_text()
+    assert re.search(r'  <releases>\n    <release version="0\.4\.0" date="\d{4}-\d{2}-\d{2}">\n'
+                     r'      <description>\n        <ul>\n          <li>Snap &amp; Flatpak\.</li>\n'
+                     r'          <li>GNOME &lt;Shell&gt; extension\.</li>\n        </ul>\n'
+                     r'      </description>\n    </release>\n    <release version="0\.2\.0"', text)
+    assert text.startswith('<?xml version="1.0"') and text.endswith("</component>\n")
+    assert read_version(str(tmp_path), "org.orcshot.Orcshot.metainfo.xml") == "0.4.0"
+
+
+def test_write_metainfo_without_a_body_is_a_bare_release(tmp_path):
+    p = write(tmp_path, "org.orcshot.Orcshot.metainfo.xml", METAINFO)
+    write_version(str(tmp_path), "org.orcshot.Orcshot.metainfo.xml", "0.4.0")
+    assert re.search(r'  <releases>\n    <release version="0\.4\.0" date="[\d-]+"/>\n    <release version="0\.2\.0"',
+                     p.read_text())
+
+
+def test_write_metainfo_is_idempotent_for_the_same_version(tmp_path):
+    p = write(tmp_path, "org.orcshot.Orcshot.metainfo.xml", METAINFO)
+    write_version(str(tmp_path), "org.orcshot.Orcshot.metainfo.xml", "0.4.0", body="* First.")
+    write_version(str(tmp_path), "org.orcshot.Orcshot.metainfo.xml", "0.4.0", body="* Second.")
+    text = p.read_text()
+    assert text.count('version="0.4.0"') == 1 and "Second." in text and "First." not in text
+    assert text.count("<release ") == 2
+
+
+def test_write_metainfo_into_an_empty_releases_block(tmp_path):
+    p = write(tmp_path, "a.metainfo.xml", "<component>\n  <releases>\n  </releases>\n</component>\n")
+    write_version(str(tmp_path), "a.metainfo.xml", "1.0.0")
+    assert re.fullmatch(r'<component>\n  <releases>\n    <release version="1\.0\.0" date="[\d-]+"/>\n  </releases>\n</component>\n',
+                        p.read_text())
+
+
+def test_write_metainfo_requires_a_releases_block(tmp_path):
+    write(tmp_path, "a.metainfo.xml", "<component>\n  <id>x</id>\n</component>\n")
+    with pytest.raises(ValueError, match="<releases>"):
+        write_version(str(tmp_path), "a.metainfo.xml", "1.0.0")
+
+
+def test_verify_consistency_includes_the_metainfo(tmp_path):
+    write(tmp_path, "pyproject.toml", PYPROJECT)
+    write(tmp_path, "org.orcshot.Orcshot.metainfo.xml", METAINFO)
+    assert verify_consistency(str(tmp_path))[0] is True
+    write_version(str(tmp_path), "pyproject.toml", "0.3.0")
+    ok, versions = verify_consistency(str(tmp_path))
+    assert ok is False and versions["org.orcshot.Orcshot.metainfo.xml"] == "0.2.0"
