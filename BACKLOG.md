@@ -268,7 +268,7 @@ reads them from.
 
 **Resolved for real, not just tracked:** `docs/superpowers/specs/2026-09-12-orclab-v18-project-type-defaults-design.md` (v18) closes every line this entry ever named. Its eleven research passes ran as plan Tasks 2-12: Task 2 `stack-python-desktop` (PySide6 chosen); Tasks 3-7 the Presence/UI/Storage/Scope-divergence facets (the facets every stack skill now answers — presence, meaning how the app stays reachable when not in front; UI framework; storage; and for games what diverges by platform) on `stack-flutter`, `stack-android-native`, `stack-ios-native`, `stack-godot`, `stack-unity`; Task 8 iOS build/sign from Linux — EAS Build does require a React Native project, but Codemagic builds and signs Flutter for iOS on 500 free macOS minutes a month, so the spec's assumed constraint did not hold and both iOS-ticked cross-family rows (cross-family meaning a project ticking two or more of desktop, mobile, web) reverted to Flutter as the default, with React Native as the first alternative (the spec's own §2 said this was the rule if the constraint broke); Task 9 `stack-kotlin-multiplatform` — the native-UI-on-both alternative, Kotlin business logic shared into an iOS app with a SwiftUI front, and the migration path from an Android-only Kotlin app to both platforms, so the Android-only row now advises keeping business logic in its own Android-free module from day one to keep that move cheap; Task 10 `stack-react-native` — React Native with Expo, the first alternative on both iOS-ticked rows, one React ecosystem spanning phones and a real React-DOM website at the cost of no maintained Linux desktop target and Windows/macOS as separate bare projects; Task 11 `stack-web` — the web-only row's default is decided as React (Vite, TypeScript) + FastAPI, SQLite via SQLModel; Task 12 the cross-family comparison — both cross-family rows stand on Flutter, the only stack whose every targeted platform its own vendor rates Supported/Stable. Two live sources overturned what the spec expected going in, and the shipped skills follow the sources, not the expectation: Unity 6.6's own docs recommend uGUI at runtime with UI Toolkit as the alternative (the spec assumed the reverse), and kotlinlang.org rates Compose Multiplatform's iOS target Stable. Three rows are stubs, by direflail's call on 2026-09-12: Java on Android and Objective-C on iOS (existing codebases only, never a new one) and Godot's web export (not researched). Java + Spring + JavaFX and C# / .NET remain listed as desktop alternatives but are not researched, per direflail: "likely we'll stick with python as default and never use these ... but i still want them as alternatives." What stays parked, per the spec's §6: Docker, observability (Grafana/Prometheus/Loki), and external databases; signing up for the Apple Developer Program and Google Play Console belongs in a session centred on a real first app, not here; Android SDK/Studio/emulator setup was already covered in `stack-android-native` before this spec.
 
-## #5: `/orc-data` — a command for tracking legacy-system info during refactor work
+## #5: `/orc-data` — a command for tracking legacy-system info during refactor work (UPDATED 2026-09-13 — the gap is the database itself, which nothing in code-modernization covers; a step of /orc-code's refactor flows, not a front door; ships the procedure, researches each engine at conversion time)
 
 Raised by direflail (2026-09-05) alongside `/orc-code`'s design, describing the real motivation
 behind the whole Orclab project: direflail's day job involves bringing 20-year-old Java/C# systems
@@ -310,6 +310,53 @@ plugin scatters across `PREFLIGHT.md`'s Check 0 answers, `PLAYBOOK.md`'s "enviro
 and the brief's open questions, with no single place and no way to add a fact between commands.
 If `/orc-data` is built, that residue is its scope: a wrapper over `map`/`extract-rules` for the
 source-derived half, plus one file for the human-derived half. Stays open.
+
+**Update 2026-09-13 — talked through with direflail; the entry is now a shape, not a question.**
+What the plugin's analysis holds about data, read from its command files rather than remembered:
+`map`'s data-dependency graph (which modules read and write which stores, by logical name —
+table, schema, dataset — with datastore nodes in `topology.json`) and `extract-rules`'
+`DATA_OBJECTS.md` (entities, fields, types, which rules consume them). That is the
+*application's* view of its data. Nothing in the plugin treats the database as a thing in
+itself — the schema DDL, constraints and indexes, the logic living in stored procedures and
+triggers, data volume, moving the data — and its own `architecture-critic` says so: *"What's
+the data migration story? 'We'll figure it out' is a finding."* It flags the gap and leaves it.
+**That gap is `/orc-data`'s scope, and it is not a wrapper over anything.** The earlier "read
+`modernize-map` first, it might already cover this" is answered: it does not.
+
+direflail's intended use (2026-09-13): only when porting another project — "like Greenshot →
+Orcshot was, but with data" — or when bringing an old project up to date; never as a
+standalone job. Both are `/orc-code refactor`'s modes, so **this is a step inside those flows,
+not a front door**: migration mode's step 5 runs it when `topology.json` has datastore nodes
+or the tree has DDL, ORM mappings, a migrations directory or embedded SQL (all of which
+`assess` and `map` already look for), and its output goes into the brief *before* the human
+approves the target architecture — so the critic's question has an answer at the moment it is
+asked. A `/orc-data` name can exist to re-run only that step (the same shape as `/orc-test`,
+a command `/orc-code` also calls), but nothing in the design assumes anyone types it cold.
+
+Orclab is meant to be public, and other people will meet engines direflail never will. With no
+first case in hand, pre-writing `stack-db-oracle`, `-sqlserver`, `-db2`, `-mysql`, `-mongo` from
+research would be Orcshot-before-the-stores five times over (`CLAUDE.md`, "Before the first
+project builds on a stack … Orclab has never met"). So **what ships is the procedure, which
+holds for any engine**: what to find out about the source (the schema as an artifact, the logic
+in procedures and triggers, volumes, the constraints the app silently relies on); what to
+decide about the target; the fixed set of questions every engine gets — which dialect, what in
+it does not translate, the type-mapping table to the usual targets, the migration tooling
+(`ora2pg`, `pgloader`, the cloud vendors' schema converters, Flyway/Liquibase for the new
+schema's versioning), and how equivalence is proven (row counts, checksums, a dual-run window);
+how the answers feed the brief; and the gate before "done." Engine-specific facts are
+**researched live at conversion time** under `currency-discipline`, stamped, and **saved into
+the consuming project** next to the brief so that project's later sessions reuse them — other
+people's research stays in their project, which is where it belongs. An engine met in
+direflail's own work gets its research promoted to a real `stack-db-<engine>` skill, the v18
+shape, for everyone after.
+
+Still separate, and still untracked: facts about a system that are not in its source — owners,
+why a decision was made, the SME's answers to `extract-rules`' questions. Not this entry's
+name; it gets its own when something needs it.
+
+**Trigger to build:** the first port or uplift with a data store, direflail's or a spec written
+against one. Not before — the procedure needs one real run to be corrected by, the same as
+every other component here.
 
 ## #6: Per-language manifest version detection/sync for /orc-version — deferred, same reasoning as #4 (PARTIALLY ADDRESSED 2026-09-07 — still open for the formats it names) (UPDATED 2026-09-13 — re-scoped from pom/package.json/Cargo to the version files of Orclab's own stacks; two-number model needed) (UPDATED 2026-09-13 — AppStream metainfo handler shipped for Orcshot 0.4.0; the plan is three steps, this was the first)
 
