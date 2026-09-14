@@ -41,7 +41,9 @@ Every other subcommand runs immediately once you type it — nothing else is ask
 ## What it changes
 
 - `commit` (and the commit half of `commit-push`/`cp`): makes one real commit, after staging
-  *every* changed file in the project — not only files you might expect.
+  *every* changed file in the project — not only files you might expect. Look at what's
+  uncommitted beforehand, or review the commit afterward, if you want to check exactly what went
+  in.
 - `push` (and the push half of `commit-push`/`cp`): pushes your current branch to its remote
   copy on GitHub.
 - `repo`: writes `.orclab/git-repo.json` recording the connected URL, and adds a line for
@@ -51,8 +53,7 @@ Every other subcommand runs immediately once you type it — nothing else is ask
   files.
 - `merge`: creates a merge commit, runs the project's test suite both before and after merging,
   and — once both runs pass — deletes the finished branch (and any separate folder that was
-  checked out for it) with a delete that only succeeds if git itself agrees the branch's work is
-  fully merged.
+  checked out for it). It only deletes the branch if none of its work would be lost by doing so.
 - `pr`: checks out the pull request's branch locally. Changes nothing else.
 - `release`: pushes a tag to GitHub and creates a GitHub Release from it — a public page other
   people can see, listing what changed.
@@ -65,11 +66,17 @@ Every other subcommand runs immediately once you type it — nothing else is ask
 - It will never merge into your current branch while you have uncommitted changes sitting
   around, or while the branch being merged does. It stops and tells you what's uncommitted
   instead.
-- It will never merge if the test suite fails, either before or after — it stops and leaves
-  everything untouched (nothing merged, nothing deleted, nothing pushed).
+- It will never guess which branch you meant: if the branch you named doesn't exist, or is the
+  one you're already on, it stops and says so instead of merging.
+- It will never merge if the test suite fails beforehand — it stops and reports the failure
+  without merging anything. If the test suite fails *after* it has already merged, it doesn't
+  undo that merge for you: the merge commit, the branch, and its separate folder (if it had one)
+  are all left exactly as they are, nothing is pushed, and undoing the merge is your call.
 - It will never resolve a merge conflict for you. If one comes up, it stops and reports which
   files conflict, and leaves the decision to you.
 - It will never force through the branch deletion after a merge — if git considers the branch
   not fully merged, it stops and tells you rather than deleting it anyway.
 - It will never overwrite an existing, different GitHub connection for the project without
   showing you the current one and asking first.
+- It will never guess which tag you meant when releasing: if you name a tag that doesn't exist
+  locally, it stops and says so instead.
