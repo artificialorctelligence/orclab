@@ -44,8 +44,9 @@ plugin and note its name and current version. Everything it actually changes liv
   not update itself; `/orc-reload` checks whether that copy has fallen behind (by fetching from
   GitHub) but, as covered in "What it will never do without asking" below, never updates it
   itself.
-- It reinstalls the plugin — uninstalling it, then installing it again — which replaces the copy
-  kept under `~/.claude/plugins/cache/`.
+- It reinstalls the plugin — uninstalling it, then installing it again — which installs a fresh
+  copy under `~/.claude/plugins/cache/`. An older version's directory may still sit beside it
+  afterward; that's normal and not a sign anything went wrong.
 - It then reads that copy back to confirm the version you expected is the one actually installed.
 
 ## What it will never do without asking
@@ -57,7 +58,9 @@ plugin and note its name and current version. Everything it actually changes liv
   it tells you plainly that this isn't a Claude Code plugin project and stops there.
 - If it can't find your plugin registered as a marketplace anywhere on this machine, it will
   never invent or guess a name for one — it says so plainly and stops, so you can register it
-  yourself first (`claude plugin marketplace add <path>`).
+  yourself first (`claude plugin marketplace add <path>`). Registering a plugin this way is a
+  normal one-time step every plugin gets on a given machine before it can be installed at all —
+  hitting this case just means that step hasn't happened here yet, not that anything is wrong.
 - If the plugin's registered from GitHub and its cached clone has fallen behind, it will never
   bring that clone up to date itself — doing so discards whatever the clone currently holds, and
   that's your call, not something to decide on your behalf. It stops and hands you the exact
