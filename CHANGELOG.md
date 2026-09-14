@@ -2,6 +2,58 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.19.0] - 2026-09-13
+
+### Added
+- `code-discipline`, a background skill in `test-discipline`'s shape: seven rules for the shape of
+  code — linear control flow, bounded loops, resources closed on the error path, ~60-line
+  functions, loud checks that survive release, no swallowed errors, zero warnings — each traced to
+  its source (five to Holzmann's "Power of Ten", the nesting limit to *Clean Code*). The
+  assertion rule is restated because `assert` is debug-only in every stack language Orclab ships,
+  verified against each language's own docs.
+- A `## Lint — where code-discipline lands` section in all nine stack skills: the exact linter
+  config for nesting depth, function length, swallowed errors and warnings-as-errors in that
+  stack's native tool (ruff + pyright, oxlint/ESLint, detekt, SwiftLint, the Dart analyzer,
+  SonarAnalyzer.CSharp with `SonarLint.xml`, gdlint + `project.godot`), each rule name and default
+  confirmed against the tool's own sources; the two honest gaps (Dart and GDScript have no free
+  nesting/length rule) are said out loud.
+- `lint_on_write`, a `PostToolUse` hook on `Edit`/`Write`: runs the project's own configured
+  linter on the file just written and reports what it found. No config in the project, no run —
+  the hook carries no rules of its own. `ORCLAB_LINT_ON_WRITE_OFF=1` disables it.
+- `/orc-code refactor` has two modes. **Quality mode** brings an existing codebase up to
+  `code-discipline` with the suite green after every file — lint config, baseline, safe autofixes
+  only, rule findings by hand one function at a time, `/orc-test generate`, before → after.
+  **Migration mode** wraps Anthropic's `code-modernization` plugin and adds what it lacks: the
+  target stack from `/orc-code`'s own Defaults Table, characterization tests on the old code
+  before any migration, a worktree laid out the plugin's way, and an exit gate — the old suite
+  green on the new code with coverage and TCE no lower. Each mode was run once for real (a scratch
+  clone of Orcshot: ruff 376 → 0; itsdangerous 1.1.0 → Python 3.12 through the plugin: exit gate
+  passed) and the prose corrected with what the runs contradicted.
+- `/orc-test` measures TCE for GDScript through gdmutant (Godot 4.3+, GUT and gdUnit4), proven on
+  a real headless run with Godot 4.7.2.
+
+### Changed
+- `CLAUDE.md`'s "show what it rests on" rule now covers a claim in a shipped skill about what an
+  Orclab component does — seven stack skills said `/orc-version` edits their version files;
+  `versionfiles.py` has never handled them, and they now say so (BACKLOG #6 re-scoped to the
+  stacks' own two-number version files).
+- Orclab's own Python adopts `code-discipline`'s ruff config at the root: 190 findings on first
+  run — 146 of them from ruff 0.16's default set, which is five whole categories, not the old
+  `E4/E7/E9/F` handful (the stack skills now say so) — all fixed by hand; 31 functions flattened.
+- `/orc-code`'s Plugin-Discovery Procedure tells a marketplace copy from an installed plugin
+  (`installed_plugins.json`), and its install note records that Desktop hands the installing
+  session the plugin's agents and skills without a restart (2026-09-13).
+
+### Fixed
+- Mutation-testing orc-todo's suite no longer rewrites the real `BACKLOG.md`: the tests pin the
+  ambient cwd to a sandbox (BACKLOG #34, proven with a negative control).
+- `/orc-test generate`'s second `analyze` returned the before-number verbatim on Python because
+  mutmut's cache hashes source only; the cache is dropped when any test file is newer (BACKLOG #35;
+  orc-todo's TCE 69.4% → 82.3%).
+- The app-store ingredient quoted GitHub's retired "10×" macOS-minutes multiplier; it now quotes
+  the live rate table (BACKLOG #38). KMP page dates, game-skill openers, Flutter tray sections and
+  the "Task N of the v17 plan" references in orc-test were cleaned up (BACKLOG #39).
+
 ## [0.18.0] - 2026-09-12
 
 ### Added
