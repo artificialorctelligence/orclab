@@ -3,9 +3,13 @@
 Orclab is a Claude Code plugin. It gives you commands for the work around code — versions,
 releases, publishing, tests, the backlog — plus background knowledge Claude reads on its own
 while it works, without you asking for it. It comes from real practice: worked out on a real
-project (Orcshot) first, then turned back on Orclab's own development.
+project (Orcshot, a screenshot tool for Linux desktops) first, then turned back on Orclab's own
+development.
 
 ## Installing
+
+Clone this repository, then register that checkout as a local plugin marketplace —
+`~/projects/orclab` below is just an example path, use wherever you cloned it:
 
     /plugin marketplace add ~/projects/orclab
     /plugin install orclab@orclab
@@ -15,7 +19,8 @@ A new install shows up in a fresh session, not the one you ran the install from.
 ## Commands
 
 - [/orc-code](docs/commands/orc-code.md) — start a new project, add a feature to one that already
-  exists, or clean up/move existing code, handing off to other installed plugins for the last two.
+  exists, or clean up/move existing code — the last two hand off to Anthropic's own `feature-dev`
+  plugin and `code-modernization` plugin, and it says plainly if the one it needs isn't installed.
 - [/orc-git](docs/commands/orc-git.md) — the everyday git and GitHub jobs: connect a repo, commit,
   push, switch branches, merge, check out a PR, cut a release.
 - [/orc-help](docs/commands/orc-help.md) — see which version of Orclab is running and what
@@ -40,6 +45,14 @@ A new install shows up in a fresh session, not the one you ran the install from.
 Inside Claude, `/orc-help <name>` shows any of these pages.
 
 ## What Claude reads on its own
+
+A plugin is installed for your user, so everything below is present in every Claude Code session
+on this machine once Orclab is installed, not only in one project — but each one only comes into
+play when its own trigger fits what you're actually doing: a stack skill when that stack is in
+play, `secret-hygiene` when a command could surface a credential. Uninstalling
+(`/plugin uninstall orclab@orclab`) removes all of it. For example, when `secret-hygiene` fires,
+it keeps secrets out of what gets shown or pasted, and gives the recovery procedure if one gets
+exposed anyway.
 
 Discipline:
 
