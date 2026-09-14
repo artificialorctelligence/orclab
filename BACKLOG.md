@@ -59,7 +59,7 @@ belong there). `/orc-code` covers new-project, add-to-existing, and refactor wor
 commands beyond `/orc-code` get built is now a separate, forward-looking question — `/orc-data` is
 already tracked on its own as #5.
 
-## #2: A base visual/design-system layer for apps Orclab helps build — a future sub-project, not v1
+## #2: A base visual/design-system layer for apps Orclab helps build — a future sub-project, not v1 (UPDATED 2026-09-13 — re-scoped: design tokens with a brand tree and an unbranded default are the foundation and reach all nine stacks; a React component layer comes later, with a React project; first slice is Orctool's skin system)
 
 Raised by direflail (2026-09-04), separately from #1 and from v1's process-core scope: right now
 Orclab has no opinion at all about how the apps it helps build actually *look* — how desktop apps,
@@ -110,6 +110,80 @@ its own research spike comparing 2-3 real candidates against Orclab's actual tar
 before a design gets proposed, not a decision made from the comparison table alone.
 
 **Note 2026-09-12 (v18):** every stack skill now carries a `## UI` section, and each one ends with the same sentence — "BACKLOG #2's design system translates into the frameworks above." — naming this entry directly: `skills/stack-android-native/SKILL.md`, `skills/stack-flutter/SKILL.md`, `skills/stack-godot/SKILL.md`, `skills/stack-ios-native/SKILL.md`, `skills/stack-kotlin-multiplatform/SKILL.md`, `skills/stack-python-desktop/SKILL.md`, `skills/stack-react-native/SKILL.md`, `skills/stack-unity/SKILL.md`, `skills/stack-web/SKILL.md` — all nine of v18's stack skills. Whatever base design system this entry eventually settles on has a concrete, enumerated set of UI frameworks to translate into: SwiftUI, Jetpack Compose, GTK/Qt/Tkinter, Flutter widgets, Compose Multiplatform, React Native's core components plus React web, React (Vite), and each game engine's own UI toolkit (Godot Control nodes/themes, Unity UGUI/UI Toolkit). This entry stays open; nothing here picks a design system.
+
+**Update 2026-09-13 — talked through with direflail against what Orclab is now; the entry is
+re-scoped.** Three things had changed under it since 2026-09-04:
+
+- **The candidates above are web-only.** Fluent, Carbon, MUI, shadcn, Radix, Chakra are all
+  React/web. Since v18 Orclab has nine stacks and one is web; the other eight draw their own
+  widgets (SwiftUI, Compose, Flutter, Qt, GTK, the game engines' UI) and none can consume a
+  React component. The "compare Fluent vs Carbon vs shadcn" next step would have decided the
+  look of one stack and nothing else. It is withdrawn.
+- **v18 already made the "full design system" choice per stack, without naming it.** Flutter's
+  skill: *"Material 3 is the default design language of Flutter"*; Android is Material 3 via
+  Compose; iOS is Apple's HIG via SwiftUI; Python desktop: *"Qt will choose the most appropriate
+  style for the user's platform."* Each is a token-driven theme plus a full component set plus
+  scaling rules — the entry's own definition of the Blocks layer — and it comes with the
+  framework. Blocks exists at Caterpillar because the web has no platform conventions; eight of
+  nine Orclab stacks do. So this entry is not "pick a design system"; it is what sits *on top of*
+  each platform's own.
+- **There is a first real case, and it is one stack.** Orctool (brainstormed 2026-09-13,
+  Flutter): *"Skinnable UI; one skin LCARS-adjacent."* A skin is a token set swapped at runtime.
+  Orctool's slice 1 is "skeleton + skin system", so the token format and its Flutter translation
+  get designed against a real need the moment that spec is written.
+
+**What direflail wants (2026-09-13):** the thing, with **multiple brand identities and subtrees
+under them** — the workplace case: a parent company's brand, and subsidiaries branded
+separately on the same underlying everything except colours and styling — and an **unbranded
+option** when none applies. Not a shared look across their own apps: Orcshot and Orctool have
+wildly different interfaces and should keep them. No attachment to Blocks as such; the ask is
+"port to as many places as possible", and the leaning toward React from the work so far was
+discussed and separated (below).
+
+**The shape, in layers:**
+
+1. **Design tokens with a brand tree — the foundation; the only layer that reaches all nine
+   stacks**, including the game engines (Unity's UI Toolkit styles with USS, a CSS-like
+   language; Godot has theme resources), because any framework can consume a generated file of
+   constants. Structure: `base` is the semantic vocabulary only (`color.surface`,
+   `color.accent`, `type.body`, `space.3`, `radius.control`) with no values that are anyone's;
+   `brand/<company>` overrides base (palette, type family, radii, mark);
+   `brand/<company>/<subsidiary>` overrides the brand, colours and styling only. **Unbranded is
+   base only**: every stack falls through to its platform's own theme untouched. Output is
+   generated per (brand, stack): one subsidiary's tokens become a Flutter `ThemeData`, a Compose
+   theme, SwiftUI constants, a Qt stylesheet or GTK CSS, CSS variables for React. Format: the W3C
+   design-tokens spec the entry names; tool: Style Dictionary, the one non-web item in the list
+   above, whose own examples I recall include a multi-brand, multi-platform build — both the
+   spec's "stable v1, October 2025" claim and that recollection are confirmed live at build time
+   under `currency-discipline`, not taken from this entry. A brand fixes colour, type, spacing
+   rhythm and radii and says nothing about layout or what is on the screen: two apps on one
+   brand read as the same family and can look nothing alike — the subsidiaries' case exactly.
+2. **A React component layer — the Blocks analog — later, when a React project exists**, built
+   on the tokens so it is brand-aware from birth. Two claims were separated here: *tokens* port
+   everywhere; *components* port only within one rendering engine. A React DOM component runs on
+   the web and in a web view (Electron/Tauri); React Native is a different renderer, and "one
+   library on both" exists only through a universal layer on top (Tamagui, Gluestack,
+   react-native-web — a research question for that day, not a fact). At its best the React
+   family covers three rows of v18's table (web, the React Native mobile row, multi-platform
+   with iOS) and none of Flutter, Compose, SwiftUI, Qt/GTK or the game engines. And v18 lists
+   React Native as the mobile default *pending pass 11* — not yet researched — while Orctool
+   chose Flutter over it for stated reasons, so a React component layer would not touch
+   direflail's first app; only tokens would.
+3. **Per-stack rules stay in the stack skills' `## UI` sections**, where v18 put them: how the
+   tokens land in that framework, and what the platform's own conventions forbid overriding
+   (the brand layer has to be the part that is *allowed* to differ — overriding GNOME's
+   conventions on Orcshot would fight Flathub's own guidelines).
+
+**First slice, and how the first brand gets proven:** the token format and the Flutter
+translation, designed inside Orctool's slice-1 spec for its skin system. Then the test direflail
+asked for: **put Orctool's skin on Orcshot** — the same token set translated to GTK CSS, no
+layout change — and look. If it reads as the same family, the brand layer works; if it fights
+GNOME's conventions, that is the layer-3 boundary showing itself. A mockup, cheap once the skin
+exists; a test of the *brand*, not a plan to reskin Orcshot, which stays unbranded unless
+direflail says otherwise. Later translations arrive with the next stack that ships something;
+the web one waits for a web project.
+
+Still open; nothing is built until Orctool's slice-1 spec.
 
 ## #3: Real enforcement for the discipline v1 only guides — not yet decided how (RESOLVED 2026-09-07)
 
