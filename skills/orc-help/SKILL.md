@@ -52,9 +52,24 @@ Commands:
   /orc          — <real description field from orc.md>
   /orc-git      — <real description field from orc-git.md>
   /orc-publish  — <real description field from skills/orc-publish/SKILL.md's frontmatter>
+
+  for any command, /orc-help <name>
 ```
 
 Always read the REAL `description` field from each real command/skill file found in this step —
 the example above shows the format, not literal text to reuse. If a future command or skill-only
 component is added, it appears here automatically because this step lists whatever files actually
 exist, rather than a hardcoded list.
+
+## Step 4: Show one command's page, when a name was given
+
+If `$ARGUMENTS` names a command — with or without the leading `/` and the `orc-` prefix, so
+`git`, `orc-git` and `/orc-git` all mean the same — skip Step 3's synopsis and instead read
+`docs/commands/<name>.md` in the plugin root Step 2 established. Present it in chat in the page's
+own order — its five headings, and its table if it has one — the way you would relay any
+document to the person in front of you, not as pasted Markdown. There is exactly one copy of
+each page and this is it; never summarise from memory of the command instead of reading the
+file.
+
+If no such page exists: "There is no `/orc-<name>` command; `/orc-help` lists what exists." —
+and stop.
