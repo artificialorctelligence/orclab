@@ -41,11 +41,11 @@ asked.
 - **Any step the document marks as done by hand:** it tells you exactly what you need to do, then
   stops and waits — it never decides for itself that a by-hand step is finished. It only records
   what you tell it you did.
-- **A step whose one-time setup hasn't happened yet** — something that only ever needs doing once
-  for the whole project, like registering a store listing name or creating a signing key: it names
-  exactly what's missing, in the document's own words, and asks whether to set it up now, then
-  asks whatever that setup itself needs (which account, which key, which name). It only runs the
-  real setup once you say yes.
+- **A step whose one-time setup hasn't happened yet** — `RELEASING.md` can mark a step as needing
+  something done just once for the whole project rather than on every release, like registering a
+  store listing name or creating a signing key: it names exactly what's missing, in the document's
+  own words, and asks whether to set it up now, then asks whatever that setup itself needs (which
+  account, which key, which name). It only runs the real setup once you say yes.
 - Expect ordinary Claude Code permission prompts throughout a real release, more than one. Each of
   your project's own commands — running its tests, building its artifact, uploading it — asks
   separately, right before it runs, rather than all being approved as a block up front. That's
@@ -68,19 +68,24 @@ asked.
 - **Whatever `RELEASING.md`'s own steps do**, exactly as that document says — nothing more. A
   step's real commands run for real; `/orc-release` never widens one beyond what's written there.
 - **When the last step passes**, the release closes itself automatically: a summary is printed
-  (the version, which steps completed, which were skipped and why, and which completed steps are
-  now permanently irreversible), and its own state record is cleared. Nothing is rolled back at
-  that point — a release that reaches its last step stands as shipped.
+  (the version, which steps completed, which were skipped and why, and which completed steps
+  `RELEASING.md` itself marks irreversible — meaning nothing, not even abandoning the release
+  later, can undo them), and its own state record is cleared. Nothing is rolled back at that point
+  — a release that reaches its last step stands as shipped.
 - **If you abandon a release instead** (asking it to abort), it rolls back what it safely can: the
-  project's version files go back to what they held before the release started. Two things are
-  deliberately left behind rather than touched automatically: a `debian/changelog` entry already
-  prepended for this release stays in place (rewriting a changelog file automatically isn't safe,
-  so you remove it by hand), and any `CHANGELOG.md` entry `/orc-version` drafted for this release
-  is left untouched too, for the same reason. Any step already completed that `RELEASING.md`
-  itself marks irreversible is never undone — it stands exactly as it is. If the document doesn't
-  mark any step irreversible at all, `/orc-release` says so plainly and tells you to check every
-  completed step yourself rather than guessing which of them can still be walked back. Its own
-  state record is cleared once the abort finishes either way.
+  project's version files go back to what they held before the release started. This rollback is
+  not guaranteed to be complete — it can leave the version files disagreeing with each other, in
+  which case `/orc-release` names exactly which files and what they each say, and the project's
+  tree really is inconsistent until you clean that up by hand. Two things are deliberately left
+  behind rather than touched automatically: a `debian/changelog` entry — the changelog kept by a
+  project that ships an actual Debian package, present only if yours does — already prepended for
+  this release stays in place (rewriting a changelog file automatically isn't safe, so you remove
+  it by hand), and any `CHANGELOG.md` entry `/orc-version` drafted for this release is left
+  untouched too, for the same reason. Any step already completed that `RELEASING.md` itself marks
+  irreversible is never undone — it stands exactly as it is. If the document doesn't mark any step
+  irreversible at all, `/orc-release` says so plainly and tells you to check every completed step
+  yourself rather than guessing which of them can still be walked back. Its own state record is
+  cleared once the abort finishes either way.
 
 ## What it will never do without asking
 
