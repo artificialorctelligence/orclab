@@ -18,13 +18,13 @@ real, current commands, even right after an update.
 | `/orc-help` | Reports the version of Orclab that's running, and lists every command it currently has, one line per command. |
 | `/orc-help <name>` | Shows that one command's own page instead of the list. Works with or without the leading `/` and the `orc-` prefix, so `git`, `orc-git`, and `/orc-git` all reach the same page. |
 
-`/orc` is a shorter way to type the same thing — see [orc.md](orc.md).
+`/orc` is a shorter way to type the same thing — see [`/orc`](orc.md).
 
 ## What it will ask you
 
 Nothing. It works out the answer on its own and reports it. When it can't — Orclab isn't
-installed as a plugin in the project you're currently in, or the name you gave doesn't match any
-real command — it stops and says so plainly, rather than asking you a question and waiting for an
+installed as a plugin anywhere on this machine, or the name you gave doesn't match any real
+command — it stops and says so plainly, rather than asking you a question and waiting for an
 answer.
 
 ## What it changes

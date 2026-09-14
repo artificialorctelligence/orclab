@@ -2,7 +2,7 @@
 
 ## What it's for
 
-`/orc` is the short name for `/orc-help`. Everything on [orc-help.md](orc-help.md) applies.
+`/orc` is the short name for `/orc-help`. Everything on [`/orc-help`](orc-help.md) applies.
 
 ## What you type
 

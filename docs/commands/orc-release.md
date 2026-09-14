@@ -100,7 +100,10 @@ asked.
   prevent.
 - It never keeps walking a release once `RELEASING.md` has changed underneath it. A mid-release
   edit can shift which step is which, so it stops and tells you to re-read the document instead of
-  guessing at the new numbering.
+  guessing at the new numbering. It stops the same way if it can't even tell what shape the
+  document is in — a code block that's opened but never closed, step numbers that skip or repeat,
+  or a "see step N" pointing at a step that doesn't exist — rather than guessing past a document it
+  can't reliably read.
 - It never marks a by-hand step complete on its own initiative — only you can say you actually did
   it, and it records exactly that, nothing more.
 - It never runs a one-time setup's real commands just to find out whether they're needed — it only

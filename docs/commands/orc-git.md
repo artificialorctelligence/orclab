@@ -18,7 +18,7 @@ out the individual git and GitHub commands yourself.
 | `/orc-git branch <name>` (alias: `/orc-git switch <name>`) | Switches you to branch `<name>`, creating it first if it doesn't exist yet |
 | `/orc-git merge <branch>` | Merges `<branch>` into the branch you're currently on |
 | `/orc-git pr <id>` | Checks out an existing pull request (a proposed set of changes someone opened on GitHub) by its number |
-| `/orc-git release [tag]` | Pushes a version tag and publishes the GitHub Release for it (uses the most recent tag if you don't name one) |
+| `/orc-git release [tag]` | Pushes your current branch's commits and a version tag, then publishes the GitHub Release for it (uses the most recent tag if you don't name one) |
 
 Typing `/orc-git` by itself lists all of these. Typing a word it doesn't recognize, or leaving out
 a `<url>`/`<name>`/`<branch>`/`<id>` a subcommand needs, gets you this same list instead of a
@@ -35,6 +35,9 @@ guess.
   typed the command — it says exactly what it's about to do (for example, "Push it to origin?")
   and waits for you to say yes, every time. Typing the command yourself is already your answer,
   so in that case it just runs.
+
+- `repo`, `pr`, and `release` need you signed in to GitHub; if you aren't, they run GitHub's own
+  `gh auth login` sign-in, which will interrupt with its own prompts before continuing.
 
 Every other subcommand runs immediately once you type it — nothing else is asked.
 
@@ -55,8 +58,8 @@ Every other subcommand runs immediately once you type it — nothing else is ask
   and — once both runs pass — deletes the finished branch (and any separate folder that was
   checked out for it). It only deletes the branch if none of its work would be lost by doing so.
 - `pr`: checks out the pull request's branch locally. Changes nothing else.
-- `release`: pushes a tag to GitHub and creates a GitHub Release from it — a public page other
-  people can see, listing what changed.
+- `release`: pushes your current branch's commits and a tag to GitHub, and creates a GitHub
+  Release from it — a public page other people can see, listing what changed.
 
 ## What it will never do without asking
 

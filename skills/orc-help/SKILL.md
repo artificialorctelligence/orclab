@@ -32,6 +32,8 @@ field is exactly `orclab`. Its containing directory is Orclab's own installed ro
 
 ## Step 3: List available commands
 
+If `$ARGUMENTS` names a command, skip this step — Step 4 handles it.
+
 (Skip this step entirely if Step 2 ended in the project-context/no-match case — it already told
 you to stop.) In the plugin root established by Step 2 — the discovered installed root, or the
 current working directory fallback in core context — enumerate every `skills/orc*/SKILL.md`.

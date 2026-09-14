@@ -60,8 +60,7 @@ Leaving `<selection>` out acts on everything the tree file has actionable.
   - **success** — it ran and worked, with whatever real output it produced
   - **accepted** — it went through, but hasn't been confirmed to have landed yet (see
     `--confirm` above)
-  - **refused** — a check caught a problem before anything ran — this is also the word used for a
-    leaf whose own setup is broken, not just one whose artifact failed a check
+  - **refused** — a check caught a problem before anything ran
   - **failed** — it ran and came back with a real error
   - **timed out** — it was still running when its time limit hit
   - **not attempted** — there was nothing configured to run for that leaf at all
@@ -85,9 +84,13 @@ Leaving `<selection>` out acts on everything the tree file has actionable.
   more than one thing, it reports the problem instead of picking one for you.
 - It never attempts a channel that has no publish action configured yet — it reports that
   plainly instead of trying and failing.
-- It never runs a leaf whose own setup is broken — something misconfigured is reported as
-  **refused**, by name, with a plain error, rather than guessed at or left to crash; one broken
-  leaf never stops the ones that are set up correctly from running.
+- It never publishes anything if any leaf in the plan has an unusable configuration — a
+  non-text `action:`, `metrics:`, or `prepare:` value, a `timeout:` that isn't a positive whole
+  number of seconds, or a `confirm:` block it can't use — it names the leaf and the bad value and
+  stops the entire run before anything is sent anywhere, rather than publishing the leaves that
+  look fine and leaving the broken one for later.
+- Once the run is actually underway, one leaf's action failing does not stop its siblings — each
+  leaf still gets its own attempt and its own reported outcome.
 - It never paraphrases a failure away, and never reports a leaf as done unless the run actually
   confirmed it — a publish that's only accepted (queued, not yet landed) is never called finished.
 - It never adds tracking, analytics, or phone-home code to get a channel's own numbers —

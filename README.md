@@ -19,16 +19,17 @@ A new install shows up in a fresh session, not the one you ran the install from.
 ## Commands
 
 - [/orc-code](docs/commands/orc-code.md) — start a new project, add a feature to one that already
-  exists, or clean up/move existing code — the last two hand off to Anthropic's own `feature-dev`
-  plugin and `code-modernization` plugin, and it says plainly if the one it needs isn't installed.
+  exists, or clean up/move existing code. Adding a feature hands off to Anthropic's own
+  `feature-dev` plugin, and moving code to another language or version hands off to its
+  `code-modernization` plugin; either way it says plainly if the one it needs isn't installed.
 - [/orc-git](docs/commands/orc-git.md) — the everyday git and GitHub jobs: connect a repo, commit,
   push, switch branches, merge, check out a PR, cut a release.
 - [/orc-help](docs/commands/orc-help.md) — see which version of Orclab is running and what
   commands it gives you, or read one command's own page; `/orc` is its short name
   ([orc.md](docs/commands/orc.md)).
 - [/orc-package](docs/commands/orc-package.md) — set your project up to ship somewhere real (a
-  PPA, an app store, a package registry) by applying a ready-made ingredient, or capturing a new
-  one.
+  PPA, an app store, a package registry) by applying a ready-made recipe (Orclab calls one an
+  *ingredient*), or capturing a new one.
 - [/orc-publish](docs/commands/orc-publish.md) — send a finished build to a channel your project
   already has set up, or read back that channel's own published numbers.
 - [/orc-release](docs/commands/orc-release.md) — walk your project's own `RELEASING.md` end to
@@ -49,10 +50,10 @@ Inside Claude, `/orc-help <name>` shows any of these pages.
 A plugin is installed for your user, so everything below is present in every Claude Code session
 on this machine once Orclab is installed, not only in one project — but each one only comes into
 play when its own trigger fits what you're actually doing: a stack skill when that stack is in
-play, `secret-hygiene` when a command could surface a credential. Uninstalling
-(`/plugin uninstall orclab@orclab`) removes all of it. For example, when `secret-hygiene` fires,
-it keeps secrets out of what gets shown or pasted, and gives the recovery procedure if one gets
-exposed anyway.
+play, `secret-hygiene` when a command could surface a credential. For example, when
+`secret-hygiene` fires, it keeps secrets out of what gets shown or pasted, and gives the recovery
+procedure if one gets exposed anyway. Uninstalling (`/plugin uninstall orclab@orclab`) removes
+all of it.
 
 Discipline:
 
