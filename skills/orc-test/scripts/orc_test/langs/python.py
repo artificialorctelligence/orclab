@@ -9,9 +9,9 @@ a mutants/ at the directory pytest runs from.
 
 import ast
 import importlib.util
+import json
 import os
 import pathlib
-import re
 import shutil
 
 import tomllib
@@ -34,8 +34,8 @@ CAVEATS = [
 SANDBOX = {"mutants", ".coverage", "__pycache__", ".pytest_cache"}   # mutmut/pytest-cov's own scratch
 
 _IGNORE = "--ignore-glob=*mutants/*"        # root and nested: each suite's mutmut has its own mutants/
-_RESULT = re.compile(r"^\s*(\S+): (.+)$")
-_HUNK = re.compile(r"^@@ -(\d+)")
+_KILLED = {1, 3, 36, 24, -24, 152, 255}     # mutmut's status_by_exit_code: "killed" and "timeout"
+MUTMUT_DIFFS = pathlib.Path(__file__).parents[1] / "mutmut_diffs.py"
 
 
 def missing(root):
@@ -58,9 +58,23 @@ def test_cmd(root, target):
     return ["python3", "-m", "pytest", "-q", _IGNORE] + ([target] if narrow else [])
 
 
+def _cov_roots(root, target):
+    """One --cov=<dir> per directory coverage.py would otherwise never look inside. It lists a
+    never-imported file only by walking down from a --cov dir through directories that have an
+    __init__.py, so a src/ without one hid every unexecuted file beneath it (BACKLOG #42). The dir
+    given as a root is exempt, so every init-less dir on the way to a .py file becomes one."""
+    root = pathlib.Path(root)
+    base = root / (target or ".")
+    roots = set()
+    for p in base.rglob("*.py"):
+        if SKIP_DIRS & set(p.relative_to(root).parts):
+            continue
+        roots.update(d for d in p.parents if base in d.parents and not (d / "__init__.py").exists())
+    return [target or "."] + sorted(os.path.relpath(d, root) for d in roots)
+
+
 def coverage_cmd(root, target, out):
-    src = target or "."
-    return ["python3", "-m", "pytest", "-q", _IGNORE, f"--cov={src}",
+    return ["python3", "-m", "pytest", "-q", _IGNORE] + [f"--cov={d}" for d in _cov_roots(root, target)] + [
             f"--cov-report=lcov:{out / 'coverage.lcov'}", f"--cov-report=html:{out / 'html'}"]
 
 
@@ -129,52 +143,73 @@ def mutation_cmd(root, target, out):
     return ["python3", "-m", "mutmut", "run"]
 
 
-def _show(root, key):
-    return run(["python3", "-m", "mutmut", "show", key], cwd=root).stdout
-
-
-def _results(root):
-    # mutmut 3.7 lists only the non-killed mutants unless asked for all; "--all" takes a value
-    return run(["python3", "-m", "mutmut", "results", "--all", "true"], cwd=root).stdout
+def _diffs(root, alive):
+    """{key: diff} for every survivor, from one process (mutmut_diffs.py) rather than one
+    `mutmut show` each — that loop was ~75% of a real project's analyze (BACKLOG #42)."""
+    if not alive:
+        return {}
+    stdin = "".join(f"{key} {file}\n" for key, file in alive)
+    out = run(["python3", str(MUTMUT_DIFFS)], cwd=root, input=stdin).stdout
+    blocks = (b.partition("\n") for b in ("\n" + out).split("\n# ")[1:])
+    return {key: diff.rstrip("\n") for key, _, diff in blocks}
 
 
 def mutation_parse(root, out):
-    text = _results(root)
-    killed, total, survivors = 0, 0, []
-    for line in text.splitlines():
-        m = _RESULT.match(line)
-        if not m:
-            continue
-        status = m.group(2)
-        if status in ("killed", "timeout"):        # timeout: the mutant hung the suite — a catch
-            killed += 1
-            total += 1
-        elif status == "survived":
-            total += 1
-            survivors.append(_survivor(root, m.group(1)))
-        # else: suspicious, skipped, "no tests" — not a verdict on the mutant, don't count it
-    return Mutation(killed, total, survivors)
+    """Verdicts from mutmut's own cache: mutants/<file>.meta holds every mutant's exit code, which is
+    all `mutmut results` prints and what `mutmut show` walks to find a key's file."""
+    root = pathlib.Path(root)
+    killed, total, alive = 0, 0, []
+    for meta in sorted((root / "mutants").rglob("*.meta")):
+        file = str(meta.relative_to(root / "mutants"))[:-len(".meta")]
+        if not (root / file).is_file():
+            continue                            # a stale cache entry; mutmut's results skips it too
+        for key, code in json.loads(meta.read_text())["exit_code_by_key"].items():
+            if code in _KILLED:                 # timeout: the mutant hung the suite — a catch
+                killed += 1
+                total += 1
+            elif code == 0:
+                total += 1
+                alive.append((key, file))
+            # else: suspicious, skipped, "no tests", not checked — not a verdict on the mutant, don't count it
+    diffs = _diffs(root, alive)
+    return Mutation(killed, total, [_survivor(root, key, file, diffs.get(key, "")) for key, file in alive])
 
 
-def _survivor(root, key):
-    """File, line and replacement text of one surviving mutant, from `mutmut show`'s diff.
-    The mutated line is the hunk's start plus the context lines before the first `-` line."""
-    diff = _show(root, key)
-    file, line, context, change = "?", 0, 0, ""
+def _survivor(root, key, file, diff):
+    """File, line and replacement text of one surviving mutant. The diff is of the function alone,
+    so its hunk numbers are function-relative (BACKLOG #42): the removed line is found by its
+    text inside the function's real span in the file instead."""
+    removed, change = "", ""
     for raw in diff.splitlines():
-        if raw.startswith("--- "):
-            file = raw[4:].strip()
-        elif (h := _HUNK.match(raw)):
-            line, context = int(h.group(1)), 0
-        elif raw.startswith("-") and not raw.startswith("---") and context is not None:
-            line += context           # first removed line only; a multi-line statement has several
-            context = None            # frozen: the mutated line is found
+        if raw.startswith("-") and not raw.startswith("---") and not removed:
+            removed = raw[1:]                   # first removed line only; a multi-line statement has several
         elif raw.startswith("+") and not raw.startswith("+++"):
             change = raw[1:].strip()
             break
-        elif raw.startswith(" ") and context is not None:
-            context += 1
-    return Survivor(file, line, change)
+    return Survivor(file, _line_of(pathlib.Path(root) / file, key, removed), change)
+
+
+def _line_of(path, key, removed):
+    """The file line holding `removed`, inside the function the key names — mutmut keys are
+    module.x_func__mutmut_N, or module.xǁClassǁmethod__mutmut_N for a method: the def line when
+    the text is not in it, 0 when the function is not in the file."""
+    name = key.partition("__mutmut_")[0].rpartition(".")[2]
+    cls, sep, func = name.rpartition("ǁ")
+    cls, func = (cls[2:], func) if sep else (None, func[2:])
+    try:
+        text = path.read_text()
+        body, lines = ast.parse(text).body, text.splitlines()
+    except (OSError, SyntaxError):
+        return 0
+    if cls:
+        body = next((n.body for n in body if isinstance(n, ast.ClassDef) and n.name == cls), [])
+    fn = next((n for n in body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == func), None)
+    if fn is None:
+        return 0
+    # ponytail: first line in the function with that text; the diff's context lines would tell
+    # apart a statement repeated inside one function
+    span = range(fn.lineno, fn.end_lineno + 1)
+    return next((i for i in span if lines[i - 1].strip() == removed.strip()), fn.lineno)
 
 
 def lint(root, target, out):

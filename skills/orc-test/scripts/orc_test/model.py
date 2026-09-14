@@ -19,7 +19,7 @@ class Coverage:
 
     def under(self, threshold):
         """[(path, percent)] for files below threshold, worst first."""
-        rows = [(p, _pct(c, t)) for p, (c, t) in self.files.items() if _pct(c, t) < threshold]
+        rows = [(p, _pct(c, t)) for p, (c, t) in self.files.items() if t and _pct(c, t) < threshold]
         return sorted(rows, key=lambda r: (r[1], r[0]))
 
 

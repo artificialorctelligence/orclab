@@ -6,8 +6,8 @@ coverage 91.6% (373/407 lines — re-measured the same day with `coverage skills
 after the test files were dropped from the denominator; the first run's 95.3% (816/856) had
 counted `tests/` as covered source), TCE 68.6% (637 killed of 928; 291 survived, 1 suspicious),
 lint 0 findings; 68 tests, 929 mutants, mutmut's run 29s, the whole command ~2 min (most of it
-one `mutmut show` per survivor). What had to change to get there is in "Caveats" — every one
-was found by that run, none by the research.
+one `mutmut show` per survivor — gone since 2026-09-13, see Mutation). What had to change to get
+there is in "Caveats" — every one was found by that run, none by the research.
 
 ## Detect
 `pyproject.toml`, `setup.py` or `setup.cfg` at the root or up to two directories down.
@@ -40,6 +40,15 @@ pytest-cov: `--cov=<path> --cov-report=lcov:.orclab/test/python/coverage.lcov
 --cov-report=html:.orclab/test/python/html`. `run.py` reads the lcov, drops the test files
 themselves (`--cov=.` includes `tests/`, which would inflate the number — every test line runs)
 and applies the 80% gate to what is left.
+
+A file nothing imports reaches the lcov only if coverage.py finds it by walking down from a
+`--cov` dir, and that walk stops at any subdirectory without an `__init__.py` (the dir named by
+`--cov` itself is exempt). Orcshot's `src/` has none, so `--cov=.` silently left its 17 never-
+imported GTK windows out of the denominator (BACKLOG #42, 2026-09-13). `run.py` now passes one
+extra `--cov=<dir>` for every `__init__.py`-less directory on the way to a `.py` file (`src`,
+`tests`, …); overlapping roots produce no duplicate records. coverage.py 7's
+`include_namespace_packages` would do the same, but it lives only in a config file, and naming
+one with `--cov-config` would replace the project's own.
 For a project-side gate in CI, pytest-cov's own switch is `--cov-fail-under=80`.
 
 ## Mutation (TCE)
@@ -52,11 +61,19 @@ source_paths = ["orc_todo/"]
 pytest_add_cli_args_test_selection = ["tests/"]
 also_copy = ["tests/"]
 ```
-`python3 -m mutmut run`, then `run.py` reads `python3 -m mutmut results --all true` (one line
-per mutant: `<key>: killed|survived|timeout|suspicious|skipped|no tests|not checked`; without
-`--all true` mutmut 3.7 lists only the *non-killed* ones, which would read as a 0% score) and
-`python3 -m mutmut show <key>` for each survivor's diff. `killed` and `timeout` count as caught,
-`survived` as a survivor; the rest are not counted. Incremental: mutmut caches per function hash
+`python3 -m mutmut run`, then `run.py` reads mutmut's own cache — `mutants/<file>.meta`, one
+JSON per source file with every mutant's exit code — which is all `mutmut results` prints
+(`--all true` needed there; mutmut 3.7 otherwise lists only the *non-killed* ones, reading as a
+0% score) and what `mutmut show <key>` walks to find a key's file. Exit codes 1/3 are `killed`,
+36/24/-24/152/255 `timeout`; both count as caught, 0 (`survived`) as a survivor; the rest are not
+counted. Survivors' diffs come from one process, `orc_test/mutmut_diffs.py`, which calls the
+function `mutmut show` calls with the file already known: on Orcshot (26k mutants) one `show`
+subprocess per survivor was ~35 of analyze's ~45 minutes; on orc-todo's 164 survivors it is now
+~1s in place of ~60s. That diff is of the *function* alone, so its `@@` line numbers start at 1
+for every function — `run.py` finds the survivor's file line by looking the removed line's text
+up inside the function's real span (`ast`), the function named by the key
+(`module.x_func__mutmut_N`, or `module.xǁClassǁmethod__mutmut_N` for a method). All three found
+by v19's first real quality run on Orcshot, BACKLOG #42. Incremental: mutmut caches per function hash
 in `mutants/`; only changed functions re-run. **That hash covers the source only, not the tests**
 — found 2026-09-13 when `generate`'s second `analyze` on orc-todo returned the before-number
 (69.4%) verbatim after ten new tests; mutmut 3.7 has no `--force`. `mutation_cmd` now removes

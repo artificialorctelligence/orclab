@@ -74,3 +74,12 @@ def test_coverage_unavailable_never_calls_coverage_cmd_or_parse(tmp_path, capsys
     monkeypatch.setattr(langs, "ALL", [m])
     code, _out = run(["coverage"], make_repo(tmp_path), capsys)
     assert code == 0
+
+
+def test_coverage_denominator_includes_a_file_nothing_imports_under_an_init_less_src(tmp_path, capsys):
+    repo = make_repo(tmp_path)
+    _src(repo, "def clamp(x, lo, hi):\n    if x < lo:\n        return lo\n"
+               "    if x > hi:\n        return hi\n    return x\n")
+    (repo / "src" / "window.py").write_text("def show():\n    return 1\n")   # a GTK window: no test imports it
+    _code, out = run(["coverage"], repo, capsys)
+    assert "(4/8 lines)" in out and "src/window.py" in out               # BACKLOG #42: was 4/6

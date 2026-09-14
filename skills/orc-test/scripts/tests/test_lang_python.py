@@ -1,3 +1,4 @@
+import json
 import pathlib
 import textwrap
 
@@ -53,23 +54,63 @@ def test_coverage_parse_drops_test_files_from_the_denominator(tmp_path):
     assert cov.files == {"src/calc.py": (1, 2)} and (cov.covered, cov.total) == (1, 2)
 
 
-def test_mutation_parse_reads_results_and_diffs(monkeypatch, tmp_path):
-    monkeypatch.setattr(py, "_results", lambda root: (FIX / "mutmut_results.txt").read_text())
-    monkeypatch.setattr(py, "_show", lambda root, key: (FIX / "mutmut_show.txt").read_text())
+def _meta(root, file, codes):
+    meta = root / "mutants" / (file + ".meta")
+    meta.parent.mkdir(parents=True, exist_ok=True)
+    meta.write_text(json.dumps({"exit_code_by_key": codes}))
+
+
+def test_coverage_cmd_names_every_dir_coverage_would_not_walk_into(tmp_path):
+    """coverage.py lists a never-imported file only under a --cov dir reached through
+    __init__.py-bearing dirs; a src/ without one hid every such file (BACKLOG #42)."""
+    for f in ["src/pkg/__init__.py", "src/pkg/a.py", "src/gui/w.py", "src/gui/sub/__init__.py",
+              "src/gui/sub/x.py", "tests/test_a.py", "venv/lib/y.py", "top.py"]:
+        (tmp_path / f).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / f).write_text("")
+    covs = [a for a in py.coverage_cmd(tmp_path, None, tmp_path / "out") if a.startswith("--cov=")]
+    assert covs == ["--cov=.", "--cov=src", "--cov=src/gui", "--cov=tests"]
+    covs = [a for a in py.coverage_cmd(tmp_path, "src", tmp_path / "out") if a.startswith("--cov=")]
+    assert covs == ["--cov=src", "--cov=src/gui"]
+
+
+def test_mutation_parse_reads_verdicts_from_mutmut_cache_and_diffs_survivors_in_one_go(monkeypatch, tmp_path):
+    (tmp_path / "calc.py").write_text("x = 1\n\n\ndef clamp(x, lo, hi):\n    if x < lo:\n        return lo\n")
+    _meta(tmp_path, "calc.py", {"calc.x_clamp__mutmut_1": 0, "calc.x_clamp__mutmut_2": 1,
+                                "calc.x_clamp__mutmut_3": 0, "calc.x_other__mutmut_1": 33,
+                                "calc.x_other__mutmut_2": 36, "calc.x_other__mutmut_3": 35,
+                                "calc.x_other__mutmut_4": 34, "calc.x_other__mutmut_5": None})
+    _meta(tmp_path, "gone.py", {"gone.x_f__mutmut_1": 0})     # stale cache: the file no longer exists
+    asked = []
+    diff = (FIX / "mutmut_show.txt").read_text()
+    monkeypatch.setattr(py, "_diffs", lambda root, alive: asked.append(alive) or
+                        {k: diff for k, _ in alive})
     m = py.mutation_parse(tmp_path, tmp_path)
-    # killed + timeout count as killed; suspicious/skipped/"no tests" don't count at all
+    # killed + timeout count as killed; suspicious/skipped/"no tests"/not-checked don't count at all
     assert (m.killed, m.total) == (2, 4)
-    assert [s.file for s in m.survivors] == ["src/calc/__init__.py"] * 2
-    assert m.survivors[0].line == 2
+    assert asked == [[("calc.x_clamp__mutmut_1", "calc.py"), ("calc.x_clamp__mutmut_3", "calc.py")]]
+    assert [s.file for s in m.survivors] == ["calc.py"] * 2
+    assert m.survivors[0].line == 5                       # the file's line, not the function's
     assert "x <= lo" in m.survivors[0].description
 
 
-def test_survivor_from_a_multi_line_removal_is_the_first_removed_line(monkeypatch, tmp_path):
+def test_survivor_from_a_multi_line_removal_is_the_first_removed_line(tmp_path):
     # seen live on orc-todo: mutmut replaces a two-line string argument with None
+    (tmp_path / "cli.py").write_text(textwrap.dedent("""\
+        import sys
+
+
+        def cmd_add():
+            body = sys.stdin.read()
+            if not body.strip():
+                print(
+                    "error: an entry needs a real paragraph of context, not a stub - that is what "
+                    "makes it worth keeping. Pipe the body in on stdin.",
+                    file=sys.stderr,
+                )
+        """))
     diff = textwrap.dedent("""\
-        # orc_todo.cli.x_cmd_add__mutmut_3: survived
-        --- orc_todo/cli.py
-        +++ orc_todo/cli.py
+        --- cli.py
+        +++ cli.py
         @@ -2,8 +2,7 @@
              body = sys.stdin.read()
              if not body.strip():
@@ -79,9 +120,36 @@ def test_survivor_from_a_multi_line_removal_is_the_first_removed_line(monkeypatc
         +            None,
                      file=sys.stderr,
         """)
-    monkeypatch.setattr(py, "_show", lambda root, key: diff)
-    s = py._survivor(tmp_path, "orc_todo.cli.x_cmd_add__mutmut_3")
-    assert (s.file, s.line, s.description) == ("orc_todo/cli.py", 5, "None,")
+    s = py._survivor(tmp_path, "cli.x_cmd_add__mutmut_3", "cli.py", diff)
+    assert (s.file, s.line, s.description) == ("cli.py", 8, "None,")
+
+
+def test_survivor_line_of_a_method_is_looked_up_inside_its_class(tmp_path):
+    (tmp_path / "m.py").write_text(textwrap.dedent("""\
+        def go():
+            return 1
+
+
+        class A:
+            def go(self):
+                return 1
+        """))
+    diff = "--- m.py\n+++ m.py\n@@ -1,2 +1,2 @@\n def go(self):\n-    return 1\n+    return 2\n"
+    assert py._survivor(tmp_path, "m.xǁAǁgo__mutmut_1", "m.py", diff).line == 7
+    assert py._survivor(tmp_path, "m.x_go__mutmut_1", "m.py", diff).line == 2
+    assert py._survivor(tmp_path, "m.x_nope__mutmut_1", "m.py", diff).line == 0
+
+
+def test_diffs_asks_one_process_for_every_survivor(monkeypatch, tmp_path):
+    seen = []
+    out = "# a.x_f__mutmut_1\n--- a.py\n-x\n+y\n# a.x_f__mutmut_2\n--- a.py\n-x\n+z\n"
+    monkeypatch.setattr(py, "run", lambda cmd, cwd, input: seen.append((cmd, input)) or
+                        type("R", (), {"stdout": out})())
+    d = py._diffs(tmp_path, [("a.x_f__mutmut_1", "a.py"), ("a.x_f__mutmut_2", "a.py")])
+    assert len(seen) == 1 and seen[0][0][:2] == ["python3", str(py.MUTMUT_DIFFS)]
+    assert seen[0][1] == "a.x_f__mutmut_1 a.py\na.x_f__mutmut_2 a.py\n"
+    assert d == {"a.x_f__mutmut_1": "--- a.py\n-x\n+y", "a.x_f__mutmut_2": "--- a.py\n-x\n+z"}
+    assert py._diffs(tmp_path, []) == {} and len(seen) == 1
 
 
 def test_lint_finds_the_four_smells(tmp_path):
@@ -172,13 +240,6 @@ def test_mutation_cwd_never_searches_above_root(tmp_path):
     outside.mkdir()
     (outside / "pyproject.toml").write_text("[tool.mutmut]\nsource_paths = ['x/']\n")
     assert py.mutation_cwd(root, "../outside") == root
-
-
-def test_results_asks_mutmut_for_every_mutant_not_just_the_unkilled(monkeypatch, tmp_path):
-    seen = []
-    monkeypatch.setattr(py, "run", lambda cmd, cwd: seen.append(cmd) or type("R", (), {"stdout": ""})())
-    py._results(tmp_path)
-    assert seen == [["python3", "-m", "mutmut", "results", "--all", "true"]]
 
 
 def test_mutation_cmd_drops_cached_verdicts_when_a_test_is_newer_than_them(tmp_path):

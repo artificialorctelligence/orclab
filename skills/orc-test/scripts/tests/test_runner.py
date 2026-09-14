@@ -15,3 +15,8 @@ def test_run_missing_binary_does_not_raise(tmp_path):
     cp = run(["definitely-not-a-real-binary-xyz"], cwd=tmp_path)
     assert cp.returncode == 127
     assert "not found" in cp.stdout
+
+
+def test_run_feeds_input_to_stdin(tmp_path):
+    cp = run([sys.executable, "-c", "import sys; print(sys.stdin.read().upper())"], cwd=tmp_path, input="hi")
+    assert cp.stdout.strip() == "HI"

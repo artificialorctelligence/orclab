@@ -3072,7 +3072,7 @@ cover the structure-and-rules half of `/orc-data`'s ask but not environment fact
 the SME answers the plugin scatters across its own files with no single place to add one; #5
 stays open.
 
-## #42: orc-test: coverage denominator omits never-imported files in a src/ layout without __init__.py; survivor line numbers are function-relative; per-survivor `mutmut show` dominates analyze
+## #42: orc-test: coverage denominator omits never-imported files in a src/ layout without __init__.py; survivor line numbers are function-relative; per-survivor `mutmut show` dominates analyze (RESOLVED 2026-09-13)
 
 Three defects in `orc-test` itself, found on 2026-09-13 during `/orc-code refactor`'s first real
 quality-mode run on a scratch clone of Orcshot (BACKLOG #41, "Quality mode, first real run";
@@ -3114,3 +3114,39 @@ metadata instead of `show`'s diff would remove the loop at the same time.
 Scope: Python only — the other languages' `langs/*.py` read their tools' own reports and are not
 known to share any of the three. Not touched by #41's resolution, which corrected `/orc-code
 refactor`'s prose and left orc-test's code alone.
+
+**Resolved for real, not just tracked** (2026-09-13, all three in `langs/python.py`, the first
+also read from the outside in `languages/python.md`'s Coverage section):
+
+*Denominator.* The mechanism was narrower than the entry says: coverage.py 7's own
+`find_python_files` walks down from each `--cov` dir and prunes any *sub*directory without an
+`__init__.py` — the dir named by `--cov` is itself exempt. With no target `run.py` passes
+`--cov=.`, so Orcshot's init-less `src/` was pruned whole; `--cov=src` would have found the
+windows. Reproduced on a two-file scratch project (`--cov=.` lists `src/used.py` only; the
+never-imported `src/unused.py` appears the moment `src` is a root). Fix: `_cov_roots` adds one
+`--cov=<dir>` for every init-less directory on the way to a `.py` file, so each is a root of its
+own; overlapping roots produce no duplicate lcov records (checked). coverage.py's
+`include_namespace_packages` does the same but is config-file-only, and `--cov-config` would
+replace the project's own config. Verified by `test_coverage_denominator_includes_a_file_nothing_
+imports_under_an_init_less_src` (real pytest-cov: 4/8 lines where it read 4/6) and by the real
+`analyze skills/orc-todo/scripts`, whose report now lists the never-imported `run.py` and
+`conftest.py` it used to omit — which surfaced that an empty file read as "0.0%" in the
+under-threshold list; `Coverage.under` now skips a file with no lines.
+
+*Line numbers and the `show` loop, one fix.* `mutation_parse` no longer runs `mutmut results`
+or `mutmut show`: it reads `mutants/<file>.meta`, the JSON mutmut itself writes with every
+mutant's exit code (1/3 killed, 36/24/-24/152/255 timeout, 0 survived), which is all `results`
+prints and what `show` walks to find a key's file. Survivors' diffs come from one subprocess,
+`orc_test/mutmut_diffs.py`, calling the function `show` calls (`get_diff_for_mutant`) with the
+file already known — ~1 ms each in-process against ~370 ms per `show` process. The diff is still
+of the function alone, so the line is now found by looking the removed line's text up inside the
+function's real span (`ast`), the function named by the key. Verified on orc-todo's real cache:
+764 killed / 164 survived / 1 suspicious, identical to `mutmut results --all true`; every
+spot-checked survivor line (`allocate.py` 54, 55, 56, 61, 67; `state.py` 75, 172–174, 216)
+holds the statement shown; 164 diffs in 1.1 s where the loop took ~60 s. The whole
+`analyze skills/orc-todo/scripts` ran in 1m21s, mutmut's own run being nearly all of it.
+
+Left as it was: a mutant that only *deletes* (an argument dropped, no `+` line) still reports an
+empty replacement, as before; and a statement repeated verbatim inside one function resolves to
+its first occurrence (the diff's context lines would tell them apart — `ponytail:` comment on
+`_line_of`).
