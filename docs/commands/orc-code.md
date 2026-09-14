@@ -54,7 +54,10 @@ hands the request to it and follows its own guided process from there.
   waits for a yes.
 - After a round of fixes, it shows you the numbers before and after (how much of the code the
   tests exercise, and how well they'd catch a real bug). If either is still short of where it
-  needs to be, it asks "Another round?" and waits for your answer before trying again.
+  needs to be, it asks "Another round?" and waits for your answer before trying again — unless
+  the shortfall is in a file the test suite doesn't touch at all, in which case it says so
+  instead: another round can't fix that, and whether that file gets a real, working test is left
+  for you to decide, not something it takes on itself.
 
 **Refactoring, migration mode**: the same two questions as quality mode above (the deletion list,
 and whether to run another round), plus:
@@ -83,11 +86,14 @@ and whether to run another round), plus:
   leaves architecture-level opinions (whether a module should exist at all, say) as a suggestion
   for you, not a change it makes.
 - **Migration mode**: creates `.orclab/modernize/` — a scratch folder holding the migration
-  plugin's own working files — and does the actual conversion in a **worktree** (a second,
-  temporary checkout of your project on its own branch, so the migration doesn't disturb whatever
-  you're already working on) or a dedicated branch. Once the new code passes its exit checks (see
-  below), it copies that code back over the checkout as the branch's content, and copies the
-  plugin's plan and its catalogs of rules and changes into `docs/` so they stay with the project.
+  plugin's own working files — and does the actual conversion inside an isolated copy of your
+  project, so the work in progress can't disturb whatever you're already doing: either a
+  **worktree** (a second, temporary checkout of your project on its own branch) or a separate
+  scratch clone. Once the new code clears the two checks named under "What it will never do
+  without asking" below (its own tests pass, and it matches or beats the original on both how
+  much code the tests exercise and how well they'd catch a real bug), it copies that code back
+  over the checkout, and copies the plugin's plan and its catalogs of rules and changes into
+  `docs/` so they stay with the project.
 
 ## What it will never do without asking
 
@@ -114,6 +120,10 @@ and whether to run another round), plus:
   that exact spot.
 - In quality mode, it never edits a lint or mutation-testing configuration the project already
   has — it only writes one if the project doesn't have one yet.
+- In quality mode, for a file the test suite doesn't exercise at all, it never rewrites that
+  file's actual logic — a passing suite can't prove such a change safe. The only fix it makes
+  there is a mechanical, behavior-preserving move (pulling a block out into a named helper,
+  unchanged, with its variables passed in as parameters).
 - In quality or migration mode, it never deletes a test without showing you the full list first
   and getting a yes.
 - In quality mode, it never says the code is "clean" without re-measuring the numbers after the
