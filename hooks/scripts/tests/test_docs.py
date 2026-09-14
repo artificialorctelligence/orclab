@@ -5,7 +5,7 @@ Shape and presence only; a page saying what its command does today is a discipli
 import pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
-PAGES = sorted((ROOT / "docs" / "commands").glob("*.md"))
+PAGES = sorted((ROOT / "docs" / "commands").glob("*.md"), key=lambda p: p.stem)
 HEADINGS = [
     "## What it's for",
     "## What you type",
@@ -35,3 +35,14 @@ def test_no_page_points_the_reader_at_the_workshop():
         # BACKLOG.md is not here: /orc-todo edits the user's own; pointing at Orclab's is the reviewer's call
         for banned in ["CLAUDE.md", "SKILL.md", "docs/superpowers"]:
             assert banned not in text, f"{page.name} mentions {banned}"
+
+
+def test_every_command_has_a_page():
+    commands = sorted(p.parent.name for p in (ROOT / "skills").glob("orc*/SKILL.md"))
+    assert [p.stem for p in PAGES] == commands
+
+
+def test_readme_links_every_page():
+    readme = (ROOT / "README.md").read_text()
+    for page in PAGES:
+        assert f"docs/commands/{page.name}" in readme, page.name
