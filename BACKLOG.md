@@ -3373,3 +3373,54 @@ Left as it was: a mutant that only *deletes* (an argument dropped, no `+` line) 
 empty replacement, as before; and a statement repeated verbatim inside one function resolves to
 its first occurrence (the diff's context lines would tell them apart — `ponytail:` comment on
 `_line_of`).
+
+## #43: orc-publish's skill says a misconfigured leaf is "refused the same way" and its siblings run; the code stops the whole run before anything publishes
+
+Found 2026-09-14 by v20's final whole-branch review, checking `docs/commands/orc-publish.md`
+against the code rather than the skill. `skills/orc-publish/SKILL.md`'s Notes (around lines
+157-162) say a leaf with an unusable configuration — a non-string `action:`/`metrics:`/
+`prepare:`, a bad `timeout:`, a bad `confirm:` — is "refused the same way … never a run in which
+the healthy siblings published while this one crashed". What `orc_publish/cli.py` does:
+`_load_leaves` (around 612-621) validates every leaf before the plan is printed, and any
+problem returns a whole-run `error:` from `main()` (635-637) — nothing publishes, no leaf is
+labelled `refused` (that word is only the preflight-inspection outcome, ~432), and the healthy
+siblings do not run either. The behaviour is the safer one and is not the defect; the skill's
+sentence is. The page written in v20 was first drafted from the skill's wording and promised
+users a per-leaf `refused` and siblings-keep-running; it now says what the code does.
+
+Consequence: anyone writing about or extending this from the skill alone — the next page, a
+release note, a `channels.yaml` author expecting one bad leaf to be skipped — inherits the false
+claim. `CLAUDE.md`'s "a claim about a component is a claim about code" is exactly the rule; the
+skill's own Notes are where it was missed.
+
+Fix: reword the skill's Notes to what `_load_leaves` does (one unusable leaf stops the run
+before anything is sent, naming the leaf and the value; a leaf whose *action* fails at run time
+does not stop its siblings — `execute_plan`, ~390), or change the code to the per-leaf refusal
+the skill describes and update the page. Either is small; the first matches what has been
+shipped and dogfooded. Out of v20's scope by its spec §5 (skill bodies unchanged), which is why
+this is an entry and not a commit.
+
+## #44: orc-reload's skill says "a reinstall never takes effect in the conversation that ran it — and no command can"; CLAUDE.md's 2026-09-13 Desktop refinement says the installing session was handed the new plugin
+
+Found 2026-09-14 by v20's final whole-branch review. `skills/orc-reload/SKILL.md` line 13
+states, as the one thing the command cannot do: a reinstall never takes effect in the
+conversation that ran it, "and no command can" — and `docs/commands/orc-reload.md`, written
+from the skill in v20, says the same, correctly to its source. `CLAUDE.md`'s marketplace
+gotcha #4 carries a refinement confirmed live on 2026-09-13 in the Desktop client: the
+`code-modernization` plugin was installed with `claude plugin install` and the *same session*
+was immediately handed its agents and skills, no restart needed; `/orc-code`'s Plugin-Discovery
+step 5 was corrected that day to "picked up by the installing session; a fresh session is the
+fallback, not the rule". The CLI case has not been re-checked since 2026-09-06.
+
+So the skill's absolute is stale for at least one client, and the page repeats it. The user-
+visible cost is small — being told to open a new session when the current one would have
+worked — but the sentence is stated as a law, and `CLAUDE.md`'s own rule is that a skill's claim
+about behaviour is verified, not remembered.
+
+Fix, when someone is in a session that can test it: run `/orc-reload` on Orclab itself in
+Desktop and in the CLI, note in each whether the reinstalled version is reachable in the same
+session (the `Skill` tool naming an `orclab:` skill, or `/orc-help` reporting the new version),
+then rewrite the skill's Step 5 and line 13 to what was observed per client, with the
+"confirmed live" date, and update the page's sentence to match. v20 left the page true to the
+skill on purpose (spec §5: skill bodies unchanged); the fix is one skill edit and one page edit
+in the same commit, per `CLAUDE.md`'s checklist item 7.
