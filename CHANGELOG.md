@@ -2,6 +2,50 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.20.0] - 2026-09-14
+
+### Added
+- `docs/commands/<name>.md` — one page per `/orc-*` command (eleven), written for the person who
+  types it rather than for Claude, each with the same five headings: what it's for, what you type,
+  what it will ask you, what it changes, what it will never do without asking. Each page was
+  written from its command's skill read in full that day, then reviewed twice: once by a reader
+  given the page alone, once against the skill both ways. GitHub renders them and `/orc-help`
+  relays them; there is one copy. (BACKLOG #32.)
+- `/orc-help <name>` (and `/orc <name>`) shows that command's page inside Claude; the name is
+  accepted with or without the leading `/` and the `orc-` prefix, and a name with no page says so.
+  Bare `/orc-help` ends with `for any command, /orc-help <name>`.
+- `/orc-version` writes an AppStream metainfo's `<release version date>` entry (`*.metainfo.xml` /
+  `*.appdata.xml` at the project root) — the file Flathub's linter checks against the built
+  version, which Orcshot's release process had been editing by hand and missed once. Same shape as
+  the `debian/changelog` handler; verified with `appstreamcli` and `flatpak-builder-lint`.
+  (BACKLOG #6, step 1 of three.)
+- `hooks/scripts/tests/test_docs.py` (every command has a page, every page has the five headings,
+  the README links every page), `test_orc_help_skill.py`, and
+  `test_side_effecting_skills_frontmatter.py` (the three side-effecting commands carry
+  `disable-model-invocation: true`).
+
+### Changed
+- `README.md` is a front page: what Orclab is, clone-then-install, the eleven commands one line
+  each linking their pages, what Claude reads on its own and its scope, and a "Changing Orclab"
+  pointer. The stale v1–v9 status, the "ships as a matching skill" claim and the `CLAUDE.md`
+  pointers are gone; every skill and stack that exists is listed, and nothing that doesn't.
+- `orc-publish` and `orc-release` now carry `disable-model-invocation: true` — they never had,
+  though `CLAUDE.md` said all three side-effecting commands did (found by the page reviews; the
+  pages' "Claude never runs this on its own" is now true). `CLAUDE.md`'s design checklist gains
+  item 7: a change to what a command asks, changes or refuses touches its page in the same commit.
+- `orc-test` (Python): the coverage denominator now includes files the suite never imports under a
+  `src/` (or any directory) without `__init__.py` — Orcshot's 17 GTK windows had been silently
+  left out; survivor line numbers are file lines, not function-relative; `analyze` reads mutmut's
+  own cache and gets every survivor's diff from one process instead of one `mutmut show` each
+  (~1 s where it took ~60 s on orc-todo; ~35 of 45 minutes on Orcshot). (BACKLOG #42.)
+- `Coverage.under` no longer lists a file with no lines as 0%.
+
+### Fixed
+- `/orc-test`'s empty-file and never-imported-file cases above.
+
+Backlog: #42 and #32 resolved; #2, #5, #6, #37 re-scoped or updated; #43 and #44 opened (two skill
+sentences the page reviews found untrue to the code or stale).
+
 ## [0.19.0] - 2026-09-13
 
 ### Added
