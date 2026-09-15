@@ -86,6 +86,19 @@ Stacks:
 - **stack-unity** — Unity game work (C#).
 - **stack-web** — web work (a Vite/TypeScript/React front end with a FastAPI back end).
 
+Sources, maps and car surfaces:
+
+- **source-librewxr** — weather radar, nowcast, storm cells and alerts from LibreWXR, and the
+  point-weather companions (NWS, Open-Meteo) it does not cover.
+- **source-road-conditions** — US road conditions: per-state 511 APIs, one paid aggregator, the
+  free federal work-zone registry, or inference from weather data already in hand.
+- **map-openstreetmap** — the OSM tile usage policy, `flutter_map`, a swappable base layer, and
+  stacking a raster weather overlay on top.
+- **car-android-auto** — Android Auto / Automotive OS through the Car App Library: the weather
+  category, manifest lines, quality rules, and how a Flutter app reaches the car screen.
+- **car-carplay** — Apple CarPlay: which categories exist (weather is not one), that only
+  navigation apps draw the map, and the iOS 26 widget / Live Activity path with no entitlement.
+
 ## Changing Orclab
 
 For people changing Orclab, not for people using it: `CLAUDE.md` is the workshop notes for how
