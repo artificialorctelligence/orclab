@@ -2592,7 +2592,7 @@ today: the hooks interface has allow/deny and no "ask" (checked against the live
 per `hooks/scripts/backlog_guard.py`). If that changes, a PreToolUse hook on `git push` and
 `gh release create` is the mechanical form.
 
-## #32: write documentation for all the commands, in simple language with clear explanations
+## #32: write documentation for all the commands, in simple language with clear explanations (RESOLVED 2026-09-14)
 
 Requested by direflail 2026-09-10, via `/orc-todo add`. Orclab has ten `/orc-*` commands
 (`orc`, `orc-code`, `orc-git`, `orc-help`, `orc-package`, `orc-publish`, `orc-release`,
@@ -2625,6 +2625,23 @@ to meet; the README's current paragraphs are the before-picture.
 Scope boundary: this is not about `CLAUDE.md`, which is deliberately Orclab's internal notes and
 stays that way, and not about the `SKILL.md` bodies, which are Claude's instructions and are
 correct as they are. It is a new, user-facing layer on top of both.
+
+**Resolved for real, not just tracked** (2026-09-14, v20): eleven pages under `docs/commands/`,
+one per `skills/orc*/SKILL.md`, each with the same five headings (what it's for, what you type,
+what it will ask you, what it changes, what it will never do without asking), each written from
+its skill read in full that day and then re-read as someone who has never opened a `SKILL.md`;
+each reviewed twice — once by a reader given the page alone, once against the skill for the
+"never does" section both ways. `README.md` rewritten as a front page listing and linking every
+page, every discipline skill and every stack that exists (checked both ways against `ls
+skills/`). `/orc-help <name>` shows a page inside Claude from the same file GitHub renders — one
+source, no second copy. `hooks/scripts/tests/test_docs.py` holds the set complete and the shape
+fixed; `CLAUDE.md`'s design checklist item 7 carries the rule that a command change touches its
+page. Found on the way, by the page reviews: `skills/orc-publish/SKILL.md` and
+`skills/orc-release/SKILL.md` had never carried `disable-model-invocation: true` — checked at
+their first commits (`0470c26`, `8fe01a6`) — while `CLAUDE.md`'s sub-skill-isolation section said
+all three side-effecting commands did; both now carry it (commit `bf9ec0e`), pinned by
+`hooks/scripts/tests/test_side_effecting_skills_frontmatter.py`, so the pages' "Claude never runs
+this on its own" is true. Spec: `docs/superpowers/specs/2026-09-13-orclab-v20-command-docs-design.md`.
 
 ## #33: Orclab ships researched platform knowledge for every store and stack it targets — reversing v15's "capture is how they arrive" (RESOLVED 2026-09-12)
 

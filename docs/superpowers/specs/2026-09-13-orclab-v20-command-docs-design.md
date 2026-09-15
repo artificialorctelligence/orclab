@@ -122,7 +122,7 @@ and nothing in `skills/orc/SKILL.md`, which already forwards `$ARGUMENTS` to `or
 
 ### 4. Keeping it true
 
-**A test, `hooks/scripts/test_docs.py`** — the root `pyproject.toml` already collects `hooks/`
+**A test, `hooks/scripts/tests/test_docs.py`** — the root `pyproject.toml` already collects `hooks/`
 and puts `hooks/scripts` on the path, so no configuration changes. It asserts, over the repo:
 
 - every `skills/orc*/SKILL.md` has a `docs/commands/<name>.md`, and every page has a skill;
@@ -158,7 +158,7 @@ it will ask, and what it will not do — from this page alone?*
 | `docs/commands/<name>.md` × 11 | New. §1's shape. |
 | `README.md` | Rewritten. §2's sections; the stale claims listed there removed. |
 | `skills/orc-help/SKILL.md` | Step 4: show a page; Step 3's format gains the closing line. |
-| `hooks/scripts/test_docs.py` | New. §4's three assertions. |
+| `hooks/scripts/tests/test_docs.py` | New. §4's three assertions. |
 | `CLAUDE.md` | One line in the design checklist: a command change touches its page. |
 | `BACKLOG.md` | #32 resolved, with what was verified. |
 | `CHANGELOG.md`, `.claude-plugin/*.json` | v0.20.0, via `/orc-version`. |

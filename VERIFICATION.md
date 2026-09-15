@@ -156,6 +156,14 @@ and irreversible.
    happened in between), and the same command synopsis.
 5. Run `/orc` (bare) in either location.
 6. **Expected:** identical output to `/orc-help` in the same location.
+7. Run `/orc-help git`, `/orc-help orc-git` and `/orc-help /orc-git`.
+8. **Expected:** each presents `docs/commands/orc-git.md` — its five headings and its subcommand
+   table — in chat, not the bare synopsis.
+9. Run `/orc-help nonesuch`.
+10. **Expected:** "There is no `/orc-nonesuch` command; `/orc-help` lists what exists." and nothing
+    else.
+11. Run `/orc-help` bare.
+12. **Expected:** the synopsis ends with `for any command, /orc-help <name>`.
 
 ## Scenario 13: /orc-git repo, all three directory states
 

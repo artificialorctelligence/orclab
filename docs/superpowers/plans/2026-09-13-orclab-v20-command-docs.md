@@ -40,7 +40,6 @@ Every task's requirements include these. Copied from the spec and from `CLAUDE.m
 Shape and presence only; a page saying what its command does today is a discipline, not a test."""
 
 import pathlib
-import re
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 PAGES = sorted((ROOT / "docs" / "commands").glob("*.md"))
@@ -70,7 +69,8 @@ def test_every_page_is_a_command_that_exists():
 def test_no_page_points_the_reader_at_the_workshop():
     for page in PAGES:
         text = page.read_text()
-        for banned in ["CLAUDE.md", "BACKLOG.md", "SKILL.md", "docs/superpowers"]:
+        # BACKLOG.md is not here: /orc-todo edits the user's own; pointing at Orclab's is the reviewer's call
+        for banned in ["CLAUDE.md", "SKILL.md", "docs/superpowers"]:
             assert banned not in text, f"{page.name} mentions {banned}"
 ```
 
@@ -225,7 +225,7 @@ Steps 1–6 as Task 2; commit message `v20: docs/commands/orc-code.md`.
 - Read in full: `skills/orc-package/SKILL.md`
 - Create: `docs/commands/orc-package.md`
 
-What the skill states that the page must carry: what an ingredient is, in the sentence it first appears (the reusable, written-down knowledge of how to set a project up for one distribution channel — a PPA, a store, a registry); which ship — Launchpad PPA, Snap Store, Flathub, Google Play, App Store — and that each says in its first paragraph whether a real release has gone through it; it asks you for the ingredient's inputs and never guesses a value; it runs only the ingredient's **checks** and **never performs the setup** — creating the account, registering a key, authorising anything is yours; what it writes — `.orclab/publish/channels.yaml`, `distro.yaml`, `RELEASING.md` — by **merging, never overwriting**; machine-local config's three rules; never writes a credential; for a channel it does not ship, it offers to **capture** one into your own project's config directory and never fails silently or invents one.
+What the skill states that the page must carry: what an ingredient is, in the sentence it first appears (the reusable, written-down knowledge of how to set a project up for one distribution channel — a PPA, a store, a registry); which ship — Launchpad PPA, Snap Store, Flathub, Google Play, App Store — and that each says in its first paragraph whether a real release has gone through it; it asks you for the ingredient's inputs and never guesses a value; it runs only the ingredient's **checks** and **never performs the setup** — creating the account, registering a key, authorising anything is yours; what it writes — `.orclab/publish/channels.yaml`, `distro.yaml`, `RELEASING.md` — by **merging, never overwriting**; machine-local config's three rules; never writes a credential; for a channel it does not ship, it offers to **capture** one into a user-level directory on the machine (`~/.config/orclab/ingredients/<channel>/`, or `ORCLAB_INGREDIENTS_DIR` when set), shared by every project on that machine, not the current project's own directory, and never fails silently or invents one.
 
 Steps 1–6 as Task 2; commit message `v20: docs/commands/orc-package.md`.
 

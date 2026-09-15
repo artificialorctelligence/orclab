@@ -119,7 +119,9 @@ judgment (its description isn't even sitting in context as a candidate) until ex
 invoked. The official docs' own example is `/deploy`: *"You don't want Claude deciding to
 deploy because your code looks ready."* Real fit for Orclab: a skill whose *whole purpose* is
 one-shot and side-effecting — `/orc-publish`, `/orc-release`, `/orc-package`, which all carry
-it. Anything more conversational and workflow-starting (`/orc-code`'s ask-questions-then-
+it (since v20; `orc-publish` and `orc-release` did not until 2026-09-14, and
+`hooks/scripts/tests/test_side_effecting_skills_frontmatter.py` now fails if any of the three
+loses it). Anything more conversational and workflow-starting (`/orc-code`'s ask-questions-then-
 scaffold flow) should stay default, since the whole point there is natural-language
 triggerability matching a `/cat-code`-style dual-invocation UX.
 
@@ -387,6 +389,11 @@ ingredients were written; this section is the rule it was meant to leave behind.
    it silently vanishes from Orclab's own command listing. If the `orc` prefix is ever dropped,
    Step 3 needs a different discriminator; a `metadata:` key is the documented way (confirmed
    live to load without error), since unknown *top-level* frontmatter keys are not.
+7. Does it have `docs/commands/<name>.md`, and does a change to what an existing command asks,
+   changes, or refuses touch its page in the same commit? The page is the one a user reads
+   (spec `2026-09-13-orclab-v20-command-docs-design.md`); `hooks/scripts/tests/test_docs.py`
+   fails a command with no page and a page with the wrong headings, and nothing mechanical
+   checks the prose — that is this item.
 
 ## Running the bundled-script test suites
 

@@ -1,100 +1,94 @@
 # Orclab
 
-Reusable project-discipline skills and commands for Claude Code, distilled from real practice on
-other projects (starting with Orcshot).
-
-## Skills
-
-- **backlog-discipline** — maintain a single flat `BACKLOG.md` of real, open findings, with
-  permanent entry numbers and resolution history layered on top of (never replacing) the original
-  diagnostic record.
-- **release-checklist** — maintain a numbered, dependency-ordered `RELEASING.md`, cross-referenced
-  against whatever CI already automates.
-- **environment-registry** — register real, live test environments (VMs, containers, staging
-  servers, devices) as Claude memory, never as a git-tracked file, never storing credentials.
-- **currency-discipline** — check that a chosen dependency, version, or technical approach is
-  actually current before committing to it, with real, concrete per-ecosystem verification
-  mechanisms.
-- **verify-before-asserting** — verify a challenged factual/technical claim instead of defending
-  it; reinforces superpowers' own `systematic-debugging` signal recognition.
-- **stack-flutter**, **stack-android-native**, **stack-ios-native**, **stack-unity**,
-  **stack-godot** — background knowledge, not commands: for each stack, the current toolchain with
-  dates, where things live in the project, and where each Google Play / App Store rule lands in
-  the build. Claude reads one whenever that stack is in play; `/orc-code` follows it when
-  scaffolding. Researched against live sources and dated; no app or game has shipped through any
-  of them yet. The two game stacks are deliberately thinner — games are not in focus.
-
-## Commands
-
-Each command below also ships as a matching skill (`skills/<name>/SKILL.md`, a thin pointer to the
-same content) so it works in Claude Desktop too, not just the CLI — see "Known gap, now fixed"
-below.
-
-- **/orc-code** — start a new project, add to an existing one, or refactor/migrate existing code.
-  Routes deterministically to one of three flows, wrapping the `feature-dev` and
-  `code-modernization` plugins where applicable rather than reimplementing their work.
-- **/orc-version** — set or increment the current project's version, draft a changelog entry from
-  real git history, and tag the commit locally. With no arguments, proposes the bump the commits
-  since the last tag suggest, and says why. Never pushes or publishes.
-- **/orc-help** (alias: **/orc**) — reports Orclab's own running version and a synopsis of its
-  available commands.
-- **/orc-git** — git and GitHub shortcuts: connect a repo, commit with a drafted message, push,
-  commit-then-push (alias `cp`), branch/switch, merge a finished branch with the tests run before
-  and after, check out a PR, and cut a GitHub Release from an existing tag. States which of its
-  subcommands are plain git and which need `gh`.
-- **/orc-publish** — push a project's built artifacts to its own configured distribution
-  channels (PPA, Snap Store, Flathub, npm, etc.), resolved from `.orclab/publish/channels.yaml`
-  and `distro.yaml`. Ships as a skill only — see `CLAUDE.md` for why.
-- **/orc-release** — drive this project's own `RELEASING.md` end to end: ordered steps, real
-  gates, human-step handoffs, and a position cursor so a release survives across sessions. Halts
-  on failure. Ships as a skill only.
-- **/orc-todo** — look at and change the backlog: list what's open, read one entry in full, add
-  or remove one, and set up the lanes that say which work runs in what order. Entry numbers come
-  from an allocator holding a lock over one canonical file, so two agents working at once can't
-  take the same one. Ships as a skill only.
-- **/orc-package** — stand up a distribution channel for this project by applying an
-  *ingredient* (the reusable knowledge of how to set up a PPA, a store, a registry) to the
-  project's own `channels.yaml`, `distro.yaml` and `RELEASING.md`. Ships ingredients for a
-  Launchpad PPA (proven by a real release), the Snap Store and Flathub (stood up for real up to
-  the first upload/submission, which has not happened yet), and Google Play and the Apple App
-  Store (researched against the stores' live rules, not yet proven by one) — each says which in
-  its first paragraph; captures a new one, into your own config directory, for any channel it
-  doesn't ship. Runs
-  only an ingredient's checks, never its account-gated setup, and never writes a credential.
-  Ships as a skill only.
-- **/orc-reload** — reinstall the plugin you're currently developing so a fresh session picks up
-  your changes, distinguishing the several causes that all look like "the reinstall didn't work"
-  and verifying the expected version actually landed. Works for any plugin project, not just
-  Orclab. Ships as a skill only.
+Orclab is a Claude Code plugin. It gives you commands for the work around code — versions,
+releases, publishing, tests, the backlog — plus background knowledge Claude reads on its own
+while it works, without you asking for it. It comes from real practice: worked out on a real
+project (Orcshot, a screenshot tool for Linux desktops) first, then turned back on Orclab's own
+development.
 
 ## Installing
 
-Register this directory as a local plugin marketplace, then install the plugin:
+Clone this repository, then register that checkout as a local plugin marketplace —
+`~/projects/orclab` below is just an example path, use wherever you cloned it:
 
     /plugin marketplace add ~/projects/orclab
     /plugin install orclab@orclab
 
-**Every `/orc-*` component is a skill** (`skills/<name>/SKILL.md`). Orclab briefly shipped a
-parallel `commands/*.md` layer as well; that was removed in v0.10.0 once the docs settled the
-question — `commands/` is the legacy flat form of a skill, and a skill wins any name collision,
-so the command files were shadowed by their own wrappers everywhere. See `CLAUDE.md` for the full
-story and the design checklist it produced.
+A new install shows up in a fresh session, not the one you ran the install from.
 
-## Status
+## Commands
 
-v1 (process core) + v2 (`/orc-code`) + v3 (`/orc-version`, `/orc-help`/`/orc`) + v4 (`/orc-git`) +
-v5 (`currency-discipline`, `verify-before-asserting`) + v6 (Desktop-compatible skill wrappers for
-every `/orc-*` command) + v7 (`/orc-publish`) + v8 (`/orc-release`) + v9 (`/orc-reload`) shipped.
-See `docs/superpowers/specs/` for the design history,
-`CHANGELOG.md` for what actually changed release to release, and `BACKLOG.md`
-for what's deliberately deferred (real per-stack defaults research is #4, `/orc-data` is #5,
-hook-based enforcement is #3, per-language manifest version-sync is #6, distribution-channel
-metrics is #7, stale VERIFICATION.md version literals is #8). See `VERIFICATION.md` for the
-dogfood script that confirms everything actually works once installed in a real project.
+- [/orc-code](docs/commands/orc-code.md) — start a new project, add a feature to one that already
+  exists, or clean up/move existing code. Adding a feature hands off to Anthropic's own
+  `feature-dev` plugin, and moving code to another language or version hands off to its
+  `code-modernization` plugin; either way it says plainly if the one it needs isn't installed.
+- [/orc-git](docs/commands/orc-git.md) — the everyday git and GitHub jobs: connect a repo, commit,
+  push, switch branches, merge, check out a PR, cut a release.
+- [/orc-help](docs/commands/orc-help.md) — see which version of Orclab is running and what
+  commands it gives you, or read one command's own page; `/orc` is its short name
+  ([orc.md](docs/commands/orc.md)).
+- [/orc-package](docs/commands/orc-package.md) — set your project up to ship somewhere real (a
+  PPA, an app store, a package registry) by applying a ready-made recipe (Orclab calls one an
+  *ingredient*), or capturing a new one.
+- [/orc-publish](docs/commands/orc-publish.md) — send a finished build to a channel your project
+  already has set up, or read back that channel's own published numbers.
+- [/orc-release](docs/commands/orc-release.md) — walk your project's own `RELEASING.md` end to
+  end, stopping the moment a step fails, and remembering where you left off.
+- [/orc-reload](docs/commands/orc-reload.md) — reinstall the plugin you're developing so a fresh
+  session picks up your latest changes.
+- [/orc-test](docs/commands/orc-test.md) — check whether your tests pass, how much they cover,
+  and whether they'd catch a real bug, then fix the weak ones.
+- [/orc-todo](docs/commands/orc-todo.md) — see and change the project's backlog: list, read, add,
+  remove, and order its lanes.
+- [/orc-version](docs/commands/orc-version.md) — bump the project's version, draft its changelog
+  entry, and tag the commit locally.
 
-## Developing Orclab
+Inside Claude, `/orc-help <name>` shows any of these pages.
 
-See `CLAUDE.md` for real, verified guidance on how Claude Code's command/skill system actually
-works — commands vs. skills, invocation determinism, `disable-model-invocation`, sub-skill
-isolation, and bundling scripts — learned while building `/orc-code` through `/orc-git`. Read it
-before designing the next `/orc-*` command or skill.
+## What Claude reads on its own
+
+A plugin is installed for your user, so everything below is present in every Claude Code session
+on this machine once Orclab is installed, not only in one project — but each one only comes into
+play when its own trigger fits what you're actually doing: a stack skill when that stack is in
+play, `secret-hygiene` when a command could surface a credential. For example, when
+`secret-hygiene` fires, it keeps secrets out of what gets shown or pasted, and gives the recovery
+procedure if one gets exposed anyway. Uninstalling (`/plugin uninstall orclab@orclab`) removes
+all of it.
+
+Discipline:
+
+- **backlog-discipline** — when a real finding or deferred decision surfaces, or an existing
+  `BACKLOG.md` entry needs resolving, updating, or considering for deletion.
+- **code-discipline** — whenever Claude is about to write or change production code, in any
+  language.
+- **currency-discipline** — when choosing a dependency, library version, framework, or technical
+  approach, or when research turns up an answer to a technical question.
+- **environment-registry** — when a real, live test environment is accessed or its access details
+  are learned, so they don't need re-deriving later.
+- **release-checklist** — when setting up a release process for a new project, or when an
+  existing `RELEASING.md` needs a newly-learned step added.
+- **secret-hygiene** — before running or pasting anything that could surface a credential.
+- **test-discipline** — whenever Claude is about to write or change a test, in any language.
+- **verify-before-asserting** — when a claim Claude made gets challenged, or something turns out
+  to behave surprisingly.
+- **whole-process-first** — before acting on any one step of a documented multi-step process.
+
+Stacks:
+
+- **stack-android-native** — native Android work (Kotlin, Jetpack Compose, Gradle).
+- **stack-flutter** — Flutter/Dart work.
+- **stack-godot** — Godot game work (GDScript or C#).
+- **stack-ios-native** — native iOS work (Swift, SwiftUI, Xcode).
+- **stack-kotlin-multiplatform** — Kotlin Multiplatform work shared between native Android and
+  iOS apps.
+- **stack-python-desktop** — Python desktop work (PySide6/Qt, tray icon, local storage).
+- **stack-react-native** — React Native work (Expo).
+- **stack-unity** — Unity game work (C#).
+- **stack-web** — web work (a Vite/TypeScript/React front end with a FastAPI back end).
+
+## Changing Orclab
+
+For people changing Orclab, not for people using it: `CLAUDE.md` is the workshop notes for how
+Claude Code's command/skill system actually works, `BACKLOG.md` the open findings, `CHANGELOG.md`
+what changed release to release, `docs/superpowers/` the design history behind each change, and
+`VERIFICATION.md` the check that confirms everything actually works once installed.

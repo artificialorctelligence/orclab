@@ -1,6 +1,7 @@
 ---
 name: orc-publish
 description: Use when the user explicitly asks to use orc-publish, or types /orc-publish, to push a project's built artifacts to their real distribution destinations (a PPA, the Snap Store, Flathub, npm, etc.) as configured in the project's own .orclab/publish/channels.yaml and distro.yaml. Also reads back each channel's own published download/install numbers with --metrics.
+disable-model-invocation: true
 allowed-tools: Bash(python3 *)
 ---
 

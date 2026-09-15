@@ -1,6 +1,7 @@
 ---
 name: orc-release
 description: Use when the user explicitly asks to use orc-release, or types /orc-release, to drive a project's own RELEASING.md release process end to end - running its ordered steps, enforcing its gates, and tracking where the release is across sessions.
+disable-model-invocation: true
 allowed-tools: Read, Bash(python3 *), Bash(git status *)
 ---
 
