@@ -1,6 +1,8 @@
 # Python
 
-Researched on: 2026-09-11 (versions read from PyPI that day). Last real run: 2026-09-12, on
+Researched on: 2026-09-11 (versions read from PyPI that day). Last real run: 2026-09-15, on Orclab's
+four package suites (orc-publish 78.9%, orc-release 81.9%, orc-test 76.6%, orc-todo 81.4% TCE —
+the day each got its `[tool.mutmut]`). Before that: 2026-09-12, on
 Orclab itself — `python3 skills/orc-test/scripts/run.py analyze skills/orc-todo/scripts`:
 coverage 91.6% (373/407 lines — re-measured the same day with `coverage skills/orc-todo/scripts`
 after the test files were dropped from the denominator; the first run's 95.3% (816/856) had
@@ -123,6 +125,25 @@ bare `@pytest.mark.skip` — checked 2026-09-11 with ruff 0.16.7. `run.py` scans
   `run.py` now takes `git status --porcelain` before and after the mutation run; if anything
   outside `.orclab/`, `mutants/` and `.coverage` changed, it names the paths, reports TCE as not
   measurable, and does not score the run.
+- **A test that kills a process group can kill the harness.** mutmut runs pytest in-process, so
+  a mutant that drops `start_new_session=True` from a `Popen` leaves the child in *mutmut's own*
+  group, and a test that then proves the group kill (`os.killpg`) SIGKILLs pytest and mutmut
+  together: `analyze` dies with exit 137 and no report, every mutant of that function left
+  unrecorded in its `.meta` (orc-publish, 2026-09-15). The fix is an autouse fixture that
+  refuses to `killpg` the test process's own group — `skills/orc-publish/scripts/tests/
+  conftest.py` — so the mutant becomes a failing test. **It has to live in `tests/conftest.py`,
+  not in the `conftest.py` beside the package**: mutmut's copy holds `source_paths` and
+  `also_copy` only, and pytest never loads a conftest above the directory it runs from, so the
+  package-level one is silently absent under mutation. The same placement rule applies to any
+  fixture a suite needs *during* `analyze`.
+- **Tests that drive the code as a subprocess measure nothing under mutmut.** The active mutant
+  is chosen through an environment variable read by the trampoline *in the test process*, and
+  which tests reach which function is recorded there too; a child Python process is invisible on
+  both counts — worse, the mutated copy imports mutmut's config at load and exits 1 when the
+  child's cwd is not the config's directory. Orclab's hook tests (`hooks/scripts/tests/`) are
+  entirely this shape, which is also why coverage reports the hooks at 0%. To count, a test has
+  to import and call the function; one subprocess test per script for the stdin/stdout contract
+  is fine, it just scores nothing.
 - `debug = true` under `[tool.mutmut]` prints the inner pytest run and is the way to see why it
   failed; it also changed three verdicts (640/288 with it, 637/291 without, stable across two
   clean runs), so measure with it off.
