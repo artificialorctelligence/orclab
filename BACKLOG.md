@@ -3424,3 +3424,41 @@ then rewrite the skill's Step 5 and line 13 to what was observed per client, wit
 "confirmed live" date, and update the page's sentence to match. v20 left the page true to the
 skill on purpose (spec §5: skill bodies unchanged); the fix is one skill edit and one page edit
 in the same commit, per `CLAUDE.md`'s checklist item 7.
+
+## #45: Tomorrow (2026-09-16): execute the v21 push-gate plan, then spec the three /orc-test config gaps found getting Orclab to 80/70
+
+Set by direflail 2026-09-15 at the end of the session that wrote the v21 spec and plan: "push
+and then put writing the plan in an /orc-todo task for tomorrow." The plan is written and
+pushed — `docs/superpowers/plans/2026-09-15-orclab-v21-push-gate.md`, commit `2a93d52` — so
+what is left for tomorrow is running it, and the item behind it.
+
+**1. Execute the v21 plan.** Five tasks: the pinning test written red, `skills/orc-git/SKILL.md`
+(`push`/`cp` run `/orc-test coverage`, `release` runs `/orc-test analyze`, a red gate stops with
+the report and nothing is pushed, no skip flag), `docs/commands/orc-git.md`, a live check on
+Orclab itself, and the BACKLOG record. Subagent-driven in a worktree, per direflail's standing
+preference; `main` is pushed, so the worktree will branch from current `origin/main`. The spec
+is `docs/superpowers/specs/2026-09-15-orclab-v21-push-gate-design.md`, approved as is.
+
+**2. Then, direflail's item 2 — "fix what's wrong with our mutmut config", which they settled as
+"a and b are both needed"**, plus a third found on the way. All three are `/orc-test` changes
+and get a brainstorm → spec → plan of their own; the v21 spec's §6 names them as out of scope:
+
+- (a) `/orc-test analyze` on a project with several `scripts/` dirs measured one suite of six
+  and said only "TCE not measurable — check its configuration" for the root. It should find
+  each Python suite (a `tests/` dir with a package or scripts beside it) and say, per suite,
+  which has no `[tool.mutmut]` — or write it.
+- (b) The two traps orc-publish hit, now fixed for Orclab and recorded in
+  `skills/orc-test/languages/python.md`'s Caveats: a `conftest.py` beside the package is not
+  loaded under mutation (it has to be `tests/conftest.py`), and a test that kills a process
+  group can kill the harness when a mutant drops `start_new_session`. `/orc-test` should
+  detect the first (a package-level conftest and no `tests/conftest.py`) and say so.
+- (c) `launchpad_ppa.py`'s 195 mutants all scored "no tests" for days because its test loaded
+  the module under a name mutmut did not derive — and the file silently dropped out of
+  orc-publish's 78.9%. `run.py` counts "the rest" as not counted; it should report how many
+  mutants no test reached, per file, the way coverage reports an uncovered file.
+
+**Ground, so tomorrow's session does not redo today's search:** whole-project coverage is 92.9%
+and every suite is over 70% TCE (commits `28f9ae4`, `3383b5d`, `dddf3d3`, `788aa67`);
+`hooks/scripts/pyproject.toml` and `skills/{orc-package,orc-publish,orc-release,orc-test}/…/pyproject.toml`
+carry the mutmut configs written today; `python.md`'s "Last real run" line has the per-suite
+numbers.
