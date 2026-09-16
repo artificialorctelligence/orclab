@@ -1,0 +1,13 @@
+# /orc-test analyze's mutation config for the two ingredient templates (languages/python.md,
+# "Where mutmut runs matters"). It sits here, not in scripts/, so source_paths need no `..`:
+# mutmut writes each mutated copy at mutants/<source path>, and a `..` would land it on the
+# real template. From here the tests' own path arithmetic (parents[2] / "ingredients" / …)
+# resolves to mutants/ingredients/… under mutation and to the real file otherwise.
+[tool.mutmut]
+source_paths = ["ingredients/ppa/templates/ppa-copy-series.py", "ingredients/app-store/templates/appstore-status.py"]
+pytest_add_cli_args_test_selection = ["scripts/tests/"]
+also_copy = ["scripts/tests/"]
+
+# Present so pytest stops here rather than at the repo root: the root config's pythonpath would
+# put the real templates' directory ahead of mutmut's copy.
+[tool.pytest.ini_options]
