@@ -1,0 +1,12 @@
+# /orc-test analyze's mutation config for the hooks (languages/python.md, "Where mutmut runs
+# matters"). Only the hook scripts are mutated, and only their own tests are selected: the
+# doc-shape tests beside them (test_docs.py and friends) find the repo root from their own
+# path, which does not resolve from mutmut's copy.
+[tool.mutmut]
+source_paths = ["backlog_guard.py", "lane_notice.py", "lint_on_write.py", "model_floor.py", "orclab_shared.py", "secret_guard.py"]
+pytest_add_cli_args_test_selection = ["tests/test_backlog_guard.py", "tests/test_lane_notice.py", "tests/test_lint_on_write.py", "tests/test_model_floor.py", "tests/test_secret_guard.py"]
+also_copy = ["tests/"]
+
+# Present so pytest stops here rather than at the repo root: the root config's pythonpath would
+# put the unmutated modules ahead of mutmut's copy and every mutant would report "no tests".
+[tool.pytest.ini_options]

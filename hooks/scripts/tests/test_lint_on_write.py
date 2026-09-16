@@ -4,8 +4,15 @@ import pathlib
 import stat
 import subprocess
 import sys
+import types
 
-HOOK = str(pathlib.Path(__file__).resolve().parent.parent / "lint_on_write.py")
+import pytest
+from lint_on_write import OFF, main
+
+# The real script, for the one test that runs it as a process: under /orc-test analyze this
+# file runs from mutmut's mutants/ copy, whose scripts are rewritten and not runnable alone.
+_SCRIPTS = pathlib.Path(__file__).resolve().parent.parent
+HOOK = str((_SCRIPTS.parent if _SCRIPTS.name == "mutants" else _SCRIPTS) / "lint_on_write.py")
 
 
 def fake_tool(bin_dir, name, exit_code, output):
@@ -17,13 +24,21 @@ def fake_tool(bin_dir, name, exit_code, output):
     return bin_dir
 
 
-def run(file_path, tool_name="Write", bin_dir=None, env_extra=None):
-    env = dict(os.environ, **(env_extra or {}))
-    if bin_dir is not None:
-        env["PATH"] = f"{bin_dir}:{env['PATH']}"
-    return subprocess.run([sys.executable, HOOK], check=False,
-                          input=json.dumps({"tool_name": tool_name, "tool_input": {"file_path": str(file_path)}}),
-                          capture_output=True, text=True, env=env)
+@pytest.fixture
+def run(run_hook, monkeypatch):
+    """run(file_path, tool_name="Write", bin_dir=None, env_extra=None) -> an object with the
+    hook's returncode, stdout and stderr, the shape subprocess.run used to give these tests."""
+    monkeypatch.delenv(OFF, raising=False)
+    path = os.environ["PATH"]
+
+    def write(file_path, tool_name="Write", bin_dir=None, env_extra=None):
+        monkeypatch.setenv("PATH", f"{bin_dir}:{path}" if bin_dir is not None else path)
+        for k, v in (env_extra or {}).items():
+            monkeypatch.setenv(k, v)
+        code, out, err = run_hook(main, {"tool_name": tool_name, "tool_input": {"file_path": str(file_path)}})
+        monkeypatch.delenv(OFF, raising=False)
+        return types.SimpleNamespace(returncode=code, stdout=out, stderr=err)
+    return write
 
 
 def project(tmp_path, config_name, config_text=""):
@@ -35,7 +50,7 @@ def project(tmp_path, config_name, config_text=""):
     return src
 
 
-def test_findings_reach_claude_as_exit_2_on_stderr(tmp_path):
+def test_findings_reach_claude_as_exit_2_on_stderr(tmp_path, run):
     src = project(tmp_path, "pyproject.toml", "[tool.ruff]\nline-length = 100\n")
     f = src / "app.py"
     f.write_text("try:\n    x = 1\nexcept:\n    pass\n")
@@ -45,7 +60,7 @@ def test_findings_reach_claude_as_exit_2_on_stderr(tmp_path):
     assert out.stdout == ""
 
 
-def test_a_clean_file_says_nothing(tmp_path):
+def test_a_clean_file_says_nothing(tmp_path, run):
     src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
     f = src / "ok.py"
     f.write_text("x = 1\n")
@@ -53,7 +68,7 @@ def test_a_clean_file_says_nothing(tmp_path):
     assert (out.returncode, out.stdout, out.stderr) == (0, "", "")
 
 
-def test_no_config_means_no_run_even_with_the_tool_installed(tmp_path):
+def test_no_config_means_no_run_even_with_the_tool_installed(tmp_path, run):
     """The hook runs the project's configured linter, never its own opinion."""
     src = project(tmp_path, "pyproject.toml", "[project]\nname = 'x'\n")   # no [tool.ruff]
     f = src / "app.py"
@@ -62,7 +77,7 @@ def test_no_config_means_no_run_even_with_the_tool_installed(tmp_path):
     assert (out.returncode, out.stderr) == (0, "")
 
 
-def test_config_is_found_between_the_file_and_the_git_root(tmp_path):
+def test_config_is_found_between_the_file_and_the_git_root(tmp_path, run):
     """A sub-project's own pyproject (skills/x/scripts/pyproject.toml) wins over none at the root."""
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     sub = tmp_path / "skills" / "x" / "scripts"
@@ -74,7 +89,7 @@ def test_config_is_found_between_the_file_and_the_git_root(tmp_path):
     assert out.returncode == 2 and "F401" in out.stderr
 
 
-def test_a_pyproject_without_tool_ruff_does_not_stop_the_search(tmp_path):
+def test_a_pyproject_without_tool_ruff_does_not_stop_the_search(tmp_path, run):
     """ruff's own discovery skips such a file; Orclab's orc-todo pyproject is mutmut-only."""
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     (tmp_path / "pyproject.toml").write_text("[tool.ruff]\n")
@@ -87,7 +102,7 @@ def test_a_pyproject_without_tool_ruff_does_not_stop_the_search(tmp_path):
     assert out.returncode == 2 and "PLR1702" in out.stderr
 
 
-def test_javascript_prefers_the_projects_own_node_modules_binary(tmp_path):
+def test_javascript_prefers_the_projects_own_node_modules_binary(tmp_path, run):
     src = project(tmp_path, ".oxlintrc.json", "{}")
     f = src / "a.ts"
     f.write_text("if (a) { if (b) { if (c) {} } }\n")
@@ -96,7 +111,7 @@ def test_javascript_prefers_the_projects_own_node_modules_binary(tmp_path):
     assert out.returncode == 2 and "max-depth" in out.stderr
 
 
-def test_eslint_config_is_the_fallback_when_there_is_no_oxlint_config(tmp_path):
+def test_eslint_config_is_the_fallback_when_there_is_no_oxlint_config(tmp_path, run):
     src = project(tmp_path, "eslint.config.js", "export default [];\n")
     f = src / "a.tsx"
     f.write_text("x\n")
@@ -104,7 +119,7 @@ def test_eslint_config_is_the_fallback_when_there_is_no_oxlint_config(tmp_path):
     assert out.returncode == 2 and "no-empty" in out.stderr
 
 
-def test_unlinted_languages_and_other_tools_are_ignored(tmp_path):
+def test_unlinted_languages_and_other_tools_are_ignored(tmp_path, run):
     src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
     cs = src / "a.cs"
     cs.write_text("class A {}\n")
@@ -116,7 +131,7 @@ def test_unlinted_languages_and_other_tools_are_ignored(tmp_path):
     assert run(tmp_path / "missing.py", bin_dir=tmp_path / "bin").returncode == 0
 
 
-def test_a_long_report_is_truncated_not_dropped(tmp_path):
+def test_a_long_report_is_truncated_not_dropped(tmp_path, run):
     src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
     f = src / "a.py"
     f.write_text("x\n")
@@ -129,3 +144,97 @@ def test_a_long_report_is_truncated_not_dropped(tmp_path):
     out = run(f, bin_dir=bin_dir)
     assert out.returncode == 2 and "line 39" in out.stderr and "line 40" not in out.stderr
     assert "20 more lines" in out.stderr
+
+
+# --- from the first mutation run (2026-09-15): the survivors that were real gaps ----------------
+
+def test_edit_and_multiedit_are_writes_too(tmp_path, run):
+    src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
+    f = src / "a.py"
+    f.write_text("x\n")
+    bin_dir = fake_tool(tmp_path / "bin", "ruff", 1, "E722 bare except")
+    for tool in ("Edit", "MultiEdit"):
+        assert run(f, tool_name=tool, bin_dir=bin_dir).returncode == 2, tool
+
+
+def test_ruff_toml_configures_python_when_pyproject_does_not(tmp_path, run):
+    src = project(tmp_path, "ruff.toml", "line-length = 100\n")
+    f = src / "a.py"
+    f.write_text("x\n")
+    out = run(f, bin_dir=fake_tool(tmp_path / "bin", "ruff", 1, "E501 line too long"))
+    assert out.returncode == 2 and "E501" in out.stderr
+
+
+def test_the_config_search_stops_at_the_git_root(tmp_path, run):
+    """A pyproject in a parent directory above the project is someone else's configuration."""
+    (tmp_path / "pyproject.toml").write_text("[tool.ruff]\n")
+    inner = tmp_path / "project"
+    inner.mkdir()
+    subprocess.run(["git", "init", "-q", str(inner)], check=True)
+    f = inner / "a.py"
+    f.write_text("x\n")
+    out = run(f, bin_dir=fake_tool(tmp_path / "bin", "ruff", 1, "would have complained"))
+    assert (out.returncode, out.stderr) == (0, "")
+
+
+def test_the_linter_runs_from_the_config_directory_with_the_absolute_path(tmp_path, run):
+    src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
+    f = src / "a.py"
+    f.write_text("x\n")
+    # The fake prints its own cwd and argv, so the report shows where and how it was run.
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    ruff = bin_dir / "ruff"
+    ruff.write_text('#!/bin/sh\necho "cwd=$(pwd) argv=$*"\nexit 1\n')
+    ruff.chmod(ruff.stat().st_mode | stat.S_IEXEC)
+    out = run(f, bin_dir=bin_dir)
+    assert f"cwd={tmp_path.resolve()} argv=check --no-fix {f.resolve()}" in out.stderr
+
+
+def test_javascript_extensions_all_reach_the_js_linter(tmp_path, run):
+    src = project(tmp_path, ".oxlintrc.json", "{}")
+    bin_dir = fake_tool(tmp_path / "bin", "oxlint", 1, "no-unused-vars")
+    for name in ("a.js", "b.jsx", "c.ts", "d.tsx"):
+        f = src / name
+        f.write_text("x\n")
+        assert run(f, bin_dir=bin_dir).returncode == 2, name
+
+
+def test_exactly_the_line_limit_is_shown_whole(tmp_path, run):
+    src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
+    f = src / "a.py"
+    f.write_text("x\n")
+    forty = "\\n".join(f"line {i}" for i in range(40))
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    p = bin_dir / "ruff"
+    p.write_text(f"#!/bin/sh\nprintf '{forty}\\n'\nexit 1\n")
+    p.chmod(p.stat().st_mode | stat.S_IEXEC)
+    out = run(f, bin_dir=bin_dir)
+    assert "line 39" in out.stderr and "more lines" not in out.stderr
+
+
+def test_a_linter_that_hangs_is_cut_off_and_the_write_goes_through(tmp_path, run, monkeypatch):
+    import lint_on_write
+    monkeypatch.setattr(lint_on_write, "TIMEOUT", 0.2)
+    src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
+    f = src / "a.py"
+    f.write_text("x\n")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    p = bin_dir / "ruff"
+    p.write_text("#!/bin/sh\nsleep 5\n")
+    p.chmod(p.stat().st_mode | stat.S_IEXEC)
+    assert run(f, bin_dir=bin_dir).returncode == 0
+
+
+def test_as_a_process_findings_are_exit_2_on_stderr(tmp_path):
+    """The contract Claude Code sees; the one test here that runs the script for real."""
+    src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
+    f = src / "app.py"
+    f.write_text("except: pass\n")
+    bin_dir = fake_tool(tmp_path / "bin", "ruff", 1, "src/app.py:1:1: E722 Do not use bare `except`")
+    out = subprocess.run([sys.executable, HOOK], check=False,
+                         input=json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(f)}}),
+                         capture_output=True, text=True, env={"PATH": f"{bin_dir}:/usr/bin:/bin"})
+    assert out.returncode == 2 and "E722" in out.stderr and out.stdout == ""

@@ -1,8 +1,10 @@
 # Python
 
-Researched on: 2026-09-11 (versions read from PyPI that day). Last real run: 2026-09-15, on Orclab's
-four package suites (orc-publish 78.9%, orc-release 81.9%, orc-test 76.6%, orc-todo 81.4% TCE —
-the day each got its `[tool.mutmut]`). Before that: 2026-09-12, on
+Researched on: 2026-09-11 (versions read from PyPI that day). Last real run: 2026-09-15, on all
+six of Orclab's suites (TCE: orc-publish 78.9%, orc-release 81.9%, orc-test 76.6%, orc-todo
+81.4%, orc-package 84.0%, hooks 84.0%; whole-project coverage 92.9%) — the day each got its
+`[tool.mutmut]`, and the day orc-package's and the hooks' tests moved in-process. Before that:
+2026-09-12, on
 Orclab itself — `python3 skills/orc-test/scripts/run.py analyze skills/orc-todo/scripts`:
 coverage 91.6% (373/407 lines — re-measured the same day with `coverage skills/orc-todo/scripts`
 after the test files were dropped from the denominator; the first run's 95.3% (816/856) had
@@ -141,9 +143,16 @@ bare `@pytest.mark.skip` — checked 2026-09-11 with ruff 0.16.7. `run.py` scans
   which tests reach which function is recorded there too; a child Python process is invisible on
   both counts — worse, the mutated copy imports mutmut's config at load and exits 1 when the
   child's cwd is not the config's directory. Orclab's hook tests (`hooks/scripts/tests/`) are
-  entirely this shape, which is also why coverage reports the hooks at 0%. To count, a test has
-  to import and call the function; one subprocess test per script for the stdin/stdout contract
-  is fine, it just scores nothing.
+  were entirely this shape until 2026-09-15, which is also why coverage reported the hooks at 0%.
+  To count, a test has to import and call the function — `hooks/scripts/tests/conftest.py`'s
+  `run_hook` drives a hook's `main()` with stdin, stdout, cwd and environment pinned in-process,
+  and `skills/orc-package/scripts/tests/conftest.py` loads an ingredient template as a module
+  the same way. One subprocess test per script for the stdin/stdout/exit-0 contract is kept; it
+  scores nothing, and **it must run the real script, not the one beside the test**: under
+  mutation the test file sits in `mutants/tests/`, and the script beside it is mutmut's
+  rewritten copy, which imports mutmut's config at load and exits 1 from any other cwd. The
+  same goes for a test that reads the source as text. Both test dirs resolve the real path by
+  stepping over a parent named `mutants`.
 - `debug = true` under `[tool.mutmut]` prints the inner pytest run and is the way to see why it
   failed; it also changed three verdicts (640/288 with it, 637/291 without, stable across two
   clean runs), so measure with it off.
