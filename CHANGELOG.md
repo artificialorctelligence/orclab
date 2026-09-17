@@ -2,6 +2,37 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.21.0] - 2026-09-16
+
+### Added
+- `/orc-git push` and `cp` run `/orc-test coverage` before pushing — every language's suite,
+  each held to 80% line coverage — and `/orc-git release` runs `/orc-test analyze` (adds 70%
+  mutation score and the test lint) before pushing the tag. A red gate stops with the report
+  and pushes nothing; there is no skip flag, plain `git push` is the deliberate way past.
+  A run that exits 0 with nothing measured (tool missing, no report, no language) is reported
+  and the push proceeds. `merge` is unchanged. Pinned by
+  `hooks/scripts/tests/test_orc_git_skill.py`, which asserts the full gate command so a gate
+  weakened to `run` fails it. Verified live on Orclab: green push at 94.1%, a red branch
+  refused with nothing on the remote, `cp` through the gate. `release`'s gate is first
+  exercised by this version's own release (BACKLOG #46).
+- Five background skills from Orcweather's research: `source-librewxr`,
+  `source-road-conditions`, `map-openstreetmap`, `car-android-auto`, `car-carplay`.
+  `car-android-auto`'s Flutter-on-the-car-surface path is confirmed live 2026-09-16 on the
+  Desktop Head Unit, with the two gotchas Google's guide omits.
+- Mutation-testing config for every Orclab suite (`hooks/scripts`, `orc-package`,
+  `orc-publish`, `orc-release`, `orc-test`), so `/orc-test analyze` measures TCE on all six.
+
+### Changed
+- Orclab's own tests: hook tests and `orc-package`'s ingredient templates run in-process
+  instead of as subprocesses (coverage 53.5% → 96.9% and 0% → 95.8%); `launchpad_ppa.py`'s
+  request logic is tested around a fake `get()` (47.3% → 98.6%) and its 195 mutants now count.
+  Whole project 92.9% coverage, every suite over 70% TCE — the prerequisite direflail set
+  before the gate could ship.
+- The v21 spec claimed `/orc-test coverage`'s report ends with a `gates failed:` line; only
+  `analyze` prints that. The final review caught it against `cli.py`; spec, skill and page
+  were corrected spec-first (#46). One gap it surfaced is open as #47: `release` measures
+  HEAD, not the tagged commit, when HEAD has moved past the tag.
+
 ## [0.20.0] - 2026-09-14
 
 ### Added
