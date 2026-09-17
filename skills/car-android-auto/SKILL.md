@@ -91,7 +91,12 @@ Options, in order of least code:
    inside a `Presentation` on a `VirtualDisplay` backed by the car `Surface`, sized from
    `SurfaceContainer`. The car screen then shows the same `flutter_map` map the phone does,
    while `MapWithContentTemplate`'s list/pane content stays native-templated. Hand-written
-   Kotlin; no package does this. Untested by Orclab — mark as the first thing to prove.
+   Kotlin; no package does this. **Confirmed live 2026-09-16** on the Desktop Head Unit against
+   a real phone: Orcweather's `android/app/src/main/kotlin/…/car/FlutterSurface.kt` (commit
+   `9c8b105`) is the reference — ~100 lines, and the car screen showed the phone's
+   `flutter_map` with radar and position. Two things the guide does not say: host pan/scale
+   gestures reach `SurfaceCallback` only when `Action.PAN` is in the map action strip (without
+   it the host delivers none), and the host silently drops a fourth action from that strip.
 3. **Native Kotlin map** on the car surface (e.g. a Canvas or an Android map SDK) with Dart
    only feeding data over a `MethodChannel` — most code, most control.
 
