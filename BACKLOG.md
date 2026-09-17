@@ -3462,3 +3462,66 @@ and every suite is over 70% TCE (commits `28f9ae4`, `3383b5d`, `dddf3d3`, `788aa
 `hooks/scripts/pyproject.toml` and `skills/{orc-package,orc-publish,orc-release,orc-test}/…/pyproject.toml`
 carry the mutmut configs written today; `python.md`'s "Last real run" line has the per-suite
 numbers.
+
+**Item 1 done 2026-09-16** — merge `033e47c`, record in #46, one spec gap it surfaced in #47.
+Item 2 (the three `/orc-test` config gaps, brainstorm → spec → plan) is what remains open here.
+
+## #46: /orc-git runs /orc-test before push, cp and release — the v21 gate (RESOLVED 2026-09-16)
+
+Requested by direflail 2026-09-15: "any time the user is going to push to github, /orc-test
+runs and makes sure the tests are 80% covered and that the test quality is high." Design in
+`docs/superpowers/specs/2026-09-15-orclab-v21-push-gate-design.md`, plan in
+`docs/superpowers/plans/2026-09-15-orclab-v21-push-gate.md`; executed 2026-09-16 (#45 item 1).
+
+**The prerequisite came first.** direflail: "we need to get orclab up to 80/70 first." Before
+this entry, `/orc-test analyze` could measure one of Orclab's six suites; commits `28f9ae4`,
+`3383b5d`, `dddf3d3`, `788aa67` gave every suite its mutmut config, moved orc-package's and
+the hooks' tests in-process, and tested `launchpad_ppa.py`. Result: whole-project coverage
+84.8% → 92.9%, every suite over 70% TCE. Three `/orc-test` defects found on the way are #45's
+item 2.
+
+**What shipped** (merge `033e47c`): `push`/`cp` run `/orc-test coverage` after the "anything to
+push?" check; `release` runs `/orc-test analyze` after the tag check. A red gate stops with the
+report and nothing is pushed; no skip flag (plain `git push` is the escape); an exit-0 run with
+no ✓ (`not measurable`, `missing … — skipped`, `nothing measured`) is reported and the push
+proceeds. Pinned by `hooks/scripts/tests/test_orc_git_skill.py`; said for the user on
+`docs/commands/orc-git.md`.
+
+**The spec was wrong about Orclab's own code, and the final review caught it.** Spec §3 said
+`coverage`'s report "ends with `gates failed: …`"; that line is printed only by `analyze`
+(`cli.py:261,263`) — `cmd_coverage` (`cli.py:137-151`) returns 1 with no hand-off line. §4 keyed
+the "can't measure" outcome to a `not measurable` line that two of its three cases never print.
+Both were carried faithfully into the skill and the page by Tasks 2-3 and found by the
+whole-branch review against `cli.py`. Fixed spec-first (`a4997ef`) then skill/page/test
+(`086082e`); the pinning test now asserts the full `--cwd <repo root> coverage` command, so a
+gate weakened to `run` fails it (proved red/green). Same shape as CLAUDE.md's "a claim about
+Orclab's own code is a claim about code" — the review that opened `cli.py` was the pass the
+spec's author skipped.
+
+**Verified live 2026-09-16** (plan Task 4), through the real surface: `/orc-git push` on `main`
+with 7 commits ahead — `Python coverage 94.1% (2889/3070 lines) ✓`, exit 0, pushed
+`2a93d52..033e47c`. Red branch `scratch-v21-red` with one `assert False` — `1 failed, 712
+passed`, `Python: tests failed; coverage not measured`, `nothing measured`, exit 1, stopped,
+`git ls-remote --heads origin scratch-v21-red` empty; `git push -u origin scratch-v21-red` by
+hand then worked (the escape, on purpose); branch deleted both ends. `cp` path: this entry is
+the committed-not-pushed change it ran on — see the commit that carries it. `release`'s gate is
+unverified until the v21 tag is cut; verify it then (six suites of `analyze`, expect ten to
+fifteen minutes) and update this entry. One spec gap found by the final review and not fixed
+here is #47.
+
+## #47: /orc-git release measures HEAD, not the tagged commit, when HEAD has moved past the tag
+
+Found by the v21 whole-branch review, 2026-09-16 (#46). `release [tag]` accepts any existing
+local tag — the newest by default, or one named — and its new step 4 runs `/orc-test analyze`
+on the working tree as it stands. When HEAD is the tagged commit, which is the common case
+right after `/orc-version`, that is the tree being released. When HEAD has moved past the tag
+(a commit or two landed after `/orc-version` and before `/orc-git release`), the gate measures
+a tree that is not the one the tag names, and a green report says nothing about what people
+will download. The spec's dirty-tree line (§2) covers uncommitted changes but not this.
+
+Not a v21 defect to fix in the gate's own commit — the spec did not decide it — but one line of
+the same shape as the dirty-tree line would close it: if `git rev-parse <tag>^{commit}` is not
+`HEAD`, say so in the report. The alternative, checking the tag out into a temporary worktree
+and running `analyze` there, is what `merge` step 3 already does for a branch; whether a
+release should measure the tag's tree rather than warn is a decision for whoever picks this up.
+Scope: `release` only; `push` and `cp` always push HEAD, so what they measure is what they push.
