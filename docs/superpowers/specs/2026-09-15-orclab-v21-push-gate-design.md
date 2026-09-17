@@ -62,9 +62,14 @@ the same line applies.
 
 ### 3. When the gate fails: stop, and nothing is pushed
 
-`/orc-test` exits non-zero. The subcommand reports `/orc-test`'s own output — its last line
-already reads `gates failed: coverage — run /orc-test generate to repair`, or `gates failed:
-tests — fix the failing tests first` — and stops. Three things it does not do:
+`/orc-test` exits non-zero. The subcommand reports `/orc-test`'s own output and stops. What
+that output ends with differs by check (`cli.py`): `analyze` (used by `release`) ends with a
+`gates failed: …` hand-off line naming what to do — `gates failed: tests — fix the failing
+tests first` (`cli.py:261`) or `gates failed: coverage — run \`/orc-test generate\` to
+repair`-style (`cli.py:263`). `coverage` (used by `push`/`cp`) has no such line: `cmd_coverage`
+(`cli.py:137–151`) prints a `tests failed; coverage not measured` line per failing language, or
+a `✗ (min 80)` line with the files under it — the subcommand itself has to say what fixes it.
+Three things it does not do:
 
 - **It does not start `/orc-test generate`.** `generate` writes and deletes tests, and
   `orc-test`'s own rule is that it runs on the user's yes or on the user typing it, never on a
@@ -80,13 +85,16 @@ tests — fix the failing tests first` — and stops. Three things it does not d
 
 ### 4. When the gate cannot measure: it says so, and the push goes ahead
 
-`/orc-test` prints "not measurable — <reason>" in words and exits 0 when a language's coverage
-tool is not installed, no report was produced, or no language was detected at all (`cli.py`
-line 145: *"not measurable — not a gate failure"*; `nothing measured` exits 0). The push
-proceeds, and the report carries that line. This is `/orc-test`'s existing policy — it never
-installs a tool and never prints 0% for "did not measure" — and the gate inherits it rather
-than inventing a stricter one. A project that wants the gate to bite installs the tool
-`/orc-test` names.
+`/orc-test` exits 0 whenever no language ends up with a ✓, without that being a gate failure —
+and the three ways that happens each print a different line (`cli.py:137–151`), not one shared
+"not measurable" line: a missing coverage tool prints `<Lang>: missing <tool> — <install> —
+skipped` (`cli.py:51`) and that language is dropped before it runs; a report that never got
+produced prints `<Lang> coverage not measurable — <reason>` (`cli.py:146`); no language
+detected at all prints `detected: no supported language`, and since no blocks were produced,
+`nothing measured` (`cli.py:150`). The push proceeds, and the report carries whichever line
+applied. This is `/orc-test`'s existing policy — it never installs a tool and never prints 0%
+for "did not measure" — and the gate inherits it rather than inventing a stricter one. A
+project that wants the gate to bite installs the tool `/orc-test` names.
 
 Outside a git repository `/orc-test` exits 1 with `error: … is not inside a git repository`;
 `push` cannot reach that state (step 1 has already read the current branch), so it needs no

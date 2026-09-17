@@ -406,7 +406,7 @@ EOF
 git commit -qam "scratch: a deliberately red test"
 ```
 
-Type `/orc-git push`. Expected: the branch is ahead (no upstream → "something to push"); `/orc-test … coverage` runs and exits 1; the report shows the failing test and ends with `gates failed: tests — fix the failing tests first`; the command stops and says nothing was pushed; `git ls-remote --heads origin scratch-v21-red` prints nothing.
+Type `/orc-git push`. Expected: the branch is ahead (no upstream → "something to push"); `/orc-test … coverage` runs and exits 1; the report shows `Python: tests failed; coverage not measured`, then `nothing measured` overall (`cmd_coverage`, `cli.py:117,150`, prints no `gates failed:` hand-off line — that's `cmd_analyze`'s only, `cli.py:261,263`); the command stops and says nothing was pushed; `git ls-remote --heads origin scratch-v21-red` prints nothing.
 
 Then prove the escape: `git push -u origin scratch-v21-red` works by hand. Then clean up:
 
