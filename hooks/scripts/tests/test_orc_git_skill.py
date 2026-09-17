@@ -21,8 +21,9 @@ def section(text, heading):
 
 def test_push_runs_coverage_after_the_nothing_to_push_check_and_before_the_push():
     body = section(SKILL, "push")
-    assert f"{RUN_PY} --cwd" in body and " coverage" in body
-    gate = body.index("coverage")
+    gate_cmd = f'{RUN_PY} --cwd <repo root> coverage'
+    assert gate_cmd in body
+    gate = body.index(gate_cmd)
     assert body.index("nothing to push") < gate < body.index("git push -u origin")
     for phrase in ["exits non-zero", "nothing is pushed", "not measurable", "git status --porcelain",
                    "does not start `/orc-test generate`"]:
@@ -37,8 +38,9 @@ def test_cp_says_the_gate_belongs_to_the_push_half():
 
 def test_release_runs_analyze_after_the_tag_check_and_before_the_pushes():
     body = section(SKILL, "release [tag]")
-    assert f"{RUN_PY} --cwd" in body and " analyze" in body
-    gate = body.index(" analyze")
+    gate_cmd = f'{RUN_PY} --cwd <repo root> analyze'
+    assert gate_cmd in body
+    gate = body.index(gate_cmd)
     assert body.index("Confirm the tag exists locally") < gate < body.index("git push origin HEAD")
     assert "TCE" in body and "minutes" in body
 

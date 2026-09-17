@@ -72,7 +72,7 @@ Every other subcommand runs immediately once you type it — nothing else is ask
   away.
 - It will never push while the tests fail or coverage is under 80%, and never release while
   the tests fail, coverage is under 80% or mutation testing scores under 70%. It stops and shows
-  you the test report, which ends by saying what would fix it. It never writes tests on its own —
+  you the test report, and tells you what would fix it. It never writes tests on its own —
   `/orc-test generate` does that, and only when you ask; there is no way to tell `/orc-git` to skip
   the check, and if you want to push past a failing one, plain `git push` is the way, on purpose.
 - When it can't measure — the project has no coverage tool installed, or no language it

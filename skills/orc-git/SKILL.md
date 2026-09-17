@@ -135,16 +135,17 @@ Stop here — do not proceed to any subcommand logic on a bare invocation.
    (`git rev-parse --show-toplevel` is the repo root.) `/orc-test` runs every language's own
    suite and holds each to 80% line coverage; a red suite is a failed gate too. Three outcomes:
    - **It exits 0 with every gate ✓** — continue to the push.
-   - **It exits non-zero** — show its report, whose last line already says what to do
-     (`gates failed: coverage — run /orc-test generate to repair`, or `gates failed: tests —
-     fix the failing tests first`), and stop — **nothing is pushed**.
+   - **It exits non-zero** — show its report and say what fixes it: a `tests failed; coverage
+     not measured` line means fix the failing tests first; a `✗ (min 80)` line, with the files
+     under it, means run `/orc-test generate` — and stop: **nothing is pushed**.
      This step does not start `/orc-test generate`: that writes tests, and runs only when the
      user types it or says yes. There is no flag to skip this gate; `git push` typed by hand is
      the way past a red one, and that is deliberate.
-   - **It exits 0 but a line reads `not measurable`** (no coverage tool installed, no report
-     produced, no language detected) — continue to the push, and carry that line into the
-     report. `/orc-test` never installs a tool; a project that wants this gate to bite installs
-     the one it names.
+   - **It exits 0 but no language got a ✓** — a line reads `not measurable` (no coverage report
+     produced), `missing … — skipped` (the coverage tool isn't installed), or `nothing measured`
+     (no language detected, or every detected language was skipped) — continue to the push, and
+     carry those lines into the report. `/orc-test` never installs a tool; a project that wants
+     this gate to bite installs the one it names.
 
    The suite runs against the working tree as it stands. If `git status --porcelain` prints
    anything, add one line to the report: the tree had uncommitted changes, so what was measured
@@ -264,10 +265,14 @@ and reversible.
    the suite notices — held at 70% TCE per language, plus a lint of the test files. It takes
    minutes on a small project and longer on a large one; say so before running it. A release
    is the one push whose artifact other people download, which is why it gets the slow check.
-   The same three outcomes as `push`'s gate: exit 0 with every gate ✓ → continue; exit
-   non-zero → show the report and stop, nothing pushed, nothing released, `generate` not
-   started; `not measurable` lines → continue and carry them into the report. If `git status
-   --porcelain` prints anything, say so in the report.
+   Three outcomes, in the same shape as `push`'s gate but ending in `analyze`'s own line: exit 0
+   with every gate ✓ → continue. Exit non-zero → show the report, which ends with a `gates
+   failed:` line naming what to do — `gates failed: tests — fix the failing tests first` for a
+   red suite, otherwise `gates failed: coverage` and/or `tce`, followed by `— run /orc-test
+   generate to repair` — → stop, nothing pushed, nothing released, `generate` not started. Exit
+   0 but no language got a ✓ → a `not measurable`, `missing … — skipped`, or `nothing measured`
+   line → continue and carry it into the report. If `git status --porcelain` prints anything,
+   say so in the report.
 5. **Push the commit and tag to `origin`** if they aren't already there:
    ```bash
    git push origin HEAD
