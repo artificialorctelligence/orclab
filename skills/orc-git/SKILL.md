@@ -23,6 +23,10 @@ as a fact rather than a surprise:
 |---|---|
 | `commit`, `push`, `branch`, `switch`, `merge` | `repo`, `pr`, `release` |
 
+One dependency cuts across the table: `push` and `release` run `/orc-test` before they touch a
+remote (v21). That is Orclab's own, not a host's, so the left column still works against any
+host — but it no longer works without the rest of the plugin.
+
 The name under-describes the right-hand column. It is not renamed: renaming a shipped command for
 a hypothetical second forge is speculative work, and the day a second forge is real is the day
 this table tells you what has to move. A `ci` subcommand (confirm named workflows are green for
@@ -55,14 +59,14 @@ List the available subcommands:
 /orc-git subcommands:
   repo <url>          — connect the current project to a GitHub repo
   commit [text]        — stage everything and commit with a drafted message
-  push                 — push the current branch
+  push                 — push the current branch, after /orc-test coverage passes
   commit-push [text]   — commit, then push (alias: cp)
   cp [text]            — alias for commit-push
   branch <name>        — switch to a branch, creating it if it doesn't exist (alias: switch)
   switch <name>        — alias for branch
   merge <branch>       — land a finished branch into the current one, tests before and after
   pr <id>              — check out an existing pull request by number
-  release [tag]        — push a tag and create the GitHub Release for it (default: newest local tag)
+  release [tag]        — push a tag and create the GitHub Release for it, after /orc-test analyze passes (default: newest local tag)
 ```
 
 Stop here — do not proceed to any subcommand logic on a bare invocation.
@@ -124,12 +128,34 @@ Stop here — do not proceed to any subcommand logic on a bare invocation.
    `git rev-list --count @{upstream}..HEAD` (this fails if there's no upstream — treat that as
    "there is something to push," since the branch has never been published). If it reports `0`,
    say so plainly and stop: already in sync, nothing to push.
-3. Check if it has an upstream: `git rev-parse --abbrev-ref <branch>@{upstream}` (this fails if
+3. **Run the project's test suites with coverage, before pushing** — with `/orc-test`:
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/skills/orc-test/scripts/run.py" --cwd <repo root> coverage
+   ```
+   (`git rev-parse --show-toplevel` is the repo root.) `/orc-test` runs every language's own
+   suite and holds each to 80% line coverage; a red suite is a failed gate too. Three outcomes:
+   - **It exits 0 with every gate ✓** — continue to the push.
+   - **It exits non-zero** — show its report and say what fixes it: a `tests failed; coverage
+     not measured` line means fix the failing tests first; a `✗ (min 80)` line, with the files
+     under it, means run `/orc-test generate` — and stop: **nothing is pushed**.
+     This step does not start `/orc-test generate`: that writes tests, and runs only when the
+     user types it or says yes. There is no flag to skip this gate; `git push` typed by hand is
+     the way past a red one, and that is deliberate.
+   - **It exits 0 but no language got a ✓** — a line reads `not measurable` (no coverage report
+     produced), `missing … — skipped` (the coverage tool isn't installed), or `nothing measured`
+     (no language detected, or every detected language was skipped) — continue to the push, and
+     carry those lines into the report. `/orc-test` never installs a tool; a project that wants
+     this gate to bite installs the one it names.
+
+   The suite runs against the working tree as it stands. If `git status --porcelain` prints
+   anything, add one line to the report: the tree had uncommitted changes, so what was measured
+   is not exactly what is being pushed.
+4. Check if it has an upstream: `git rev-parse --abbrev-ref <branch>@{upstream}` (this fails if
    there's no upstream set — that's the signal to use the second command below instead of the
    first).
    - Has an upstream: `git push`.
    - No upstream: `git push -u origin <branch>`.
-4. If the user typed this, it runs; if pushing was your idea, ask first — see "Whose idea was it" above.
+5. If the user typed this, it runs; if pushing was your idea, ask first — see "Whose idea was it" above.
 
 ## commit-push [text] / cp [text]
 
@@ -141,6 +167,10 @@ whole point of the combined form, and getting it wrong makes `cp` useless in a c
 
 - Tree dirty → commit it. Tree clean → say so, and carry on to the push.
 - Branch ahead of its upstream → push it. Nothing ahead → say so, and stop.
+
+The test gate is part of the push half, so it runs after the commit and on the committed tree.
+When it fails, the commit stands and the report says exactly that —
+`committed abc123; not pushed: coverage 71% (min 80)` — with `/orc-test`'s own output under it.
 
 Both halves being no-ops at once is a legitimate result, not a failure: report it as nothing to
 commit, nothing to push, already in sync.
@@ -226,12 +256,29 @@ and reversible.
    ```
 3. **Confirm the tag exists locally:** `git tag --list '<tag>'`. If it doesn't, report this plainly
    and stop — do not guess what tag was meant.
-4. **Push the commit and tag to `origin`** if they aren't already there:
+4. **Run the project's test suites with coverage and mutation testing, before anything is
+   pushed** — with `/orc-test`:
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/skills/orc-test/scripts/run.py" --cwd <repo root> analyze
+   ```
+   `analyze` is `coverage` plus mutation testing — it plants one defect at a time and checks
+   the suite notices — held at 70% TCE per language, plus a lint of the test files. It takes
+   minutes on a small project and longer on a large one; say so before running it. A release
+   is the one push whose artifact other people download, which is why it gets the slow check.
+   Three outcomes, in the same shape as `push`'s gate but ending in `analyze`'s own line: exit 0
+   with every gate ✓ → continue. Exit non-zero → show the report, which ends with a `gates
+   failed:` line naming what to do — `gates failed: tests — fix the failing tests first` for a
+   red suite, otherwise `gates failed: coverage` and/or `tce`, followed by `— run /orc-test
+   generate to repair` — → stop, nothing pushed, nothing released, `generate` not started. Exit
+   0 but no language got a ✓ → a `not measurable`, `missing … — skipped`, or `nothing measured`
+   line → continue and carry it into the report. If `git status --porcelain` prints anything,
+   say so in the report.
+5. **Push the commit and tag to `origin`** if they aren't already there:
    ```bash
    git push origin HEAD
    git push origin <tag>
    ```
-5. **Create the real GitHub Release**, using the corresponding `CHANGELOG.md` section (if present)
+6. **Create the real GitHub Release**, using the corresponding `CHANGELOG.md` section (if present)
    as the release notes body:
    ```bash
    gh release create <tag> --notes-file <path to a temp file containing that section's content>
@@ -240,7 +287,7 @@ and reversible.
    (the tag with its leading `v` stripped) to the next `## [` heading or end of file — into a temp
    file first, then pass that file's path. If there is no `CHANGELOG.md` or no matching section,
    say so and create the Release with `--generate-notes` instead, naming which happened.
-6. **Report the real Release URL** that `gh release create` prints.
+7. **Report the real Release URL** that `gh release create` prints.
 
 If the user typed this, it runs; if releasing was your idea, ask first — see "Whose idea was it"
 above.
