@@ -48,18 +48,27 @@ def audit_cmd(root):
 
 
 def audit_findings(stdout, returncode):
+    # Valid-but-wrong-shape JSON (a dependency missing name/version, a top-level int, a vulns
+    # entry that isn't a dict, ...) must land on the sentinel too, not crash the caller — "raises
+    # nothing" per the interface. seen/dedupe: pip-audit lists the same advisory twice for one
+    # package when it comes from more than one source (found in the real captured fixture); the
+    # ✗ N count is a count of distinct vulnerabilities, not of records.
     try:
         data = json.loads(stdout)
-    except json.JSONDecodeError:
+        deps = data.get("dependencies", []) if isinstance(data, dict) else data
+        out, seen = [], set()
+        for dep in deps:
+            for v in dep.get("vulns", []):
+                key = (dep["name"], dep["version"], v.get("id", "?"))
+                if key in seen:
+                    continue
+                seen.add(key)
+                ids = ", ".join([v.get("id", "?")] + v.get("aliases", []))
+                fix = ", ".join(v.get("fix_versions", [])) or "none published"
+                out.append(f"{dep['name']} {dep['version']}: {ids} — fix {fix}")
+        return out
+    except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
         return _UNREADABLE
-    deps = data.get("dependencies", []) if isinstance(data, dict) else data
-    out = []
-    for dep in deps:
-        for v in dep.get("vulns", []):
-            ids = ", ".join([v.get("id", "?")] + v.get("aliases", []))
-            fix = ", ".join(v.get("fix_versions", [])) or "none published"
-            out.append(f"{dep['name']} {dep['version']}: {ids} — fix {fix}")
-    return out
 
 
 _IGNORE = "--ignore-glob=*mutants/*"        # root and nested: each suite's mutmut has its own mutants/

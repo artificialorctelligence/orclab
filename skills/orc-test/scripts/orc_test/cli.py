@@ -162,7 +162,10 @@ def _audit_line(mod, d):
     cp = run(mod.audit_cmd(d), cwd=d)
     findings = mod.audit_findings(cp.stdout, cp.returncode)
     if findings == ["audit output not understood — see above"]:
+        # Not a vulnerability count — an audit we could not read must not pass a push silently,
+        # so this fails the gate too, just not as "N vulnerable" (it is not a finding).
         print(cp.stdout[-3000:])
+        return f"{mod.LABEL}: audit output not understood — see above", True
     mark = "✗" if findings else "✓"
     lines = [f"{mod.LABEL:<10} audit {mark} {len(findings)} vulnerable"] + [f"    {f}" for f in findings]
     return "\n".join(lines), bool(findings)

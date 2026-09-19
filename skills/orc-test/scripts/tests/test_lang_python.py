@@ -266,15 +266,34 @@ def test_audit_tool_and_command():
 
 
 def test_audit_findings_from_captured_json():
+    # 36 raw (dependency, vuln) records in the fixture, 18 distinct (name, version, id) triples —
+    # pip-audit lists the same advisory id twice for one package when it comes from more than
+    # one source; deduped, ✗ N is a count of distinct vulnerabilities, not of records.
     text = (FIX / "pip_audit.json").read_text()
     lines = py.audit_findings(text, 1)
-    assert len(lines) >= 1
+    assert len(lines) == 18
     assert lines[0].startswith("requests 2.19.0: ") and " — fix " in lines[0]
+
+
+def test_audit_findings_dedupes_the_same_id_for_the_same_package():
+    data = ('{"dependencies": [{"name": "x", "version": "1", "vulns": ['
+            '{"id": "CVE-1", "fix_versions": ["2"], "aliases": []},'
+            '{"id": "CVE-1", "fix_versions": ["2"], "aliases": []}]}]}')
+    assert py.audit_findings(data, 1) == ["x 1: CVE-1 — fix 2"]
 
 
 def test_audit_clean_and_unreadable():
     assert py.audit_findings('{"dependencies": [], "fixes": []}', 0) == []
     assert py.audit_findings("Traceback (most recent call last)", 2) == ["audit output not understood — see above"]
+
+
+def test_audit_findings_never_raises_on_valid_but_wrong_shaped_json():
+    # Valid JSON, but not the shape pip-audit documents: must land on the sentinel, not crash
+    # cmd_audit with a KeyError/TypeError/AttributeError.
+    assert py.audit_findings('{"dependencies": [{"vulns": [{}]}]}', 1) == ["audit output not understood — see above"]
+    assert py.audit_findings("42", 1) == ["audit output not understood — see above"]
+    assert py.audit_findings('{"dependencies": [{"name": "x", "version": "1", "vulns": [1]}]}', 1) == [
+        "audit output not understood — see above"]
 
 
 def test_audit_unavailable_names_pip_audit(monkeypatch):

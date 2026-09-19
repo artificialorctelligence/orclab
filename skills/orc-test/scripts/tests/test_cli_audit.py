@@ -48,3 +48,10 @@ def test_audit_prints_the_command_it_ran(tmp_path, capsys, monkeypatch):
     _with(monkeypatch, fake())
     _code, out = run(["audit"], make_repo(tmp_path), capsys)
     assert "$ true" in out
+
+
+def test_unreadable_audit_output_fails_the_gate_without_a_bogus_count(tmp_path, capsys, monkeypatch):
+    _with(monkeypatch, fake(audit_findings=["audit output not understood — see above"]))
+    code, out = run(["audit"], make_repo(tmp_path), capsys)
+    assert code == 1 and "Fake: audit output not understood — see above" in out
+    assert "vulnerable" not in out
