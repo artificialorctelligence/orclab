@@ -93,13 +93,13 @@ def test_audit_findings_from_captured_json():
     # pub exited 0 with the advisory; only http is flagged, the two transitive rows have
     # current: null and must not trip the parser.
     lines = dart.audit_findings((FIX / "pub_outdated.json").read_text(), 0)
-    assert lines == ["http 0.13.0: security advisory (dart pub get prints the URL) — latest 1.6.0"]
+    assert lines == ["http 0.13.0: security advisory (dart pub get prints the URL) — fix not reported by pub (latest 1.6.0)"]
 
 
 def test_audit_clean_and_unreadable():
     assert dart.audit_findings('{"packages": []}', 0) == []
     assert dart.audit_findings('{"packages": [{"package": "a", "isCurrentAffectedByAdvisory": true, "current": null, "latest": null}]}', 0) == [
-        "a ?: security advisory (dart pub get prints the URL) — latest none published"]
+        "a ?: security advisory (dart pub get prints the URL) — fix not reported by pub (latest unknown)"]
     assert dart.audit_findings("Resolving dependencies...\nBecause x depends on y", 1) == _UNREADABLE
     assert dart.audit_findings('{"packages": [{}]}', 0) == _UNREADABLE
     assert dart.audit_findings("42", 0) == _UNREADABLE

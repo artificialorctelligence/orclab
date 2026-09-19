@@ -45,9 +45,14 @@ and https://plugins.gradle.org/plugin/org.owasp.dependencycheck — the Gradle h
 `languages/java.md`'s Audit section, which `langs/kotlin.py` reuses outright (same
 `audit_findings`). Installed means `build.gradle(.kts)` has
 `id("org.owasp.dependencycheck") version "13.0.0"` **and** `dependencyCheck { formats =
-listOf("JSON") }`; then `./gradlew dependencyCheckAnalyze` writes
-`build/reports/dependency-check-report.json`, which `cli.py` prints and reads (the build's own
-output goes to `build/reports/dependency-check.log`). Exit code ignored: `failBuildOnCVSS`
+listOf("JSON") }` — **in the root build file**, because `cli.py` reads the root's report; a
+plugin applied only in `app/build.gradle.kts` writes `app/build/reports/…` and the audit fails
+loud (log printed, "output not understood") rather than reading nothing as clean. A multi-module
+build wants `dependencyCheckAggregate`, not wired here. Then `./gradlew dependencyCheckAnalyze`
+writes `build/reports/dependency-check-report.json`, which `cli.py` removes beforehand, then
+prints and reads (the build's own output goes to `build/reports/dependency-check.log`; a build
+that fails before writing the report prints the log instead, never last run's report). Exit
+code ignored: `failBuildOnCVSS`
 defaults to 11 and *"the build will not fail by default"*. First run downloads the NVD (20+
 minutes; get an API key — `nvd.apiKey` in the block, from an environment variable, not in the
 file). Last real run: none yet.

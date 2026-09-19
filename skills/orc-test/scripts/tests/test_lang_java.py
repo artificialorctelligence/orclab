@@ -123,6 +123,8 @@ def test_audit_cmd_runs_the_build_then_prints_the_report(tmp_path):
     (tmp_path / "pom.xml").write_text("")
     cmd = java.audit_cmd(tmp_path)
     assert cmd[:2] == ["sh", "-c"]
+    # A build that fails before writing today's report must not leave last week's to be read
+    assert cmd[2].startswith("rm -f target/dependency-check-report.json; ")
     assert "mvn -q org.owasp:dependency-check-maven:check -Dformat=JSON >target/dependency-check.log 2>&1" in cmd[2]
     assert cmd[2].endswith("cat target/dependency-check-report.json 2>/dev/null || cat target/dependency-check.log")
     (tmp_path / "pom.xml").unlink()

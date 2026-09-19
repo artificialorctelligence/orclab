@@ -55,10 +55,12 @@ def audit_unavailable(root):
 def _report_cmd(build, report):
     """The build, then the report on stdout — audit_findings sees stdout only. The build's own
     output goes to a log beside the report and stands in for it when no report was written, so
-    an audit that never ran lands on the sentinel with the reason printed."""
+    an audit that never ran lands on the sentinel with the reason printed. The old report goes
+    first: a build that fails before writing (NVD update, plugin resolution) must not leave last
+    run's clean report to be read as today's."""
     d = report.rpartition("/")[0]
     log = f"{d}/dependency-check.log"
-    return ["sh", "-c", f"mkdir -p {d}; {build} >{log} 2>&1; cat {report} 2>/dev/null || cat {log}"]
+    return ["sh", "-c", f"rm -f {report}; mkdir -p {d}; {build} >{log} 2>&1; cat {report} 2>/dev/null || cat {log}"]
 
 
 def _gradle_audit_cmd(root):

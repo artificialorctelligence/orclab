@@ -52,7 +52,8 @@ outdated --json` is the one pub command with the advisory in its JSON: a per-pac
 `isCurrentAffectedByAdvisory` boolean (from `outdated.dart`), alongside `current`, `upgradable`,
 `resolvable` and `latest` versions. It also exits 0 either way, so the flag decides. What the
 JSON lacks is the advisory's id and the version that fixes it, so the line reads
-`http 0.13.0: security advisory (dart pub get prints the URL) — latest 1.6.0`; `dart pub get`'s
+`http 0.13.0: security advisory (dart pub get prints the URL) — fix not reported by pub (latest
+1.6.0)` — the same `— fix` token every language's audit line carries; `dart pub get`'s
 footnote (`[^0]: https://github.com/advisories/GHSA-…`) names it, and `ignored_advisories` in
 `pubspec.yaml` silences one the project has judged. Fixture captured from a real run with the
 docs' own example pin (`http: 0.13.0`, GHSA-4rgh-jx4f-qfcq). Last real run: none yet.

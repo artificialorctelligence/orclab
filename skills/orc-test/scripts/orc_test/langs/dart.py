@@ -51,14 +51,16 @@ def audit_cmd(root):
 
 def audit_findings(stdout, returncode):
     # pub exits 0 either way, so the flag decides. The JSON carries no advisory id and no fixed
-    # version — `dart pub get` prints the GHSA URL — so the line offers the latest version.
+    # version — `dart pub get` prints the GHSA URL — so the line keeps the shared `— fix` token
+    # and offers the latest version in brackets.
     try:
         out = []
         for p in json.loads(stdout)["packages"]:
             if p["isCurrentAffectedByAdvisory"]:
                 current = (p.get("current") or {}).get("version", "?")
-                latest = (p.get("latest") or {}).get("version") or "none published"
-                out.append(f"{p['package']} {current}: security advisory (dart pub get prints the URL) — latest {latest}")
+                latest = (p.get("latest") or {}).get("version") or "unknown"
+                out.append(f"{p['package']} {current}: security advisory (dart pub get prints the URL)"
+                           f" — fix not reported by pub (latest {latest})")
         return out
     except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
         return _UNREADABLE

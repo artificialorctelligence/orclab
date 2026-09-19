@@ -61,13 +61,18 @@ means the build file names it — `cli.py` never adds it:
   build-file config with no command-line property, so the JSON has to be asked for there — then
   `./gradlew dependencyCheckAnalyze` (or `gradle`); the report is
   `build/reports/dependency-check-report.json` (`outputDirectory` default `${buildDir}/reports`).
+  **The plugin block goes in the root build file**: `cli.py` reads the root's report, and a
+  plugin applied only in a subproject (`app/build.gradle.kts`) writes `app/build/reports/…`
+  instead — the audit then fails loud (log printed, "output not understood"), not silently. A
+  multi-module Gradle build wants `dependencyCheckAggregate`, not wired here either.
 
 Exit code: ignored. `failBuildOnCVSS` — *"The default is 11 which means since the CVSS scores
 are 0-10, by default the build will never fail"* — and the report is written before that check
 in any case, so `audit_findings` reads the report. Because `cli.py` only sees the command's
-stdout, the command is a one-line `sh -c` that sends the build's own output to
-`dependency-check.log` beside the report and then prints the report; when no report was written
-the log is printed instead and lands on "output not understood" with the reason above it. One
+stdout, the command is a one-line `sh -c` that removes any previous report, sends the build's
+own output to `dependency-check.log` beside it and then prints the report; when no report was
+written (NVD update failed, plugin did not resolve) the log is printed instead and lands on
+"output not understood" with the reason above it — last run's report is never read as today's. One
 line per (jar, advisory): `commons-io-2.6.jar: CVE-2021-29425 (MEDIUM) — fix not reported by
 dependency-check` — it matches CPEs against the NVD and names no fixed version; one CVE listed
 by two sources (NVD and OSS Index) for the same jar is one line. **The first run downloads the
