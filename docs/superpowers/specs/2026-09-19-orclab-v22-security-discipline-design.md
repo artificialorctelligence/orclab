@@ -91,7 +91,7 @@ stack's tool and config:
 - for the exposed tier, what the scaffold builds (§2, `/orc-code`).
 
 This makes Security the fourth facet every stack skill answers, after v18's Presence, UI and
-Storage. All ten shipped stack skills get the section in this pass, researched and stamped; every one says
+Storage. All nine shipped stack skills get the section in this pass, researched and stamped; every one says
 *"no project has been through this yet"* until one has. The PHP skill (v23) is born with one.
 
 **`/orc-code` changes in three places** (`skills/orc-code/SKILL.md`, `docs/commands/orc-code.md`):
