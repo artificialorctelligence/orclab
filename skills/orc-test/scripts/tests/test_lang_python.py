@@ -258,3 +258,25 @@ def test_mutation_cmd_drops_cached_verdicts_when_a_test_is_newer_than_them(tmp_p
     os.utime(meta, (1_600_000_000, 1_600_000_000))     # now the test is newer: verdicts go
     py.mutation_cmd(tmp_path, None, tmp_path)
     assert not meta.exists()
+
+
+def test_audit_tool_and_command():
+    assert py.AUDIT_TOOL == ("pip-audit", "pip install pip-audit")
+    assert py.audit_cmd("/x") == ["python3", "-m", "pip_audit", "-f", "json", "--progress-spinner", "off", "."]
+
+
+def test_audit_findings_from_captured_json():
+    text = (FIX / "pip_audit.json").read_text()
+    lines = py.audit_findings(text, 1)
+    assert len(lines) >= 1
+    assert lines[0].startswith("requests 2.19.0: ") and " — fix " in lines[0]
+
+
+def test_audit_clean_and_unreadable():
+    assert py.audit_findings('{"dependencies": [], "fixes": []}', 0) == []
+    assert py.audit_findings("Traceback (most recent call last)", 2) == ["audit output not understood — see above"]
+
+
+def test_audit_unavailable_names_pip_audit(monkeypatch):
+    monkeypatch.setattr(py.importlib.util, "find_spec", lambda name: None)
+    assert "pip-audit" in py.audit_unavailable("/x")

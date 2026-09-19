@@ -151,6 +151,34 @@ def cmd_coverage(args):
     return 1 if failed else 0
 
 
+def _audit_line(mod, d):
+    """One language's audit line (plus indented findings), and whether it failed the gate."""
+    if getattr(mod, "AUDIT_TOOL", None) is None:
+        return f"{mod.LABEL:<10} audit not available — {mod.AUDIT_NONE}", False
+    why = mod.audit_unavailable(d)
+    if why:
+        tool, install = mod.AUDIT_TOOL
+        return f"{mod.LABEL}: missing {tool} — {install} — skipped", False
+    cp = run(mod.audit_cmd(d), cwd=d)
+    findings = mod.audit_findings(cp.stdout, cp.returncode)
+    if findings == ["audit output not understood — see above"]:
+        print(cp.stdout[-3000:])
+    mark = "✗" if findings else "✓"
+    lines = [f"{mod.LABEL:<10} audit {mark} {len(findings)} vulnerable"] + [f"    {f}" for f in findings]
+    return "\n".join(lines), bool(findings)
+
+
+def cmd_audit(args):
+    _root, _cfg, usable = _resolve(args)
+    failed, blocks = False, []
+    for m, d, _target in usable:
+        block, bad = _audit_line(m, d)
+        failed |= bad
+        blocks.append(block)
+    print("\n" + "\n".join(blocks) if blocks else "nothing audited")
+    return 1 if failed else 0
+
+
 def _source_count(d, mod, target):
     base = pathlib.Path(d) / (target or ".")
     skip = detect.SKIP_DIRS | getattr(mod, "SKIP_DIRS", set())   # the language's own vendored dirs
@@ -271,7 +299,7 @@ def main(argv=None):
     p.set_defaults(fn=cmd_run, path=None, no_mutation=False)   # no subcommand means `run`
     sub = p.add_subparsers(dest="cmd")
     for name, fn in (("detect", cmd_detect), ("run", cmd_run), ("coverage", cmd_coverage),
-                     ("analyze", cmd_analyze)):
+                     ("audit", cmd_audit), ("analyze", cmd_analyze)):
         sp = sub.add_parser(name)
         sp.add_argument("path", nargs="?")
         sp.add_argument("--no-mutation", action="store_true")

@@ -101,6 +101,14 @@ bare `@pytest.mark.skip` — checked 2026-09-11 with ruff 0.16.7. `run.py` scans
 `*_test.py` with the stdlib `ast` module for: no assertion (an `assert`, `pytest.raises`, or a
 `.assert_*` call counts), `sleep` calls, `@pytest.mark.skip`/`skipif`, duplicate test names.
 
+## Audit
+pip-audit 2.10.1 (`pip install pip-audit`), confirmed live 2026-09-19 against its README:
+`python3 -m pip_audit -f json --progress-spinner off .` audits the project's declared dependencies
+from `pyproject.toml` — not the environment — and exits 1 when any has a known vulnerability
+(*"pip-audit's exit code cannot be suppressed"*). `run.py` reads the JSON: one line per
+vulnerable package with its advisory ids and the versions that fix it. First resolution can take
+as long as a `pip install`. Last real run: none yet.
+
 ## Caveats
 - **mutmut copies only `source_paths` and `also_copy` into `mutants/`; the tests are not copied
   unless `also_copy` names them.** Without it the inner pytest says "file or directory not

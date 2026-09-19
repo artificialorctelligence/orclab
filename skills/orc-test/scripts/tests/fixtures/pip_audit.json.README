@@ -1,0 +1,23 @@
+pip-audit 2.10.1, captured 2026-09-19 in a scratch venv (not hand-built), from a real network
+install and a real audit run:
+
+    python3 -m venv pa
+    pa/bin/pip install -q pip-audit
+    printf 'requests==2.19.0\n' > req.txt
+    pa/bin/pip-audit -r req.txt -f json --no-deps > pip_audit.json
+
+`--no-deps` was passed, but it does not limit the audit to the one pinned package: pip-audit's
+own `--help` describes it as "don't perform any dependency resolution; requires all requirements
+are pinned to an exact version" — it changes how pip-audit resolves *unpinned* requirements, not
+whether it installs and audits `requests`' own dependencies. The real run still pulled in and
+audited `requests==2.19.0`'s four installed dependencies (`chardet`, `idna`, `urllib3`,
+`certifi`), five packages total; three of them (`requests`, `idna`, `urllib3`) carry known
+vulnerabilities, two (`chardet`, `certifi`) come back with an empty `vulns` list. That is useful
+here: the fixture exercises both the vulnerable-dependency path and the clean-dependency path in
+one file.
+
+Top-level shape: a **dict** with two keys, `dependencies` (a list) and `fixes` (empty here). Each
+`dependencies` entry is `{"name": ..., "version": ..., "vulns": [...]}`; each `vulns` entry is
+`{"id": ..., "fix_versions": [...], "aliases": [...], "description": ...}` — matching
+`langs/python.py`'s `audit_findings` parser (`dependencies`/`vulns`/`fix_versions`/`aliases`) as
+written, no correction needed against this capture.

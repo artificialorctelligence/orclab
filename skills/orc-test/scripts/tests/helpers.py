@@ -23,7 +23,8 @@ def run(args, repo, capsys):
     return code, out.out + out.err
 
 
-def fake(mutation=None, unavailable=None, cov=(9, 10), lint=None, test_cmd=None, coverage_unavailable=None):
+def fake(mutation=None, unavailable=None, cov=(9, 10), lint=None, test_cmd=None, coverage_unavailable=None,
+         audit_tool=("faketool", "install faketool"), audit_unavailable=None, audit_findings=None):
     m = types.SimpleNamespace(
         KEY="fake", LABEL="Fake", SOURCE_EXT=".py", MARKERS=["pyproject.toml"], TOOLS={}, CAVEATS=["a caveat"],
         mutation_unavailable=lambda root, target=None: unavailable, missing=lambda root: [],
@@ -34,5 +35,9 @@ def fake(mutation=None, unavailable=None, cov=(9, 10), lint=None, test_cmd=None,
         mutation_cmd=lambda root, t, out: ["true"],
         mutation_parse=lambda root, out: mutation,
         lint=lambda root, t, out: lint if lint is not None else [
-            Finding("tests/test_a.py", 3, "no assertion in test_x")])
+            Finding("tests/test_a.py", 3, "no assertion in test_x")],
+        AUDIT_TOOL=audit_tool, AUDIT_NONE="no free audit tool for Fake",
+        audit_unavailable=lambda root: audit_unavailable,
+        audit_cmd=lambda root: ["true"],
+        audit_findings=lambda stdout, rc: audit_findings if audit_findings is not None else [])
     return m

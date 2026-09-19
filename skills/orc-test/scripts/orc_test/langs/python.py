@@ -33,6 +33,35 @@ CAVEATS = [
 ]
 SANDBOX = {"mutants", ".coverage", "__pycache__", ".pytest_cache"}   # mutmut/pytest-cov's own scratch
 
+AUDIT_TOOL = ("pip-audit", "pip install pip-audit")
+_UNREADABLE = ["audit output not understood — see above"]
+
+
+def audit_unavailable(root):
+    return None if importlib.util.find_spec("pip_audit") else "pip-audit not installed"
+
+
+def audit_cmd(root):
+    # `.` audits the project's own declared dependencies (pyproject.toml), not whatever happens to
+    # be in the environment; README: "audit a local Python project at the given path".
+    return ["python3", "-m", "pip_audit", "-f", "json", "--progress-spinner", "off", "."]
+
+
+def audit_findings(stdout, returncode):
+    try:
+        data = json.loads(stdout)
+    except json.JSONDecodeError:
+        return _UNREADABLE
+    deps = data.get("dependencies", []) if isinstance(data, dict) else data
+    out = []
+    for dep in deps:
+        for v in dep.get("vulns", []):
+            ids = ", ".join([v.get("id", "?")] + v.get("aliases", []))
+            fix = ", ".join(v.get("fix_versions", [])) or "none published"
+            out.append(f"{dep['name']} {dep['version']}: {ids} — fix {fix}")
+    return out
+
+
 _IGNORE = "--ignore-glob=*mutants/*"        # root and nested: each suite's mutmut has its own mutants/
 _KILLED = {1, 3, 36, 24, -24, 152, 255}     # mutmut's status_by_exit_code: "killed" and "timeout"
 MUTMUT_DIFFS = pathlib.Path(__file__).parents[1] / "mutmut_diffs.py"

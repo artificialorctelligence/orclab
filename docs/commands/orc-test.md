@@ -13,6 +13,7 @@ project is written in, without you telling it which.
 |---|---|
 | `/orc-test` (or `/orc-test run`) | Runs every test suite in the project and reports pass or fail |
 | `/orc-test coverage` | Reports what percent of the code the tests actually exercise, held to a minimum of 80% |
+| `/orc-test audit` | Checks every dependency the project declares against the public list of known vulnerabilities and names any that are affected, with the version that fixes each |
 | `/orc-test analyze` | Runs coverage, then mutation testing — plants a small, deliberate defect in the code and reruns the tests to see whether any of them notice — and reports a score for that, called TCE (Test Case Effectiveness), held to a minimum of 70%, plus a check over the test files themselves for problems like a test with no assertion or one that's silently skipped |
 | `/orc-test generate` | Writes and fixes tests to repair whatever the last `analyze` found weak |
 | `/orc-test detect` | Lists which languages it found in the project and which command it will use to test each, without running anything |
@@ -67,9 +68,9 @@ For `generate`:
 
 - It will never run outside a git-tracked project. It says so and stops, rather than trying to
   test whatever it happens to find.
-- It will never install a missing testing or mutation tool on your behalf. If one isn't installed,
-  it names the missing tool and the command to install it, and skips just that language — every
-  other language it found still runs.
+- It will never install a missing testing or mutation tool, or the dependency-audit tool, on your
+  behalf. If one isn't installed, it names the missing tool and the command to install it, and
+  skips just that language — every other language it found still runs.
 - It will never run git itself — no commits, no branches — no matter which subcommand you run.
 - It will never guess which language a project is written in. If it can't find that language's own
   marker file, it leaves that language out rather than assuming.
