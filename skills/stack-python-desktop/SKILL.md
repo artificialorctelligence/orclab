@@ -127,7 +127,7 @@ in `pyproject.toml`, confirmed 2026-09-13 against ruff 0.16.7's and pyright 1.1.
 [tool.ruff]
 preview = true                      # PLR1702 has been a preview rule since 0.1.15
 [tool.ruff.lint]
-extend-select = ["PLR1702", "PLR0915", "E722", "S110"]
+extend-select = ["PLR1702", "PLR0915", "E722", "S"]   # "S" is the security ruleset — see Security below
 [tool.ruff.lint.pylint]
 max-nested-blocks = 2               # ruff's default is 5
 max-statements = 50                 # ruff's default; statements, not lines — about a printed page
@@ -136,7 +136,8 @@ typeCheckingMode = "strict"         # default is "standard"
 ```
 
 `PLR1702` too-many-nested-blocks, `PLR0915` too-many-statements, `E722` bare-except (on by
-default), `S110` try-except-pass (*"consider logging the exception"*). These sit on top of ruff's
+default), and inside `S`, `S110` try-except-pass (*"consider logging the exception"*) — the
+rule this section needs; the rest of `S` is the Security section's. These sit on top of ruff's
 own default set, which since 0.16 is **five whole categories** — *"correctness, suspicious,
 complexity, performance, style"*, about 800 rules (its linter doc, confirmed live 2026-09-13) —
 not the old `E4/E7/E9/F` handful; the first run on an existing codebase says so loudly (Orclab's
@@ -148,7 +149,8 @@ survive release) have no linter — they are reviewed, not linted.
 
 ## Security — where security-discipline lands
 
-`security-discipline`'s rules for this stack, confirmed live 2026-09-19; no project has been through this yet, and the first one corrects it.
+`security-discipline`'s rules for this stack, confirmed live 2026-09-19;
+no project has been through this yet, and the first one corrects it.
 
 ### Static analysis
 
@@ -158,15 +160,14 @@ them (rule 1: `S105`–`S107` hardcoded password; rule 5: `S608` SQL built from 
 `shell=True`, `S301` pickle, `S506` unsafe `yaml.load`; rule 8: `S501` `verify=False`). Turn
 the whole category on rather than those seven, so a rule the skill does not name (`S102`
 `exec`, `S307` `eval`, `S324` MD5/SHA1, `S202` `tarfile.extractall`) is still caught, and the
-skill and this config cannot drift: the skill's codes are a subset of `S`. In the same
-`pyproject.toml` the Lint section owns, the `extend-select` line changes and two lines are
-added (ruff 0.16.8, 2026-09-16; confirmed live 2026-09-19 against its rule index and settings
-page, and run on 0.16.8 against a five-line fixture: `S105` and `S607` fire, `S101` in
-`tests/` does not, `S403`/`S404` fire only when the `ignore` line is removed):
+skill and this config cannot drift: the skill's codes are a subset of `S`. The `"S"` in the
+Lint section's `extend-select` line is this; two more lines go inside the `[tool.ruff.lint]`
+table the Lint section already opens (ruff 0.16.8, 2026-09-16; confirmed live 2026-09-19
+against its rule index and settings page, and run on 0.16.8 against a five-line fixture:
+`S105` and `S607` fire, `S101` in `tests/` does not, `S403`/`S404` fire only when the `ignore`
+line is removed):
 
 ```toml
-[tool.ruff.lint]
-extend-select = ["PLR1702", "PLR0915", "E722", "S"]   # "S" replaces "S110": the whole bandit set
 ignore = ["S4"]                     # the 13 "suspicious import" rules: the call-site rules already cover them
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]               # assert is the test framework's own statement
@@ -189,10 +190,10 @@ arguments have been validated."* It fires when any argument is not a literal (th
 the OS's opener will hit it, and `S607` (*"Starting a process with a partial executable
 path"*) alongside; the fix for `S607` is the full path, and `S603` gets a per-line
 `# noqa: S603` naming why the argument is trusted — `code-discipline`'s named, commented
-suppression — not a blanket ignore. **`S311`** fires on `random` for anything; if the use is
-not cryptographic, the same per-line form. `S102`, `S110` and `S112` are already in ruff's
-default set (its index marks them "Enabled by default"), so `"S110"` leaving the
-`extend-select` line changes nothing. pyright has no security rules — its configuration
+suppression — not a blanket ignore. **`S311`** (*"Checks for uses of cryptographically weak
+pseudo-random number generators"*) flags a call into the `random` module without knowing what
+the number is for; a shuffle or a retry delay is not cryptographic, and gets the same
+per-line form with the reason. pyright has no security rules — its configuration
 reference has none (read 2026-09-13 for the Lint section; nothing security-shaped in it).
 Rules 3 and 4 (a download run without a check; a permission the code does not use) have no
 linter in this stack — reviewed, not linted.
@@ -211,9 +212,8 @@ and never in the source. **`keyring` 25.7.0** (2025-11-16, MIT, Python ≥ 3.9; 
 `keyring.set_password("<app>", "<account>", token)` / `keyring.get_password(...)` — and its
 README names the store behind it: *"macOS Keychain, Freedesktop Secret Service, KDE4 & KDE5
 KWallet, and Windows Credential Locker"*. Its Linux dependencies (`SecretStorage`, `jeepney`)
-are declared platform-conditionally on PyPI, so `pip install keyring` is the whole install;
-the Secret Service store is the same D-Bus service GNOME, Cinnamon and KDE all run, so the
-`## Presence` split by desktop does not recur here. On a Linux box with no desktop (CI, a
+are declared platform-conditionally on PyPI, so `pip install keyring` is the whole install.
+On a Linux box with no desktop (CI, a
 headless test) none of those stores is running; the README's answer is the `keyrings.alt`
 package, and the app's answer is the same as the tray's — detect and degrade, never write the
 token to a file instead.
@@ -353,7 +353,7 @@ Direct download of the `.exe`/`.app` is a channel with no store rules at all.
 ## Sources (live on 2026-09-12)
 
 - Lint — where code-discipline lands (2026-09-13): `https://docs.astral.sh/ruff/rules/`, `https://docs.astral.sh/ruff/settings/`, `https://raw.githubusercontent.com/microsoft/pyright/main/docs/configuration.md`; versions from `https://pypi.org/pypi/<name>/json`
-- Security — where security-discipline lands (2026-09-19): `https://docs.astral.sh/ruff/rules/` (the flake8-bandit table, 73 rows), `https://docs.astral.sh/ruff/rules/assert/`, `.../rules/subprocess-without-shell-equals-true/`, `.../rules/start-process-with-partial-path/`, `.../rules/hardcoded-password-string/`, `https://docs.astral.sh/ruff/settings/` (`lint.extend-select`, `lint.ignore`, `lint.per-file-ignores`); `https://pypi.org/pypi/ruff/json`, `https://pypi.org/pypi/keyring/json`, `https://raw.githubusercontent.com/jaraco/keyring/main/README.rst`; the fixture run: ruff 0.16.8 in a scratch venv on this machine
+- Security — where security-discipline lands (2026-09-19): `https://docs.astral.sh/ruff/rules/` (the flake8-bandit table, 73 rows), `https://docs.astral.sh/ruff/rules/assert/`, `.../rules/subprocess-without-shell-equals-true/`, `.../rules/start-process-with-partial-path/`, `.../rules/hardcoded-password-string/`, `.../rules/suspicious-non-cryptographic-random-usage/`, `https://docs.astral.sh/ruff/settings/` (`lint.extend-select`, `lint.ignore`, `lint.per-file-ignores`); `https://pypi.org/pypi/ruff/json`, `https://pypi.org/pypi/keyring/json`, `https://raw.githubusercontent.com/jaraco/keyring/main/README.rst`; the fixture run: ruff 0.16.8 in a scratch venv on this machine
 - Python: `https://www.python.org/downloads/`; tkinter docs `https://docs.python.org/3/library/tkinter.html`; sqlite3 docs `https://docs.python.org/3/library/sqlite3.html`; What's New 3.13/3.14 `https://docs.python.org/3/whatsnew/3.13.html`, `.../3.14.html`; bundled Tk/SQLite `https://raw.githubusercontent.com/python/cpython/3.14/PCbuild/get_externals.bat`, `.../3.14/Mac/BuildScript/build-installer.py`; macOS notes `https://docs.python.org/3/using/mac.html`
 - PySide6: `https://pypi.org/project/PySide6/` (+ `/pypi/PySide6/json` for wheel tags); getting started `https://doc.qt.io/qtforpython-6/gettingstarted.html`, FAQ `https://doc.qt.io/qtforpython-6/faq/whatisqt.html`; deployment `https://doc.qt.io/qtforpython-6/deployment/index.html`, `.../deployment-pyside6-deploy.html`, `.../deployment-pyinstaller.html`, `.../deployment-briefcase.html`; Qt 6.11 platforms `https://doc.qt.io/qt-6/supported-platforms.html`; `https://doc.qt.io/qt-6/qsystemtrayicon.html`; `https://doc.qt.io/qt-6/qstyle.html`; LGPL `https://doc.qt.io/qt-6/lgpl.html`, `https://www.qt.io/qt-licensing`
 - GTK / PyGObject: `https://pypi.org/project/PyGObject/`; `https://pygobject.gnome.org/getting_started.html`; `https://www.gtk.org/docs/installations/windows/`, `.../macos/`, `https://www.gtk.org/docs/language-bindings/python/`; `https://docs.gtk.org/gtk4/` (4.23.4 docs; 4.24.0 tagged 2026-09-11 per GitLab releases API), `https://docs.gtk.org/gtk3/class.StatusIcon.html`, `https://docs.gtk.org/gtk4/migrating-3to4.html`; GTK licence `https://gitlab.gnome.org/GNOME/gtk/-/raw/main/COPYING`; AppIndicator libraries `https://github.com/AyatanaIndicators/libayatana-appindicator` (marked OBSOLETE), `https://github.com/AyatanaIndicators/libayatana-appindicator-glib`

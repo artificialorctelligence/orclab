@@ -146,7 +146,7 @@ The same rules for the Python half, in `pyproject.toml` — confirmed 2026-09-13
 [tool.ruff]
 preview = true                      # PLR1702 has been a preview rule since 0.1.15
 [tool.ruff.lint]
-extend-select = ["PLR1702", "PLR0915", "E722", "S110"]
+extend-select = ["PLR1702", "PLR0915", "E722", "S"]   # "S" is the security ruleset — see Security below
 [tool.ruff.lint.pylint]
 max-nested-blocks = 2               # ruff's default is 5
 max-statements = 50                 # ruff's default; statements, not lines — about a printed page
@@ -155,7 +155,8 @@ typeCheckingMode = "strict"         # default is "standard"
 ```
 
 `PLR1702` too-many-nested-blocks, `PLR0915` too-many-statements, `E722` bare-except (on by
-default), `S110` try-except-pass (*"consider logging the exception"*). These sit on top of ruff's
+default), and inside `S`, `S110` try-except-pass (*"consider logging the exception"*) — the
+rule this section needs; the rest of `S` is the Security section's. These sit on top of ruff's
 own default set, which since 0.16 is **five whole categories** — *"correctness, suspicious,
 complexity, performance, style"*, about 800 rules (its linter doc, confirmed live 2026-09-13) —
 not the old `E4/E7/E9/F` handful; the first run on an existing codebase says so loudly (Orclab's
@@ -167,27 +168,47 @@ survive release) have no linter — they are reviewed, not linted.
 
 ## Security — where security-discipline lands
 
-`security-discipline`'s rules for this stack, confirmed live 2026-09-19; no project has been through this yet, and the first one corrects it. This stack is the *Reachable by strangers* tier by definition — a web app is at a URL — so all nine rules apply, and the four subsections below say where each lands in the two halves.
+`security-discipline`'s rules for this stack, confirmed live 2026-09-19;
+no project has been through this yet, and the first one corrects it. This stack is the
+*Reachable by strangers* tier by definition — a web app is at a URL — so all nine rules
+apply, and the four subsections below say where each lands in the two halves.
 
 ### Static analysis
 
-**The browser half has no security linter of its own, and the one ESLint has does not fit
-it.** oxlint's rule tree (`oxc_linter/src/rules/`, 16 directories, read live 2026-09-19) has
-no `security` directory; `eslint-plugin-security` 4.0.1 (2026-06-12, Apache-2.0) exists on
-npm, but its fifteen rules are Node-server rules — `detect-child-process`,
-`detect-non-literal-fs-filename`, `detect-non-literal-require`, `detect-new-buffer`,
-`detect-no-csrf-before-method-override` — and `web/` is browser code that has no
-`child_process`, `fs` or `require`. Running ESLint beside oxlint for rules that cannot fire is
-a second linter for nothing, so it does not run here. What the browser half owes is rule 5's
-XSS half — CWE Top 25 #1 — at the point where a value is used: React escapes what it renders,
-and the two ways around that are `dangerouslySetInnerHTML` and a `javascript:` URL. oxlint
-ports both of React's rules (`no_danger.rs`, `jsx_no_script_url.rs`, in the `react` directory
-the template already enables); `no-danger` is in oxlint's `restriction` category and
-`jsx-no-script-url` in `suspicious`, neither on by default (only `correctness` is), so in the
-same `.oxlintrc.json` the Lint section owns:
+**The browser half: oxlint has no security plugin, and the ESLint one is not worth a second
+linter.** oxlint's rule tree (`oxc_linter/src/rules/`, 16 directories, read live 2026-09-19)
+has no `security` directory. `eslint-plugin-security` 4.0.1 (2026-06-12, Apache-2.0) exists
+on npm with fifteen rules, and its README's own verdict is *"finds a lot of false positives
+which need triage by a human."* Seven of the fifteen are Node-only (`child_process`, `fs`
+filenames, `require`, `Buffer`, Express CSRF middleware, `pseudoRandomBytes`, template-engine
+escaping) and cannot fire on `web/`. Of the eight that could, one is covered:
+`detect-eval-with-expression` is oxlint's `no-eval` (`correctness`, on by default;
+`no-implied-eval` and `no-new-func` beside it). The other seven are **reviewed, not
+linted**: `detect-unsafe-regex` and `detect-non-literal-regexp` (a regex that runs for ever
+— oxlint's `no-invalid-regexp`, `no-control-regex` and `no-misleading-character-class` check
+a regex's validity, not its run time); `detect-bidi-characters` and
+`detect-invisible-characters` (hidden Unicode in source —
+oxlint's `no-irregular-whitespace` is whitespace only); `detect-object-injection`
+(`obj[key]`, which is every ordinary lookup in a React app); `detect-possible-timing-attacks`
+(the browser compares no secret — the password check is the server's, in `pwdlib`). Running
+ESLint for one covered rule and seven the README says need a human is the second linter for
+nothing, so it does not run here.
+
+What the browser half owes on its own is rule 5's XSS half — CWE Top 25 #1 — at the point
+where a value is used. react.dev marks exactly one prop as the way to put raw HTML on the
+page, `dangerouslySetInnerHTML`: *"Unless the markup is coming from a completely trusted
+source, it is trivial to introduce an XSS vulnerability this way"*; the other way is a
+`javascript:` URL in an `href`. oxlint ports both of React's rules (`no_danger.rs`,
+`jsx_no_script_url.rs`, in the `react` directory the template already enables); `no-danger`
+is in oxlint's `restriction` category and `jsx-no-script-url` in `suspicious`, neither on by
+default (only `correctness` is). JSON does not merge, so the `.oxlintrc.json` `rules` object
+is written once — the Lint section's three entries plus these two:
 
 ```json
 "rules": {
+  "max-depth": ["error", { "max": 2 }],
+  "max-lines-per-function": ["error", { "max": 60, "skipBlankLines": true, "skipComments": true }],
+  "no-empty": ["error", { "allowEmptyCatch": false }],
   "react/no-danger": "error",
   "react/jsx-no-script-url": "error"
 }
@@ -196,29 +217,28 @@ same `.oxlintrc.json` the Lint section owns:
 `no-danger`: *"`dangerouslySetInnerHTML` is a way to inject HTML into your React component.
 This is dangerous because it can easily lead to XSS vulnerabilities."* `jsx-no-script-url`:
 *"URLs starting with `javascript:` are a dangerous attack surface because it's easy to
-accidentally include unsanitized output in a tag like `<a href>`."* `no-eval`,
-`no-implied-eval` and `no-new-func` are `correctness`, on already. A component that must
+accidentally include unsanitized output in a tag like `<a href>`."* A component that must
 render HTML sanitises it first and suppresses `no-danger` on that one line with the reason —
 `code-discipline`'s named, commented suppression. (Confirmed live 2026-09-19: oxlint 1.83.0 on
-npm, `eslint-plugin-security` on npm and its README, the three `.rs` files and oxlint's
-config page; and run — oxlint 1.83.0 via `npx` on a three-line fixture with the template's
-`.oxlintrc.json` plus the two rules: both fire as errors, and `eval("1")` fires as a
-`no-eval` warning with nothing added, which `--deny-warnings` turns red.)
+npm, `eslint-plugin-security` on npm and its README, the `.rs` files named above and oxlint's
+config page, react.dev's common-components reference; and run — oxlint 1.83.0 via `npx` on a
+three-line fixture with the template's `.oxlintrc.json` plus the two rules: both fire as
+errors, and `eval("1")` fires as a `no-eval` warning with nothing added, which
+`--deny-warnings` turns red.)
 
 **The FastAPI half** gets ruff's `S` category — its port of bandit, 71 live rules (73 listed,
 `S320` and `S410` marked removed) — every code `security-discipline` cites among them: rule
 1's `S105`–`S107` hardcoded password, rule 5's `S608` SQL built from strings, `S602`
 `shell=True`, `S301` pickle, `S506` unsafe `yaml.load`, rule 8's `S501` `verify=False`; plus
 the ones only a server trips, `S104` (bind to all interfaces in code) and `S701` (Jinja2 with
-autoescape off). The whole category, so the skill's codes are a subset and cannot drift, in
-the `pyproject.toml` the Lint section's `### The FastAPI back end` owns (ruff 0.16.8,
-2026-09-16; confirmed live 2026-09-19 against its rule index and settings page, and run on
-0.16.8 against a five-line fixture: `S105` fires, `S101` in `tests/` does not, `S403`/`S404`
-fire only when the `ignore` line is removed):
+autoescape off). The whole category, so the skill's codes are a subset and cannot drift: the
+`"S"` in the `extend-select` line of the Lint section's `### The FastAPI back end` block is
+this. Two more lines go inside the `[tool.ruff.lint]` table the Lint section already opens
+(ruff 0.16.8, 2026-09-16; confirmed live 2026-09-19 against its rule index and settings page,
+and run on 0.16.8 against a five-line fixture: `S105` fires, `S101` in `tests/` does not,
+`S403`/`S404` fire only when the `ignore` line is removed):
 
 ```toml
-[tool.ruff.lint]
-extend-select = ["PLR1702", "PLR0915", "E722", "S"]   # "S" replaces "S110": the whole bandit set
 ignore = ["S4"]                     # the 13 "suspicious import" rules: the call-site rules already cover them
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]               # assert is the test framework's own statement
@@ -231,7 +251,7 @@ Python is run with optimization requested"*, `code-discipline` rule 5's reason �
 `preview = true` would switch on, and duplicate the call-site rules, hence the `ignore`.
 `S603` (*"Prone to false positives"*, its own page) and `S607` (partial executable path) are
 the noisy ones a server rarely hits; a hit gets the full path or a per-line `# noqa: S603`
-with the reason. `S102`, `S110`, `S112` are in ruff's default set already. pyright has no
+with the reason. pyright has no
 security rules (its configuration reference, read 2026-09-13). Rules 3, 4, 6's ownership check
 and 9's later routes have no linter — reviewed, not linted.
 
@@ -286,8 +306,10 @@ What `/orc-code` scaffolds on day one for this tier, each piece from FastAPI's o
   its Pydantic body model are the allow-list, and a request that does not match gets `422`
   before the handler runs (the handling-errors page: *"When a request contains invalid data,
   FastAPI internally raises a `RequestValidationError`"*). What the scaffold adds is the rule
-  that every body is a model with typed, bounded fields — no `dict`, no `Any` — and SQLModel
-  queries are parameterised by construction; `S608` catches a string-built one.
+  that every body is a model with typed, bounded fields — no `dict`, no `Any` — and that a
+  query is written the way the SQL tutorial writes it, `session.get(Hero, hero_id)` or
+  `select(Hero).where(...)`, never as a string with the value inside; `S608` catches the
+  string-built one.
 - **Errors (rule 7):** a last-resort handler, `@app.exception_handler(Exception)` (Starlette:
   *"Both keys `500` and `Exception` can be used"*), that logs the full traceback with a
   generated id and returns `{"error": "internal error", "id": …}` and nothing else. Two
@@ -378,7 +400,7 @@ are deliberately parked (v18 spec §6); no default here.
 ## Sources (live on 2026-09-12)
 
 - Lint — where code-discipline lands (2026-09-13): `https://raw.githubusercontent.com/oxc-project/oxc/main/crates/oxc_linter/src/rules/eslint/{max_depth,max_lines_per_function,no_empty}.rs`, `.../apps/oxlint/src/command/lint.rs` (`--deny-warnings`), `https://raw.githubusercontent.com/vitejs/vite/main/packages/create-vite/template-react-ts/_oxlintrc.json`; ESLint defaults `https://raw.githubusercontent.com/eslint/eslint/main/docs/src/rules/{max-depth,max-lines-per-function,no-empty}.md`; `https://docs.astral.sh/ruff/rules/`, `https://docs.astral.sh/ruff/settings/`, `https://raw.githubusercontent.com/microsoft/pyright/main/docs/configuration.md`; versions from `https://pypi.org/pypi/<name>/json`
-- Security — where security-discipline lands (2026-09-19): `https://api.github.com/repos/oxc-project/oxc/contents/crates/oxc_linter/src/rules` (no `security/`), `.../rules/react`, `.../rules/eslint`; `https://raw.githubusercontent.com/oxc-project/oxc/main/crates/oxc_linter/src/rules/react/{no_danger,jsx_no_script_url}.rs`, `.../eslint/no_eval.rs`; `https://oxc.rs/docs/guide/usage/linter/config.html` (categories; `correctness` is the default), `https://oxc.rs/docs/guide/usage/linter/rules/react/no-danger.html`; `https://registry.npmjs.org/eslint-plugin-security`, `https://raw.githubusercontent.com/eslint-community/eslint-plugin-security/main/README.md`, `https://registry.npmjs.org/oxlint`; `https://docs.astral.sh/ruff/rules/` (the flake8-bandit table), `.../rules/assert/`, `.../rules/subprocess-without-shell-equals-true/`, `https://docs.astral.sh/ruff/settings/`; `https://vite.dev/guide/env-and-mode`, `https://raw.githubusercontent.com/vitejs/vite/main/packages/create-vite/template-react-ts/_gitignore`; FastAPI `https://fastapi.tiangolo.com/tutorial/security/`, `/tutorial/security/oauth2-jwt/`, `/tutorial/bigger-applications/`, `/tutorial/handling-errors/`, `/advanced/settings/`, `/advanced/middleware/`, `/deployment/https/`, `/features/`, `/reference/fastapi/` (`debug`); `https://starlette.dev/exceptions/`; `https://slowapi.readthedocs.io/en/latest/`, `https://raw.githubusercontent.com/laurents/slowapi/master/README.md`; versions from `https://pypi.org/pypi/<name>/json` for `ruff`, `pydantic-settings`, `pyjwt`, `pwdlib`, `slowapi`; the fixture runs: ruff 0.16.8 in a scratch venv and `npx oxlint@1.83.0`, on this machine
+- Security — where security-discipline lands (2026-09-19): `https://api.github.com/repos/oxc-project/oxc/contents/crates/oxc_linter/src/rules` (no `security/`), `.../rules/react`, `.../rules/eslint`; `https://raw.githubusercontent.com/oxc-project/oxc/main/crates/oxc_linter/src/rules/react/{no_danger,jsx_no_script_url}.rs`, `.../eslint/no_eval.rs`; `https://oxc.rs/docs/guide/usage/linter/config.html` (categories; `correctness` is the default), `https://oxc.rs/docs/guide/usage/linter/rules/react/no-danger.html`; `https://react.dev/reference/react-dom/components/common` (`dangerouslySetInnerHTML`); `https://registry.npmjs.org/eslint-plugin-security`, `https://raw.githubusercontent.com/eslint-community/eslint-plugin-security/main/README.md`, `https://registry.npmjs.org/oxlint`; `https://docs.astral.sh/ruff/rules/` (the flake8-bandit table), `.../rules/assert/`, `.../rules/subprocess-without-shell-equals-true/`, `https://docs.astral.sh/ruff/settings/`; `https://vite.dev/guide/env-and-mode`, `https://raw.githubusercontent.com/vitejs/vite/main/packages/create-vite/template-react-ts/_gitignore`; FastAPI `https://fastapi.tiangolo.com/tutorial/security/`, `/tutorial/security/oauth2-jwt/`, `/tutorial/bigger-applications/`, `/tutorial/handling-errors/`, `/advanced/settings/`, `/advanced/middleware/`, `/deployment/https/`, `/features/`, `/reference/fastapi/` (`debug`); `https://starlette.dev/exceptions/`; `https://slowapi.readthedocs.io/en/latest/`, `https://raw.githubusercontent.com/laurents/slowapi/master/README.md`; versions from `https://pypi.org/pypi/<name>/json` for `ruff`, `pydantic-settings`, `pyjwt`, `pwdlib`, `slowapi`; the fixture runs: ruff 0.16.8 in a scratch venv and `npx oxlint@1.83.0`, on this machine
 - Versions: `https://registry.npmjs.org/<pkg>` for `react`, `vite`, `create-vite`, `vitest`, `next`, `react-router`, `jest`; `https://nodejs.org/dist/index.json`; `https://pypi.org/pypi/<pkg>/json` for `fastapi`, `django`, `uvicorn`, `sqlmodel`, `sqlalchemy`, `pytest`; `https://www.python.org/downloads/`; `https://react.dev/versions`
 - React: `https://react.dev/learn/creating-a-react-app`, `/learn/build-a-react-app-from-scratch`, `/learn` (Quick Start), `/learn/thinking-in-react`
 - Vite: `https://vite.dev/guide/`, `/config/server-options`, `/guide/static-deploy`; template files via `https://api.github.com/repos/vitejs/vite/contents/packages/create-vite/template-react-ts` and `https://raw.githubusercontent.com/vitejs/vite/main/packages/create-vite/template-react-ts/{package.json,_gitignore}`; `https://vitest.dev/guide/`
