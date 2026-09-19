@@ -38,6 +38,31 @@ output: `xUnit1004` (test skipped), `xUnit2013` (`Assert.Equal` used to check a 
 `xUnit1013` (public method not marked as a test), among others. NUnit projects instead get
 `NUnit.Analyzers` warnings, reported as `NUnit####` — not yet parsed here, a known gap.
 
+## Audit
+`dotnet list package --vulnerable --include-transitive --format json` (the .NET SDK itself;
+`--vulnerable` since SDK 5.0.200, `--format json` since 7.0.200, audit sources since 9.0.300),
+confirmed live 2026-09-19 against
+https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-list-package and
+https://learn.microsoft.com/en-us/nuget/concepts/auditing-packages. The verb-first form is kept
+on purpose: .NET 10 added `dotnet package list` as an alias and *"the verb-first forms continue
+to work"*. It reads the restored project assets (*"Starting with .NET 10, the command
+automatically performs restore if necessary"*; earlier SDKs need the restore `dotnet test` has
+already done) and checks them against the audit sources' vulnerability data (nuget.org by
+default). `--include-transitive` is passed because *"`--include-transitive` is not default, so
+should be included"*.
+
+**Exit code: 0 with findings.** Not on the docs page; read from the source that computes it
+(NuGet.Client `ListPackageCommandRunner.cs`, dev branch, 2026-09-19): the code is 1 only when a
+`problems` entry is an error — vulnerable packages never set it — and the request for a
+non-zero code is NuGet/Home#11315, closed "not planned". So `audit_findings` reads the JSON: one
+line per (package, version, advisory) — `A 1.0.0: GHSA-g8j6-m4p7-5rfq (High) — fix not reported
+by NuGet` (the report carries the advisory URL and a severity, no fixed version) — deduplicated,
+because the report repeats every package once per target framework and per project. A
+`problems` entry of level `error` (no assets file, unreachable source) is reported as output not
+understood rather than as a clean pass. The fixture is hand-built from the renderer's own test
+(`fixtures/dotnet_list_vulnerable.json.README`); no .NET SDK is installed here. Last real run:
+none yet.
+
 ## Caveats
 - **Stryker.NET 5.0.0 targets .NET 10.** On an older SDK, pin the 4.16.0 global tool instead:
   `dotnet tool install -g dotnet-stryker --version 4.16.0`.

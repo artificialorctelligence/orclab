@@ -23,6 +23,11 @@ SKIP_DIRS = {"addons"}             # gdmutant never mutates addons/; do not coun
 SANDBOX = {".orclab", "reports"}   # gdmutant reruns gdUnit4/GUT, which write their JUnit XML under reports/
 _GDLINT = re.compile(r"^(?P<file>[^:]+):(?P<line>\d+): (?P<msg>.*)$", re.MULTILINE)
 
+AUDIT_TOOL = None
+AUDIT_NONE = ("Godot addons have no advisory database — checked 2026-09-19 against the Asset Library "
+              "docs (submitting_to_assetlib, using_assetlib): review is manual and nothing reports a "
+              "vulnerable asset")
+
 
 def _runner(root):
     return pathlib.Path(root) / "addons" / "gdUnit4" / "runtest.sh"

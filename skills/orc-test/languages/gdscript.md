@@ -44,6 +44,15 @@ gdlint (gdtoolkit 4.5.0, `pip install gdtoolkit`) — style rules only (naming, 
 line length); it has no assertion-free-test rule the way this project's own `run.py` scanners do
 for other languages.
 
+## Audit
+None free. Godot addons have no advisory database — checked 2026-09-19 against the Asset
+Library docs, https://docs.godotengine.org/en/stable/community/asset_library/submitting_to_assetlib.html
+and https://docs.godotengine.org/en/stable/community/asset_library/using_assetlib.html: a
+submission's review is manual (*"The approval process is manual and may take up to a few days"*),
+nothing on either page reports a vulnerable asset, and an addon under `addons/` is vendored
+source with no manifest of its own to audit. `/orc-test audit` prints `audit not available`
+with this sentence; the first tool that appears corrects it.
+
 ## Caveats
 - **A fresh checkout needs one `$GODOT_BIN --headless --import` before anything else** (found
   2026-09-12): without the `.godot/` class cache, gdUnit4's own scripts fail to parse

@@ -88,3 +88,7 @@ def test_source_count_skips_addons(tmp_path):
     (tmp_path / "addons" / "gdUnit4" / "x.gd").write_text("")
     (tmp_path / "player.gd").write_text("")
     assert cli._source_count(tmp_path, gd, None) == 1
+
+
+def test_audit_has_no_free_tool():
+    assert gd.AUDIT_TOOL is None and "2026-09-19" in gd.AUDIT_NONE and "Asset Library" in gd.AUDIT_NONE

@@ -1,5 +1,6 @@
 """Dart/Flutter: dart test or flutter test, lcov via package:coverage, mutation_test (junit)."""
 
+import json
 import pathlib
 import re
 import shlex
@@ -25,6 +26,9 @@ SANDBOX = {"coverage", ".dart_tool"}   # package:coverage/mutation_test/pub outp
 
 _CASE = re.compile(r"^(?P<file>[^:]+):(?P<line>\d+):\d+ (?P<what>.*)$")
 
+AUDIT_TOOL = ("dart pub outdated", TOOLS["dart"])
+_UNREADABLE = ["audit output not understood — see above"]
+
 
 def _flutter(root):
     return "sdk: flutter" in (pathlib.Path(root) / "pubspec.yaml").read_text()
@@ -32,6 +36,32 @@ def _flutter(root):
 
 def _tool(root):
     return "flutter" if _flutter(root) else "dart"
+
+
+def audit_unavailable(root):
+    tool = _tool(root)
+    return None if shutil.which(tool) else f"{tool} not installed"
+
+
+def audit_cmd(root):
+    # `pub outdated --json` is the one pub command with machine-readable advisory data
+    # (isCurrentAffectedByAdvisory); `pub get` prints the advisory URL but only as prose.
+    return [_tool(root), "pub", "outdated", "--json"]
+
+
+def audit_findings(stdout, returncode):
+    # pub exits 0 either way, so the flag decides. The JSON carries no advisory id and no fixed
+    # version — `dart pub get` prints the GHSA URL — so the line offers the latest version.
+    try:
+        out = []
+        for p in json.loads(stdout)["packages"]:
+            if p["isCurrentAffectedByAdvisory"]:
+                current = (p.get("current") or {}).get("version", "?")
+                latest = (p.get("latest") or {}).get("version") or "none published"
+                out.append(f"{p['package']} {current}: security advisory (dart pub get prints the URL) — latest {latest}")
+        return out
+    except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
+        return _UNREADABLE
 
 
 def missing(root):

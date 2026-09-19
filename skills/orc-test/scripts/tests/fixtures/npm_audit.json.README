@@ -1,0 +1,21 @@
+npm 10.8.2 (Node v20.20.2), captured 2026-09-19 in a scratch directory (not hand-built), from a
+real registry lookup:
+
+    printf '{"name":"fix","version":"1.0.0","private":true,
+             "dependencies":{"lodash":"4.17.15","minimist":"1.2.0"}}' > package.json
+    npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+    npm audit --json > npm_audit.json        # exited 1
+
+The docs read for the command were npm 11's (docs.npmjs.com/cli/v11/commands/npm-audit); the
+capture is from the npm 10 installed here. Both write `auditReportVersion: 2`, the shape parsed.
+
+Top-level shape: a **dict** with `auditReportVersion`, `vulnerabilities` and `metadata`.
+`vulnerabilities` is a dict keyed by package name; each value has `name`, `severity`,
+`isDirect`, `via` (a list of advisory dicts with `source`, `name`, `title`, `url`, `severity`,
+`cwe`, `cvss`, `range` — or, for a package vulnerable only through a dependency, bare package
+name strings), `effects`, `range` (the vulnerable version range; the installed version is not in
+the report), `nodes` and `fixAvailable` (`true`, `false`, or a dict `{name, version,
+isSemVerMajor}` when the fix is an upgrade of a different top-level package). Here: lodash
+(six advisories, `fixAvailable` a dict naming lodash 4.18.1) and minimist (two advisories) —
+both direct, so no `via` strings; that case is covered inline in test_lang_javascript.py.
+`metadata.vulnerabilities.total` is 2, which matches the two lines the parser produces.

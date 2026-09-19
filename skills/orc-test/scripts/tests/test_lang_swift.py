@@ -93,3 +93,7 @@ def test_lint_filters_by_path_component(tmp_path, monkeypatch):
     monkeypatch.setattr(swift, "run", lambda cmd, cwd: type("R", (), {"stdout": json.dumps(findings), "returncode": 0})())
     result = swift.lint("/x", None, tmp_path)
     assert [f.file for f in result] == ["Tests/AppTests.swift"]
+
+
+def test_audit_has_no_free_tool():
+    assert swift.AUDIT_TOOL is None and "2026-09-19" in swift.AUDIT_NONE and "SwiftPM" in swift.AUDIT_NONE

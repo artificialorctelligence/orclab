@@ -1,0 +1,30 @@
+dependency_check_report.json — from documented schema — verify on first real run.
+
+Hand-built, not captured: neither mvn nor gradle is installed on the machine this was written on
+(2026-09-19), and a real dependency-check run also needs the NVD database (20+ minutes on a
+first run without an API key). The shape is dependency-check's own, read the same day from the
+Velocity template that writes the JSON report, on the main branch of
+dependency-check/DependencyCheck (release v13.0.0, 2026-08-03):
+
+    core/src/main/resources/templates/jsonReport.vsl
+        — top level: `reportSchema`, `scanInfo`, `projectInfo`, `dependencies`; each dependency
+          has `fileName` (the jar's display name) and, only when the analysis found any,
+          `vulnerabilities`; each vulnerability has `source`, `name` (the CVE or GHSA id),
+          `severity` (from cvssV4, else cvssV3, else cvssV2 baseSeverity; "unscored"
+          advisories carry `"unscored": "true"` and a severity string instead), `cvssv3`,
+          `cwes`, `description`, `references`, `vulnerableSoftware`. No fixed version: the tool
+          matches CPEs against the NVD and reports ranges, not fixes.
+
+The same file is written by the Maven plugin (target/dependency-check-report.json) and the
+Gradle plugin (build/reports/dependency-check-report.json), so one fixture serves both
+`langs/java.py` and `langs/kotlin.py`.
+
+What it exercises: a clean dependency with no `vulnerabilities` key (junit); one CVE reported
+twice for one jar from two sources (commons-io: NVD and OSSINDEX both name CVE-2021-29425) —
+`$dependency.getVulnerabilities(true)` iterates every source's record, which is the repeat the
+parser dedupes on (fileName, name); and a jar with two distinct CVEs (snakeyaml). Expected: three
+lines, not four. The CVE ids, jars and descriptions are real advisories; the hashes and
+reference URLs are placeholders.
+
+Verify against a real target/dependency-check-report.json the first time one is generated, and
+replace this file with the capture.

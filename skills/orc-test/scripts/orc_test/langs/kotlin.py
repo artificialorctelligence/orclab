@@ -7,7 +7,7 @@ from .. import jacoco, licence, pitest
 from ..detect import SKIP_DIRS
 from ..model import Coverage, Finding, Mutation
 from ..runner import run
-from .java import _find_build_gradle
+from .java import _DC_GRADLE, _find_build_gradle, _gradle_audit_cmd, _gradle_audit_unavailable, audit_findings  # noqa: F401 — audit_findings is this module's too
 
 KEY = "kotlin"
 LABEL = "Kotlin"
@@ -17,6 +17,10 @@ TOOLS = {"java": "install a JDK (https://adoptium.net)",
          "gradle": "install Gradle (https://gradle.org), or commit the wrapper (./gradlew)"}
 CAVEATS = []          # computed per project — see CAVEATS_FOR
 SANDBOX = {"build", ".gradle"}   # Gradle/Kover/Pitest build output
+
+AUDIT_TOOL = ("dependency-check", f"declare {_DC_GRADLE}")   # the Gradle half of java.py's audit
+audit_unavailable = _gradle_audit_unavailable
+audit_cmd = _gradle_audit_cmd
 
 
 def claims(root):

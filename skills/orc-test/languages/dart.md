@@ -40,6 +40,23 @@ reader would read its report unchanged, no new parser needed.
 No tool. `dart analyze` runs as part of a normal Dart workflow but has no rule for an
 assertion-free test, and nothing else on pub.dev fills that gap as of this research.
 
+## Audit
+`dart pub outdated --json` (or `flutter pub outdated --json` for a Flutter package; Dart SDK
+3.13.3 here), confirmed live 2026-09-19 against
+https://dart.dev/tools/pub/security-advisories, https://dart.dev/tools/pub/cmd/pub-outdated and
+pub's source (dart-lang/pub `lib/src/command/outdated.dart`, `lib/src/solver/report.dart`). The
+brief's candidate was `dart pub get`; it does surface advisories — *"The pub client surfaces
+security advisories at dependency resolution"* — but only as prose, and `report.dart`'s
+`reportAdvisories()` just logs, so it **exits 0** and prints nothing machine-readable. `pub
+outdated --json` is the one pub command with the advisory in its JSON: a per-package
+`isCurrentAffectedByAdvisory` boolean (from `outdated.dart`), alongside `current`, `upgradable`,
+`resolvable` and `latest` versions. It also exits 0 either way, so the flag decides. What the
+JSON lacks is the advisory's id and the version that fixes it, so the line reads
+`http 0.13.0: security advisory (dart pub get prints the URL) — latest 1.6.0`; `dart pub get`'s
+footnote (`[^0]: https://github.com/advisories/GHSA-…`) names it, and `ignored_advisories` in
+`pubspec.yaml` silences one the project has judged. Fixture captured from a real run with the
+docs' own example pin (`http: 0.13.0`, GHSA-4rgh-jx4f-qfcq). Last real run: none yet.
+
 ## Caveats
 - **mutation_test is young** (pub.dev 1.8.0, 2026-02) and its report is read here from junit XML
   rather than a purpose-built machine format; dart_mutant is the fallback if this proves
