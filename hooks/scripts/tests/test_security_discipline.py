@@ -10,7 +10,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[3]
 SKILL = ROOT / "skills" / "security-discipline" / "SKILL.md"
 HEADING = "## Security — where security-discipline lands"
 SUBHEADINGS = ["### Static analysis", "### Dependency audit", "### Secrets", "### Reachable by strangers"]
-EXPECTED = {"stack-python-desktop", "stack-web"}   # each stack task adds its skill's directory name here
+EXPECTED = {"stack-android-native", "stack-kotlin-multiplatform", "stack-python-desktop", "stack-web"}   # each stack task adds its skill's directory name here
 
 
 def _frontmatter():

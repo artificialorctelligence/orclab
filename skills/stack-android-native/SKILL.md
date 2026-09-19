@@ -108,6 +108,149 @@ Apply the detekt Gradle plugin and `./gradlew detekt` joins the check before any
 3 and 5 (loop exits, `use {}` on the error path, `require`/`check` over `assert`) are reviewed,
 not linted.
 
+## Security — where security-discipline lands
+
+`security-discipline`'s rules for this stack, confirmed live 2026-09-19;
+no project has been through this yet, and the first one corrects it. A phone app is the
+*Every project* tier — it accepts no connections — so rules 1–4 apply in full and of 5–9 only
+the client halves: what the app does with a value another app handed it (rule 5), and whether
+it checks the certificate of the server it talks to (rule 8). That server carries 5–9 in its
+own stack.
+
+### Static analysis
+
+**detekt has no security rules — none free there — and it does not matter, because Android
+Lint is this stack's security linter and the Build section already runs it.** detekt.dev's
+rule index (read live 2026-09-19) lists twelve rule sets — comments, complexity, coroutines,
+empty-blocks, exceptions, ktlint, libraries, naming, performance, potential-bugs, ruleauthors,
+style — and no `security`; `config/detekt/detekt.yml` above stays as it is. Android Lint ships
+with the Android Gradle Plugin, and its issue index (googlesamples.github.io's
+android-custom-lint-rules, read live 2026-09-19) has a **Security** category of 87 checks: 62
+built in, 24 from Google's separate `com.android.security.lint:lint` package, one from Slack's.
+Of the 62, 59 are on by default (off: `EasterEgg`, `PermissionNamingConvention`,
+`VulnerableCordovaVersion`); 48 are Warning severity, 11 Error, 3 Fatal. `./gradlew lint` stops
+the build on an Error or a Fatal — `abortOnError`, *"If set to true (default), stops the build
+if errors are found"* — and only reports a Warning. So one line, in a block the Lint section
+does not open:
+
+```kotlin
+// app/build.gradle.kts
+android {
+    lint {
+        warningsAsErrors = true   // "Whether lint should treat all warnings as errors" — the 45 Warning-severity Security checks that are on now stop the build
+    }
+}
+```
+
+What the 59 cover, by rule (each check's page read live 2026-09-19):
+
+- **Rule 1 — narrowly.** `SecretInSource` (AGP 8.3+) sounds general and is not: its detector,
+  `SecretDetector.kt`, fires on one thing, an `AIza…` literal passed to the Gemini SDK's
+  `GenerativeModel` constructor. `PackagedPrivateKey` (Fatal: *"you should not package private
+  key files inside your app"*) and `HardcodedDebugMode` (Fatal: a literal `android:debuggable`
+  *"can lead to accidentally publishing your app with debug information"*) are the artifact
+  half. A token typed into a Kotlin file is otherwise reviewed, not linted.
+- **Rule 3.** `UnsafeDynamicallyLoadedCode` and `UnsafeNativeCodeLocation`: *"Dynamically
+  loading code from locations other than the application's library directory or the Android
+  platform's built-in library directories is dangerous, as there is an increased risk that the
+  code could have been tampered with."* Play's Device and Network Abuse policy makes the rule
+  absolute on this stack: *"an app may not download executable code (such as dex, JAR, .so
+  files) from a source other than Google Play"*; the exception is code in an interpreter,
+  *"such as JavaScript in a webview"*, which is where rule 3 is reviewed.
+- **Rule 4.** `WorldReadableFiles`, `WorldWriteableFiles`, `SetWorldReadable`,
+  `SetWorldWritable` (Mobile M8's file case), and the exported-component set —
+  `ExportedService` (*"Without this, any application can use this service"*),
+  `ExportedReceiver`, `ExportedContentProvider`, `GrantAllUris`. Whether a declared
+  `<uses-permission>` is used: reviewed, as the rule says.
+- **Rule 5's client half.** A value from another app arrives as an Intent, a content URI or
+  inside a WebView: `UnsafeIntentLaunch`, `UnsafeImplicitIntentLaunch` (Error),
+  `UnsanitizedFilenameFromContentProvider`, `SetJavaScriptEnabled`, `AddJavascriptInterface`,
+  `JavascriptInterface` (Error).
+- **Rule 8's client half.** `TrustAllX509TrustManager` (*"thus trusting any certificate
+  chain"*), `CustomX509TrustManager`, `BadHostnameVerifier`, `AllowAllHostnameVerifier`,
+  `SSLCertificateSocketFactoryGetInsecure`, `WebViewClientOnReceivedSslError` in code;
+  `InsecureBaseConfiguration` (*"Permitting cleartext traffic could allow eavesdroppers to
+  intercept data sent by your app"*) and `AcceptsUserCertificates` in
+  `network_security_config.xml`. `UsingHttp` is the Gradle wrapper's own download URL.
+
+Google's `com.android.security.lint:lint` 1.0.4 (Google Maven, 2025-12-12; Apache; its README:
+*"more security-focused and experimental than the built-in lint checks"*) adds the other 24 with
+one line — `lintChecks("com.android.security.lint:lint:1.0.4")` in `app/build.gradle.kts`'s
+`dependencies {}`. They are crypto algorithms, PRNGs, logcat leaks, FileProvider paths,
+tapjacking and a cleartext check for apps targeting below 28 — nothing the built-in set and API
+36's defaults do not already cover for the nine rules — and none has been run here, so the line is
+not in the scaffold; a project that wants them adds it. Rule 3's checksum before use and rule
+4's unused permission have no linter: reviewed.
+
+### Dependency audit
+
+One run, from `/orc-test audit`: the OWASP dependency-check Gradle plugin —
+`skills/orc-test/languages/kotlin.md`, `## Audit`. Installed means, **in the root
+`build.gradle.kts`**, `id("org.owasp.dependencycheck") version "13.0.0"` in `plugins {}` and
+`dependencyCheck { formats = listOf("JSON") }` (rule 2).
+
+### Secrets
+
+Three kinds of secret, three places, none of them a source file (rule 1; every quotation below
+confirmed live 2026-09-19 on developer.android.com unless said otherwise):
+
+- **The upload key.** `keystore.properties` and the `.jks` it names — the layout table's row.
+  The app-signing page (dated 2026-03-06): *"Be sure to keep the `keystore.properties` file
+  secure. This may include removing it from your source control system."* `.gitignore` gets
+  `keystore.properties`, `*.jks` and `*.keystore` on day one; the template already ignores
+  `local.properties` and `build/` (the layout table), and what else Studio's template ignores
+  was not checked — Now in Android's `.gitignore`, read live, has no keystore line. Lint's
+  `PackagedPrivateKey` is the check that none of it went into the bundle.
+- **A token the app holds for its user** (a session, a refresh token). Jetpack Security's
+  `EncryptedSharedPreferences` is no longer a choice: its release notes, 1.1.0-alpha07
+  (2025-04-09) and again at 1.1.0-beta01 (2025-06-04), *"Deprecated all APIs in favour of
+  existing platform APIs and direct use of Android Keystore."* What replaces it is two things
+  the Storage section and the Keystore page already give. The value sits in app-private storage
+  (*"Other apps cannot access files stored within internal storage"*), encrypted under an
+  **Android Keystore** key — an AES-GCM key from `KeyGenerator.getInstance(KEY_ALGORITHM_AES,
+  "AndroidKeyStore")` with a `KeyGenParameterSpec`, the recipe on Google's *Hardcoded
+  Cryptographic Secrets* risk page (dated 2024-09-24) — because *"Key material never enters the
+  application process"* and, hardware-bound, *"is never exposed outside of secure hardware"*
+  (Keystore page, dated 2026-03-06). The ciphertext file goes under `context.noBackupFilesDir`:
+  Auto Backup copies `getFilesDir()`, shared preferences and the database directory to the cloud
+  by default, *"always"* excludes `getNoBackupFilesDir()`, and its own tip is *"To back up user
+  credentials and authentication tokens, don't store them in shared preferences or a file"* —
+  its answer, Block Store, is a Play Services dependency and a Data-safety row, so the scaffold
+  takes the no-backup directory, and a project that wants a token to follow the user to a new
+  phone chooses Block Store on purpose (Auto Backup page, dated 2026-02-26).
+- **An API key for a service the app calls.** The bundle is public — anyone who installs the
+  app can unpack it — so a key in it is a key everyone has. Google's own API-key page
+  (docs.cloud.google.com, dated 2026-09-16): *"Don't include API keys in client code or commit
+  them to code repositories"*; *"The client should pass requests to the server, which can add the
+  credential and issue the request."* That server is the *Reachable by strangers* tier of
+  whatever stack it is in. The one exception is a key Google designs to ship in an app — a Maps
+  key — which goes through the Secrets Gradle Plugin
+  (`com.google.android.libraries.mapsplatform.secrets-gradle-plugin` 2.0.1, page dated
+  2026-09-17): it reads a git-ignored `secrets.properties` and *"exposes those properties as
+  variables in the Gradle-generated `BuildConfig` class and in the Android manifest file"* —
+  out of the repository, not out of the artifact, which is the most any build plugin can do.
+
+Never in the built bundle: the keystore, `keystore.properties`, `secrets.properties`,
+`local.properties`, `.git`. `PackagedPrivateKey` and `HardcodedDebugMode` are the two checks
+that run; whether `bundleRelease` can ever pick up a stray properties file was not checked — the
+first project lists the bundle once (`unzip -l app/build/outputs/bundle/release/app-release.aab`)
+and records the answer here.
+
+### Reachable by strangers
+
+This stack does not accept connections: n/a — a phone app has no route to authenticate, no error
+to sanitise and no rate to limit; the service it talks to carries rules 5–9 in its own stack. What
+still applies is rule 8's client half: refuse plain HTTP and trust only the system's certificate
+store, which on API 36 is the platform default — *"Starting with Android 9 (API level 28),
+cleartext support is disabled by default"*, with `<certificates src="system" />` as the only
+trust anchor (network security configuration page, dated 2026-08-28, confirmed live
+2026-09-19). So a `network_security_config.xml` that sets `cleartextTrafficPermitted="true"` or
+adds `<certificates src="user" />`, and any `X509TrustManager` or `HostnameVerifier` of the
+app's own, is a finding, and the Static analysis checks above catch both the XML and the code.
+A CA for a development server belongs in `<debug-overrides>`, which the platform honours only
+when `android:debuggable` is true — `AcceptsUserCertificates`' own advice. And the API-key
+paragraph above: the bundle is not a secret store.
+
 ## Presence
 
 No project has been built with these facets yet; the first one corrects them. Presence is how
@@ -253,6 +396,7 @@ own Gradle export; the Play ingredient applies to it unchanged.
 ## Sources (live on 2026-09-11; facets 2026-09-12)
 
 - Lint — where code-discipline lands (2026-09-13): `https://raw.githubusercontent.com/detekt/detekt/main/detekt-core/src/main/resources/default-detekt-config.yml`, `https://kotlinlang.org/docs/gradle-compiler-options.html` (`allWarningsAsErrors`); detekt release from the GitHub releases API
+- Security — where security-discipline lands (2026-09-19): detekt's rule-set index `https://detekt.dev/docs/rules/comments` (sidebar; `/docs/rules/` itself is a 404); Android Lint's issue index `https://googlesamples.github.io/android-custom-lint-rules/checks/categories.md.html` (Security, 87), `.../checks/severity.md.html`, `.../checks/vendors.md.html`, and the check pages `.../checks/{SecretInSource,UnsafeDynamicallyLoadedCode,TrustAllX509TrustManager,WorldReadableFiles,ExportedService,HardcodedDebugMode,PackagedPrivateKey,UsingHttp,DefaultCleartextTraffic,AcceptsUserCertificates,InsecureBaseConfiguration}.md.html`; `SecretDetector.kt` from `https://android.googlesource.com/platform/tools/base/+/mirror-goog-studio-main/lint/libs/lint-checks/src/main/java/com/android/tools/lint/checks/SecretDetector.kt`; the `lint {}` block `https://developer.android.com/studio/write/lint` and `https://developer.android.com/reference/tools/gradle-api/9.4/com/android/build/api/dsl/Lint` (`warningsAsErrors`, `abortOnError`); Google's security lints `https://raw.githubusercontent.com/google/android-security-lints/main/README.md`, `https://dl.google.com/android/maven2/com/android/security/lint/lint/maven-metadata.xml`; Play policy `https://support.google.com/googleplay/android-developer/answer/9888379`; secrets: `https://developer.android.com/jetpack/androidx/releases/security`, `https://developer.android.com/privacy-and-security/keystore`, `https://developer.android.com/privacy-and-security/risks/hardcoded-cryptographic-secrets`, `https://developer.android.com/identity/data/autobackup`, `https://developer.android.com/studio/publish/app-signing`, `https://docs.cloud.google.com/docs/authentication/api-keys-best-practices`, `https://developers.google.com/maps/documentation/android-sdk/secrets-gradle-plugin`, `https://raw.githubusercontent.com/android/nowinandroid/main/.gitignore`; transport: `https://developer.android.com/privacy-and-security/security-config`
 - Android Studio current release: `https://developer.android.com/studio`
 - AGP 9.4.0 requirements: `https://developer.android.com/build/releases/gradle-plugin`
 - Compose BOM mapping: `https://developer.android.com/develop/ui/compose/bom/bom-mapping`;

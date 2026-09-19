@@ -126,6 +126,90 @@ Apply the detekt Gradle plugin and `./gradlew detekt` joins the check before any
 3 and 5 (loop exits, `use {}` on the error path, `require`/`check` over `assert`) are reviewed,
 not linted.
 
+## Security — where security-discipline lands
+
+`security-discipline`'s rules for this stack, confirmed live 2026-09-19;
+no project has been through this yet, and the first one corrects it. Two phone apps and a
+library between them: the *Every project* tier — rules 1–4, plus the client halves of 5 and 8 —
+exactly as `stack-android-native`'s Security section lays it out for `androidApp/` and
+`stack-ios-native` does for `iosApp/`. This section covers only `shared/` and the seam.
+
+### Static analysis
+
+detekt: none free — its twelve rule sets carry no security rule (the Android skill's Static
+analysis, same read, 2026-09-19); `config/detekt/detekt.yml` above stays as it is. **Android Lint
+runs on the shared module too**, because the KMP Android library target has the same `lint {}`
+block as an app — `KotlinMultiplatformAndroidLibraryTarget.lint`, *"Specifies options for the
+lint tool"* (AGP 9.4 DSL reference, read live 2026-09-19). The line is the Android skill's, inside
+the target block — which is `android {}` on AGP 8.12 and later; the layout table above still says
+`androidLibrary {}`, *"deprecated since AGP 9.1.0-alpha09"* (Google's KMP plugin page, dated
+2026-09-16):
+
+```kotlin
+// shared/build.gradle.kts
+kotlin {
+    android {
+        // namespace, compileSdk, minSdk as the wizard wrote them
+        lint {
+            warningsAsErrors = true   // "Whether lint should treat all warnings as errors" — the Android skill's line, for the shared module
+        }
+    }
+}
+```
+
+What that buys: `commonMain` *"compiles to every target"* (the layout table), the Android one
+included, so the Security checks that read Kotlin — `TrustAllX509TrustManager`,
+`UnsafeDynamicallyLoadedCode`, `WorldReadableFiles` and the rest of the Android skill's list — see
+the shared logic once. Whether a finding in a `commonMain` file is reported under that path was
+not run; the first project records it. Nothing lints the iOS compilation of the same code:
+`iosMain` and the Swift app are `stack-ios-native`'s.
+
+### Dependency audit
+
+The Android skill's: the OWASP dependency-check Gradle plugin, `skills/orc-test/languages/kotlin.md`
+`## Audit`, installed in the **root** `build.gradle.kts` — `id("org.owasp.dependencycheck")
+version "13.0.0"` and `dependencyCheck { formats = listOf("JSON") }`. One thing that section says
+which bites here: a multi-module build — and this stack is always one, `shared/` plus
+`androidApp/` — *"wants `dependencyCheckAggregate`, not wired here"*, so until it is, `/orc-test
+audit` reads the root project's own dependency list, not the modules'. The iOS app's Swift
+packages: `languages/swift.md`, none free (rule 2).
+
+### Secrets
+
+Where each kind lives is the native skill's — the upload key and a Play-facing key in
+`androidApp/` per `stack-android-native`'s Secrets, the signing identity in `iosApp/` per
+`stack-ios-native`. The shared module adds the one case the native skills do not have: **a token
+the common code holds is stored by platform code**, because `commonMain` can reach neither Android
+Keystore nor the Keychain — an `expect fun` in common, one `actual` per side, the migration
+guide's own shape. Android's `actual` is the Android skill's Keystore-encrypted file in the
+no-backup directory. iOS's `actual` has two routes, both confirmed live 2026-09-19: the platform
+API — Kotlin/Native ships a binding for Apple's Security framework (`Security.def` in
+JetBrains/kotlin's `platformLibs/src/platform/ios`, `package = platform.Security`), so
+`SecItemAdd` and `SecItemCopyMatching` are callable from `iosMain` with nothing to install; or
+**`multiplatform-settings` 1.3.0's `KeychainSettings`** — *"writes to the Keychain. Construct it by
+passing a String which will be interpreted as a service name"* — which its README marks
+*"experimental"*. The concern that picks: `KeychainSettings` is a few lines for a string-keyed
+token; the platform API is the answer once when-readable or biometric access control matters.
+**What is not a secret store on either side:** the Storage section's `NSUserDefaultsSettings`
+and `SharedPreferencesSettings`, and DataStore. The README lists what the no-arg module does not
+provide — *"the ability to use an encrypted implementation on platforms that support it"* — and
+the platforms' own words are in the native skills: Auto Backup's *"don't store them in shared
+preferences or a file"* (Android skill), Apple's *"Don't store personal or sensitive information as
+settings"* (`stack-ios-native`, Storage).
+
+`.gitignore`: the Android skill's entries; `shared/` has no secret file of its own. Never in
+either artifact: each side's list, and the Kotlin framework Xcode embeds carries whatever
+`iosMain` compiled in — a literal in `commonMain` ships in both apps (rule 1).
+
+### Reachable by strangers
+
+This stack does not accept connections: n/a — each app carries its native skill's client-side
+line (Android: cleartext off by default since API 28, the system trust store only; iOS:
+`stack-ios-native`'s). The HTTP client the Android skill leaves undecided will live in
+`commonMain` here, so one rule crosses the seam: code in `commonMain` or a platform `actual` that
+turns certificate checking off is a finding on both phones at once (rule 8), and an API key
+belongs on a server, not in the framework or the bundle — the Android skill's API-key paragraph.
+
 ## Presence
 
 Presence is how the app stays visible and reachable when it is not in front — a notification on
@@ -212,6 +296,7 @@ multiplatform library calls on iOS goes in the *app's* `PrivacyInfo.xcprivacy` (
 ## Sources (live on 2026-09-12)
 
 - Lint — where code-discipline lands (2026-09-13): `https://raw.githubusercontent.com/detekt/detekt/main/detekt-core/src/main/resources/default-detekt-config.yml`, `https://kotlinlang.org/docs/gradle-compiler-options.html` (`allWarningsAsErrors`); detekt release from the GitHub releases API
+- Security — where security-discipline lands (2026-09-19): the Android skill's Security sources for detekt, Android Lint and the secrets pages; `https://developer.android.com/reference/tools/gradle-api/9.4/com/android/build/api/dsl/KotlinMultiplatformAndroidLibraryTarget` (`lint`), `https://developer.android.com/kotlin/multiplatform/plugin` (`android {}` vs `androidLibrary {}`); `https://raw.githubusercontent.com/JetBrains/kotlin/master/kotlin-native/platformLibs/src/platform/ios/Security.def` and `https://api.github.com/repos/JetBrains/kotlin/contents/kotlin-native/platformLibs/src/platform/ios`; `https://raw.githubusercontent.com/russhwolf/multiplatform-settings/main/README.md` (`KeychainSettings`), `https://api.github.com/repos/russhwolf/multiplatform-settings/releases/latest`
 - Google's status and library table: `https://developer.android.com/kotlin/multiplatform`; Room 3 releases: `https://developer.android.com/jetpack/androidx/releases/room3`; add to an existing project: `https://developer.android.com/kotlin/multiplatform/migrate`; Room: `https://developer.android.com/kotlin/multiplatform/room`; DataStore: `https://developer.android.com/kotlin/multiplatform/datastore`
 - Migration guide (day-one answer): `https://kotlinlang.org/docs/multiplatform/multiplatform-integrate-in-existing-app.html`
 - Toolchain: `https://kotlinlang.org/docs/multiplatform/multiplatform-compatibility-guide.html`, `https://kotlinlang.org/docs/releases.html`, `https://kotlinlang.org/docs/multiplatform/quickstart.html`, `https://kotlinlang.org/docs/multiplatform/recommended-ides.html`, `https://blog.jetbrains.com/kotlin/2025/02/kotlin-multiplatform-tooling-shifting-gears/` (Fleet)
