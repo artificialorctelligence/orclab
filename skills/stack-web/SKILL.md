@@ -165,6 +165,160 @@ warnings-as-errors switch; `python -W error` in the test command promotes the ru
 `DeprecationWarning`s. Rules 2, 3 and 5 (loop exits, closing on the error path, checks that
 survive release) have no linter — they are reviewed, not linted.
 
+## Security — where security-discipline lands
+
+`security-discipline`'s rules for this stack, confirmed live 2026-09-19; no project has been through this yet, and the first one corrects it. This stack is the *Reachable by strangers* tier by definition — a web app is at a URL — so all nine rules apply, and the four subsections below say where each lands in the two halves.
+
+### Static analysis
+
+**The browser half has no security linter of its own, and the one ESLint has does not fit
+it.** oxlint's rule tree (`oxc_linter/src/rules/`, 16 directories, read live 2026-09-19) has
+no `security` directory; `eslint-plugin-security` 4.0.1 (2026-06-12, Apache-2.0) exists on
+npm, but its fifteen rules are Node-server rules — `detect-child-process`,
+`detect-non-literal-fs-filename`, `detect-non-literal-require`, `detect-new-buffer`,
+`detect-no-csrf-before-method-override` — and `web/` is browser code that has no
+`child_process`, `fs` or `require`. Running ESLint beside oxlint for rules that cannot fire is
+a second linter for nothing, so it does not run here. What the browser half owes is rule 5's
+XSS half — CWE Top 25 #1 — at the point where a value is used: React escapes what it renders,
+and the two ways around that are `dangerouslySetInnerHTML` and a `javascript:` URL. oxlint
+ports both of React's rules (`no_danger.rs`, `jsx_no_script_url.rs`, in the `react` directory
+the template already enables); `no-danger` is in oxlint's `restriction` category and
+`jsx-no-script-url` in `suspicious`, neither on by default (only `correctness` is), so in the
+same `.oxlintrc.json` the Lint section owns:
+
+```json
+"rules": {
+  "react/no-danger": "error",
+  "react/jsx-no-script-url": "error"
+}
+```
+
+`no-danger`: *"`dangerouslySetInnerHTML` is a way to inject HTML into your React component.
+This is dangerous because it can easily lead to XSS vulnerabilities."* `jsx-no-script-url`:
+*"URLs starting with `javascript:` are a dangerous attack surface because it's easy to
+accidentally include unsanitized output in a tag like `<a href>`."* `no-eval`,
+`no-implied-eval` and `no-new-func` are `correctness`, on already. A component that must
+render HTML sanitises it first and suppresses `no-danger` on that one line with the reason —
+`code-discipline`'s named, commented suppression. (Confirmed live 2026-09-19: oxlint 1.83.0 on
+npm, `eslint-plugin-security` on npm and its README, the three `.rs` files and oxlint's
+config page; and run — oxlint 1.83.0 via `npx` on a three-line fixture with the template's
+`.oxlintrc.json` plus the two rules: both fire as errors, and `eval("1")` fires as a
+`no-eval` warning with nothing added, which `--deny-warnings` turns red.)
+
+**The FastAPI half** gets ruff's `S` category — its port of bandit, 71 live rules (73 listed,
+`S320` and `S410` marked removed) — every code `security-discipline` cites among them: rule
+1's `S105`–`S107` hardcoded password, rule 5's `S608` SQL built from strings, `S602`
+`shell=True`, `S301` pickle, `S506` unsafe `yaml.load`, rule 8's `S501` `verify=False`; plus
+the ones only a server trips, `S104` (bind to all interfaces in code) and `S701` (Jinja2 with
+autoescape off). The whole category, so the skill's codes are a subset and cannot drift, in
+the `pyproject.toml` the Lint section's `### The FastAPI back end` owns (ruff 0.16.8,
+2026-09-16; confirmed live 2026-09-19 against its rule index and settings page, and run on
+0.16.8 against a five-line fixture: `S105` fires, `S101` in `tests/` does not, `S403`/`S404`
+fire only when the `ignore` line is removed):
+
+```toml
+[tool.ruff.lint]
+extend-select = ["PLR1702", "PLR0915", "E722", "S"]   # "S" replaces "S110": the whole bandit set
+ignore = ["S4"]                     # the 13 "suspicious import" rules: the call-site rules already cover them
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]               # assert is the test framework's own statement
+```
+
+`S101` (*"Use of `assert` detected"*) stays on for `app/` — assertions *"are removed when
+Python is run with optimization requested"*, `code-discipline` rule 5's reason — and off for
+`tests/`, which pytest builds on `assert`; the rule page has no test exemption of its own.
+`S401`–`S415` flag an `import` rather than a call, are preview rules that the Lint section's
+`preview = true` would switch on, and duplicate the call-site rules, hence the `ignore`.
+`S603` (*"Prone to false positives"*, its own page) and `S607` (partial executable path) are
+the noisy ones a server rarely hits; a hit gets the full path or a per-line `# noqa: S603`
+with the reason. `S102`, `S110`, `S112` are in ruff's default set already. pyright has no
+security rules (its configuration reference, read 2026-09-13). Rules 3, 4, 6's ownership check
+and 9's later routes have no linter — reviewed, not linted.
+
+### Dependency audit
+
+Two languages, two runs, both from `/orc-test audit`: `npm audit --json` on `web/`'s lock file
+— `skills/orc-test/languages/javascript.md`, `## Audit`; npm ships with Node — and pip-audit on
+`pyproject.toml`'s declared dependencies — `languages/python.md`, `## Audit`;
+`pip install pip-audit` (rule 2).
+
+### Secrets
+
+**Server:** every secret — the JWT signing key, a database URL with a password in it, an API
+key for a service the back end calls — is an environment variable, read once through
+`pydantic-settings` 2.15.0 (2026-08-07, MIT, Python ≥ 3.10; confirmed live 2026-09-19 on PyPI
+and FastAPI's settings page). A `Settings(BaseSettings)` class in `app/config.py` with a field
+per secret and `model_config = SettingsConfigDict(env_file=".env")` reads the process
+environment and a local `.env` file, and a `@lru_cache`'d `get_settings()`
+dependency hands it to routes — FastAPI's own page's shape. `.env` is in `.gitignore` before
+it exists. The JWT tutorial's `SECRET_KEY = "09d25e…"` on one line of `main.py` is the exact
+thing ruff's `S105` flags and rule 1 forbids; the scaffold has `secret_key: str` in `Settings`
+instead, populated from `openssl rand -hex 32` — the tutorial's own command, with its warning:
+*"don't use the one in the example"*. **Browser: nothing secret ever in `web/`.** Vite's own
+page: *"`VITE_*` variables should not contain sensitive information such as API keys. The
+values of these variables are bundled into your source code at build time"* — `web/dist` is
+served to everyone who asks, so anything in it is public by construction, and a key the front
+end needs is a route on the back end that holds the key and answers on the user's behalf.
+Vite's `*.local` env files are the local-only kind, and the template's own `_gitignore`
+already carries `*.local` but not `.env`; the repository root's `.gitignore` gets `.env`
+(confirmed live 2026-09-19: `vite.dev/guide/env-and-mode` and the template's `_gitignore`).
+Never in the built artifact: `.env`, `*.local`, and `.git` —
+the deployed unit is `web/dist` plus the Python package, not the repository (rule 1).
+
+### Reachable by strangers
+
+What `/orc-code` scaffolds on day one for this tier, each piece from FastAPI's own pages
+(confirmed live 2026-09-19):
+
+- **Auth (rule 6):** the security tutorial's fourth page, *OAuth2 with Password (and hashing),
+  Bearer with JWT tokens* — `pyjwt` 2.14.0 (2026-09-11) for the token, `pwdlib[argon2]` 0.3.1
+  (2026-08-12) for the password hash, a `/token` route that issues a bearer token, and a
+  `get_current_user` dependency that decodes it and raises `401` (*"Could not validate
+  credentials"*) on anything invalid. **The public/private split:** private routes live on an
+  `APIRouter(dependencies=[Depends(get_current_user)])` — the bigger-applications page: *"All
+  these path operations will have the list of dependencies evaluated/executed before them"* —
+  so a new route on that router is authenticated by being there, and a public route is public
+  by living on the second router, the one with no dependencies — the split is which file the
+  route is in, with nothing to forget. `app.frontend()` serves
+  `web/dist` to anyone; that is the site, not the API. The ownership check inside a handler
+  (the record's owner is the caller) is reviewed, not scaffolded.
+- **Input (rule 5):** FastAPI's door is already the declared schema — a route's parameters and
+  its Pydantic body model are the allow-list, and a request that does not match gets `422`
+  before the handler runs (the handling-errors page: *"When a request contains invalid data,
+  FastAPI internally raises a `RequestValidationError`"*). What the scaffold adds is the rule
+  that every body is a model with typed, bounded fields — no `dict`, no `Any` — and SQLModel
+  queries are parameterised by construction; `S608` catches a string-built one.
+- **Errors (rule 7):** a last-resort handler, `@app.exception_handler(Exception)` (Starlette:
+  *"Both keys `500` and `Exception` can be used"*), that logs the full traceback with a
+  generated id and returns `{"error": "internal error", "id": …}` and nothing else. Two
+  defaults to know: `FastAPI(debug=…)` is `False` by default — *"Boolean indicating if debug
+  tracebacks should be returned on server errors"* — and stays so; and the default `422`
+  body names the field and what was wrong with it (`loc`, `msg`, `type` — the page's
+  example) and nothing about the server, which is what a form needs; override it
+  (`@app.exception_handler(RequestValidationError)`, same page) only if a field name is
+  itself private. The `HTTPException` detail strings the auth layer raises are written for
+  the caller, so they carry nothing.
+- **Transport (rule 8):** the `## Deployment` section already puts a reverse proxy in front
+  holding the certificate — FastAPI's HTTPS page: *"a separate system to handle HTTPS with a
+  TLS Termination Proxy instead of just using the TLS certificates with the application
+  server directly"* — so the redirect from `http://` and the HSTS header are that proxy's
+  configuration, not the app's; the page does not mention HSTS (checked), so it is written
+  into the proxy config the scaffold leaves, per proxy, on the first project. When the app
+  must terminate TLS itself, FastAPI's `HTTPSRedirectMiddleware` (*"Any incoming request to
+  `http` or `ws` will be redirected to the secure scheme"*) and `TrustedHostMiddleware`
+  (`allowed_hosts=[...]`, *"to guard against HTTP Host Header attacks"*) are on its middleware
+  page. The browser side: `fetch` to the same origin over the page's own HTTPS — nothing to
+  configure.
+- **Rate limits (rule 9):** FastAPI has none built in — its features page and its security
+  tutorial name no limiter (read 2026-09-19). `slowapi` 0.1.10
+  (2026-06-13, MIT; confirmed live 2026-09-19 on PyPI and its docs) is the Starlette/FastAPI
+  extension: `limiter = Limiter(key_func=get_remote_address)`, `app.state.limiter = limiter`,
+  `app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)`, then
+  `@limiter.limit("5/minute")` under the route decorator (*"the route decorator must be above
+  the limit decorator"*), on a handler that declares `request: Request` — its README: *"The
+  `request` argument must be explicitly passed to your endpoint, or slowapi won't be able to
+  hook into it."* The scaffold puts it on `/token`; the number is the project's.
+
 ## Presence
 
 Presence is how the app reaches the person when its tab is not in front — or is closed. A web page
@@ -224,6 +378,7 @@ are deliberately parked (v18 spec §6); no default here.
 ## Sources (live on 2026-09-12)
 
 - Lint — where code-discipline lands (2026-09-13): `https://raw.githubusercontent.com/oxc-project/oxc/main/crates/oxc_linter/src/rules/eslint/{max_depth,max_lines_per_function,no_empty}.rs`, `.../apps/oxlint/src/command/lint.rs` (`--deny-warnings`), `https://raw.githubusercontent.com/vitejs/vite/main/packages/create-vite/template-react-ts/_oxlintrc.json`; ESLint defaults `https://raw.githubusercontent.com/eslint/eslint/main/docs/src/rules/{max-depth,max-lines-per-function,no-empty}.md`; `https://docs.astral.sh/ruff/rules/`, `https://docs.astral.sh/ruff/settings/`, `https://raw.githubusercontent.com/microsoft/pyright/main/docs/configuration.md`; versions from `https://pypi.org/pypi/<name>/json`
+- Security — where security-discipline lands (2026-09-19): `https://api.github.com/repos/oxc-project/oxc/contents/crates/oxc_linter/src/rules` (no `security/`), `.../rules/react`, `.../rules/eslint`; `https://raw.githubusercontent.com/oxc-project/oxc/main/crates/oxc_linter/src/rules/react/{no_danger,jsx_no_script_url}.rs`, `.../eslint/no_eval.rs`; `https://oxc.rs/docs/guide/usage/linter/config.html` (categories; `correctness` is the default), `https://oxc.rs/docs/guide/usage/linter/rules/react/no-danger.html`; `https://registry.npmjs.org/eslint-plugin-security`, `https://raw.githubusercontent.com/eslint-community/eslint-plugin-security/main/README.md`, `https://registry.npmjs.org/oxlint`; `https://docs.astral.sh/ruff/rules/` (the flake8-bandit table), `.../rules/assert/`, `.../rules/subprocess-without-shell-equals-true/`, `https://docs.astral.sh/ruff/settings/`; `https://vite.dev/guide/env-and-mode`, `https://raw.githubusercontent.com/vitejs/vite/main/packages/create-vite/template-react-ts/_gitignore`; FastAPI `https://fastapi.tiangolo.com/tutorial/security/`, `/tutorial/security/oauth2-jwt/`, `/tutorial/bigger-applications/`, `/tutorial/handling-errors/`, `/advanced/settings/`, `/advanced/middleware/`, `/deployment/https/`, `/features/`, `/reference/fastapi/` (`debug`); `https://starlette.dev/exceptions/`; `https://slowapi.readthedocs.io/en/latest/`, `https://raw.githubusercontent.com/laurents/slowapi/master/README.md`; versions from `https://pypi.org/pypi/<name>/json` for `ruff`, `pydantic-settings`, `pyjwt`, `pwdlib`, `slowapi`; the fixture runs: ruff 0.16.8 in a scratch venv and `npx oxlint@1.83.0`, on this machine
 - Versions: `https://registry.npmjs.org/<pkg>` for `react`, `vite`, `create-vite`, `vitest`, `next`, `react-router`, `jest`; `https://nodejs.org/dist/index.json`; `https://pypi.org/pypi/<pkg>/json` for `fastapi`, `django`, `uvicorn`, `sqlmodel`, `sqlalchemy`, `pytest`; `https://www.python.org/downloads/`; `https://react.dev/versions`
 - React: `https://react.dev/learn/creating-a-react-app`, `/learn/build-a-react-app-from-scratch`, `/learn` (Quick Start), `/learn/thinking-in-react`
 - Vite: `https://vite.dev/guide/`, `/config/server-options`, `/guide/static-deploy`; template files via `https://api.github.com/repos/vitejs/vite/contents/packages/create-vite/template-react-ts` and `https://raw.githubusercontent.com/vitejs/vite/main/packages/create-vite/template-react-ts/{package.json,_gitignore}`; `https://vitest.dev/guide/`
