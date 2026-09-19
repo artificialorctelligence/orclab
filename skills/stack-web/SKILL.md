@@ -179,11 +179,11 @@ apply, and the four subsections below say where each lands in the two halves.
 linter.** oxlint's rule tree (`oxc_linter/src/rules/`, 16 directories, read live 2026-09-19)
 has no `security` directory. `eslint-plugin-security` 4.0.1 (2026-06-12, Apache-2.0) exists
 on npm with fifteen rules, and its README's own verdict is *"finds a lot of false positives
-which need triage by a human."* Seven of the fifteen are Node-only (`child_process`, `fs`
-filenames, `require`, `Buffer`, Express CSRF middleware, `pseudoRandomBytes`, template-engine
-escaping) and cannot fire on `web/`. Of the eight that could, one is covered:
-`detect-eval-with-expression` is oxlint's `no-eval` (`correctness`, on by default;
-`no-implied-eval` and `no-new-func` beside it). The other seven are **reviewed, not
+which need triage by a human."* Eight of the fifteen are Node-only (`child_process`, `fs`
+filenames, `require`, `new Buffer` and `noAssert`, Express CSRF middleware,
+`pseudoRandomBytes`, template-engine escaping) and cannot fire on `web/`. Of the seven that
+could, one is covered: `detect-eval-with-expression` is oxlint's `no-eval` (`correctness`, on
+by default; `no-implied-eval` and `no-new-func` beside it). The other six are **reviewed, not
 linted**: `detect-unsafe-regex` and `detect-non-literal-regexp` (a regex that runs for ever
 — oxlint's `no-invalid-regexp`, `no-control-regex` and `no-misleading-character-class` check
 a regex's validity, not its run time); `detect-bidi-characters` and
@@ -191,7 +191,7 @@ a regex's validity, not its run time); `detect-bidi-characters` and
 oxlint's `no-irregular-whitespace` is whitespace only); `detect-object-injection`
 (`obj[key]`, which is every ordinary lookup in a React app); `detect-possible-timing-attacks`
 (the browser compares no secret — the password check is the server's, in `pwdlib`). Running
-ESLint for one covered rule and seven the README says need a human is the second linter for
+ESLint for one covered rule and six the README says need a human is the second linter for
 nothing, so it does not run here.
 
 What the browser half owes on its own is rule 5's XSS half — CWE Top 25 #1 — at the point
