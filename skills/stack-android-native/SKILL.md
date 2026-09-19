@@ -112,10 +112,11 @@ not linted.
 
 `security-discipline`'s rules for this stack, confirmed live 2026-09-19;
 no project has been through this yet, and the first one corrects it. A phone app is the
-*Every project* tier — it accepts no connections — so rules 1–4 apply in full and of 5–9 only
-the client halves: what the app does with a value another app handed it (rule 5), and whether
-it checks the certificate of the server it talks to (rule 8). That server carries 5–9 in its
-own stack.
+*Every project* tier — it accepts no connections — so rules 1–4 apply in full, and of 5–9 only
+what a client owes: whether it checks the certificate of the server it talks to (rule 8's own
+client half), and rule 5's *shape* — untrusted input reaching the point where it is used —
+extended here to a value another app handed it over IPC, which the rule's text does not name.
+That server carries 5–9 in its own stack.
 
 ### Static analysis
 
@@ -128,7 +129,8 @@ with the Android Gradle Plugin, and its issue index (googlesamples.github.io's
 android-custom-lint-rules, read live 2026-09-19) has a **Security** category of 87 checks: 62
 built in, 24 from Google's separate `com.android.security.lint:lint` package, one from Slack's.
 Of the 62, 59 are on by default (off: `EasterEgg`, `PermissionNamingConvention`,
-`VulnerableCordovaVersion`); 48 are Warning severity, 11 Error, 3 Fatal. `./gradlew lint` stops
+`VulnerableCordovaVersion`, all three Warning severity); 48 are Warning severity, 11 Error, 3
+Fatal — so 45 Warning-severity checks are on. `./gradlew lint` stops
 the build on an Error or a Fatal — `abortOnError`, *"If set to true (default), stops the build
 if errors are found"* — and only reports a Warning. So one line, in a block the Lint section
 does not open:
@@ -142,7 +144,8 @@ android {
 }
 ```
 
-What the 59 cover, by rule (each check's page read live 2026-09-19):
+What the 59 cover, by rule (the index, and the eleven quoted check pages, read live
+2026-09-19):
 
 - **Rule 1 — narrowly.** `SecretInSource` (AGP 8.3+) sounds general and is not: its detector,
   `SecretDetector.kt`, fires on one thing, an `AIza…` literal passed to the Gemini SDK's
@@ -162,8 +165,9 @@ What the 59 cover, by rule (each check's page read live 2026-09-19):
   `ExportedService` (*"Without this, any application can use this service"*),
   `ExportedReceiver`, `ExportedContentProvider`, `GrantAllUris`. Whether a declared
   `<uses-permission>` is used: reviewed, as the rule says.
-- **Rule 5's client half.** A value from another app arrives as an Intent, a content URI or
-  inside a WebView: `UnsafeIntentLaunch`, `UnsafeImplicitIntentLaunch` (Error),
+- **Rule 5's shape, extended to IPC** — the rule itself covers only input that arrives over
+  the network. A value from another app arrives as an Intent, a content URI or inside a
+  WebView: `UnsafeIntentLaunch`, `UnsafeImplicitIntentLaunch` (Error),
   `UnsanitizedFilenameFromContentProvider`, `SetJavaScriptEnabled`, `AddJavascriptInterface`,
   `JavascriptInterface` (Error).
 - **Rule 8's client half.** `TrustAllX509TrustManager` (*"thus trusting any certificate
@@ -173,8 +177,9 @@ What the 59 cover, by rule (each check's page read live 2026-09-19):
   intercept data sent by your app"*) and `AcceptsUserCertificates` in
   `network_security_config.xml`. `UsingHttp` is the Gradle wrapper's own download URL.
 
-Google's `com.android.security.lint:lint` 1.0.4 (Google Maven, 2025-12-12; Apache; its README:
-*"more security-focused and experimental than the built-in lint checks"*) adds the other 24 with
+Google's `com.android.security.lint:lint` 1.0.4 (Google Maven, 2025-12-12; its README: *"This
+library uses the Apache license, as is Google's default"*, and *"more security-focused and
+experimental than the built-in lint checks"*) adds the other 24 with
 one line — `lintChecks("com.android.security.lint:lint:1.0.4")` in `app/build.gradle.kts`'s
 `dependencies {}`. They are crypto algorithms, PRNGs, logcat leaks, FileProvider paths,
 tapjacking and a cleartext check for apps targeting below 28 — nothing the built-in set and API
@@ -187,7 +192,10 @@ not in the scaffold; a project that wants them adds it. Rule 3's checksum before
 One run, from `/orc-test audit`: the OWASP dependency-check Gradle plugin —
 `skills/orc-test/languages/kotlin.md`, `## Audit`. Installed means, **in the root
 `build.gradle.kts`**, `id("org.owasp.dependencycheck") version "13.0.0"` in `plugins {}` and
-`dependencyCheck { formats = listOf("JSON") }` (rule 2).
+`dependencyCheck { formats = listOf("JSON") }` (rule 2). One thing that section says which
+bites here: a multi-module build *"wants `dependencyCheckAggregate`, not wired here"*, and the
+template is one — root plus `app/`, with every dependency in `app/` — so until it is wired,
+`/orc-test audit` reads the root project's own dependency list, which is empty, not `app/`'s.
 
 ### Secrets
 
@@ -197,7 +205,8 @@ confirmed live 2026-09-19 on developer.android.com unless said otherwise):
 - **The upload key.** `keystore.properties` and the `.jks` it names — the layout table's row.
   The app-signing page (dated 2026-03-06): *"Be sure to keep the `keystore.properties` file
   secure. This may include removing it from your source control system."* `.gitignore` gets
-  `keystore.properties`, `*.jks` and `*.keystore` on day one; the template already ignores
+  `keystore.properties`, `*.jks` and `*.keystore` on day one, and `secrets.properties` the day
+  the Maps-key case below arrives; the template already ignores
   `local.properties` and `build/` (the layout table), and what else Studio's template ignores
   was not checked — Now in Android's `.gitignore`, read live, has no keystore line. Lint's
   `PackagedPrivateKey` is the check that none of it went into the bundle.

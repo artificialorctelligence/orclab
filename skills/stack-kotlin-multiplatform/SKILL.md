@@ -47,7 +47,7 @@ one: it pins AGP to Kotlin's compatibility table (below) for no gain yet.
 |---|---|---|
 | Kotlin, and with it the KMP Gradle plugin `org.jetbrains.kotlin.multiplatform` | **2.4.20** — *"the Kotlin Multiplatform Gradle plugin (same as the Kotlin version in your project)"* | kotlinlang.org compatibility guide; releases page |
 | What 2.4.20 is compatible with | Gradle 7.6.3–9.7.0; **Android Gradle Plugin 8.5.2–9.3.1**; **Xcode 26.4** | compatibility guide's table (confirmed live 2026-09-12) |
-| Android target in the shared module | Google's `com.android.kotlin.multiplatform.library` plugin, `androidLibrary {}` block — the older `androidTarget` name is deprecated since Kotlin 2.3.0 | compatibility guide; the integrate-existing-app tutorial's snippet |
+| Android target in the shared module | Google's `com.android.kotlin.multiplatform.library` plugin, `android {}` block inside `kotlin {}` (2026-09-19: `androidLibrary {}` deprecated since AGP 9.1.0-alpha09, per Google's KMP plugin page) — the older `androidTarget` name is deprecated since Kotlin 2.3.0 | compatibility guide; the integrate-existing-app tutorial's snippet; Google's KMP plugin page |
 | IDE | **Default: Android Studio** — already installed for the Android half, *"another stable solution for Kotlin Multiplatform"*, needs ≥ Otter 2025.2.1 plus the **Kotlin Multiplatform IDE plugin** (iOS run/debug, preflight checks). Alternative: **IntelliJ IDEA** (≥ 2025.2.2), which JetBrains lists first as *"full Kotlin Multiplatform support"* — the concern is *"specific updates may not be released simultaneously"*, so a KMP-tooling feature missing in Studio is the reason to open IDEA. **Fleet is gone**: JetBrains' blog (2025-02) *"will no longer be releasing a standalone IDE for KMP"*. | recommended-IDEs page (dated 2026-01-27); quickstart; JetBrains blog |
 | iOS half | *"To create iOS applications, you need a macOS host with Xcode installed. Your IDE will run Xcode under the hood to build iOS frameworks."* Everything in `stack-ios-native`'s "The Mac requirement" holds; App Store minimum is its Xcode 26. | quickstart (dated 2026-07-21) |
 | Compose Multiplatform (only if UI is shared) | 1.12.0 → Jetpack Compose 1.12.0 on Android; *"always compatible with the latest version of Kotlin"*; release *"usually 1–3 months"* behind Jetpack Compose | compatibility-and-versions page (dated 2026-08-25) |
@@ -69,7 +69,7 @@ shared-module wizard both make KMP's own layout (project-structure page, confirm
 
 | Path | What |
 |---|---|
-| `shared/build.gradle.kts` | Targets (`androidLibrary {}`, `iosArm64()`, `iosSimulatorArm64()`, `iosX64()`), each iOS target's `binaries.framework { baseName = "sharedKit" }` — the framework name Swift imports — and per-source-set dependencies. |
+| `shared/build.gradle.kts` | Targets (`android {}` — 2026-09-19: `androidLibrary {}` deprecated since AGP 9.1.0-alpha09 — `iosArm64()`, `iosSimulatorArm64()`, `iosX64()`), each iOS target's `binaries.framework { baseName = "sharedKit" }` — the framework name Swift imports — and per-source-set dependencies. |
 | `shared/src/commonMain/kotlin/` | The logic. Compiles to every target; *"you can't use the `java.io.File` dependency from the common code"* — the compiler refuses JDK and Android APIs here. Only multiplatform libraries (klibs.io indexes them). |
 | `shared/src/androidMain/kotlin/`, `shared/src/iosMain/kotlin/` | `actual` implementations for `expect` declarations in common code, and anything that must touch a platform API. |
 | `shared/src/commonTest/kotlin/` | Tests of the logic, `kotlin.test` — *"The `commonTest` source set stores all common tests"*; run per target, on the JVM/Android here and Kotlin/Native's own runner for iOS on a Mac. |
@@ -130,7 +130,8 @@ not linted.
 
 `security-discipline`'s rules for this stack, confirmed live 2026-09-19;
 no project has been through this yet, and the first one corrects it. Two phone apps and a
-library between them: the *Every project* tier — rules 1–4, plus the client halves of 5 and 8 —
+library between them: the *Every project* tier — rules 1–4, rule 8's client half, and rule 5's
+shape extended to IPC, which the rule's text does not name —
 exactly as `stack-android-native`'s Security section lays it out for `androidApp/` and
 `stack-ios-native` does for `iosApp/`. This section covers only `shared/` and the seam.
 
@@ -141,8 +142,8 @@ analysis, same read, 2026-09-19); `config/detekt/detekt.yml` above stays as it i
 runs on the shared module too**, because the KMP Android library target has the same `lint {}`
 block as an app — `KotlinMultiplatformAndroidLibraryTarget.lint`, *"Specifies options for the
 lint tool"* (AGP 9.4 DSL reference, read live 2026-09-19). The line is the Android skill's, inside
-the target block — which is `android {}` on AGP 8.12 and later; the layout table above still says
-`androidLibrary {}`, *"deprecated since AGP 9.1.0-alpha09"* (Google's KMP plugin page, dated
+the target block — `android {}` on AGP 8.12 and later, as the tables above now say;
+`androidLibrary {}` is *"deprecated since AGP 9.1.0-alpha09"* (Google's KMP plugin page, dated
 2026-09-16):
 
 ```kotlin
@@ -190,9 +191,9 @@ JetBrains/kotlin's `platformLibs/src/platform/ios`, `package = platform.Security
 passing a String which will be interpreted as a service name"* — which its README marks
 *"experimental"*. The concern that picks: `KeychainSettings` is a few lines for a string-keyed
 token; the platform API is the answer once when-readable or biometric access control matters.
-**What is not a secret store on either side:** the Storage section's `NSUserDefaultsSettings`
-and `SharedPreferencesSettings`, and DataStore. The README lists what the no-arg module does not
-provide — *"the ability to use an encrypted implementation on platforms that support it"* — and
+**What is not a secret store on either side:** the Storage section's two config stores —
+Preferences DataStore, and `multiplatform-settings`, which it says *"wraps `SharedPreferences` on
+Android and `NSUserDefaults` on iOS"*. The README lists what the no-arg module does not provide — *"the ability to use an encrypted implementation on platforms that support it"* — and
 the platforms' own words are in the native skills: Auto Backup's *"don't store them in shared
 preferences or a file"* (Android skill), Apple's *"Don't store personal or sensitive information as
 settings"* (`stack-ios-native`, Storage).
