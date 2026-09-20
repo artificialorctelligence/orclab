@@ -129,6 +129,18 @@ def test_php_without_phpstan_neon_is_not_linted(tmp_path, run):
     assert out.returncode == 0 and out.stderr == ""
 
 
+def test_phpstan_neon_dist_configures_php_when_phpstan_neon_does_not(tmp_path, run):
+    """PHPStan's own lookup order (phpstan.org/config-reference): phpstan.neon, then
+    phpstan.neon.dist, then phpstan.dist.neon - a project shipping only the .dist file must
+    still be linted."""
+    src = project(tmp_path, "phpstan.neon.dist", "parameters:\n  level: max\n")
+    f = src / "a.php"
+    f.write_text("<?php\n")
+    fake_tool(tmp_path / "vendor" / "bin", "phpstan", 1, "Undefined variable: $x")
+    out = run(f)                                   # nothing on PATH; vendor/bin must be used
+    assert out.returncode == 2 and "Undefined variable" in out.stderr
+
+
 def test_eslint_config_is_the_fallback_when_there_is_no_oxlint_config(tmp_path, run):
     src = project(tmp_path, "eslint.config.js", "export default [];\n")
     f = src / "a.tsx"

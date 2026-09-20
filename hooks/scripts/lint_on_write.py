@@ -135,6 +135,11 @@ def command_for(path):
     root = _config_dir(path, config, _ruff_section if ext == ".py" else lambda p: True)
     if root is None and ext == ".py":
         root = _config_dir(path, "ruff.toml")
+    if root is None and ext == ".php":
+        # PHPStan's own config-reference lookup order (phpstan.org/config-reference): phpstan.neon,
+        # then phpstan.neon.dist, then phpstan.dist.neon
+        dirs = (_config_dir(path, name) for name in ("phpstan.neon.dist", "phpstan.dist.neon"))
+        root = next((d for d in dirs if d is not None), None)
     if root is None and ext in (".ts", ".tsx", ".js", ".jsx"):
         config, tool, argv = ESLINT
         root = _config_dir(path, config)

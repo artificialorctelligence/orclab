@@ -185,21 +185,30 @@ parameters:
 `level: max` is PHPStan's own alias for its highest numbered level — *"You can also use `--level
 max` as an alias for the highest level. This will ensure that you will always use the highest
 level when upgrading to new versions of PHPStan"* (`phpstan.org/user-guide/rule-levels`,
-confirmed live 2026-09-20). Its ten levels (0–10) accumulate, and most of what `max` buys is
-rule 5 — a check on what a function did not produce itself: level 0 *"always undefined
-variables"*, level 1 *"possibly undefined variables"*, level 3 *"return types, types assigned to
-properties"*, level 6 *"report missing typehints"*, level 8 *"report calling methods and
-accessing properties on nullable types"*, level 9 *"be strict about explicit `mixed` type"*, and
-level 10, new in PHPStan 2.0, *"be even more strict about the `mixed` type — reports errors even
-for implicit mixed"* (same page). None of the ten levels' descriptions mention nesting depth,
-function length, or an empty `catch` block.
-
-`phpstan/phpstan-strict-rules` (`github.com/phpstan/phpstan-strict-rules` README, confirmed live
-2026-09-20; not in this project's `composer.json`) adds `checkAlwaysTrueInstanceof`,
+confirmed live 2026-09-20). PHP has no compiler warnings of its own — like `stack-web`'s Python
+half, where *"ruff and pyright are the analyzer… both exit non-zero on a finding, and that is the
+warnings-as-errors switch"* — so PHPStan itself is the analyzer, and rule 7's switch is turning
+that analyzer all the way up: `level: max`'s ten levels (0–10) accumulate strictness, from level
+0's *"always undefined variables"* through level 1's *"possibly undefined variables"*, level 3's
+*"return types, types assigned to properties"*, level 6's *"report missing typehints"*, level 8's
+*"report calling methods and accessing properties on nullable types"*, level 9's *"be strict
+about explicit `mixed` type"*, to level 10's, new in PHPStan 2.0, *"be even more strict about the
+`mixed` type — reports errors even for implicit mixed"* (same page) — every one of them a
+build-blocking error at `max`, never an advisory. `phpstan/phpstan-strict-rules`
+(`github.com/phpstan/phpstan-strict-rules` README, confirmed live 2026-09-20; not in this
+project's `composer.json`) turns the same analyzer up further: `checkAlwaysTrueInstanceof`,
 `checkAlwaysTrueCheckTypeFunctionCall` and `checkAlwaysTrueStrictComparison` — *"Always true
-`instanceof`, type-checking `is_*` functions and strict comparisons `===`/`!==`"* — the same
-defect rule 5 warns against, a check that can never be false is not a check. Its rule table has
-nothing for nesting, function length, or an empty `catch` either.
+`instanceof`, type-checking `is_*` functions and strict comparisons `===`/`!==`"* — are more
+findings in the same zero-warnings bucket, not a different rule. None of PHPStan's ten levels or
+`phpstan-strict-rules`' table mention nesting depth, function length, or an empty `catch` block.
+
+Rule 5 (a check on a caller's, a file's or the network's input, written with `raise`/`require`/
+an exception so it survives release) is not what either tool does — PHPStan and
+`phpstan-strict-rules` both check that the code is internally type-consistent, at analysis time,
+not that a value crossing into the program at runtime gets validated. `stack-web`'s own Lint
+section draws the same line for pyright strict, which narrows types the same way PHPStan does and
+is still listed under "reviewed, not linted" rather than credited against rule 5. PHP follows the
+same call here: rule 5 is reviewed, not linted.
 
 Rules 1 (nesting ≤ 2 levels) and 4 (≈60 lines) need a tool this project does not carry yet: PHP
 CodeSniffer's `Generic.Metrics.NestingLevel` (`nestingLevel` warns past its default of 5,
@@ -207,19 +216,24 @@ CodeSniffer's `Generic.Metrics.NestingLevel` (`nestingLevel` warns past its defa
 warns past 10, `absoluteComplexity` errors past 20) —
 `github.com/PHPCSStandards/PHP_CodeSniffer/wiki/Customisable-Sniff-Properties`, confirmed live
 2026-09-20. Neither PHPStan nor `phpstan-strict-rules` measures either one. Rules 2 and 3 (a
-bounded loop, a resource closed on the error path) and rule 6 (never swallow an error) are
-reviewed, not linted — no PHPStan rule level and no `phpstan-strict-rules` entry covers an empty
-`catch`, and adding `phpcs` is future work, not something this stack runs today.
+bounded loop, a resource closed on the error path), rule 5, and rule 6 (never swallow an error)
+are all reviewed, not linted — no PHPStan rule level and no `phpstan-strict-rules` entry covers
+an empty `catch` either, and adding `phpcs` is future work, not something this stack runs today.
 
-Rule 7's switch, in PHP's own form: `declare(strict_types=1);` at the top of every file. Without
-it, a call with a mismatched scalar argument is coerced silently; with it, the same call is a
-`TypeError` — the same "catch it day one, not week three" argument code-discipline rule 7 makes
-for the other stacks' compiler flags, enforced here by the language itself rather than a linter
-option. `phpstan analyse` has no separate warning severity — any finding at all is a non-zero
-exit — so running it at `level: max` is already PHP's zero-warnings gate.
+Rule 7's switch also has a PHP-language form, on top of the analyzer above: `declare(strict_types=1);`
+at the top of every file. PHP's manual states the default plainly — *"By default, PHP will coerce
+values of the wrong type into the expected scalar type declaration if possible"* — against strict
+mode: *"In strict mode, only a value corresponding exactly to the type declaration will be
+accepted, otherwise a `TypeError` will be thrown"*
+(`php.net/manual/en/language.types.declarations.php#language.types.declarations.strict`,
+confirmed live 2026-09-20). A coerced value that silently becomes the "wrong but close enough"
+type is exactly the kind of defect rule 7 wants surfaced on day one rather than found in week
+three; `declare(strict_types=1)` is what turns it into a `TypeError` instead.
 
-`lint_on_write` runs `vendor/bin/phpstan analyse` on every `.php` file Claude writes when
-`phpstan.neon` is present, through the container when the project has one.
+`lint_on_write` looks for `phpstan.neon`, then `phpstan.neon.dist`, then `phpstan.dist.neon` —
+PHPStan's own lookup order — and when one is found, runs the project's own `vendor/bin/phpstan`
+(falling back to `phpstan` on PATH) as `analyse --no-progress --error-format=raw` on every `.php`
+file Claude writes, through the container when the project has one.
 
 ## Containers
 
@@ -312,4 +326,4 @@ same paths on the host.
 - Tool set: `https://docs.phpunit.de/en/13.0/installation.html` (*"PHPUnit 13 requires PHP 8.4"*; `composer require --dev phpunit/phpunit`), `/en/13.0/cli-options.html` (`--coverage-clover <file>`, `--coverage-text`, `--coverage-xml`, `--fail-on-risky`), `/en/13.0/configuration.html` (`bootstrap`, `cacheDirectory`, `<source><include><directory suffix=".php">src</directory>`), `/en/13.0/risky-tests.html` (*"By default, PHPUnit is strict about tests that do not test anything: tests that do not perform assertions"*); `https://infection.github.io/guide/command-line-options.html` (`--logger-text`, `--logger-html`, `--logger-summary-json`, `--logger-github`, `--logger-gitlab`, `--min-msi`, `--coverage`, `--no-progress`, `--static-analysis-tool`; no `--logger-json` — the full JSON log is the `logs.json` config key); `https://phpstan.org/user-guide/getting-started` (`composer require --dev phpstan/phpstan`; `vendor/bin/phpstan analyse src tests`), `https://phpstan.org/user-guide/command-line-usage` (`--level`, `--configuration`, `--error-format`, exit code 0 means no errors), `https://phpstan.org/user-guide/output-format` (`table`, `raw`, `checkstyle`, `json`, `prettyJson`, `junit`, `github`, …), `https://phpstan.org/user-guide/rule-levels` (`--level max` as the alias for the highest level; level 10 is the top today), `https://phpstan.org/config-reference` (`phpstan.neon` lookup order; `parameters: level:` and `paths:`); `https://getcomposer.org/doc/03-cli.md` (`audit`: exit `0` no issues, `1` findings or missing packages; `--format` table/plain/json/summary; `--locked`; `--abandoned`; `--no-dev`), `https://getcomposer.org/doc/06-config.md` (`allow-plugins`: *"Defaults to {} which does not allow any plugins to be loaded"*, and the interactive prompt); `https://raw.githubusercontent.com/phpstan/phpstan-phpunit/2.0.x/README.md` and `https://raw.githubusercontent.com/phpstan/phpstan-strict-rules/2.0.x/README.md` (neither has an assertion-free-test rule; PHPUnit's own risky-test check is that rule); Packagist searches `https://packagist.org/search.json?q=phpunit%20assertion%20rule` and `?q=test%20without%20assertion` (nothing relevant)
 - The live run (2026-09-20, `## Build, run, test` and `## Containers`): `https://raw.githubusercontent.com/docker-library/docs/master/php/README.md` again, its "PHP Core Extensions" example (`apt-get install -y … && docker-php-ext-install -j$(nproc) gd`) and "How to install more PHP extensions"; `https://raw.githubusercontent.com/docker-library/docs/master/composer/README.md` (the bare `COPY --from=composer` line under multi-stage builds); `https://getcomposer.org/doc/00-intro.md` (*"For decompressing files, Composer relies on tools like 7z (or 7zz), gzip, tar, unrar, unzip and xz"*); `https://getcomposer.org/doc/03-cli.md` (`audit`: `0 No issues; 1 Found packages matching dependency policies or failed due to missing required packages`; `--locked`: *"Audit packages from the lock file, regardless of what is currently in vendor dir"*; `--no-blocking`: *"Disables all policy based dependency blocking during this command"*; `--no-security-blocking` deprecated for it); `https://getcomposer.org/doc/06-config.md` (`policy.advisories.block`, the successor of `audit.block-insecure`: *"Defaults to true. If true, any package versions affected by security advisories will be blocked and cannot be used during a composer update/require/delete commands, unless the security advisories are ignored"*); `https://infection.github.io/guide/command-line-options.html` again (`--with-uncovered`: *"Allow mutation of code not covered by tests"*; `--only-covered`: *"This option was removed in Infection 0.31.0, use --with-uncovered instead"*); `https://www.php.net/manual/en/features.commandline.webserver.php` again (`-t` for the document root; Example #2 `php -S localhost:8000 -t foo/`); `https://packagist.org/api/security-advisories/?packages[]=guzzlehttp/guzzle` (fifteen advisories, fourteen covering 7.4.0); this machine's `/etc/containers/registries.conf.d/shortnames.conf` and `registries.conf` (a `php` alias, no `composer` alias, no `unqualified-search-registries`) and `apt-cache madison php` (noble's own 2:8.3, the PPA's 2:8.4, `php8.5-cli` 8.5.10 installed from the PPA)
 - Versions: `https://repo.packagist.org/p2/<vendor>/<name>.json` and `https://packagist.org/packages/<vendor>/<name>.json` for `phpunit/phpunit` 13.3.4 (2026-09-15, PHP ≥ 8.4.1), `infection/infection` 0.35.4 (2026-09-02, PHP ^8.3; requires the `infection/extension-installer` Composer plugin), `phpstan/phpstan` 2.2.14 (2026-09-12), `slim/slim` 4.15.3, `slim/psr7` 1.8.0, `zircote/swagger-php` 6.9.0, `laravel/framework` v13.32.0, `laravel/laravel` v13.10.1, `dedoc/scramble` v0.13.45, `symfony/framework-bundle` v8.1.7 (2026-09-14, PHP ≥ 8.4.1), `api-platform/core` v5.0.0, `phpstan/phpstan-strict-rules` 2.0.12, `phpstan/phpstan-phpunit` 2.0.18, `composer/composer` 2.10.3 (2026-08-27)
-- Lint (Task 4, `## Lint`): `https://phpstan.org/user-guide/rule-levels` again, this time for each level's own wording (level 0 *"always undefined variables"*, level 1 *"possibly undefined variables"*, level 3 *"return types, types assigned to properties"*, level 6 *"report missing typehints"*, level 8 *"report calling methods and accessing properties on nullable types"*, level 9 *"be strict about explicit `mixed` type"*, level 10 *"be even more strict about the `mixed` type — reports errors even for implicit mixed"*) and the `--level max` alias sentence; `https://github.com/phpstan/phpstan-strict-rules` README's rule table (`checkAlwaysTrueInstanceof`, `checkAlwaysTrueCheckTypeFunctionCall`, `checkAlwaysTrueStrictComparison`, and the rest — no empty-`catch` or nesting/length rule among them); `https://github.com/PHPCSStandards/PHP_CodeSniffer/wiki/Customisable-Sniff-Properties` (`Generic.Metrics.NestingLevel`: `nestingLevel` default 5, `absoluteNestingLevel` default 10; `Generic.Metrics.CyclomaticComplexity`: `complexity` default 10, `absoluteComplexity` default 20)
+- Lint (Task 4, `## Lint`): `https://phpstan.org/user-guide/rule-levels` again, this time for each level's own wording (level 0 *"always undefined variables"*, level 1 *"possibly undefined variables"*, level 3 *"return types, types assigned to properties"*, level 6 *"report missing typehints"*, level 8 *"report calling methods and accessing properties on nullable types"*, level 9 *"be strict about explicit `mixed` type"*, level 10 *"be even more strict about the `mixed` type — reports errors even for implicit mixed"*) and the `--level max` alias sentence; `https://github.com/phpstan/phpstan-strict-rules` README's rule table (`checkAlwaysTrueInstanceof`, `checkAlwaysTrueCheckTypeFunctionCall`, `checkAlwaysTrueStrictComparison`, and the rest — no empty-`catch` or nesting/length rule among them); `https://github.com/PHPCSStandards/PHP_CodeSniffer/wiki/Customisable-Sniff-Properties` (`Generic.Metrics.NestingLevel`: `nestingLevel` default 5, `absoluteNestingLevel` default 10; `Generic.Metrics.CyclomaticComplexity`: `complexity` default 10, `absoluteComplexity` default 20); `https://phpstan.org/config-reference` again, its automatic config-file lookup order (`phpstan.neon`, then `phpstan.neon.dist`, then `phpstan.dist.neon`); `https://www.php.net/manual/en/language.types.declarations.php#language.types.declarations.strict` (coercive mode: *"By default, PHP will coerce values of the wrong type into the expected scalar type declaration if possible"*; strict mode: *"In strict mode, only a value corresponding exactly to the type declaration will be accepted, otherwise a `TypeError` will be thrown"*)
