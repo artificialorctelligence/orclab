@@ -150,6 +150,176 @@ rules: {
 `"error"`, and `eslint --max-warnings 0` for the CLI; typescript-eslint 8.70.0's
 `strictTypeChecked` config is the type-level equivalent. Rules 2, 3 and 5 are reviewed, not linted.
 
+## Security — where security-discipline lands
+
+`security-discipline`'s rules for this stack, confirmed live 2026-09-19;
+no project has been through this yet, and the first one corrects it. A React Native app is an
+Android app and an iOS app with JavaScript in the middle, so it is the *Every project* tier —
+rules 1–4, rule 8's client half, and rule 5's shape extended to a URL another app handed it,
+which the rule's text does not name — and each platform half is the native skill's:
+`stack-android-native`'s Security section for what prebuild writes into `android/` (the
+keystore, cleartext, the system trust store), `stack-ios-native`'s for `ios/` (the signing
+identity, App Transport Security). Here those directories are generated, so the platform
+settings arrive through `app.json`, and this section says which keys. It covers only what the
+JavaScript layer adds: its linter, npm's audit, the module that wraps both platforms' secure
+stores, and where a key must not go.
+
+### Static analysis
+
+**The plugin question is `stack-web`'s, already answered, and RN's own config does not change
+it.** `eslint-plugin-security` 4.0.1 (2026-06-12, Apache-2.0; npm, read live 2026-09-19) is
+fifteen rules, categorised in `stack-web`'s Security section against its README: eight Node-only,
+one covered by an `eval` rule, six *"reviewed, not linted"* because the README's own verdict is
+that it *"finds a lot of false positives which need triage by a human."* Neither config a React
+Native project lints with depends on it — `eslint-config-expo` 57.0.2 (the template's, via
+`npx expo lint`) pulls in `expo`, `react`, `react-hooks` and `import`; `@react-native/eslint-config`
+0.87.1 (a bare project's) pulls in `react`, `react-hooks`, `react-native`, `jest`, `ft-flow`,
+`eslint-comments` and typescript-eslint (both `package.json`s on npm, read live 2026-09-19). What
+does change from `stack-web` is that this stack already runs ESLint, so the plugin is not a
+second linter here: it *can* run beside either config as one `require` and one array entry
+(its README's flat-config form, `pluginSecurity.configs.recommended`). It still does not,
+because the six that could fire are the six that need a human, and the eight Node-only ones
+would fire on `app.config.js` and `metro.config.js`, which the ESLint guide says *"are run in a
+Node.js environment"*; a project that wants the hotspot list adds that one entry.
+
+What the JavaScript layer owes on its own is what the browser half of `stack-web` owes — rule 5
+at the point where a value is used — plus `eval`, and none of it is on in the template's config:
+`eslint-config-expo/flat` spreads `pluginReact.configs.recommended.rules` (`utils/react.js` on
+`sdk-57`, read live), and eslint-plugin-react's README marks `no-danger` and `jsx-no-script-url`
+as in no preset — only `no-danger-with-children` is recommended; its `utils/core.js` sets
+`eqeqeq`, `no-undef` and the like and no `eval` rule. So five entries go in the same `rules: {}`
+object the Lint section opens — the generated file *"extends configuration from
+`eslint-config-expo`"*, and every example in the ESLint guide (read live 2026-09-19) is a
+`defineConfig([...])` holding `eslint-config-expo/flat` and a `dist/*` ignore, so the object
+below is one more element of that array, written once with the Lint section's three plus these:
+
+```js
+// eslint.config.js
+const { defineConfig } = require('eslint/config');
+const expoConfig = require('eslint-config-expo/flat');
+
+module.exports = defineConfig([
+  expoConfig,
+  { ignores: ['dist/*'] },
+  {
+    rules: {
+      "max-depth": ["error", 2],                                         // default 4
+      "max-lines-per-function": ["error", { max: 60, skipBlankLines: true, skipComments: true }],  // default 50
+      "no-empty": ["error", { allowEmptyCatch: false }],                 // a commented catch still passes
+      "react/no-danger": "error",                                        // dangerouslySetInnerHTML — the web half
+      "react/jsx-no-script-url": "error",                                // javascript: in an href — the web half
+      "no-eval": "error",                                                // eslint-plugin-security's one covered rule, as ESLint core
+      "no-implied-eval": "error",                                        // setTimeout("…")
+      "no-new-func": "error",                                            // new Function("…")
+    },
+  },
+]);
+```
+
+`react/no-danger`: *"Dangerous properties in React are those whose behavior is known to be a
+common source of application vulnerabilities"* — a `<View>` has no `dangerouslySetInnerHTML`,
+but `react-native-web`'s DOM and any `.web.tsx` file do, and the rule reads the JSX. `no-eval`:
+*"Using `eval()` on untrusted code can open a program up to several different injection
+attacks"*; `no-implied-eval` is the string form of `setTimeout` and `setInterval`; `no-new-func`
+the `Function` constructor (eslint's rule docs on `main`, read live 2026-09-19). None of the five
+has been run against this template; the first project does, and records it. A web component
+that must render HTML sanitises it first and suppresses `no-danger` on that one line with the
+reason — `code-discipline`'s named, commented suppression; HTML handed to a WebView
+(`react-native-webview`'s `source.html`, `injectedJavaScript`) is the same rule with no linter
+reading it — reviewed. Rules 1, 3, 4, 5's shape and 8's client half
+are otherwise **reviewed, not linted** in JavaScript: no ESLint rule reads `app.json`, and the
+platform checks — Android Lint on `android/`, ATS on `ios/` — run on generated directories that
+are not in the repo, so they run on the build service or after a local prebuild, never on write.
+
+### Dependency audit
+
+One run, from `/orc-test audit`: `npm audit --json` on `package-lock.json` —
+`skills/orc-test/languages/javascript.md`, `## Audit`; npm ships with Node, nothing to install
+(rule 2). It reads the lock file and nothing under it: the Gradle and CocoaPods dependencies a
+native module brings into the generated `android/` and `ios/` are not npm packages, so they are
+not in the report — the Android skill's dependency-check plugin would have to be wired into a
+generated directory, which no project has done; Swift packages and pods are none free
+(`languages/swift.md`).
+
+### Secrets
+
+Three kinds of secret, three places, none of them a `.ts` file or `app.json` (rule 1; each
+claim confirmed live 2026-09-19 against the page named):
+
+- **The upload key and the signing identity.** On the `### Building without a Mac` default they
+  are EAS's: *"Where needed, they will be stored on EAS servers"* (managed credentials, quoted
+  there), so nothing is on disk here. The local alternative — the store table's row — is a
+  keystore under `android/app/` with its passwords in `gradle.properties`, or EAS's
+  `credentials.json` naming both; `.gitignore` gets `credentials.json`. The template's own
+  `gitignore` (`expo-template-default` on `sdk-57`, read live) already ignores `*.jks`, `*.p8`,
+  `*.p12`, `*.key`, `*.mobileprovision`, `*.pem`, `.env*.local` and the whole of `/android` and
+  `/ios` — so a keystore left inside a generated directory is out of the repo by the directory's
+  rule, and `credentials.json` and `.env` are the two lines it lacks.
+- **A token the app holds for its user** (a session, a refresh token): **`expo-secure-store`**
+  (57.0.4 on npm, MIT; SDK 57's page — `npx expo install expo-secure-store`; Android, iOS, tvOS),
+  the module that wraps both platforms' stores, each the native skill's answer: on iOS *"values
+  are stored using the keychain services as `kSecClassGenericPassword`"*, with *"the additional
+  option of being able to set the value's `kSecAttrAccessible` attribute"* (`AFTER_FIRST_UNLOCK`
+  and its `_THIS_DEVICE_ONLY` form are the page's own recommendations — the choice the iOS skill
+  says to make on purpose); on Android *"values are stored in
+  `SharedPreferences`, encrypted with Android's Keystore system"*. Three things its page makes
+  the project know: *"Large payloads can be rejected by the underlying platform. Historically,
+  some iOS releases refused values above roughly 2048 bytes"* — a token, not a document; on iOS
+  the value *"will persist across app uninstallations when the app is reinstalled with the same
+  bundle ID"*; and Android Auto Backup *"has to be configured to exclude `expo-secure-store`
+  shared preferences entries, as it's impossible to decrypt them after restoring the backup"* —
+  the Android skill's no-backup reasoning, arriving as an unreadable restore — which its config
+  plugin does for you (*"If your app doesn't have any custom backup configuration,
+  `expo-secure-store` will automatically configure the Auto Backup system to ignore the
+  `expo-secure-store` data"*; a project with its own backup rules excludes `SecureStore` under
+  `sharedpref` and sets `configureAndroidBackup` to `false`). reactnative.dev's security page
+  names it (*"Some libraries to consider:
+  expo-secure-store, react-native-keychain"*) and says what the Storage section's stores are
+  not: Async Storage is *"an asynchronous, unencrypted, key-value store"*, and its *"Don't"*
+  column is *"Token storage, Secrets"* — `expo-sqlite/kv-store` is its drop-in (the Storage
+  section), and nothing on its page says encrypted.
+- **An API key for a service the app calls.** reactnative.dev: *"Never store sensitive API keys
+  in your app code. Anything included in your code could be accessed in plain text by anyone
+  inspecting the app bundle"*, and the fix in its words: *"build an orchestration layer between
+  your app and the resource ... which can forward the request with the required API key or
+  secret."* That layer is the *Reachable by strangers* tier of whatever stack it is in — the
+  Android skill's API-key paragraph, same answer. Expo's environment variables do not change
+  it: *"Do not store sensitive info, such as private keys, in `EXPO_PUBLIC_` variables. These
+  variables will be visible in plain-text in your compiled application"* — they are for a
+  staging URL, and EAS Build inlines them from the `.env` files uploaded with the job. `extra`
+  in `app.json` is *"accessible via `Constants.expoConfig.extra`"* — read by the app, so in the
+  app.
+
+Never in the built artifact: a keystore, `credentials.json`, a `.p8` or `.p12`, `.env`, `.git`
+— and any `EXPO_PUBLIC_` value, which is there by construction. Nothing lints the bundle; the
+first project lists it once (`unzip -l android/app/build/outputs/bundle/release/app-release.aab`
+after a local build, or the EAS artifact) and records the answer here.
+
+### Reachable by strangers
+
+This stack does not accept connections: n/a — a phone app has no route to authenticate, no
+error to sanitise and no rate to limit; the service it talks to carries rules 5–9 in its own
+stack. What still applies is rule 8's client half, per platform as the native skills say it,
+reached here through `app.json` because `android/` and `ios/` are generated: on Android
+cleartext is off by default since API 28 (`stack-android-native`), and the `app.json` key that
+turns it back on is `expo-build-properties`' `android.usesCleartextTraffic` — *"For Android 9
+and above, the default platform-specific value is `false`"* (its SDK page, read live
+2026-09-19) — so that key set to `true` is a finding, as is any config plugin that writes a
+`network_security_config.xml`; on iOS App Transport Security refuses plain HTTP at runtime
+(`stack-ios-native`), and a loosening lands as an `NSAppTransportSecurity` dictionary under
+`ios.infoPlist` — *"No other validation is performed, so use this at your own risk of rejection
+from the App Store"* (the app config reference) — so every loosening key there is the iOS
+skill's finding, in `app.json` instead of Xcode. reactnative.dev's own line:
+*"Your APIs should always use SSL encryption"*; pinning (*"embedding (or pinning) a list of
+trusted certificates to the client"*) tightens and is never a finding, with its page's own
+warning that a pinned certificate expires with the server's. Rule 5's shape, the one input a
+phone app takes from a stranger, in the page's words: *"Deep links are not secure and you should
+never send any sensitive information in them"* — *"there is no centralized method of registering
+URL schemes"*, so a URL that arrives through Expo Router or `Linking` is validated, matched
+against the app's few paths and otherwise refused, the native skills' line; an OAuth redirect
+needs PKCE for the same reason (the page's `react-native-app-auth`). And the API-key paragraph:
+the bundle is not a secret store.
+
 ## Presence
 
 Presence is how the app stays visible and reachable when it is not in front: on a phone a
@@ -213,6 +383,7 @@ native project — so each check runs on the generated file, after `npx expo pre
 
 ## Sources (live on 2026-09-12)
 
+- Security — where security-discipline lands (2026-09-19): `https://registry.npmjs.org/eslint-plugin-security` (+ `/latest`), its README `https://raw.githubusercontent.com/eslint-community/eslint-plugin-security/main/README.md`, and `stack-web`'s Security section for the fifteen-rule categorisation; `https://registry.npmjs.org/eslint-config-expo/latest`, `https://registry.npmjs.org/@react-native/eslint-config/latest`; `eslint-config-expo`'s flat config on `sdk-57`: `https://raw.githubusercontent.com/expo/expo/sdk-57/packages/eslint-config-expo/flat/{default.js,utils/core.js,utils/react.js}`; eslint-plugin-react's rule table `https://raw.githubusercontent.com/jsx-eslint/eslint-plugin-react/master/README.md` and `.../docs/rules/no-danger.md`; `https://raw.githubusercontent.com/eslint/eslint/main/docs/src/rules/{no-eval,no-implied-eval,no-new-func}.md`; `https://docs.expo.dev/guides/using-eslint.md` (the generated file, Node-environment files); audit: `skills/orc-test/languages/javascript.md`; `expo-secure-store`: `https://docs.expo.dev/versions/latest/sdk/securestore.md`, `https://registry.npmjs.org/expo-secure-store/latest`; `https://reactnative.dev/docs/security` (API keys, Async Storage, SSL, deep links, PKCE); `https://docs.expo.dev/guides/environment-variables.md` (`EXPO_PUBLIC_`); `https://docs.expo.dev/versions/latest/config/app.md` (`ios.infoPlist`, `extra`); `https://docs.expo.dev/versions/latest/sdk/build-properties.md` (`usesCleartextTraffic`); the template's `https://raw.githubusercontent.com/expo/expo/sdk-57/templates/expo-template-default/gitignore`; the platform halves and Google's API-key page: `stack-android-native`'s and `stack-ios-native`'s Security sections and their sources
 - Lint — where code-discipline lands (2026-09-13): `https://raw.githubusercontent.com/eslint/eslint/main/docs/src/rules/{max-depth,max-lines-per-function,no-empty}.md`; versions from `https://registry.npmjs.org/<name>/latest`
 - Versions: `https://registry.npmjs.org/<pkg>` for `react-native`, `expo`, `react-native-web`, `react-native-windows`, `react-native-macos`, `expo-notifications`, `expo-sqlite`, `expo-router`, `jest-expo`, `@react-native-async-storage/async-storage`; `https://nodejs.org/dist/index.json`; `https://raw.githubusercontent.com/expo/expo/sdk-57/packages/expo/bundledNativeModules.json`
 - React Native: `https://reactnative.dev/` (front page), `/docs/environment-setup`, `/docs/getting-started-without-a-framework`, `/docs/intro-react-native-components`, `/docs/platform-specific-code`, `/docs/out-of-tree-platforms`, `/blog` (0.87 2026-08-11, 0.82 2025-10-08, 0.80 2025-06-12), `/blog/2026/08/11/react-native-0.87`, `/blog/2025/01/21/version-0.77` (16 KB); `https://raw.githubusercontent.com/facebook/react-native/0.86-stable/packages/react-native/gradle/libs.versions.toml` (and `0.87-stable`)

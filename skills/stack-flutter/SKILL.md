@@ -236,6 +236,137 @@ analyzer:
 `flutter analyze --fatal-infos` in the check before any build fails on anything at all. Rules
 2, 3 and 5 (`assert` is *"ignored"* in production — throw an `ArgumentError`) are reviewed.
 
+## Security — where security-discipline lands
+
+`security-discipline`'s rules for this stack, confirmed live 2026-09-19;
+no project has been through this yet, and the first one corrects it. A Flutter app is an
+Android app and an iOS app with Dart in the middle, so it is the *Every project* tier — rules
+1–4, rule 8's client half, and rule 5's shape extended to a URL another app handed it, which the
+rule's text does not name — and each platform half is the native skill's: `stack-android-native`'s
+Security section for `android/` (the keystore, cleartext, the system trust store),
+`stack-ios-native`'s for `ios/` (the signing identity, App Transport Security). This section
+covers only what the Dart layer adds: its linter, its package manager's audit, the plugin that
+wraps both platforms' secure stores, and where a key must not go.
+
+### Static analysis
+
+**None free.** dart.dev's rule index for Dart 3.13.3 (read live 2026-09-19) has three rules
+whose name or description carries "secur", "unsafe" or "http": `secure_pubspec_urls` (*"Use
+secure urls in `pubspec.yaml`. Use `https` instead of `http` or `git:`."* — in `package:lints`'
+`core` set, so `flutter_lints` already has it on; the nearest thing to a rule here is 3's shape,
+a dependency fetched over a channel that gives no integrity, which the rule's text does not
+name); `unsafe_html` (*"This lint is deprecated and will be removed in a future release"* —
+`dart:html` APIs, not on and not to be added); and `unsafe_variance` (*"Has a type variable in
+a non-covariant position"* — type soundness, not security). Nothing for a credential in a
+Dart file, a certificate check turned off, a query built from a string or a download run
+unchecked. So `analysis_options.yaml` stays exactly as the Lint section left it — no block to
+add — and rules 1, 3, 4, 5's shape and 8's client half are **reviewed, not linted** in Dart:
+
+- **Rule 8's client half** has one signature in Dart. `dart:io`'s
+  `HttpClient.badCertificateCallback` — *"a callback that will decide whether to accept a secure
+  connection with a server certificate that cannot be authenticated by any of our trusted root
+  certificates"*; *"If the value of badCertificateCallback is `null`, the bad certificate is
+  rejected"* (api.dart.dev, read live 2026-09-19). A callback that returns `true` is the
+  finding; pinning through the same callback tightens and is not. The check is Orclab's own,
+  before any release build: `grep -rn badCertificateCallback lib/` prints nothing, or only a
+  pinning callback with the reason on the line. The platform side of the same rule — a
+  `network_security_config.xml` or an `NSAppTransportSecurity` exception under `android/` or
+  `ios/` — is the native skills' check, and `flutter create` writes neither: the template's
+  main `AndroidManifest.xml.tmpl` names no `networkSecurityConfig`, its `res/` has no `xml/`,
+  and its `Info.plist.tmpl` has no `NSAppTransportSecurity` key (all on `stable`, read live
+  2026-09-19).
+- **Rules 1, 3, 4, 5's shape:** a token typed into a Dart file (rule 1 — no linter, and the
+  `### Secrets` subsection says where it goes instead); a download run without a check (rule 3
+  — on the phones also Play's and Apple's own rules, quoted in the native skills); a
+  `<uses-permission>` or `NS*UsageDescription` the code does not use (rule 4 — the store table
+  says where each is declared; `flutter create` declares none in the main manifest or the
+  `Info.plist` — `INTERNET` is in the debug manifest only, *"required for development"*); and a
+  URL that arrived from
+  another app, read in Dart from whatever deep-link plugin the project chose (rule 5's shape —
+  validate the few paths the app defines, refuse the rest, the native skills' line). The
+  Android skill's linter, Android Lint, reads `android/`, which in the template is one
+  `MainActivity.kt`; whether Flutter's Gradle project runs `./gradlew lint` unchanged was not
+  run here — the first project records it.
+
+### Dependency audit
+
+One run, from `/orc-test audit`: `flutter pub outdated --json` reads pub.dev's security
+advisories — `skills/orc-test/languages/dart.md`, `## Audit`; pub ships with the SDK, nothing to
+install (rule 2). What it reads is the Dart package graph and nothing under it: a plugin's own
+Gradle or CocoaPods/SwiftPM dependencies are not pub packages, so they are not in the report.
+The Android skill's dependency-check plugin would have to be wired into `android/` to cover
+those, which no project has done; Swift packages are none free (`languages/swift.md`).
+
+### Secrets
+
+Three kinds of secret, three places, none of them a Dart file (rule 1; each claim confirmed live
+2026-09-19 against the page named):
+
+- **The upload key.** `android/key.properties` and the `.jks` it names — the layout table's
+  row. Flutter's Android deployment page: *"Keep the `key.properties` file private; don't check
+  it into public source control."* The template already does it: `flutter create` writes an
+  `android/.gitignore` (`android.tmpl/.gitignore` on `stable`, read live) with `key.properties`,
+  `**/*.keystore` and `**/*.jks` under the comment *"Remember to never publicly share your
+  keystore"* — nothing to add for Android. The iOS signing identity and the App Store Connect
+  `.p8` never touch this machine on the `### Building without a Mac` path — Codemagic's Team
+  settings hold them — and `stack-ios-native`'s Secrets says the rest.
+- **A token the app holds for its user** (a session, a refresh token): **`flutter_secure_storage`
+  11.2.0** (published 2026-09-16, BSD-3-Clause; Android, iOS, macOS, Linux, Windows, web — pub.dev,
+  read live 2026-09-19), the one plugin that wraps both platforms' stores, each the native skill's
+  answer: *"Uses Keychain for iOS/macOS"* (with an `accessibility` option — `unlocked` is the
+  default, `first_unlock` for a background fetch — the same choice `stack-ios-native` says to make
+  on purpose), and on Android an encrypted value in SharedPreferences whose key is *"RSA OAEP (key
+  cipher) + AES-GCM (storage cipher)"* by default, or an AES key that *"stores the key directly in
+  Android KeyStore"* through `AndroidOptions.biometric(...)`; *"The deprecated Jetpack Security
+  library's `encryptedSharedPreferences` is no longer recommended"*, the same retirement the
+  Android skill records. *"Minimum Android SDK is now 23"* — under this stack's `minSdk` 24. Two
+  things its README makes the project do: on Android, Auto Backup *"can cause exception
+  `java.security.InvalidKeyException: Failed to unwrap key`"*, so either `android:allowBackup="false"`
+  in `android/app/src/main/AndroidManifest.xml` (its snippet) or exclude its shared preferences
+  from the backup rules — the Android skill's no-backup reasoning, arriving as a crash instead of
+  a policy; and on web, where it is *"an experimental implementation using WebCrypto"* over
+  LocalStorage, it *"only works on HTTPS or localhost environments"*. Linux goes through
+  libsecret to the Freedesktop Secret Service (or the Secret Portal in a Flatpak/Snap). Not
+  `shared_preferences` — the Storage section's config store is `NSUserDefaults` and
+  SharedPreferences in the clear.
+- **An API key for a service the app calls.** The `.aab` and the `.ipa` are public — anyone who
+  installs the app can unpack it — so a key in either is a key everyone has, and Flutter's own
+  obfuscation page says it in its words: *"It is a poor security practice to store secrets in an
+  app"*, and `--obfuscate` *"does not encrypt resources nor does it protect against reverse
+  engineering. It only renames symbols"*. `--dart-define` and `--dart-define-from-file` do not
+  change that: their values are *"available as constants from the String.fromEnvironment,
+  bool.fromEnvironment, and int.fromEnvironment constructors"* (`flutter_command.dart` on
+  `stable`), and dart.dev's environment-declarations page says they are *"accessed and evaluated
+  at compile time"* — a constant compiled into the program is in the program. They are for a
+  staging URL, not a secret. The key lives on a server the app calls, which is the *Reachable by
+  strangers* tier of whatever stack it is in — the Android skill's API-key paragraph, with
+  Google's *"The client should pass requests to the server, which can add the credential and
+  issue the request"*; the one exception it names, a Maps key, is that skill's to handle in
+  `android/`.
+
+`.gitignore`: the template's `android/.gitignore` covers the keystore; the root `.gitignore.tmpl`
+(read live 2026-09-19) ignores `build/`, `.dart_tool/` and the symbol and obfuscation maps, and
+does not mention `.env` — add `.env` the day `--dart-define-from-file` is used, and `*.p12`,
+`*.p8` the day an iOS key is exported on a Mac.
+Never in the built artifact: `key.properties`, a `.jks`, a `.p12`, a `.p8`, `.env`, `.git` —
+and any value that went through `--dart-define`, which is there by construction. Nothing lints
+the bundle; the first project lists it once (`unzip -l
+build/app/outputs/bundle/release/app-release.aab`) and records the answer here.
+
+### Reachable by strangers
+
+This stack does not accept connections: n/a — a phone app has no route to authenticate, no
+error to sanitise and no rate to limit; the service it talks to carries rules 5–9 in its own
+stack. What still applies is rule 8's client half, per platform as the native skills say it:
+on Android cleartext is off by default since API 28 and the system store is the only trust
+anchor, so a `network_security_config.xml` that loosens either is a finding
+(`stack-android-native`); on iOS App Transport Security refuses plain HTTP at runtime and every
+`NSAppTransportSecurity` loosening key in `ios/Runner/Info.plist` is a finding
+(`stack-ios-native`). The Dart layer adds the one loosening the platforms cannot see —
+`badCertificateCallback` returning `true`, above — and the API-key paragraph: the bundle is not a
+secret store. Rule 5's shape, a URL another app handed the app, is the native skills' rule read
+from Dart: validate, match the app's few paths, refuse the rest.
+
 ## Presence
 
 Presence is how the app stays visible and reachable when it is not in front. On a phone that is
@@ -407,6 +538,7 @@ that is `stack-unity`'s or `stack-godot`'s concern.
 
 ## Sources (live on 2026-09-11; facets and no-Mac builds 2026-09-12)
 
+- Security — where security-discipline lands (2026-09-19): the rule index `https://dart.dev/tools/linter-rules` and `https://dart.dev/tools/linter-rules/all`, `https://dart.dev/tools/linter-rules/secure_pubspec_urls`, `https://dart.dev/tools/linter-rules/unsafe_html`, `https://dart.dev/tools/linter-rules/unsafe_variance`, `https://raw.githubusercontent.com/dart-lang/core/main/pkgs/lints/lib/core.yaml` (`secure_pubspec_urls` in `core`); `https://api.dart.dev/dart-io/HttpClient/badCertificateCallback.html`; audit: `skills/orc-test/languages/dart.md`; `flutter_secure_storage`: `https://pub.dev/packages/flutter_secure_storage`, `https://pub.dev/api/packages/flutter_secure_storage` (version and date), README at `https://raw.githubusercontent.com/juliansteenbakker/flutter_secure_storage/develop/flutter_secure_storage/README.md`; keystore: `https://docs.flutter.dev/deployment/android`, the template's `https://raw.githubusercontent.com/flutter/flutter/stable/packages/flutter_tools/templates/app/android.tmpl/.gitignore` and `.../templates/app/.gitignore.tmpl`; the template's manifests and plist: `.../templates/app/android.tmpl/app/src/main/AndroidManifest.xml.tmpl`, `.../app/src/debug/AndroidManifest.xml.tmpl`, `.../app/src/main/res` (directory listing via the GitHub contents API), `.../templates/app/ios.tmpl/Runner/Info.plist.tmpl`; defines: `https://raw.githubusercontent.com/flutter/flutter/stable/packages/flutter_tools/lib/src/runner/flutter_command.dart` (`--dart-define`, `--dart-define-from-file` help text), `https://dart.dev/guides/environment-declarations`; obfuscation: `https://docs.flutter.dev/deployment/obfuscate`; the platform halves and Google's API-key page: `stack-android-native`'s and `stack-ios-native`'s Security sections and their sources
 - Lint — where code-discipline lands (2026-09-13): `https://dart.dev/tools/linter-rules/empty_catches`, `https://dart.dev/tools/linter-rules/all` (no nesting/length rule), `https://raw.githubusercontent.com/dart-lang/core/main/pkgs/lints/lib/core.yaml`, `https://dart.dev/tools/analysis`, `https://raw.githubusercontent.com/flutter/flutter/stable/packages/flutter_tools/lib/src/commands/analyze.dart` (`--fatal-infos`), `https://dart.dev/language/error-handling`
 - Current release and Dart version: `https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json`
 - Android defaults: `https://raw.githubusercontent.com/flutter/flutter/stable/packages/flutter_tools/gradle/src/main/kotlin/FlutterExtension.kt`
