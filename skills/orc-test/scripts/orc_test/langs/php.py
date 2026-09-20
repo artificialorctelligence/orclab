@@ -71,6 +71,15 @@ def mutation_unavailable(root, target=None):
         return "Infection not installed — composer require --dev infection/infection"
     if not any((pathlib.Path(root) / n).exists() for n in ("infection.json5", "infection.json")):
         return "no infection.json5 — vendor/bin/infection writes one on first interactive run"
+    p = pathlib.Path(root) / "infection.json5"
+    if p.is_file():
+        try:
+            data = _json5_load(p.read_text())
+        except ValueError:
+            return None
+        if not data.get("logs", {}).get("json"):
+            return ('infection.json5 has no logs.json — add "logs": '
+                     '{"json": ".orclab/test/php/infection.json"}')
     return None
 
 

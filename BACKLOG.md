@@ -3711,6 +3711,9 @@ dependencies); `composer.json` goes on #6's list.
 `/orc-test` (`skills/orc-test/scripts/orc_test/langs/php.py`, four captured fixtures), a `.php`
 row in `lint_on_write`, and PHP on the Defaults Table's web row — each proven against a real,
 uncommitted sample project (`v24check`) run live inside a Podman container, not assumed.
+`php8.5-cli` was already on the host from the Surý PPA since 2026-09-19 (not by v24); Composer
+and every PHP tool were not, and all of them ran through the container — the premise "nothing
+PHP on the host" in the plan was narrower in truth than in wording.
 
 **The framework:** Slim 4 (`slim/slim` 4.15.3, `slim/psr7` 1.8.0, `zircote/swagger-php` 6.9.0) —
 "the easiest option that meets all three of spec §2's constraints on a first-party page: Slim's

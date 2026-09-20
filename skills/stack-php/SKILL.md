@@ -37,6 +37,10 @@ Every version here is what the tool itself printed inside the image on 2026-09-2
 | PHPStan (static analysis) | **2.2.14** | `composer require --dev phpstan/phpstan` |
 | PCOV (coverage driver) | **1.0.12** | `RUN pecl install pcov-1.0.12 && docker-php-ext-enable pcov` in the `Dockerfile` |
 
+The install lines are each package's documented `composer require`; the sample's `composer.json`
+was written by hand and installed with one `composer install`, so the `require` form itself was
+not run here.
+
 The project's own version lives in `composer.json`'s `version` key. `/orc-version` does not edit
 `composer.json` yet — `versionfiles.py`'s `KNOWN_FORMATS` has no entry for it (BACKLOG #6, where
 `composer.json` was added on 2026-09-20) — so bump it by hand until it does.
@@ -146,7 +150,8 @@ public_html or www)"* — and Composer's PSR-4 autoloading.
 | `vendor/` | Git-ignored; written by `composer install`, and where every tool's executable lives (`vendor/bin/…`). |
 | `openapi.yaml` | **The contract** — see below. |
 
-**The contract.** `vendor/bin/openapi src -o openapi.yaml` reads the attributes on the classes in
+**The contract.** `vendor/bin/openapi src -o openapi.yaml` (the `-o` form is swagger-php's
+documented one; the run here printed to stdout) reads the attributes on the classes in
 `src/` — `#[OA\Get(path: '/greet')]`, its `#[OA\Parameter]`s, its `#[OA\Response]` — and writes
 one file that describes every route the API has: its path, what it takes, what it answers with.
 That file is what another project's client is written against. A phone app that calls this API

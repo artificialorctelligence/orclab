@@ -39,7 +39,9 @@ Infection 0.35.4: `vendor/bin/infection --no-interaction --no-progress --threads
 --with-uncovered [--filter=<target>]`. Config is `infection.json5` at the project root (or
 wherever the marker directory is); `mutation_unavailable` requires `infection/infection` in
 `composer.json`'s `require-dev` and an `infection.json5`/`infection.json` present — Infection
-writes the former on its own first interactive run.
+writes the former on its own first interactive run. Since `mutation_cmd` passes no logger flag
+(Infection has none), `mutation_unavailable` also refuses an `infection.json5` with no `logs.json`
+key — without it a full run would end in `Mutation(0, 0)` with no way to find the real log.
 
 **Infection has no `--logger-json` option.** Its command-line-options page (read 2026-09-20)
 lists `--logger-text`, `--logger-html`, `--logger-summary-json` (stats only), `--logger-github`,

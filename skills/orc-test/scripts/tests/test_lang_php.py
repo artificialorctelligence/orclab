@@ -13,7 +13,7 @@ def test_markers_and_source_ext():
     assert php.SOURCE_EXT == ".php"
 
 
-def test_missing_wants_composer_and_phpunit(tmp_path, monkeypatch):
+def test_missing_wants_composer(tmp_path, monkeypatch):
     (tmp_path / "composer.json").write_text('{"require-dev": {"phpunit/phpunit": "^12"}}')
     monkeypatch.setattr(probe, "which", lambda n: False)
     assert php.missing(tmp_path) == ["composer"]
@@ -47,7 +47,20 @@ def test_mutation_needs_infection_in_require_dev(tmp_path):
     (tmp_path / "composer.json").write_text('{"require-dev": {}}')
     assert "infection/infection" in php.mutation_unavailable(tmp_path)
     (tmp_path / "composer.json").write_text('{"require-dev": {"infection/infection": "^0.30"}}')
-    (tmp_path / "infection.json5").write_text("{}")
+    (tmp_path / "infection.json5").write_text(json.dumps({"logs": {"json": "out/infection.json"}}))
+    assert php.mutation_unavailable(tmp_path) is None
+
+
+def test_mutation_needs_logs_json_key(tmp_path):
+    # infection.json5 exists and infection/infection is required, but the config has no
+    # logs.json key: mutation_cmd passes no logger flag (Infection has none), so a full run
+    # would end in Mutation(0, 0) and cli.py would blame "produced no mutants" instead of the
+    # real cause — this must be caught before the run, not diagnosed after it.
+    (tmp_path / "composer.json").write_text('{"require-dev": {"infection/infection": "^0.30"}}')
+    (tmp_path / "infection.json5").write_text(json.dumps({"source": {"directories": ["src"]}}))
+    reason = php.mutation_unavailable(tmp_path)
+    assert reason is not None and "logs.json" in reason
+    (tmp_path / "infection.json5").write_text(json.dumps({"logs": {"json": "x.json"}}))
     assert php.mutation_unavailable(tmp_path) is None
 
 
