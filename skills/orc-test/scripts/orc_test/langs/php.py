@@ -25,7 +25,7 @@ TOOLS = {"composer": "https://getcomposer.org/download/ — or run inside the st
 CAVEATS = [("vendor/bin/phpunit, infection and phpstan are the project's own require-dev packages;"
             " `composer install` once, and again when composer.json changes."),
            "Infection needs a coverage driver (pcov or xdebug) loaded in the PHP that runs it."]
-SANDBOX = {".phpunit.cache", "vendor"}
+SANDBOX = {".phpunit.cache", "vendor"}   # PHPUnit's own cache and composer's installed packages, not mutation output
 
 AUDIT_TOOL = ("composer", "https://getcomposer.org/download/")
 _UNREADABLE = ["audit output not understood — see above"]
@@ -94,13 +94,33 @@ def _json5_load(text):
 
 def _infection_log_path(root, out):
     """Where Infection wrote its JSON log: infection.json5's logs.json key, resolved relative to
-    root, or <out>/infection.json when the file or the key is absent."""
+    root, or <out>/infection.json when the file is absent, the key is absent, or the file is
+    real JSON5 (trailing commas, block comments) beyond the //-line-comment fallback above —
+    never raise on a config file this module cannot fully read."""
     p = pathlib.Path(root) / "infection.json5"
     if p.is_file():
-        log = _json5_load(p.read_text()).get("logs", {}).get("json")
+        try:
+            log = _json5_load(p.read_text()).get("logs", {}).get("json")
+        except ValueError:
+            log = None
         if log:
             return pathlib.Path(root) / log
     return pathlib.Path(out) / "infection.json"
+
+
+def _survivor(root, entry, uncovered):
+    # `escaped` and `uncovered` entries share the same mutator/diff shape (infection.json.README).
+    # --with-uncovered counts an uncovered mutant in the denominator (mutation_cmd), so it has to
+    # be reported as a survivor too, or `generate` never learns the file is untested — the same
+    # "alive but no test reaches it" case stryker.py/pitest.py tag the same way.
+    m = entry["mutator"]
+    file = m["originalFilePath"]
+    try:
+        file = str(pathlib.Path(file).relative_to(root))
+    except ValueError:
+        pass
+    desc = m["mutatorName"] + (" (no test reaches it)" if uncovered else "")
+    return Survivor(file, m["originalStartLine"], desc)
 
 
 def mutation_parse(root, out):
@@ -110,15 +130,8 @@ def mutation_parse(root, out):
     data = json.loads(p.read_text())
     s = data["stats"]
     killed = s["killedCount"] + s["timeOutCount"] + s["errorCount"]
-    survivors = []
-    for e in data.get("escaped", []):
-        m = e["mutator"]
-        file = m["originalFilePath"]
-        try:
-            file = str(pathlib.Path(file).relative_to(root))
-        except ValueError:
-            pass
-        survivors.append(Survivor(file, m["originalStartLine"], m["mutatorName"]))
+    survivors = [_survivor(root, e, False) for e in data.get("escaped", [])]
+    survivors += [_survivor(root, e, True) for e in data.get("uncovered", [])]
     return Mutation(killed, s["totalMutantsCount"], survivors)
 
 

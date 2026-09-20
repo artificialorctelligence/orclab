@@ -76,9 +76,29 @@ def test_mutation_parse_reads_infection_log_named_by_json5(tmp_path):
     mut = php.mutation_parse(tmp_path, out)
     assert mut.total == data["stats"]["totalMutantsCount"]
     assert mut.killed == data["stats"]["killedCount"] + data["stats"]["timeOutCount"] + data["stats"]["errorCount"]
-    assert len(mut.survivors) == len(data["escaped"]) >= 1
+    # escaped + uncovered: --with-uncovered counts both as alive (see the dedicated test below)
+    assert len(mut.survivors) == len(data["escaped"]) + len(data["uncovered"]) >= 1
     s = mut.survivors[0]
     assert s.file.endswith(".php") and s.line > 0 and s.description
+
+
+def test_mutation_parse_survivors_include_uncovered_mutants(tmp_path):
+    # --with-uncovered counts an uncovered mutant in the denominator too (mutation_cmd), so a
+    # survivor list built from `escaped` alone would never tell `generate` that GreetAction.php
+    # is untested. The log's `uncovered` array shares `escaped`'s mutator/diff shape
+    # (infection.json.README); the siblings (stryker.py, pitest.py) both list these and tag them
+    # " (no test reaches it)".
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / "infection.json").write_bytes((FIX / "infection.json").read_bytes())
+    data = json.loads((FIX / "infection.json").read_text())
+    mut = php.mutation_parse(tmp_path, out)
+    assert len(mut.survivors) == len(data["escaped"]) + len(data["uncovered"]) == 9
+    tagged = [s for s in mut.survivors if "no test reaches it" in s.description]
+    assert tagged and any(s.file.endswith("GreetAction.php") for s in tagged)
+    # the one escaped (covered but not killed) mutant is not tagged uncovered
+    untagged = [s for s in mut.survivors if "no test reaches it" not in s.description]
+    assert untagged and untagged[0].file.endswith("Greeting.php")
 
 
 def test_mutation_parse_tolerates_json5_comments(tmp_path):
@@ -89,6 +109,17 @@ def test_mutation_parse_tolerates_json5_comments(tmp_path):
     (out / "infection.json").write_bytes((FIX / "infection.json").read_bytes())
     (tmp_path / "infection.json5").write_text(
         '{\n  // where the full log lands\n  "logs": {"json": "out/infection.json"}\n}')
+    mut = php.mutation_parse(tmp_path, out)
+    assert mut.total == 10
+
+
+def test_mutation_parse_falls_back_on_json5_it_cannot_read(tmp_path):
+    # Real JSON5 (trailing commas, block comments) is beyond the //-line-comment fallback;
+    # mutation_parse must degrade to <out>/infection.json, never raise.
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / "infection.json").write_bytes((FIX / "infection.json").read_bytes())
+    (tmp_path / "infection.json5").write_text('{\n  "logs": {"json": "out/infection.json",},\n}')
     mut = php.mutation_parse(tmp_path, out)
     assert mut.total == 10
 

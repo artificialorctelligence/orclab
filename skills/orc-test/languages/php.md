@@ -46,9 +46,11 @@ lists `--logger-text`, `--logger-html`, `--logger-summary-json` (stats only), `-
 `--logger-gitlab` — nothing that names an arbitrary path for the full log. The full log's path
 is instead `infection.json5`'s own `logs.json` key (`.orclab/test/php/infection.json` in the
 sample); `mutation_parse` reads that key — resolved relative to the project root — and falls
-back to `<out>/infection.json` when the file or the key is absent. `infection.json5` is JSON5
-(comments and trailing commas are legal there); the sample's is plain JSON, so `json.loads` with
-a fallback that strips `//`-comment lines is enough, without a JSON5 dependency.
+back to `<out>/infection.json` when the file is absent, the key is absent, or the file is real
+JSON5 (comments and trailing commas are legal there) beyond what a `//`-comment-stripping
+fallback can parse: `_infection_log_path` never lets a config file it cannot fully read raise
+out of `mutation_parse` — a hand-edited `infection.json5` with a trailing comma degrades to the
+`<out>/infection.json` fallback rather than crashing `analyze`.
 
 **`--with-uncovered` is deliberate, not optional.** Since Infection 0.31 the default mutates
 covered code only (*"`--only-covered` … was removed in Infection 0.31.0, use `--with-uncovered`
@@ -60,9 +62,14 @@ other language's.
 
 `mutation_parse` reads the log's `stats` block (`totalMutantsCount`, `killedCount`,
 `timeOutCount`, `errorCount` — the last two count as killed, matching how a timeout or a harness
-error is read elsewhere) and the `escaped` list for survivors: each entry's `mutator.
-originalFilePath` (absolute, made root-relative the same way Clover's `file name=` is),
-`mutator.originalStartLine`, and `mutator.mutatorName` as the description.
+error is read elsewhere) and **both** the `escaped` and the `uncovered` lists for survivors —
+`--with-uncovered` counts an uncovered mutant in the denominator too, so a survivor list built
+from `escaped` alone would never tell `/orc-test generate` that a whole file is untested; the
+same "alive but no test reaches it" case `stryker.py`/`pitest.py` already list and tag for their
+own tools. Each entry's `mutator.originalFilePath` (absolute, made root-relative the same way
+Clover's `file name=` is) and `mutator.originalStartLine` become the survivor's file and line;
+the description is `mutator.mutatorName`, with `" (no test reaches it)"` appended for an
+`uncovered` entry so the two cases read differently in the report.
 
 ## Test lint
 No tool. PHPStan (2.2.14, `vendor/bin/phpstan analyse`) has no rule that reports an
