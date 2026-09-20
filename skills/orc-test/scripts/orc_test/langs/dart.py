@@ -4,7 +4,6 @@ import json
 import pathlib
 import re
 import shlex
-import shutil
 import xml.etree.ElementTree as ET
 
 from .. import lcov, probe
@@ -40,7 +39,7 @@ def _tool(root):
 
 def audit_unavailable(root):
     tool = _tool(root)
-    return None if shutil.which(tool) else f"{tool} not installed"
+    return None if probe.which(tool) else f"{tool} not installed"
 
 
 def audit_cmd(root):

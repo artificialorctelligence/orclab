@@ -3,6 +3,7 @@ container (v23), a command through the same chokepoint the tools run through —
 means missing where it matters, not on the developer's machine."""
 
 import importlib.util
+import shlex
 import shutil
 
 from . import runner
@@ -11,7 +12,7 @@ from . import runner
 def which(tool):
     if runner.active() is None:
         return shutil.which(tool) is not None
-    return runner.run(["sh", "-c", f"command -v {tool}"], cwd=runner.active().root).returncode == 0
+    return runner.run(["sh", "-c", f"command -v {shlex.quote(tool)}"], cwd=runner.active().root).returncode == 0
 
 
 def python_module(name):

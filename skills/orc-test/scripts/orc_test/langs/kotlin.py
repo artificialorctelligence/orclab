@@ -1,7 +1,6 @@
 """Kotlin: Gradle + JUnit 5, Kover (JaCoCo-format XML), Pitest with or without Arcmutate."""
 
 import pathlib
-import shutil
 
 from .. import jacoco, licence, pitest, probe
 from ..detect import SKIP_DIRS
@@ -100,7 +99,7 @@ def mutation_parse(root, out):
 
 
 def lint(root, target, out):
-    if shutil.which("detekt") is None:
+    if not probe.which("detekt"):
         return "detekt not installed — https://detekt.dev/docs/gettingstarted/cli"
     tests = pathlib.Path(root) / (target or "src/test")
     report = pathlib.Path(out) / "detekt.xml"

@@ -84,9 +84,9 @@ def test_audit_tool_and_command(tmp_path, monkeypatch):
     assert dart.audit_cmd(tmp_path) == ["dart", "pub", "outdated", "--json"]
     (tmp_path / "pubspec.yaml").write_text("name: x\ndependencies:\n  flutter:\n    sdk: flutter\n")
     assert dart.audit_cmd(tmp_path) == ["flutter", "pub", "outdated", "--json"]
-    monkeypatch.setattr(dart.shutil, "which", lambda tool: None)
+    monkeypatch.setattr(probe, "which", lambda tool: False)
     assert "flutter" in dart.audit_unavailable(tmp_path)
-    monkeypatch.setattr(dart.shutil, "which", lambda tool: "/opt/flutter")
+    monkeypatch.setattr(probe, "which", lambda tool: True)
     assert dart.audit_unavailable(tmp_path) is None
 
 

@@ -2,7 +2,6 @@
 
 import json
 import pathlib
-import shutil
 
 from .. import jacoco, pitest, probe
 from ..model import Coverage, Finding, Mutation
@@ -179,7 +178,7 @@ def _test_dir(target):
 
 
 def lint(root, target, out):
-    if shutil.which("pmd") is None:
+    if not probe.which("pmd"):
         return "PMD not installed — https://pmd.github.io (`pmd check` with the unit-test rules)"
     tests = pathlib.Path(root) / _test_dir(target)
     cp = run(["pmd", "check", "-d", str(tests), "-f", "json", "--no-progress", "-R",

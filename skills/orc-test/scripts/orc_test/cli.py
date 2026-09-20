@@ -58,7 +58,7 @@ def _resolve(args):
         for m, _d in found:
             print(f"{m.LABEL}: container runner not found — install docker or podman — skipped")
         return root, cfg, []
-    if c:
+    if c and found:
         cp = runner.run_on_host(container.build_cmd(c), cwd=root)   # the engine itself is a host command
         if cp.returncode != 0:
             print(cp.stdout[-3000:])
@@ -215,7 +215,7 @@ def _dirty(root, sandbox):
     lines are never a defect signature here — a mutation tool's own scratch files it never
     committed are not "the suite writing to the real tree" (test-discipline rule 4; BACKLOG #34)."""
     cp = runner.run_on_host(["git", "status", "--porcelain"], cwd=root)   # git is the host's, container or not
-    paths =(ln[3:] for ln in cp.stdout.splitlines() if not ln.startswith("??"))
+    paths = (ln[3:] for ln in cp.stdout.splitlines() if not ln.startswith("??"))
     return {p for p in paths if not sandbox & set(pathlib.PurePath(p).parts)}
 
 

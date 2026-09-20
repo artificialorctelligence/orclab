@@ -2,7 +2,6 @@
 
 import json
 import pathlib
-import shutil
 
 from .. import lcov, probe, stryker
 from ..model import Finding, Mutation
@@ -23,7 +22,7 @@ _UNREADABLE = ["audit output not understood — see above"]
 
 
 def audit_unavailable(root):
-    return None if shutil.which("npm") else "npm not installed"
+    return None if probe.which("npm") else "npm not installed"
 
 
 def audit_cmd(root):

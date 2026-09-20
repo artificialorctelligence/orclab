@@ -8,7 +8,6 @@ a mutants/ at the directory pytest runs from.
 """
 
 import ast
-import importlib.util
 import json
 import os
 import pathlib
@@ -49,7 +48,7 @@ def audit_nothing(root):
 
 
 def audit_unavailable(root):
-    return None if importlib.util.find_spec("pip_audit") else "pip-audit not installed"
+    return None if probe.python_module("pip_audit") else "pip-audit not installed"
 
 
 def audit_cmd(root):
@@ -138,7 +137,7 @@ def coverage_parse(root, out):
 
 
 def mutation_unavailable(root, target=None):
-    if importlib.util.find_spec("mutmut") is None:
+    if not probe.python_module("mutmut"):
         return "mutmut not installed — pip install mutmut"
     if _mutmut_config(root, target) is None:
         where = pathlib.Path(root) / (target or ".")

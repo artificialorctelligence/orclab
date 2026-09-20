@@ -1,3 +1,4 @@
+from orc_test import probe
 from orc_test.langs import gdscript as gd
 
 
@@ -24,9 +25,9 @@ def test_no_gdunit4_is_a_missing_tool(tmp_path, monkeypatch):
 
 
 def test_mutation_needs_gdmutant(tmp_path, monkeypatch):
-    monkeypatch.setattr(gd.shutil, "which", lambda n: None)
+    monkeypatch.setattr(probe, "which", lambda n: False)
     assert "pip install 'gdmutant==0.1.*'" in gd.mutation_unavailable(tmp_path)
-    monkeypatch.setattr(gd.shutil, "which", lambda n: "/usr/bin/gdmutant")
+    monkeypatch.setattr(probe, "which", lambda n: True)
     assert gd.mutation_unavailable(tmp_path) is None
 
 
@@ -77,7 +78,7 @@ def test_coverage_parse_no_report(tmp_path):
 def test_gdlint_parse(tmp_path, monkeypatch):
     out = "test/test_player.gd:12: Error: Function name 'testJump' is not valid (function-name)\n"
     monkeypatch.setattr(gd, "run", lambda cmd, cwd: type("R", (), {"stdout": out, "returncode": 1})())
-    monkeypatch.setattr(gd.shutil, "which", lambda n: "/usr/bin/gdlint")
+    monkeypatch.setattr(probe, "which", lambda n: True)
     assert [(f.file, f.line) for f in gd.lint(tmp_path, None, tmp_path)] == [("test/test_player.gd", 12)]
 
 

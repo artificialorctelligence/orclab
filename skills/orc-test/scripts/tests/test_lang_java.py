@@ -51,7 +51,7 @@ def test_lint_maps_main_target_to_test_dir(tmp_path, monkeypatch):
         return SimpleNamespace(stdout='{"files": []}', returncode=0)
 
     monkeypatch.setattr(java, "run", fake_run)
-    monkeypatch.setattr(java.shutil, "which", lambda tool: "/usr/bin/pmd")
+    monkeypatch.setattr(probe, "which", lambda tool: True)
 
     java.lint(tmp_path, "src/main/java/com/x", tmp_path)
 
@@ -67,7 +67,7 @@ def test_lint_other_target_used_as_given(tmp_path, monkeypatch):
         return SimpleNamespace(stdout='{"files": []}', returncode=0)
 
     monkeypatch.setattr(java, "run", fake_run)
-    monkeypatch.setattr(java.shutil, "which", lambda tool: "/usr/bin/pmd")
+    monkeypatch.setattr(probe, "which", lambda tool: True)
 
     java.lint(tmp_path, "src/test/java/com/x", tmp_path)
 

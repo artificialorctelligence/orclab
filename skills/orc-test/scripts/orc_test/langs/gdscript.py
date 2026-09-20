@@ -3,9 +3,8 @@
 import os
 import pathlib
 import re
-import shutil
 
-from .. import lcov, stryker
+from .. import lcov, probe, stryker
 from ..model import Coverage, Finding, Mutation
 from ..runner import run
 
@@ -64,7 +63,7 @@ def coverage_parse(root, out):
 
 
 def mutation_unavailable(root, target=None):
-    if shutil.which("gdmutant") is None:
+    if not probe.which("gdmutant"):
         return "gdmutant not installed — pip install 'gdmutant==0.1.*'"
     return None
 
@@ -87,7 +86,7 @@ def mutation_parse(root, out):
 
 
 def lint(root, target, out):
-    if shutil.which("gdlint") is None:
+    if not probe.which("gdlint"):
         return "gdlint not installed — pip install gdtoolkit"
     cp = run(["gdlint", target or "test"], cwd=root)
     return [Finding(m["file"], int(m["line"]), m["msg"]) for m in _GDLINT.finditer(cp.stdout)]

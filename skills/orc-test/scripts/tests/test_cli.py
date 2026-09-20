@@ -122,9 +122,23 @@ def test_detect_says_in_container_and_probes_inside(tmp_path, capsys, monkeypatc
 def test_runner_missing_skips_the_language_and_never_runs_on_the_host(tmp_path, capsys, monkeypatch):
     repo = make_repo(tmp_path)
     (repo / "compose.yaml").write_text("services:\n  orclab:\n    build: .\n")
-    monkeypatch.setattr(cli.container.shutil, "which", lambda n: None)
+    (repo / ".orclab").mkdir()
+    (repo / ".orclab" / "test.yaml").write_text("runner: podman\n")
+    git_only = repo / "gitonly"          # a PATH with git and nothing else: podman is absent whatever this host has
+    git_only.mkdir()
+    (git_only / "git").symlink_to(cli.shutil.which("git"))
+    monkeypatch.setenv("PATH", str(git_only))
     code, out = run(["run"], repo, capsys)
     assert code == 0 and "Python: container runner not found — install docker or podman — skipped" in out
+    assert "$ python3 -m pytest" not in out
+
+
+def test_tool_missing_inside_the_container_is_skipped_never_the_host(tmp_path, capsys, monkeypatch):
+    repo = make_repo(tmp_path)
+    (repo / "compose.yaml").write_text("services:\n  orclab:\n    build: .\n")
+    _fake_docker(repo, monkeypatch, '#!/bin/sh\ncase "$*" in\n  "compose build"*) exit 0 ;;\n  *) exit 1 ;;\nesac\n')
+    code, out = run(["run"], repo, capsys)
+    assert code == 0 and "Python: missing pytest — pip install pytest — skipped" in out
     assert "$ python3 -m pytest" not in out
 
 

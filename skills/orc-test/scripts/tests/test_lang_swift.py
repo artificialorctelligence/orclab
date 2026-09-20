@@ -1,7 +1,7 @@
 import json
 import pathlib
 
-from orc_test import detect
+from orc_test import detect, probe
 from orc_test.langs import swift
 from orc_test.model import Coverage, Mutation
 
@@ -84,7 +84,7 @@ def test_xcodeproj_marker_matches_nested_bundle(tmp_path):
 
 
 def test_lint_filters_by_path_component(tmp_path, monkeypatch):
-    monkeypatch.setattr(swift.shutil, "which", lambda name: "/usr/bin/swiftlint")
+    monkeypatch.setattr(probe, "which", lambda name: True)
     findings = [
         {"file": "/x/Tests/AppTests.swift", "line": 5, "rule_id": "force_cast", "reason": "avoid force casts"},
         {"file": "/x/Sources/App/Clamp.swift", "line": 10, "rule_id": "force_cast", "reason": "avoid force casts"},

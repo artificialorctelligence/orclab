@@ -2,6 +2,7 @@ import json
 import pathlib
 from unittest.mock import patch
 
+from orc_test import probe
 from orc_test.langs import javascript as js
 from orc_test.model import Finding, Mutation
 
@@ -123,7 +124,7 @@ def test_audit_findings_skips_stderr_prefix():
 
 
 def test_audit_unavailable_names_npm(monkeypatch):
-    monkeypatch.setattr(js.shutil, "which", lambda tool: None)
+    monkeypatch.setattr(probe, "which", lambda tool: False)
     assert "npm" in js.audit_unavailable("/x")
-    monkeypatch.setattr(js.shutil, "which", lambda tool: "/usr/bin/npm")
+    monkeypatch.setattr(probe, "which", lambda tool: True)
     assert js.audit_unavailable("/x") is None
