@@ -156,11 +156,12 @@ def test_build_failure_is_exit_one_with_the_output(tmp_path, capsys, monkeypatch
 
 
 def test_build_failure_logged_by_podman_compose_1_0_6_is_still_a_failure(tmp_path, capsys, monkeypatch):
-    # podman-compose 1.0.6 (Mint's apt) prints podman's status as "exit code: N" and exits 0
-    # itself; seen live 2026-09-20 with FROM no-such-image:0 — the tests ran in the stale image
+    # podman-compose 1.0.6 (Mint's apt) logs podman's status as "exit code: N" on stderr and
+    # exits 0 itself; seen live 2026-09-20 with FROM no-such-image:0 — the tests ran in the stale
+    # image. The fake logs it on stderr too: build_failed sees it only because run_on_host merges
     repo = make_repo(tmp_path)
     (repo / "compose.yaml").write_text("services:\n  orclab:\n    build: .\n")
-    _fake_docker(repo, monkeypatch, '#!/bin/sh\ncase "$*" in\n  "compose build"*) echo "STEP 1/1: FROM no-such-image:0"; echo "Error: creating build container"; echo "exit code: 125"; exit 0 ;;\n  *) exit 0 ;;\nesac\n')
+    _fake_docker(repo, monkeypatch, '#!/bin/sh\ncase "$*" in\n  "compose build"*) echo "STEP 1/1: FROM no-such-image:0"; echo "Error: creating build container"; echo "exit code: 125" >&2; exit 0 ;;\n  *) exit 0 ;;\nesac\n')
     code, out = run(["run"], repo, capsys)
     assert code == 1 and "exit code: 125" in out and "container build failed — see above" in out
     assert "$ python3 -m pytest" not in out

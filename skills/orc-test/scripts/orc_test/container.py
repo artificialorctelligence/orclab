@@ -55,6 +55,7 @@ _LOGGED_EXIT = re.compile(r"^exit code: (\d+)$", re.MULTILINE)
 
 def build_failed(cp):
     """True when the build failed — by the engine's exit code, or by the status podman-compose
-    1.0.6 logs and then throws away."""
+    1.0.6 logs (on stderr) and then throws away. Reads stdout with stderr merged, as
+    `runner.run_on_host` captures it."""
     logged = _LOGGED_EXIT.findall(cp.stdout or "")
     return cp.returncode != 0 or any(int(n) != 0 for n in logged)

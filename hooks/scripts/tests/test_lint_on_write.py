@@ -244,9 +244,11 @@ def test_containerised_project_lints_through_compose_run(tmp_path, run):
     docker = bin_dir / "docker"
     docker.write_text('#!/bin/sh\necho "argv: $*"\nexit 1\n')
     docker.chmod(docker.stat().st_mode | stat.S_IEXEC)
+    (tmp_path / ".orclab").mkdir()
+    (tmp_path / ".orclab" / "test.yaml").write_text("runner: docker\n")   # not the real podman this machine has
     r = run(f, bin_dir=bin_dir)
     assert r.returncode == 2
-    assert f"compose run --rm -T --workdir {tmp_path} orclab ruff check --no-fix" in r.stderr
+    assert f"argv: compose run --rm -T --workdir {tmp_path} orclab ruff check --no-fix" in r.stderr
     assert "`ruff check`" in r.stderr    # the header names the linter, never the engine prefix
 
 
