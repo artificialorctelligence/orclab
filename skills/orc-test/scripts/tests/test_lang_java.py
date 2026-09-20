@@ -1,6 +1,7 @@
 import pathlib
 from types import SimpleNamespace
 
+from orc_test import probe
 from orc_test.langs import java
 
 
@@ -87,7 +88,7 @@ def test_mutation_unavailable_no_build_file_at_all(tmp_path):
 
 def test_missing_maven_reports_only_mvn_no_duplication(tmp_path, monkeypatch):
     (tmp_path / "pom.xml").write_text("<project/>")
-    monkeypatch.setattr(java.shutil, "which", lambda tool: None if tool == "mvn" else "/usr/bin/" + tool)
+    monkeypatch.setattr(probe, "which", lambda tool: tool != "mvn")
     assert java.missing(tmp_path) == ["mvn"]
     assert java.missing(tmp_path) == ["mvn"]
 
@@ -95,7 +96,7 @@ def test_missing_maven_reports_only_mvn_no_duplication(tmp_path, monkeypatch):
 def test_missing_gradle_with_wrapper_never_reports_gradle(tmp_path, monkeypatch):
     (tmp_path / "build.gradle.kts").write_text("")
     (tmp_path / "gradlew").write_text("")
-    monkeypatch.setattr(java.shutil, "which", lambda tool: None)
+    monkeypatch.setattr(probe, "which", lambda tool: False)
     assert "gradle" not in java.missing(tmp_path)
 
 

@@ -4,7 +4,6 @@
 import os
 import stat
 
-import pytest
 from orc_test import container, runner
 
 COMPOSE = "services:\n  orclab:\n    build: .\n    volumes:\n      - .:${PWD}\n    working_dir: ${PWD}\n"
@@ -18,13 +17,6 @@ def fake_runner(tmp_path, name="docker"):
     p.write_text('#!/bin/sh\necho "argv: $*"\n')
     p.chmod(p.stat().st_mode | stat.S_IEXEC)
     return bin_dir
-
-
-@pytest.fixture(autouse=True)
-def no_container():
-    runner.use(None)
-    yield
-    runner.use(None)
 
 
 def test_no_compose_means_no_container(tmp_path):

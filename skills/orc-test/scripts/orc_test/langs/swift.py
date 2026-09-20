@@ -5,6 +5,7 @@ import pathlib
 import platform
 import shutil
 
+from .. import probe
 from ..detect import SKIP_DIRS
 from ..model import Coverage, Finding, Mutation, Survivor
 from ..runner import run
@@ -40,7 +41,7 @@ def _xcodeproj(root):
 def missing(root):
     if _xcodeproj(root) and (platform.system() != "Darwin" or shutil.which("xcodebuild") is None):
         return ["xcodebuild"]
-    return [] if shutil.which("swift") else ["swift"]
+    return [] if probe.which("swift") else ["swift"]
 
 
 def _scheme(root):

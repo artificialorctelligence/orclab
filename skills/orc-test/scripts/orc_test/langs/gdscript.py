@@ -34,6 +34,8 @@ def _runner(root):
 
 
 def missing(root):
+    # Host checks on purpose (v23): GODOT_BIN is a host environment variable and gdUnit4 a file in
+    # the project; in a container the Godot binary path must be inside the image (stack-godot).
     if not _runner(root).exists():
         return ["gdUnit4"]
     return [] if os.environ.get("GODOT_BIN") else ["GODOT_BIN"]

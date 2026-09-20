@@ -16,7 +16,7 @@ import shutil
 
 import tomllib
 
-from .. import lcov
+from .. import lcov, probe
 from ..detect import SKIP_DIRS
 from ..model import Coverage, Finding, Mutation, Survivor
 from ..runner import run
@@ -92,7 +92,7 @@ MUTMUT_DIFFS = pathlib.Path(__file__).parents[1] / "mutmut_diffs.py"
 
 
 def missing(root):
-    return [t for t in TOOLS if importlib.util.find_spec(t) is None]
+    return [t for t in TOOLS if not probe.python_module(t)]
 
 
 def _has_tests(base):

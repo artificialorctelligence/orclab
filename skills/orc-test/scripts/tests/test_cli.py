@@ -1,6 +1,7 @@
+import os
 import types
 
-from orc_test import langs
+from orc_test import cli, container, langs, runner
 from tests.helpers import fake, make_repo, run
 
 
@@ -96,3 +97,50 @@ def test_bad_config_reports_error(tmp_path, capsys):
     (repo / ".orclab" / "test.yaml").write_text("coverage: [unterminated\n")
     code, out = run(["detect"], repo, capsys)
     assert code == 1 and "invalid YAML" in out
+
+
+# --- containers (v23 §2): built once, probed inside, never the host ---
+
+def _fake_docker(repo, monkeypatch, script):
+    bin_dir = repo / "fakebin"
+    bin_dir.mkdir()
+    (bin_dir / "docker").write_text(script)
+    (bin_dir / "docker").chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}:{os.environ['PATH']}")
+
+
+def test_detect_says_in_container_and_probes_inside(tmp_path, capsys, monkeypatch):
+    repo = make_repo(tmp_path)
+    (repo / "compose.yaml").write_text("services:\n  orclab:\n    build: .\n")
+    _fake_docker(repo, monkeypatch, "#!/bin/sh\necho \"argv: $*\"\nexit 0\n")
+    code, out = run(["detect"], repo, capsys)
+    assert code == 0 and "detected: Python (in container)" in out
+    assert "$ docker compose build orclab" in out
+    assert "$ docker compose run --rm -T --workdir" in out and "import pytest" in out
+
+
+def test_runner_missing_skips_the_language_and_never_runs_on_the_host(tmp_path, capsys, monkeypatch):
+    repo = make_repo(tmp_path)
+    (repo / "compose.yaml").write_text("services:\n  orclab:\n    build: .\n")
+    monkeypatch.setattr(cli.container.shutil, "which", lambda n: None)
+    code, out = run(["run"], repo, capsys)
+    assert code == 0 and "Python: container runner not found — install docker or podman — skipped" in out
+    assert "$ python3 -m pytest" not in out
+
+
+def test_build_failure_is_exit_one_with_the_output(tmp_path, capsys, monkeypatch):
+    repo = make_repo(tmp_path)
+    (repo / "compose.yaml").write_text("services:\n  orclab:\n    build: .\n")
+    _fake_docker(repo, monkeypatch, "#!/bin/sh\necho 'ERROR: failed to solve'\nexit 17\n")
+    code, out = run(["run"], repo, capsys)
+    assert code == 1 and "failed to solve" in out and "container build failed — see above" in out
+    assert "$ python3 -m pytest" not in out
+
+
+def test_dirty_asks_the_host_git_even_when_a_container_is_active(tmp_path, capsys, monkeypatch):
+    repo = make_repo(tmp_path)
+    _fake_docker(repo, monkeypatch, "#!/bin/sh\necho \"argv: $*\"\nexit 0\n")
+    runner.use(container.Container(root=repo, runner="docker"))
+    assert cli._dirty(repo, set()) == set()
+    out = capsys.readouterr().out
+    assert out.startswith("$ git status --porcelain") and "$ docker" not in out

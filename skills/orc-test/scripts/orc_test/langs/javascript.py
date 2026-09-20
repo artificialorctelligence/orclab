@@ -4,7 +4,7 @@ import json
 import pathlib
 import shutil
 
-from .. import lcov, stryker
+from .. import lcov, probe, stryker
 from ..model import Finding, Mutation
 from ..runner import run
 
@@ -70,7 +70,7 @@ def _runner(root):
 
 
 def missing(root):
-    return [t for t in TOOLS if shutil.which(t) is None]
+    return [t for t in TOOLS if not probe.which(t)]
 
 
 def test_cmd(root, target):

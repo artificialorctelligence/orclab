@@ -1,5 +1,6 @@
 import pathlib
 
+from orc_test import probe
 from orc_test.langs import dart
 from orc_test.model import Coverage, Mutation
 
@@ -48,17 +49,17 @@ def test_mutation_needs_dev_dependency(tmp_path):
 
 def test_missing_reports_dart(tmp_path, monkeypatch):
     (tmp_path / "pubspec.yaml").write_text("name: x\n")
-    monkeypatch.setattr(dart.shutil, "which", lambda name: None)
+    monkeypatch.setattr(probe, "which", lambda name: False)
     assert dart.missing(tmp_path) == ["dart"]
-    monkeypatch.setattr(dart.shutil, "which", lambda name: "/usr/bin/dart")
+    monkeypatch.setattr(probe, "which", lambda name: True)
     assert dart.missing(tmp_path) == []
 
 
 def test_missing_reports_flutter(tmp_path, monkeypatch):
     (tmp_path / "pubspec.yaml").write_text("name: x\ndependencies:\n  flutter:\n    sdk: flutter\n")
-    monkeypatch.setattr(dart.shutil, "which", lambda name: None)
+    monkeypatch.setattr(probe, "which", lambda name: False)
     assert dart.missing(tmp_path) == ["flutter"]
-    monkeypatch.setattr(dart.shutil, "which", lambda name: "/usr/bin/flutter")
+    monkeypatch.setattr(probe, "which", lambda name: True)
     assert dart.missing(tmp_path) == []
 
 

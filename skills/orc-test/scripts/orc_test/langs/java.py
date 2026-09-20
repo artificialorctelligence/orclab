@@ -4,7 +4,7 @@ import json
 import pathlib
 import shutil
 
-from .. import jacoco, pitest
+from .. import jacoco, pitest, probe
 from ..model import Coverage, Finding, Mutation
 from ..runner import run
 
@@ -103,7 +103,7 @@ def missing(root):
         del needed["mvn"]
         if (pathlib.Path(root) / "gradlew").exists():
             del needed["gradle"]
-    return [t for t in needed if shutil.which(t) is None]
+    return [t for t in needed if not probe.which(t)]
 
 
 def _pkg_filter(target):

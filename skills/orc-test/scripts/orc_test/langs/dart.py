@@ -7,7 +7,7 @@ import shlex
 import shutil
 import xml.etree.ElementTree as ET
 
-from .. import lcov
+from .. import lcov, probe
 from ..model import Coverage, Mutation, Survivor
 
 KEY = "dart"
@@ -71,7 +71,7 @@ def audit_findings(stdout, returncode):
 
 def missing(root):
     tool = _tool(root)
-    return [] if shutil.which(tool) else [tool]
+    return [] if probe.which(tool) else [tool]
 
 
 def test_cmd(root, target):

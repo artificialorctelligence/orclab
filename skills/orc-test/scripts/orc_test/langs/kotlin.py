@@ -3,7 +3,7 @@
 import pathlib
 import shutil
 
-from .. import jacoco, licence, pitest
+from .. import jacoco, licence, pitest, probe
 from ..detect import SKIP_DIRS
 from ..model import Coverage, Finding, Mutation
 from ..runner import run
@@ -66,7 +66,7 @@ def missing(root):
     needed = dict(TOOLS)
     if (pathlib.Path(root) / "gradlew").exists():
         del needed["gradle"]
-    return [t for t in needed if shutil.which(t) is None]
+    return [t for t in needed if not probe.which(t)]
 
 
 def test_cmd(root, target):
