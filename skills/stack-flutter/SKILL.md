@@ -6,8 +6,8 @@ user-invocable: false
 
 # Flutter (Dart) — the cross-platform mobile stack
 
-**Checked against live sources on 2026-09-11.** Flutter stable **3.47.4** (released that day;
-Dart **3.13.3**), from Flutter's own release feed. Every version and default below has a date;
+**Checked against live sources on 2026-09-11; the release re-read 2026-09-20.** Flutter stable
+**3.47.5** (2026-09-18; Dart **3.13.4**), from Flutter's own release feed. Every version and default below has a date;
 Flutter ships a stable every ~quarter, so anything here older than one is suspect —
 `orclab:currency-discipline` says re-check, and the "Sources" section says where.
 
@@ -29,8 +29,8 @@ native-only (`stack-android-native`, `stack-ios-native`).
 
 | Thing | Current | Where it was read |
 |---|---|---|
-| Flutter stable | 3.47.4 (2026-09-11) | `storage.googleapis.com/flutter_infra_release/releases/releases_linux.json` — the feed `flutter upgrade` reads |
-| Dart | 3.13.3, bundled with Flutter | same |
+| Flutter stable | 3.47.5 (2026-09-18; read 2026-09-20) | `storage.googleapis.com/flutter_infra_release/releases/releases_linux.json` — the feed `flutter upgrade` reads |
+| Dart | 3.13.4, bundled with Flutter | same |
 | Android: default `compileSdk` / `targetSdk` / `minSdk` | **36 / 36 / 24** | `FlutterExtension.kt` on the `stable` branch |
 | Android: default NDK | **28.2.13676358** (r28) | same |
 | Android: supported API levels | 24–37 | docs.flutter.dev supported platforms |
@@ -395,8 +395,8 @@ Android skill's base and SDK packages, plus the NDK and CMake the toolchain tabl
 row lists (Flutter's template pins `flutter.ndkVersion`, so AGP wants that NDK present rather
 than fetching it into a container that is then discarded), and Flutter's own stable tarball
 with the SHA-256 from Flutter's own release feed — the file `flutter upgrade` reads
-(`releases_linux.json`: `3.47.5`, released 2026-09-18, Dart 3.13.4; the toolchain table's
-3.47.4 is one patch behind it today). Every tool `skills/orc-test/languages/dart.md` names is
+(`releases_linux.json`: `3.47.5`, released 2026-09-18, Dart 3.13.4 — the toolchain table's
+row). Every tool `skills/orc-test/languages/dart.md` names is
 either in the SDK or a project dependency, so the image installs no Dart tool:
 
 ```dockerfile
@@ -419,7 +419,7 @@ RUN wget -q -O /tmp/flutter.tar.xz https://storage.googleapis.com/flutter_infra_
     && tar -xf /tmp/flutter.tar.xz -C /opt \
     && rm /tmp/flutter.tar.xz
 ENV BOT=true
-RUN flutter precache --android && flutter doctor
+RUN flutter precache --android
 ENV GRADLE_USER_HOME=/cache/gradle PUB_CACHE=/cache/pub
 ```
 
@@ -439,15 +439,18 @@ Not run here — the first project records it. Why each Flutter line:
   root"* on every run when `EUID` is 0 unless `/.dockerenv` exists (Docker creates it, Podman
   does not) or one of `CI`, `BOT`, `CONTINUOUS_INTEGRATION` is `true` — its own condition,
   read from `shared.sh`. `BOT` is the narrowest of the three.
-- **`flutter precache --android && flutter doctor`** at build time — the first `flutter` run
-  populates the SDK's own `bin/cache` (the Dart SDK, then the Android engine artifacts
-  `precache --android` asks for — the Cirrus Dockerfile's line), which this way lands in the
-  image, not in a container that is thrown away. `flutter doctor` is
-  the check the toolchain section says to run first on any machine; it finds the JDK through
-  `JAVA_HOME` (`java.dart`: Android Studio's bundle first, *"the JAVA_HOME env variable, if
-  set"* second) and the SDK through `ANDROID_HOME` (`android_sdk.dart`). What `doctor` says
-  about the licences that `sdkmanager --licenses` already accepted was not seen here — if it
-  asks again, `yes | flutter doctor --android-licenses` is the setup page's own command.
+- **`flutter precache --android`** at build time — the first `flutter` run populates the
+  SDK's own `bin/cache` (the Dart SDK, then the Android engine artifacts `precache --android`
+  asks for — the Cirrus Dockerfile's line), which this way lands in the image, not in a
+  container that is thrown away. Not `flutter doctor` in the Dockerfile: its output would be
+  discarded with the layer, and its exit code in an image with no Chrome or GTK was not seen
+  here — a non-zero one would fail the build for a line nobody reads. Run it through the
+  container once instead (`<engine> compose run --rm orclab flutter doctor`), the check the
+  toolchain section says to run first on any machine; it finds the JDK through `JAVA_HOME`
+  (`java.dart`: Android Studio's bundle first, *"the JAVA_HOME env variable, if set"* second)
+  and the SDK through `ANDROID_HOME` (`android_sdk.dart`). What it says about the licences
+  that `sdkmanager --licenses` already accepted was not seen here — if it asks again,
+  `yes | flutter doctor --android-licenses` is the setup page's own command.
 - **`PUB_CACHE`**, set *after* the precache so the tool's own packages stay in the image:
   *"By default, this directory is located under `$HOME/.pub-cache`"* (pub's environment
   variables page), which `compose run --rm` would discard. The project's packages —

@@ -68,6 +68,10 @@ services:
     working_dir: ${PWD}
 ```
 
+A stack's own Containers section may add to this file (a named volume for a build cache, an
+environment variable); the three lines above stay as they are, and the `orclab` service name
+is what `/orc-test` and `lint_on_write` recognise.
+
 Every command runs as `<engine> compose run --rm -T --workdir <dir> orclab <cmd>`, after one
 `<engine> compose build orclab`; the first line of the report says
 `detected: Python (in container)`. `${PWD}` is filled in from the environment of the process

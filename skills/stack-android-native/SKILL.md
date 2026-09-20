@@ -339,7 +339,9 @@ Not run here — the first project records it. Why each line, so the next reader
   the required NDK and CMake the first time you build your project if their licenses have
   been accepted in advance"* — into a container that is discarded after the command.
 - **detekt** is the one tool on the language page that is not a Gradle plugin: `/orc-test`'s
-  test lint and `lint_on_write`'s `.kt` line both call `detekt` on `PATH`. The zip is the CLI
+  test lint and `lint_on_write`'s `.kt` line both call `detekt` on `PATH`. Java's `pmd`
+  (`languages/java.md`) is never needed here: `detect.py` drops Java from a Gradle project
+  whose `src/` holds `.kt` files, so the two never both run. The zip is the CLI
   page's *"Direct Download (Any OS)"* form; v1.23.8 (2025-02-21) is the latest non-prerelease
   on GitHub and the version the Lint section names. detekt publishes no checksum, so the
   SHA-256 on that line was computed here from the release asset on 2026-09-20 — pinned so a
