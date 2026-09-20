@@ -50,6 +50,22 @@ def test_audit_prints_the_command_it_ran(tmp_path, capsys, monkeypatch):
     assert "$ true" in out
 
 
+def test_nothing_declared_is_not_available_and_never_asks_for_the_tool(tmp_path, capsys, monkeypatch):
+    # BACKLOG #54: a project that declares nothing to audit is "not available", not red — and the
+    # check runs before the tool check, so a tool-only repo is never told to install a tool that
+    # will then refuse it.
+    def never(root):
+        raise AssertionError("audit_unavailable consulted although nothing is declared")
+    m = fake()
+    m.audit_nothing = lambda root: "nothing declared: pyproject.toml has no [project] table"
+    m.audit_unavailable = never
+    _with(monkeypatch, m)
+    code, out = run(["audit"], make_repo(tmp_path), capsys)
+    assert code == 0
+    assert "Fake       audit not available — nothing declared: pyproject.toml has no [project] table" in out
+    assert "$ true" not in out and "vulnerable" not in out
+
+
 def test_unreadable_audit_output_fails_the_gate_without_a_bogus_count(tmp_path, capsys, monkeypatch):
     _with(monkeypatch, fake(audit_findings=["audit output not understood — see above"]))
     code, out = run(["audit"], make_repo(tmp_path), capsys)

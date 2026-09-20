@@ -110,11 +110,15 @@ vulnerable package with its advisory ids and the versions that fix it. First res
 as long as a `pip install`. pip-audit prints a one-line summary on stderr ahead of the JSON
 (`No known vulnerabilities found` / `Found 36 known vulnerabilities in 3 packages`, seen live
 2026-09-19) and `run.py` merges stderr into stdout, so the parser reads from the first `{`. A
-`pyproject.toml` with no `[project]` table is refused — ``ERROR:pip_audit._cli:pyproject file
-pyproject.toml does not contain `project` section`` — and lands on `audit output not understood`.
-Last real run: 2026-09-19. On the v22check scaffold (`stack-web`, six declared dependencies):
-`Python     audit ✓ 0 vulnerable`, exit 0. On Orclab itself, whose root `pyproject.toml` is tool
-config only: `Python: audit output not understood — see above`, exit 1 (BACKLOG #54).
+`pyproject.toml` with no `[project]` table is refused by pip-audit — ``ERROR:pip_audit._cli:pyproject
+file pyproject.toml does not contain `project` section`` — so `audit_nothing` checks for the table
+first and reports `audit not available — nothing declared: pyproject.toml has no [project] table`,
+exit 0, before pip-audit (or its install line) is ever consulted: a tool-only pyproject declares
+nothing to audit, and is not a red gate (BACKLOG #54). `requirements.txt` is not read — `-r`
+would be a different command. Last real run: 2026-09-19. On the v22check scaffold (`stack-web`,
+six declared dependencies): `Python     audit ✓ 0 vulnerable`, exit 0. On Orclab itself, whose
+root `pyproject.toml` is tool config only: `Python     audit not available — nothing declared:
+pyproject.toml has no [project] table`, exit 0.
 
 ## Caveats
 - **mutmut copies only `source_paths` and `also_copy` into `mutants/`; the tests are not copied

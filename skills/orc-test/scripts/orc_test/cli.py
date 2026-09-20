@@ -16,7 +16,9 @@ _PYTEST_SUMMARY = re.compile(r"(\d+) passed|(\d+) failed|(\d+) error")
 # What every mutation tool may legitimately touch, whatever the language. A language module adds
 # its own leftovers via an optional top-level `SANDBOX: set[str]` (path prefixes), alongside the
 # other optional module members: `CAVEATS_FOR(root)`, `coverage_unavailable(root)`,
-# `mutation_cwd(root, target)`. Anything a tracked file gains outside the union of the two is the
+# `mutation_cwd(root, target)`, `audit_nothing(root)` (a reason the project declares nothing to
+# audit, e.g. a tool-only pyproject.toml — "not available", never red, checked before the tool
+# is; BACKLOG #54). Anything a tracked file gains outside the union of the two is the
 # suite writing to the real tree under a planted defect (test-discipline rule 4; BACKLOG #34).
 _SANDBOX = {".orclab"}
 
@@ -155,6 +157,9 @@ def _audit_line(mod, d):
     """One language's audit line (plus indented findings), and whether it failed the gate."""
     if getattr(mod, "AUDIT_TOOL", None) is None:
         return f"{mod.LABEL:<10} audit not available — {mod.AUDIT_NONE}", False
+    nothing = getattr(mod, "audit_nothing", lambda r: None)(d)
+    if nothing:   # before the tool check: never "install X" for a tool that will then refuse the project
+        return f"{mod.LABEL:<10} audit not available — {nothing}", False
     why = mod.audit_unavailable(d)
     if why:
         tool, install = mod.AUDIT_TOOL

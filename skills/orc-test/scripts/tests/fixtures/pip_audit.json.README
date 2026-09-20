@@ -21,3 +21,9 @@ Top-level shape: a **dict** with two keys, `dependencies` (a list) and `fixes` (
 `{"id": ..., "fix_versions": [...], "aliases": [...], "description": ...}` — matching
 `langs/python.py`'s `audit_findings` parser (`dependencies`/`vulns`/`fix_versions`/`aliases`) as
 written, no correction needed against this capture.
+
+The capture is stdout only (`> pip_audit.json`); pip-audit's one-line summary ("No known vulnerabilities
+found" / "Found N known vulnerabilities in M packages") goes to stderr, which `runner.run` merges into
+stdout at run time, so this fixture never showed the line that broke every real run — found live
+2026-09-19 and pinned by `test_audit_findings_skips_pip_audits_stderr_summary` in
+`test_lang_python.py`.

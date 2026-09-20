@@ -37,6 +37,17 @@ AUDIT_TOOL = ("pip-audit", "pip install pip-audit")
 _UNREADABLE = ["audit output not understood — see above"]
 
 
+def audit_nothing(root):
+    # audit_cmd's `.` reads the [project] table and nothing else — pip-audit refuses a pyproject
+    # without one ("does not contain `project` section", seen live on Orclab 2026-09-19; BACKLOG
+    # #54). requirements.txt is deliberately not consulted: `-r` would be a different audit_cmd.
+    try:
+        data = tomllib.loads((pathlib.Path(root) / "pyproject.toml").read_text())
+    except (OSError, tomllib.TOMLDecodeError):
+        data = {}
+    return None if "project" in data else "nothing declared: pyproject.toml has no [project] table"
+
+
 def audit_unavailable(root):
     return None if importlib.util.find_spec("pip_audit") else "pip-audit not installed"
 
@@ -58,7 +69,7 @@ def audit_findings(stdout, returncode):
         # JSON ("No known vulnerabilities found" / "Found N known vulnerabilities in M packages",
         # seen live 2026-09-19); read from the first `{`, the way csharp.py does.
         data, _ = json.JSONDecoder().raw_decode(stdout, stdout.index("{"))
-        deps = data.get("dependencies", []) if isinstance(data, dict) else data
+        deps = data.get("dependencies", [])
         out, seen = [], set()
         for dep in deps:
             for v in dep.get("vulns", []):

@@ -295,7 +295,8 @@ def test_audit_findings_skips_pip_audits_stderr_summary():
     # of it on a cold cache). Read as pure JSON, every real run was "not understood", a red gate.
     clean = 'No known vulnerabilities found\n{"dependencies": [{"name": "fastapi", "version": "0.141.1", "vulns": []}], "fixes": []}\n'
     assert py.audit_findings(clean, 0) == []
-    vuln = ('Found 1 known vulnerability in 1 package\n{"dependencies": [{"name": "x", "version": "1", "vulns": ['
+    vuln = ('WARNING:cachecontrol.controller:Cache entry deserialization failed, entry ignored\n'
+            'Found 36 known vulnerabilities in 3 packages\n{"dependencies": [{"name": "x", "version": "1", "vulns": ['
             '{"id": "CVE-1", "fix_versions": ["2"], "aliases": []}]}], "fixes": []}\n')
     assert py.audit_findings(vuln, 1) == ["x 1: CVE-1 — fix 2"]
     # No JSON at all — pip-audit's own error line, as on a pyproject.toml with no [project] table.
@@ -310,6 +311,17 @@ def test_audit_findings_never_raises_on_valid_but_wrong_shaped_json():
     assert py.audit_findings("42", 1) == ["audit output not understood — see above"]
     assert py.audit_findings('{"dependencies": [{"name": "x", "version": "1", "vulns": [1]}]}', 1) == [
         "audit output not understood — see above"]
+
+
+def test_audit_nothing_is_a_pyproject_without_a_project_table(tmp_path):
+    # Orclab's own shape (BACKLOG #54): pyproject.toml exists for tool config only, and pip-audit's
+    # `.` form refuses it. Not red, not "install pip-audit" — nothing declared to audit.
+    reason = "nothing declared: pyproject.toml has no [project] table"
+    assert py.audit_nothing(tmp_path) == reason                           # no file at all
+    (tmp_path / "pyproject.toml").write_text('[tool.ruff]\npreview = true\n')
+    assert py.audit_nothing(tmp_path) == reason                           # tool-only
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "0"\n')
+    assert py.audit_nothing(tmp_path) is None                             # declares something
 
 
 def test_audit_unavailable_names_pip_audit(monkeypatch):
