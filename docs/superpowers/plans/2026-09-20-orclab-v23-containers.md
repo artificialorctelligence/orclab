@@ -454,7 +454,7 @@ In `_resolve`, after `found = detect.languages(root, mods)` and before the `dete
             print(f"{m.LABEL}: container runner not found — install docker or podman — skipped")
         return root, cfg, []
     if c:
-        cp = runner.run(container.build_cmd(c), cwd=root)
+        cp = runner.run_on_host(container.build_cmd(c), cwd=root)   # the engine is a host command — never through the (now active) wrap
         if cp.returncode != 0:
             print(cp.stdout[-3000:])
             raise ContainerUnavailable
