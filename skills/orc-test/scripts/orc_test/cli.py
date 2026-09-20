@@ -60,7 +60,7 @@ def _resolve(args):
         return root, cfg, []
     if c and found:
         cp = runner.run_on_host(container.build_cmd(c), cwd=root)   # the engine itself is a host command
-        if cp.returncode != 0:
+        if container.build_failed(cp):
             print(cp.stdout[-3000:])
             raise ContainerUnavailable
     usable = []

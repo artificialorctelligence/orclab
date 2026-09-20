@@ -1,6 +1,7 @@
 import json
 import os
 import pathlib
+import shutil
 import stat
 import subprocess
 import sys
@@ -333,7 +334,11 @@ def test_containerised_project_with_no_engine_says_nothing(tmp_path, run):
     (tmp_path / "compose.yaml").write_text(COMPOSE)
     f = src / "a.py"
     f.write_text("x = 1\n")
-    r = run(f, bin_dir=fake_tool(tmp_path / "bin", "ruff", 1, "finding"))   # ruff on the host, no docker
+    # ruff and git on the host and nothing else: no engine, whatever this machine has (it has
+    # podman since 2026-09-20, and the real PATH would have found it)
+    bin_dir = fake_tool(tmp_path / "bin", "ruff", 1, "finding")
+    (bin_dir / "git").symlink_to(shutil.which("git"))
+    r = run(f, env_extra={"PATH": str(bin_dir)})
     assert r.returncode == 0    # fail open - the hook never runs a containerised project's linter on the host
 
 

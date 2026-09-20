@@ -105,7 +105,12 @@ free of a second package: on Ubuntu-derived Mint, `compose` is a separate apt pa
   engine was installed), and nothing to join or start. `podman-compose` 1.0.6's source, read
   for the four facts the code depends on: `run` accepts `--rm`, `-T` and `--workdir`, always
   attaches stdin (`-i`), fills `${PWD}` from the environment, and does **not** build a missing
-  image — which is why the command runs `compose build` first.
+  image — which is why the command runs `compose build` first. A fifth, found live 2026-09-20
+  and not by the reading: its `build` **exits 0 when `podman build` fails** — `compose_build`
+  discards `build_one`'s result and only logs podman's status as `exit code: 125` (1.6.0
+  returns it). `FROM no-such-image:0` "built", and the tests ran in the stale image from the
+  previous build. `container.build_failed` reads that logged line as well as the exit code,
+  which is what makes the `container build failed` line below hold on this version.
 - **Docker Engine** — `sudo apt install docker.io docker-compose-v2` (Mint's apt: 29.1.3 and
   2.40.3; `docker.io` only *suggests* the compose plugin, so name both), then
   `sudo usermod -aG docker $USER` and log out and in. Docker's own repository is the other route

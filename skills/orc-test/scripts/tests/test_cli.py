@@ -107,6 +107,10 @@ def _fake_docker(repo, monkeypatch, script):
     (bin_dir / "docker").write_text(script)
     (bin_dir / "docker").chmod(0o755)
     monkeypatch.setenv("PATH", f"{bin_dir}:{os.environ['PATH']}")
+    # RUNNERS prefers podman; on a machine that has it (this one, since 2026-09-20) the real
+    # engine would win over the fake — name the fake explicitly
+    (repo / ".orclab").mkdir(exist_ok=True)
+    (repo / ".orclab" / "test.yaml").write_text("runner: docker\n")
 
 
 def test_detect_says_in_container_and_probes_inside(tmp_path, capsys, monkeypatch):
@@ -148,6 +152,17 @@ def test_build_failure_is_exit_one_with_the_output(tmp_path, capsys, monkeypatch
     _fake_docker(repo, monkeypatch, "#!/bin/sh\necho 'ERROR: failed to solve'\nexit 17\n")
     code, out = run(["run"], repo, capsys)
     assert code == 1 and "failed to solve" in out and "container build failed — see above" in out
+    assert "$ python3 -m pytest" not in out
+
+
+def test_build_failure_logged_by_podman_compose_1_0_6_is_still_a_failure(tmp_path, capsys, monkeypatch):
+    # podman-compose 1.0.6 (Mint's apt) prints podman's status as "exit code: N" and exits 0
+    # itself; seen live 2026-09-20 with FROM no-such-image:0 — the tests ran in the stale image
+    repo = make_repo(tmp_path)
+    (repo / "compose.yaml").write_text("services:\n  orclab:\n    build: .\n")
+    _fake_docker(repo, monkeypatch, '#!/bin/sh\ncase "$*" in\n  "compose build"*) echo "STEP 1/1: FROM no-such-image:0"; echo "Error: creating build container"; echo "exit code: 125"; exit 0 ;;\n  *) exit 0 ;;\nesac\n')
+    code, out = run(["run"], repo, capsys)
+    assert code == 1 and "exit code: 125" in out and "container build failed — see above" in out
     assert "$ python3 -m pytest" not in out
 
 

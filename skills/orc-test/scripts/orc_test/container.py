@@ -4,6 +4,7 @@ under .orclab/ can serve, that directory is git-ignored. Inside, the project is 
 own host path, so every path in every report is valid on both sides and nothing is translated."""
 
 import pathlib
+import re
 import shutil
 from dataclasses import dataclass
 
@@ -44,3 +45,16 @@ def wrap(c, cmd, cwd):
 
 def build_cmd(c):
     return [c.runner, "compose", "build", SERVICE]
+
+
+# podman-compose 1.0.6 (Mint 22.3's apt) logs podman's own status as "exit code: N" and exits 0
+# regardless — compose_build discards build_one's result; 1.6.0 returns it. Seen live
+# 2026-09-20: FROM no-such-image:0 built "successfully" and the tests ran in the stale image.
+_LOGGED_EXIT = re.compile(r"^exit code: (\d+)$", re.MULTILINE)
+
+
+def build_failed(cp):
+    """True when the build failed — by the engine's exit code, or by the status podman-compose
+    1.0.6 logs and then throws away."""
+    logged = _LOGGED_EXIT.findall(cp.stdout or "")
+    return cp.returncode != 0 or any(int(n) != 0 for n in logged)
