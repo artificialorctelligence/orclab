@@ -549,6 +549,14 @@ while the app is `0.3.0`) moves on its own cadence by `RELEASING.md`'s own rule,
 version file for `verify_consistency` — which means the check will one day need "these agree,
 that one is independent" as a per-project statement; not built until a second such file exists.
 
+**Update 2026-09-20 — `composer.json` joins the list (v24).** `stack-php` (spec
+`docs/superpowers/specs/2026-09-20-orclab-v24-php-design.md`, §3) puts `composer.json` at the
+project root as the version file and says, like the seven stack sentences above, that
+`/orc-version` does not edit it yet — `KNOWN_FORMATS` is unchanged. One number, not two: no store
+build code, so it is the `pyproject.toml` shape, the easy kind. Same rule as the rest: added when
+a real PHP project reaches a release.
+
+
 ## #7: Distribution-channel download/install metrics — carried over from Orcshot #186, direflail wants Orclab to own this eventually (PARTIALLY ADDRESSED 2026-09-10 — Launchpad and Flathub confirmed, Snap blocked until a snap exists)
 
 Raised by direflail (2026-09-06), explicitly carrying over Orcshot's own `BACKLOG.md` #186 (raised
@@ -3657,7 +3665,7 @@ the push before the history leaves the machine. It waits for a real case — the
 not built") names it as "a BACKLOG entry citing this spec", and no project has yet leaked a
 secret into Orclab-managed history; `secret-hygiene` holds the recovery procedure when one does.
 
-## #50: PHP as a /orc-code alternative on the web row — v23, starts when v22 ships
+## #50: PHP as a /orc-code alternative on the web row — v24, spec written 2026-09-20
 
 direflail is putting an API on DreamHost, which serves PHP and nothing else; the request that
 became v22 (#48) started as "add PHP to `/orc-code`", and direflail's decision was that the
@@ -3684,6 +3692,20 @@ v24 and starts when v23 ships; its live check runs in the container `stack-php`'
 section will define — the toolchain and Composer's audit inside the image, nothing installed on
 the machine — with the section proposing "yes" to `/orc-code`'s container question, PHP being
 the toolchain unusual on a dev machine that §1 of the v23 spec had in mind.
+
+**Update 2026-09-20 — spec written and approved:**
+`docs/superpowers/specs/2026-09-20-orclab-v24-php-design.md`. Scope is the skill *and* the
+machinery (direflail: "B") — `stack-php`, a `php.py` module for `/orc-test` with `languages/php.md`
+and captured fixtures, a `.php` row in `lint_on_write`, PHP on the web row's Alternatives column —
+but not the real DreamHost API, which is its own session and gets a handoff file
+(`docs/handoffs/<date>-php-first-project.md`). Order is prove-then-write (direflail: "A"): the
+image is built and every tool run inside it on a sample project first, so the Containers section
+is the first that says "run here." The "back end or whole row" question was withdrawn — a PHP
+server emits JSON or HTML, one stack; the framework is decided by live research under three
+constraints (shared hosting, JSON first, OpenAPI from code), runner-up stubbed. The audit command
+this entry promised for `/orc-test audit` is now something `/orc-test` can actually run rather
+than a sentence in a skill. Opens #64 (shared-hosting publishing) and #65 (cross-project
+dependencies); `composer.json` goes on #6's list.
 
 ## #51: /orc-test audit on a multi-module Gradle build reads only the root project's dependencies until dependencyCheckAggregate is wired
 
@@ -4111,3 +4133,67 @@ under the project instead of `<out>` — `stryker.py`'s reader already takes the
 with a `files` key under the directory it is given), run it live on a scaffold with a real test,
 and record the run in `javascript.md`. Not fixed in v23 because it is the JS module's own
 contract with Stryker, not the container layer, and the live check's job was to record it.
+
+## #64: Shared-hosting publishing (DreamHost the confirmed-live example) — written from the first real deployment, not before one
+
+Opened by the v24 spec (`docs/superpowers/specs/2026-09-20-orclab-v24-php-design.md`, §7).
+#50 has said since 2026-09-19 that shared-hosting publishing "is a separate task, not
+PHP-specific, and direflail wants it written from a real deployment, not before one"; this is
+that task, given its own number so `stack-php`'s Deployment section has something to point at
+instead of pretending to know DreamHost.
+
+**What is known, confirmed live 2026-09-19 (#50):** DreamHost's PHP-version page lists 8.5, 8.4,
+8.3 and 8.2 as selectable per domain; DreamHost's own page has the Composer install steps for a
+shared account; orcshot.org is set to 8.5. Nothing about upload, what a first deploy takes, or
+where a `RELEASING.md` step lands has been run.
+
+**Where the input comes from.** The v24 handoff file (`docs/handoffs/<date>-php-first-project.md`)
+asks the first-project session — the one that actually deploys the API to DreamHost — to record
+in its own `RELEASING.md`, through `release-checklist`: selecting the PHP version per domain,
+Composer on the shared account, what is uploaded and how, and what the first deploy actually took.
+Those lines are this entry's material. Until that session has run, this entry holds nothing to
+build.
+
+**What it becomes when picked up:** an `/orc-package` ingredient under
+`skills/orc-package/ingredients/<name>/` in the nine-section shape, per CLAUDE.md's "Before the
+first project ... ships to a channel Orclab has never met" — written from the recorded lines, each
+stamped with the date the first project ran it. Not a PHP thing: a static React build lands on the
+same host the same way.
+
+## #65: Cross-project dependencies — orcweather's app stacks will call the v24 PHP API; what, if anything, Orclab records about one project depending on another
+
+Raised by direflail 2026-09-20 in the v24 brainstorm (spec
+`docs/superpowers/specs/2026-09-20-orclab-v24-php-design.md`, §7): *"when we've got one stack
+depending upon another, like orcweather's android/ios stacks depending on this php api stack, is
+this something that needs to be recorded? if so, to what extent."*
+
+**Nothing in Orclab records this today.** Searched every shipped `SKILL.md` and `docs/commands/`
+page for a cross-project notion — "other project", "contract", "openapi", "sibling repo": the only
+hits are "the project you're in", and every `.orclab/` file that exists (`git-repo.json`,
+`publish/channels.yaml`, `publish/distro.yaml`, `test.yaml`, `test/analyze.json`) is one
+project's own settings. A real gap, not a rule that failed to fire.
+
+**What v24 does about it, and what it deliberately does not.** Does: `stack-php`'s Layout says
+where the API's OpenAPI description lives and which tool produces it — the file a consuming app's
+Dart or Swift client is written or generated against, and the thing a change to actually breaks;
+"a framework that produces OpenAPI from the code" is one of the three constraints on v24's
+framework research; the handoff file asks the first-project session to say in the API's README
+where the contract is. Does not: a record in the *consuming* project ("calls that API, contract
+at this path, deployed at this URL"). Nothing in Orclab would read it — no command asks "what does
+this project depend on" — and a `.orclab/` file with no reader is config for its own sake.
+
+**Trigger:** the first session that works on a project which calls another project's API — the
+orcweather session that adds the client against the PHP API.
+
+**Sequence, so "when" has an answer:** (1) opened here by v24; (2) the API's first-project session
+writes the contract and the README sentence; (3) the orcweather client session either finds the
+contract from that sentence and works — in which case a sentence *is* the record and this entry
+closes saying so — or stumbles: cannot find the contract, does not know which deployed URL to
+point at, changes the app against a contract that has since moved. Whatever it stumbled on is
+what the record must hold, and only then is the shape designed; (4) built, if step 3 says so, by
+whichever command turned out to need the reader — `/orc-code`'s add-a-feature flow asking "does
+this change an API another project calls?", or `/orc-release` warning that an app depends on what
+is being released. Its own small spec then. Could be v25, could be never.
+
+**Not this:** anything that versions or locks the two repos together mechanically. Two repos with
+a contract file between them is how this is normally done; Orclab should not invent a coupling.
