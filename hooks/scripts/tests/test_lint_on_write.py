@@ -297,17 +297,19 @@ def test_runner_with_a_comment_is_honored_over_the_default_order(tmp_path, run):
     assert "docker compose" not in r.stderr
 
 
-def test_a_file_outside_any_git_repo_fails_open(tmp_path, run):
-    """No git root means container status can't be established - fail open rather than guess,
-    same as an exception anywhere else in this hook."""
+def test_a_file_outside_any_git_repo_lints_on_the_host_as_before(tmp_path, run):
+    """No git root rules out being containerised outright (the record can only ever live at a
+    git root), so this is the plain host case - pre-v23 behaviour, unchanged."""
     proj = tmp_path / "proj"
     proj.mkdir()
     (proj / "pyproject.toml").write_text("[tool.ruff]\n")
     f = proj / "a.py"
     f.write_text("x = 1\n")
-    bin_dir = fake_tool(tmp_path / "bin", "ruff", 1, "would have complained")
+    bin_dir = fake_tool(tmp_path / "bin", "ruff", 1, "src/a.py:1:1: E999 fake finding")
     r = run(f, bin_dir=bin_dir)
-    assert r.returncode == 0
+    assert r.returncode == 2
+    assert "E999 fake finding" in r.stderr
+    assert "compose run" not in r.stderr
 
 
 def test_containerised_project_with_no_engine_says_nothing(tmp_path, run):

@@ -140,12 +140,11 @@ def command_for(path):
         argv = [str(local)] + argv[1:]
 
     # container status is a property of the git root, not of `root` (which may be a nested
-    # sub-project's own config dir) - and it can't be told apart from "not containerised"
-    # without one, so no git root means no lint, same as no engine on PATH.
+    # sub-project's own config dir). no git root: not containerised - host, as before (the
+    # container record can only ever live at a git root, so lacking one rules it out outright,
+    # rather than leaving it undetermined).
     git_root = invoking_root(root)
-    if git_root is None:
-        return None
-    prefix = container_prefix(git_root)
+    prefix = container_prefix(git_root) if git_root else []
     if prefix is None:
         return None
     if not prefix and not local.exists() and shutil.which(tool) is None:
