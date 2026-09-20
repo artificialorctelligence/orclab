@@ -313,9 +313,10 @@ Three kinds of secret, three places, none of them a Dart file (rule 1; each clai
 - **A token the app holds for its user** (a session, a refresh token): **`flutter_secure_storage`
   11.2.0** (published 2026-09-16, BSD-3-Clause; Android, iOS, macOS, Linux, Windows, web — pub.dev,
   read live 2026-09-19), the one plugin that wraps both platforms' stores, each the native skill's
-  answer: *"Uses Keychain for iOS/macOS"* (with an `accessibility` option — `unlocked` is the
-  default, `first_unlock` for a background fetch — the same choice `stack-ios-native` says to make
-  on purpose), and on Android an encrypted value in SharedPreferences whose key is *"RSA OAEP (key
+  answer: *"Uses Keychain for iOS/macOS"* (with `IOSOptions(accessibility:
+  KeychainAccessibility.…)` — `unlocked` is the default, `first_unlock` *"after the device is
+  unlocked for the first time after a reboot"*, the README's own identifiers — the same choice
+  `stack-ios-native` says to make on purpose), and on Android an encrypted value in SharedPreferences whose key is *"RSA OAEP (key
   cipher) + AES-GCM (storage cipher)"* by default, or an AES key that *"stores the key directly in
   Android KeyStore"* through `AndroidOptions.biometric(...)`; *"The deprecated Jetpack Security
   library's `encryptedSharedPreferences` is no longer recommended"*, the same retirement the
@@ -361,8 +362,9 @@ stack. What still applies is rule 8's client half, per platform as the native sk
 on Android cleartext is off by default since API 28 and the system store is the only trust
 anchor, so a `network_security_config.xml` that loosens either is a finding
 (`stack-android-native`); on iOS App Transport Security refuses plain HTTP at runtime and every
-`NSAppTransportSecurity` loosening key in `ios/Runner/Info.plist` is a finding
-(`stack-ios-native`). The Dart layer adds the one loosening the platforms cannot see —
+`NSAppTransportSecurity` loosening key in `ios/Runner/Info.plist` is a finding, bar the
+dev-server exception that skill names, `NSAllowsLocalNetworking` (`stack-ios-native`). The
+Dart layer adds the one loosening the platforms cannot see —
 `badCertificateCallback` returning `true`, above — and the API-key paragraph: the bundle is not a
 secret store. Rule 5's shape, a URL another app handed the app, is the native skills' rule read
 from Dart: validate, match the app's few paths, refuse the rest.

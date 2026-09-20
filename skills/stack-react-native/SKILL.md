@@ -149,6 +149,8 @@ rules: {
 "named, commented suppression"; `allowEmptyCatch: false` refuses only the bare one. Every rule at
 `"error"`, and `eslint --max-warnings 0` for the CLI; typescript-eslint 8.70.0's
 `strictTypeChecked` config is the type-level equivalent. Rules 2, 3 and 5 are reviewed, not linted.
+The full `eslint.config.js`, with these three rules and five more, is written once in the
+Security section below.
 
 ## Security — where security-discipline lands
 
@@ -228,8 +230,12 @@ reason — `code-discipline`'s named, commented suppression; HTML handed to a We
 (`react-native-webview`'s `source.html`, `injectedJavaScript`) is the same rule with no linter
 reading it — reviewed. Rules 1, 3, 4, 5's shape and 8's client half
 are otherwise **reviewed, not linted** in JavaScript: no ESLint rule reads `app.json`, and the
-platform checks — Android Lint on `android/`, ATS on `ios/` — run on generated directories that
-are not in the repo, so they run on the build service or after a local prebuild, never on write.
+platform checks read directories that are generated and not in the repo. Whether Android Lint
+runs on the generated `android/` at all — on EAS, or after a local prebuild — was not run here;
+the first project records it. And the Android skill's `lint { warningsAsErrors = true }` block
+lands in `app/build.gradle.kts`, which prebuild writes, so it has no route into a generated
+`android/` until the first project finds one — a config plugin, or a committed `android/` (the
+bare path), are the two candidates, neither confirmed.
 
 ### Dependency audit
 
@@ -309,7 +315,8 @@ and above, the default platform-specific value is `false`"* (its SDK page, read 
 (`stack-ios-native`), and a loosening lands as an `NSAppTransportSecurity` dictionary under
 `ios.infoPlist` — *"No other validation is performed, so use this at your own risk of rejection
 from the App Store"* (the app config reference) — so every loosening key there is the iOS
-skill's finding, in `app.json` instead of Xcode. reactnative.dev's own line:
+skill's finding, in `app.json` instead of Xcode, bar the dev-server exception that skill names
+(`NSAllowsLocalNetworking`). reactnative.dev's own line:
 *"Your APIs should always use SSL encryption"*; pinning (*"embedding (or pinning) a list of
 trusted certificates to the client"*) tightens and is never a finding, with its page's own
 warning that a pinned certificate expires with the server's. Rule 5's shape, the one input a
