@@ -327,6 +327,115 @@ against the app's few paths and otherwise refused, the native skills' line; an O
 needs PKCE for the same reason (the page's `react-native-app-auth`). And the API-key paragraph:
 the bundle is not a secret store.
 
+## Containers
+
+Runs in a container: **yes** for Android, **no** for iOS — confirmed live 2026-09-20.
+`npx expo lint`, `npx jest`, every `/orc-test` step for JavaScript, `lint_on_write`'s eslint,
+`npx expo prebuild` and `cd android && ./gradlew app:bundleRelease` run inside; `npx expo
+run:ios` and everything under `ios/` cannot, because it is Xcode on a Mac —
+`### Building without a Mac` — and a Linux container is not one. EAS Build stays what that
+section says it is; the relationship is below.
+
+**What EAS Build is, so the container is not mistaken for it.** Expo's infrastructure page,
+read live: *"Android builders run on virtual machines in an isolated environment. Every build
+gets its own dedicated VM instance."* The current Android image, `ubuntu-26.04-jdk-17-ndk-r27b-sdk-57`
+(`latest`, `sdk-57`), is a Google Compute Engine image — `ubuntu-2604-resolute-amd64-v20260624`,
+Java 17, Node.js 22.23.1, NDK 27.1.12297006 — while the older `sdk-53` image still lists
+*"Docker image: `ubuntu:jammy-v20250112`"*; iOS builds run *"on Mac mini hosts"* with Xcode
+26.6. So EAS is a cloud machine of the same shape as the Dockerfile below (Ubuntu 26.04, JDK
+17, Node, that NDK), for the build that ships, with the credentials EAS holds. The Dockerfile
+is the local one: `/orc-test`, the lint hook, and a local prebuild-and-Gradle for a debugging
+build. `eas build --platform android --local` could run inside too — its page makes you
+*"responsible for making sure that the environment has all the necessary tools installed:
+Node.js/Yarn/npm … Android SDK and NDK"*, which is what the image is — not run here.
+
+The `Dockerfile` `/orc-code` writes when the user says yes to the container question —
+`stack-android-native`'s image (Eclipse Temurin JDK **17**, which reactnative.dev's Linux
+setup page itself asks for: *"React Native currently recommends version 17 of the Java SE
+Development Kit (JDK). You may encounter problems using higher JDK versions"*; Google's
+command-line tools with Google's checksum; that skill's Containers section says why each
+line), the SDK packages RN 0.86's own version catalog names (`compileSdk = "36"`,
+`buildTools = "36.0.0"`, `ndkVersion = "27.1.12297006"` in `gradle/libs.versions.toml` on
+`0.86-stable`), and Node the way `stack-web`'s Containers section brings it in — copied out of
+the official `node` image, whose Dockerfile verifies the nodejs.org tarball against its
+GPG-signed checksums (`24-trixie` is Node 24.21.0 LTS today; nodejs.org's own floor for the
+binary is *"glibc >= 2.28"*, Ubuntu 26.04's `libc6` is 2.43). Every tool
+`skills/orc-test/languages/javascript.md` names is a project dependency in the mounted tree,
+so the image installs no JS tool:
+
+```dockerfile
+FROM node:24-trixie AS nodejs
+FROM eclipse-temurin:17-jdk
+COPY --from=nodejs /usr/local/bin/node /usr/local/bin/node
+COPY --from=nodejs /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
+ENV ANDROID_HOME=/opt/android-sdk
+ENV PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends unzip \
+    && rm -rf /var/lib/apt/lists/*
+RUN wget -q -O /tmp/cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-15859902_latest.zip \
+    && echo "4e4c464f145a7512b57d088ac6c278c03c9eea610886b35a5e0804e74eedf583 /tmp/cmdline-tools.zip" | sha256sum -c - \
+    && mkdir -p $ANDROID_HOME/cmdline-tools \
+    && unzip -q /tmp/cmdline-tools.zip -d $ANDROID_HOME/cmdline-tools \
+    && mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest \
+    && rm /tmp/cmdline-tools.zip
+RUN yes | sdkmanager --licenses >/dev/null \
+    && sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;27.1.12297006" "cmake;3.22.1"
+ENV GRADLE_USER_HOME=/cache/gradle
+```
+
+Not run here — the first project records it. Why the lines that differ from the Android skill's:
+
+- **The NDK and CMake are not optional here.** The bare template's `android/app/build.gradle`
+  (`expo-template-bare-minimum` on `sdk-57`, the file prebuild writes from) sets
+  `ndkVersion rootProject.ext.ndkVersion`, and RN's Gradle plugin wires a C++ build into
+  every app: `NdkConfiguratorUtils.kt` on `0.86-stable` sets `externalNativeBuild.cmake.path`
+  to `ReactAndroid/cmake-utils/default-app-setup/CMakeLists.txt` when the app names none, and
+  that file is `cmake_minimum_required(VERSION 3.13)`. The NDK is the catalog's
+  `27.1.12297006` (r27b; EAS's image carries the same), 2.2 GB on disk for the sibling r28
+  measured on this machine. Which CMake AGP resolves to was not run: Google's page says
+  *"Projects that don't set a specific CMake version are built with CMake 3.10.2"*, RN sets
+  none and asks for ≥ 3.13, and AGP *"can automatically install the required NDK and CMake"*
+  when licences are accepted — into the discarded container, every run. `cmake;3.22.1` is
+  the version installed and building on this machine (60 MB); if the first project sees AGP
+  fetch another, that one goes on the line instead.
+- **Which JS tools the image installs: none.** They are the project's own `devDependencies`
+  in `package.json`, installed into `node_modules` — inside the mounted tree, so they survive
+  the container and are the files the host sees: `jest` with the `jest-expo` preset
+  (`## Build, run, test`), `@stryker-mutator/core` and `@stryker-mutator/jest-runner`,
+  `eslint` with `eslint-config-expo` and `eslint-plugin-jest` (`languages/javascript.md`
+  picks Jest when `vitest` is absent). `npm audit` and `npx` came over with npm. The one
+  command that installs anything is the project's own `npm install`, run through the
+  container once — `<engine> compose run --rm orclab npm install` from the project root — and
+  again when `package.json` changes; `lint_on_write` then finds `node_modules/.bin/eslint`
+  by path. Host and container are both `linux-x64`, so a package's platform binary is the
+  same either side. Node 24.21.0 clears the toolchain table's floors (SDK 57 ≥ 22.13, RN 0.87
+  ≥ 22.13) and reactnative.dev's *"Node 22.11.0 or newer"*.
+- **`node_modules` and the generated `android/` are both in the tree**, and `android/` is
+  git-ignored (the layout table) — so `npx expo prebuild` inside writes it where the host
+  sees it, and a `./gradlew` there resolves through the `GRADLE_USER_HOME` the last line
+  points at `/cache/gradle`, the Android skill's reason.
+
+**The `compose.yaml`** is the one in `skills/orc-test/SKILL.md`'s Containers section plus the
+named volume `cache:/cache` the Android skill's Containers section shows and explains.
+
+What cannot happen inside: **`npx expo start`** for a device — Metro binds a port the compose
+file does not publish, and Expo Go on a phone needs to reach it — and **`npx expo run:android`**'s
+install step, which needs the emulator (the host's KVM, per the Android skill) or a USB phone,
+neither passed in; so the dev loop is the host's, on a host Node and `node_modules` as
+`## Build, run, test` shows. **The iOS half**: `run:ios`, `pod install`, Xcode — a Mac's, or
+EAS's Mac minis. **Uploads**: `eas submit` and the store consoles, from the host with the
+credentials EAS holds (the Secrets section: nothing is on disk here). What *can*: a local
+release bundle signs inside if the project chose local credentials (the store table's row —
+a keystore under `android/app/` in the mounted tree). The proposal `/orc-code` makes for this
+stack's container question: **no**, because Node is on any dev machine and one JDK 17 is the
+whole extra install, EAS already builds the artifact that ships on its own Ubuntu 26.04
+machine, and the image is ~3 GB on disk (211 MB of JDK image, ~480 MB of SDK, 2.2 GB of NDK)
+for a `jest` run that needs none of it. Say yes on a machine that must run a local prebuild
+and Gradle build with no Android Studio on it, or whose JDK is not 17.
+
 ## Presence
 
 Presence is how the app stays visible and reachable when it is not in front: on a phone a
@@ -399,3 +508,4 @@ native project — so each check runs on the generated file, after `npx expo pre
 - Desktop and web: `https://necolas.github.io/react-native-web/docs/`, `https://microsoft.github.io/react-native-windows/docs/getting-started`, `.../docs/rnw-dependencies`, `https://raw.githubusercontent.com/microsoft/react-native-macos/main/README.md`, `https://raw.githubusercontent.com/react-native-async-storage/async-storage/main/README.md`, `https://api.github.com/repos/react-native-skia/react-native-skia/commits`; Notifee: `https://notifee.app/react-native/docs/overview`, `.../docs/android/styles`, `https://registry.npmjs.org/@notifee/react-native`, `https://api.github.com/repos/invertase/notifee/commits`
 - Against Flutter (2026-09-12): `https://docs.flutter.dev/platform-integration/web/faq`
 - EAS: `https://docs.expo.dev/build/setup.md`, `/submit/ios.md`, `/app-signing/managed-credentials.md`, `https://expo.dev/pricing` (all 2026-09-12), and `stack-flutter`'s `### Building without a Mac`; store rules: the Play and App Store ingredients under `skills/orc-package/ingredients/`.
+- Containers (2026-09-20): `https://docs.expo.dev/build-reference/infrastructure.md` (VMs, the `ubuntu-26.04-jdk-17-ndk-r27b-sdk-57` image, `sdk-53`'s Docker image, Mac minis), `https://docs.expo.dev/build-reference/local-builds.md` (`--local` prerequisites); `https://reactnative.dev/docs/set-up-your-environment?platform=android&os=linux` (JDK 17, Node 22.11.0); `https://raw.githubusercontent.com/facebook/react-native/0.86-stable/packages/react-native/gradle/libs.versions.toml` (compileSdk, buildTools, ndkVersion), `https://raw.githubusercontent.com/facebook/react-native/0.86-stable/packages/gradle-plugin/react-native-gradle-plugin/src/main/kotlin/com/facebook/react/utils/NdkConfiguratorUtils.kt`, `.../packages/react-native/ReactAndroid/cmake-utils/default-app-setup/CMakeLists.txt` (`cmake_minimum_required(VERSION 3.13)`), `https://raw.githubusercontent.com/expo/expo/sdk-57/templates/expo-template-bare-minimum/android/app/build.gradle` (`ndkVersion`); Node: `https://raw.githubusercontent.com/docker-library/official-images/master/library/node` (`24-trixie` = 24.21.0), `https://raw.githubusercontent.com/nodejs/node/main/BUILDING.md` (glibc ≥ 2.28), `https://packages.ubuntu.com/resolute/libc6` (2.43), and `stack-web`'s Containers section for the copy; the Android image, NDK/CMake auto-install, emulator and cache volume: `stack-android-native`'s Containers sources

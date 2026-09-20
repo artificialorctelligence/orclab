@@ -1,6 +1,12 @@
 # Python
 
-Researched on: 2026-09-11 (versions read from PyPI that day). Last real run: 2026-09-15, on all
+Researched on: 2026-09-11 (versions read from PyPI that day). Last real run: 2026-09-20, in a
+container — the v23check scaffold (`stack-web`, `python:3.14` image with pytest 9.1.1,
+pytest-cov 7.1.0, mutmut 3.8.0, pip-audit 2.10.1; podman 4.9.3 / podman-compose 1.0.6,
+rootless), `python3 skills/orc-test/scripts/run.py --cwd <scratch>/v23check analyze`:
+`detected: Python (in container), JS/TS (web/) (in container)`, `Python     coverage 100.0%
+(9/9 lines) ✓`, `TCE 100.0% ✓    lint: 0 findings` (10 mutants, all killed) — the first run of
+this module through `compose run` (BACKLOG, v23). Before that: 2026-09-15, on all
 six of Orclab's suites (TCE: orc-publish 78.9%, orc-release 81.9%, orc-test 76.6%, orc-todo
 81.4%, orc-package 84.0%, hooks 84.0%; whole-project coverage 92.9%) — the day each got its
 `[tool.mutmut]`, and the day orc-package's and the hooks' tests moved in-process. Before that:
@@ -121,6 +127,13 @@ root `pyproject.toml` is tool config only: `Python     audit not available — n
 pyproject.toml has no [project] table`, exit 0.
 
 ## Caveats
+- **mutmut ignores decorated functions by design** (`mutmut/mutation/file_mutation.py`, 3.7.0
+  and 3.8.0 alike; its own comment names `@app.post("/foo")` — *"copying them for the trampoline
+  setup can cause side effects"*; only `@staticmethod`/`@classmethod` are exempt). A FastAPI
+  route handler is therefore never mutated, and a bare f-string return has nothing to mutate
+  either: the v23check scaffold's first `analyze` (2026-09-20) came back `TCE not measurable —
+  mutation tool produced no mutants` for exactly that pair. Keep the logic in the plain function
+  the handler calls; that is what the score measures.
 - **mutmut copies only `source_paths` and `also_copy` into `mutants/`; the tests are not copied
   unless `also_copy` names them.** Without it the inner pytest says "file or directory not
   found: tests/" and mutmut stops with `BadTestExecutionCommandsException`. With it, `mutants/`

@@ -9,8 +9,13 @@ import shutil
 import sys
 import time
 
-from . import config, detect, langs
+from . import config, container, detect, langs, runner
 from .runner import run
+
+
+class ContainerUnavailable(Exception):
+    """The project is containerised and its image did not build; nothing runs on the host instead."""
+
 
 _PYTEST_SUMMARY = re.compile(r"(\d+) passed|(\d+) failed|(\d+) error")
 # What every mutation tool may legitimately touch, whatever the language. A language module adds
@@ -45,7 +50,19 @@ def _resolve(args):
     if args.path:
         p = pathlib.Path(args.path)
         path = p.resolve().relative_to(root) if p.is_absolute() else p
-    print("detected: " + (", ".join(_name(m, d, root) for m, d in found) or "no supported language"))
+    c = container.detect(root, cfg)
+    runner.use(c)
+    suffix = " (in container)" if c else ""
+    print("detected: " + (", ".join(_name(m, d, root) + suffix for m, d in found) or "no supported language"))
+    if c and c.runner is None:
+        for m, _d in found:
+            print(f"{m.LABEL}: container runner not found — install podman or docker — skipped")
+        return root, cfg, []
+    if c and found:
+        cp = runner.run_on_host(container.build_cmd(c), cwd=root)   # the engine itself is a host command
+        if container.build_failed(cp):
+            print(cp.stdout[-3000:])
+            raise ContainerUnavailable
     usable = []
     for m, d in found:
         gone = m.missing(d)
@@ -197,7 +214,7 @@ def _dirty(root, sandbox):
     """Tracked paths `git status --porcelain` reports changed, outside `sandbox`. Untracked (`??`)
     lines are never a defect signature here — a mutation tool's own scratch files it never
     committed are not "the suite writing to the real tree" (test-discipline rule 4; BACKLOG #34)."""
-    cp = run(["git", "status", "--porcelain"], cwd=root)
+    cp = runner.run_on_host(["git", "status", "--porcelain"], cwd=root)   # git is the host's, container or not
     paths = (ln[3:] for ln in cp.stdout.splitlines() if not ln.startswith("??"))
     return {p for p in paths if not sandbox & set(pathlib.PurePath(p).parts)}
 
@@ -320,4 +337,7 @@ def main(argv=None):
         return 1
     except config.BadConfig as e:
         print(f"error: {e}", file=sys.stderr)
+        return 1
+    except ContainerUnavailable:
+        print("container build failed — see above", file=sys.stderr)
         return 1

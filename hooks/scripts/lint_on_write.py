@@ -20,14 +20,22 @@ a PostToolUse hook's output reaches Claude (the docs: "exit 2 instead so Claude 
 even though the tool already ran"). A clean file, an unlinted language, or any failure of this
 script itself exits 0 and says nothing: a hook that wedges every write is worse than a missed
 warning.
+
+v23: a containerised project (compose.yaml with an `orclab` service at the git root, per
+skills/orc-test/scripts/orc_test/container.py) lints through `compose run` instead of the host -
+same config-file gate, same tool, run one layer over. No engine on PATH means no lint, never a
+silent fall-through to the host.
 """
 
 import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
+
+from orclab_shared import invoking_root
 
 OFF = "ORCLAB_LINT_ON_WRITE_OFF"
 TIMEOUT = 30
@@ -51,6 +59,48 @@ LINTERS = {
 ESLINT = ("eslint.config.js", "eslint", ["eslint"])
 NODE_BIN = "node_modules/.bin"
 
+# v23: a containerised project (compose.yaml with an `orclab` service at the git root) lints
+# through the container. A deliberate copy of skills/orc-test/scripts/orc_test/container.py's
+# detection, by the rule in orclab_shared.py's docstring; no PyYAML here, a regex is enough for
+# the one shape Orclab itself writes.
+SERVICE_RE = re.compile(r"^services:\s*$(?:\n(?!\S).*)*?^  orclab:\s*$", re.MULTILINE)
+RUNNERS = ("podman", "docker")     # the order skills/orc-test/SKILL.md "Containers" settles
+# PyYAML's boolean spellings for false that skills/orc-test/scripts/orc_test/config.py's real
+# `yaml.safe_load` would also accept here (`data.get("container", True) is not False`)
+FALSE_WORDS = ("false", "no", "off")
+
+
+def _override_value(text, key):
+    """The value after `key:` on its own line in `.orclab/test.yaml`, comment and surrounding
+    whitespace stripped - a hand-rolled stand-in for the one or two lines this hook cares about,
+    since real YAML parsing needs PyYAML (config.py has it; this hook does not)."""
+    for raw in text.splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if line.startswith(key + ":"):
+            return line[len(key) + 1:].strip()
+    return None
+
+
+def container_prefix(root):
+    """[] on the host; the compose-run prefix when `root` (the git root) is containerised and
+    this checkout has not opted out; None when it is containerised but no engine is on PATH -
+    then lint nothing, never fall back to the host."""
+    compose = pathlib.Path(root) / "compose.yaml"
+    if not compose.is_file() or not SERVICE_RE.search(compose.read_text(errors="replace")):
+        return []
+    override = pathlib.Path(root) / ".orclab" / "test.yaml"
+    text = override.read_text(errors="replace") if override.is_file() else ""
+    if (_override_value(text, "container") or "").lower() in FALSE_WORDS:
+        return []
+    runner = _override_value(text, "runner")
+    if runner and runner not in RUNNERS:   # config.py rejects this at load; shutil.which takes a
+        return None                        # path, so an unchecked value could run something else
+    names = (runner,) if runner else RUNNERS
+    engine = next((n for n in names if shutil.which(n)), None)
+    if engine is None:
+        return None
+    return [engine, "compose", "run", "--rm", "-T", "--workdir", str(root), "orclab"]
+
 
 def _config_dir(start, name, holds=lambda p: True):
     """The nearest ancestor of `start` holding `name` (and passing `holds`), up to the git root."""
@@ -72,7 +122,9 @@ def _ruff_section(pyproject):
 
 
 def command_for(path):
-    """(cwd, argv) to lint `path`, or None when the project has not configured a linter for it."""
+    """(cwd, argv, header) to lint `path`, or None when the project has not configured a linter
+    for it, or its container status can't be established. `header` is the two tokens worth
+    naming in the exit-2 message - the linter itself, never the container-engine prefix."""
     ext = pathlib.Path(path).suffix
     if ext not in LINTERS:
         return None
@@ -88,9 +140,21 @@ def command_for(path):
     local = root / NODE_BIN / tool
     if local.exists():
         argv = [str(local)] + argv[1:]
-    elif shutil.which(tool) is None:
+
+    # container status is a property of the git root, not of `root` (which may be a nested
+    # sub-project's own config dir). no git root: not containerised - host, as before (the
+    # container record can only ever live at a git root, so lacking one rules it out outright,
+    # rather than leaving it undetermined).
+    git_root = invoking_root(root)
+    prefix = container_prefix(git_root) if git_root else []
+    if prefix is None:
         return None
-    return root, argv + [str(pathlib.Path(path).resolve())]
+    if not prefix and not local.exists() and shutil.which(tool) is None:
+        return None
+
+    cwd = pathlib.Path(git_root) if prefix else root
+    header = " ".join(argv[:2])
+    return cwd, prefix + argv + [str(pathlib.Path(path).resolve())], header
 
 
 def main():
@@ -106,13 +170,15 @@ def main():
         found = command_for(path)
         if found is None:
             return 0
-        root, argv = found
-        cp = subprocess.run(argv, check=False, cwd=root, capture_output=True, text=True, timeout=TIMEOUT)
+        root, argv, header = found
+        # compose.yaml's `${PWD}` is read from the environment, which `cwd=` does not rewrite
+        env = {**os.environ, "PWD": str(root)}
+        cp = subprocess.run(argv, check=False, cwd=root, env=env, capture_output=True, text=True, timeout=TIMEOUT)
         if cp.returncode == 0:
             return 0
         lines = (cp.stdout + cp.stderr).strip().splitlines()
         report = "\n".join(lines[:MAX_LINES]) + (f"\n… {len(lines) - MAX_LINES} more lines" if len(lines) > MAX_LINES else "")
-        print(f"orclab lint_on_write: `{' '.join(argv[:2])}` on {path} exited {cp.returncode} - "
+        print(f"orclab lint_on_write: `{header}` on {path} exited {cp.returncode} - "
               f"code-discipline's checkable rules, from the project's own config. Set {OFF}=1 to disable.\n"
               f"{report}", file=sys.stderr)
         return 2

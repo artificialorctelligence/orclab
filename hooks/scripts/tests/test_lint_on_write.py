@@ -1,6 +1,7 @@
 import json
 import os
 import pathlib
+import shutil
 import stat
 import subprocess
 import sys
@@ -228,6 +229,141 @@ def test_a_linter_that_hangs_is_cut_off_and_the_write_goes_through(tmp_path, run
     assert run(f, bin_dir=bin_dir).returncode == 0
 
 
+# --- v23: a containerised project lints through compose run -----------------------------------
+
+COMPOSE = "services:\n  orclab:\n    build: .\n"
+
+
+def test_containerised_project_lints_through_compose_run(tmp_path, run):
+    src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
+    (tmp_path / "compose.yaml").write_text(COMPOSE)
+    f = src / "a.py"
+    f.write_text("x = 1\n")
+    bin_dir = tmp_path / "dockerbin"
+    bin_dir.mkdir()
+    docker = bin_dir / "docker"
+    docker.write_text('#!/bin/sh\necho "argv: $*"\nexit 1\n')
+    docker.chmod(docker.stat().st_mode | stat.S_IEXEC)
+    (tmp_path / ".orclab").mkdir()
+    (tmp_path / ".orclab" / "test.yaml").write_text("runner: docker\n")   # not the real podman this machine has
+    r = run(f, bin_dir=bin_dir)
+    assert r.returncode == 2
+    assert f"argv: compose run --rm -T --workdir {tmp_path} orclab ruff check --no-fix" in r.stderr
+    assert "`ruff check`" in r.stderr    # the header names the linter, never the engine prefix
+
+
+def test_container_false_in_test_yaml_lints_on_the_host(tmp_path, run):
+    src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
+    (tmp_path / "compose.yaml").write_text(COMPOSE)
+    (tmp_path / ".orclab").mkdir()
+    (tmp_path / ".orclab" / "test.yaml").write_text("container: false\n")
+    f = src / "a.py"
+    f.write_text("x = 1\n")
+    bin_dir = fake_tool(tmp_path / "bin", "ruff", 1, "src/a.py:1:1: E999 fake finding")
+    r = run(f, bin_dir=bin_dir)
+    assert r.returncode == 2 and "compose run" not in r.stderr
+
+
+def test_container_false_with_yaml_boolean_spelling_and_a_comment_lints_on_the_host(tmp_path, run):
+    """`False` (YAML's capitalised spelling of false) and a trailing comment - both of which the
+    real `yaml.safe_load` in config.py accepts - must not be missed by the hand-rolled scan."""
+    src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
+    (tmp_path / "compose.yaml").write_text(COMPOSE)
+    (tmp_path / ".orclab").mkdir()
+    (tmp_path / ".orclab" / "test.yaml").write_text("container: False  # note\n")
+    f = src / "a.py"
+    f.write_text("x = 1\n")
+    bin_dir = fake_tool(tmp_path / "bin", "ruff", 1, "src/a.py:1:1: E999 fake finding")
+    r = run(f, bin_dir=bin_dir)
+    assert r.returncode == 2 and "compose run" not in r.stderr
+
+
+def test_runner_with_a_comment_is_honored_over_the_default_order(tmp_path, run):
+    """`runner: docker  # note` must win even with `podman` also on PATH - a missed comment strip
+    would silently fall back to the default RUNNERS order (podman first), the opposite of what
+    the user wrote."""
+    src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
+    (tmp_path / "compose.yaml").write_text(COMPOSE)
+    (tmp_path / ".orclab").mkdir()
+    (tmp_path / ".orclab" / "test.yaml").write_text("runner: docker  # note\n")
+    f = src / "a.py"
+    f.write_text("x = 1\n")
+    bin_dir = tmp_path / "enginebin"
+    bin_dir.mkdir()
+    for name in ("docker", "podman"):
+        engine = bin_dir / name
+        engine.write_text('#!/bin/sh\necho "argv: $*"\nexit 1\n')
+        engine.chmod(engine.stat().st_mode | stat.S_IEXEC)
+    r = run(f, bin_dir=bin_dir)
+    assert r.returncode == 2
+    assert f"compose run --rm -T --workdir {tmp_path} orclab ruff check --no-fix" in r.stderr
+    assert "podman compose" not in r.stderr
+
+
+def test_the_engine_sees_pwd_as_the_git_root(tmp_path, run):
+    """compose.yaml's `${PWD}` is read from the environment; `cwd=` alone leaves the session's
+    PWD in place, which is wherever Claude's shell sits, not necessarily this project."""
+    src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
+    (tmp_path / "compose.yaml").write_text(COMPOSE)
+    f = src / "a.py"
+    f.write_text("x = 1\n")
+    bin_dir = tmp_path / "enginebin"
+    bin_dir.mkdir()
+    engine = bin_dir / "podman"      # python, not sh: a shell rewrites PWD to its real cwd on start
+    engine.write_text('#!/usr/bin/env python3\nimport os\nprint("pwd:", os.environ.get("PWD"))\nraise SystemExit(1)\n')
+    engine.chmod(engine.stat().st_mode | stat.S_IEXEC)
+    r = run(f, bin_dir=bin_dir, env_extra={"PWD": "/somewhere/else"})
+    assert r.returncode == 2 and f"pwd: {tmp_path}" in r.stderr
+
+
+def test_a_file_outside_any_git_repo_lints_on_the_host_as_before(tmp_path, run):
+    """No git root rules out being containerised outright (the record can only ever live at a
+    git root), so this is the plain host case - pre-v23 behaviour, unchanged."""
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    (proj / "pyproject.toml").write_text("[tool.ruff]\n")
+    f = proj / "a.py"
+    f.write_text("x = 1\n")
+    bin_dir = fake_tool(tmp_path / "bin", "ruff", 1, "src/a.py:1:1: E999 fake finding")
+    r = run(f, bin_dir=bin_dir)
+    assert r.returncode == 2
+    assert "E999 fake finding" in r.stderr
+    assert "compose run" not in r.stderr
+
+
+def test_containerised_project_with_no_engine_says_nothing(tmp_path, run):
+    src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
+    (tmp_path / "compose.yaml").write_text(COMPOSE)
+    f = src / "a.py"
+    f.write_text("x = 1\n")
+    # ruff and git on the host and nothing else: no engine, whatever this machine has (it has
+    # podman since 2026-09-20, and the real PATH would have found it)
+    bin_dir = fake_tool(tmp_path / "bin", "ruff", 1, "finding")
+    (bin_dir / "git").symlink_to(shutil.which("git"))
+    r = run(f, env_extra={"PATH": str(bin_dir)})
+    assert r.returncode == 0    # fail open - the hook never runs a containerised project's linter on the host
+
+
+def test_an_unrecognised_runner_value_lints_nothing(tmp_path, run):
+    """`runner:` outside {docker, podman} - config.py's BadConfig for this same value - must not
+    reach shutil.which, which resolves a path and would run it as the engine. An absolute path
+    to a real executable (standing in for `runner: ./x`) proves it: if the guard is missing, this
+    script is what `compose run` shells out to, and its own marker text shows up in the report."""
+    src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
+    (tmp_path / "compose.yaml").write_text(COMPOSE)
+    (tmp_path / ".orclab").mkdir()
+    rogue = tmp_path / "x"
+    rogue.write_text('#!/bin/sh\necho "ROGUE RAN: $*"\nexit 1\n')
+    rogue.chmod(rogue.stat().st_mode | stat.S_IEXEC)
+    (tmp_path / ".orclab" / "test.yaml").write_text(f"runner: {rogue}\n")
+    f = src / "a.py"
+    f.write_text("x = 1\n")
+    bin_dir = fake_tool(tmp_path / "bin", "ruff", 1, "src/a.py:1:1: E999 fake finding")
+    r = run(f, bin_dir=bin_dir)
+    assert r.returncode == 0
+    assert "compose run" not in r.stderr and "ROGUE RAN" not in r.stderr
+
+
 def test_as_a_process_findings_are_exit_2_on_stderr(tmp_path):
     """The contract Claude Code sees; the one test here that runs the script for real."""
     src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
@@ -238,3 +374,4 @@ def test_as_a_process_findings_are_exit_2_on_stderr(tmp_path):
                          input=json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(f)}}),
                          capture_output=True, text=True, env={"PATH": f"{bin_dir}:/usr/bin:/bin"})
     assert out.returncode == 2 and "E722" in out.stderr and out.stdout == ""
+

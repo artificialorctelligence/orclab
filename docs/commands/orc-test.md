@@ -33,6 +33,13 @@ JavaScript, `pyproject.toml` for Python, and so on) at the project's root or a c
 down — you never tell it what language the project is in, and a project with more than one
 language gets every one of them run.
 
+A project that chose, when it was scaffolded, to keep its toolchain in a container rather than on
+this machine has its tests run inside that container — the same commands, one layer over, with
+nothing installed here beyond the container engine itself (Podman by default, Docker if that is
+what you have). The report's first line says so: `detected: Python (in container)`. To change
+that for just this checkout, put either of these in `.orclab/test.yaml`: `container: false` to
+run on this machine instead, or `runner: docker` (or `podman`) to pick the engine.
+
 ## What it will ask you
 
 Nothing, for `run`, `coverage`, `analyze`, and `detect` — each one runs the moment you type it. A
@@ -69,8 +76,12 @@ For `generate`:
 - It will never run outside a git-tracked project. It says so and stops, rather than trying to
   test whatever it happens to find.
 - It will never install a missing testing or mutation tool, or the dependency-audit tool, on your
-  behalf. If one isn't installed, it names the missing tool and the command to install it, and
-  skips just that language — every other language it found still runs.
+  behalf — and that includes the container engine itself. If one isn't installed, it names the
+  missing tool and the command to install it, and skips just that language — every other
+  language it found still runs.
+- It will never run a containerised project's tests on this machine instead when the container
+  can't be used — no engine installed, or an image that fails to build — it says why and stops
+  for that project.
 - It will never run git itself — no commits, no branches — no matter which subcommand you run.
 - It will never guess which language a project is written in. If it can't find that language's own
   marker file, it leaves that language out rather than assuming.

@@ -5,6 +5,7 @@ import pathlib
 import platform
 import shutil
 
+from .. import probe
 from ..detect import SKIP_DIRS
 from ..model import Coverage, Finding, Mutation, Survivor
 from ..runner import run
@@ -38,9 +39,10 @@ def _xcodeproj(root):
 
 
 def missing(root):
+    # xcodebuild is a host check on purpose (v23): it only exists on a Mac, never inside a Linux image.
     if _xcodeproj(root) and (platform.system() != "Darwin" or shutil.which("xcodebuild") is None):
         return ["xcodebuild"]
-    return [] if shutil.which("swift") else ["swift"]
+    return [] if probe.which("swift") else ["swift"]
 
 
 def _scheme(root):
@@ -100,7 +102,7 @@ def _parse_xccov(path, root):
 
 
 def mutation_unavailable(root, target=None):
-    if shutil.which("muter") is None:
+    if not probe.which("muter"):
         return "Muter not installed — brew install muter-mutation-testing/formulae/muter"
     if not (pathlib.Path(root) / "muter.conf.yml").exists():
         return "no muter.conf.yml — run `muter init` once in the project"
@@ -128,7 +130,7 @@ def _parse_muter(path):
 
 
 def lint(root, target, out):
-    if shutil.which("swiftlint") is None:
+    if not probe.which("swiftlint"):
         return "SwiftLint not installed — brew install swiftlint"
     cp = run(["swiftlint", "lint", "--reporter", "json", "--quiet", target or "."], cwd=root)
     try:

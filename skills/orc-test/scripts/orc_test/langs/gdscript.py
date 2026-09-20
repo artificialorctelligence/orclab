@@ -3,9 +3,8 @@
 import os
 import pathlib
 import re
-import shutil
 
-from .. import lcov, stryker
+from .. import lcov, probe, stryker
 from ..model import Coverage, Finding, Mutation
 from ..runner import run
 
@@ -34,13 +33,19 @@ def _runner(root):
 
 
 def missing(root):
+    # Host checks on purpose (v23): GODOT_BIN is a host environment variable and gdUnit4 a file in
+    # the project; in a container the Godot binary path must be inside the image (stack-godot).
     if not _runner(root).exists():
         return ["gdUnit4"]
     return [] if os.environ.get("GODOT_BIN") else ["GODOT_BIN"]
 
 
 def test_cmd(root, target):
-    return ["./addons/gdUnit4/runtest.sh", "-a", target or "test"]
+    # runtest.sh passes every other argument through to Godot. --headless so the run needs no
+    # display (a container has none); --ignoreHeadlessMode because gdUnit4's CI runner otherwise
+    # exits 103 under --headless (GdUnitTestCIRunner.gd, 2026-09-20) — the pair gdmutant already
+    # passes for every mutant, so run, coverage and mutation see the same suite, host or container.
+    return ["./addons/gdUnit4/runtest.sh", "--headless", "--ignoreHeadlessMode", "-a", target or "test"]
 
 
 def coverage_unavailable(root):
@@ -62,7 +67,7 @@ def coverage_parse(root, out):
 
 
 def mutation_unavailable(root, target=None):
-    if shutil.which("gdmutant") is None:
+    if not probe.which("gdmutant"):
         return "gdmutant not installed — pip install 'gdmutant==0.1.*'"
     return None
 
@@ -85,7 +90,7 @@ def mutation_parse(root, out):
 
 
 def lint(root, target, out):
-    if shutil.which("gdlint") is None:
+    if not probe.which("gdlint"):
         return "gdlint not installed — pip install gdtoolkit"
     cp = run(["gdlint", target or "test"], cwd=root)
     return [Finding(m["file"], int(m["line"]), m["msg"]) for m in _GDLINT.finditer(cp.stdout)]

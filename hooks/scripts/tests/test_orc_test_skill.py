@@ -17,3 +17,14 @@ def test_every_rule_the_spec_names_is_stated():
                    "test-discipline", "uncommitted", "## When something goes wrong",
                    "## Deferred", "`ci`", "characterization tests"]:
         assert phrase in TEXT, phrase
+
+
+def test_containers_section_names_the_record_the_override_and_the_engine():
+    s = TEXT[TEXT.index("## Containers"):]
+    s = s[:s.index("\n## ", 1)]
+    for phrase in ["compose.yaml", "`orclab`", "container: false", "runner:", "docker", "podman",
+                   "confirmed live 2026-", "(in container)", "container runner not found",
+                   "container build failed", "never the host"]:
+        assert phrase in s, phrase
+    never = TEXT[TEXT.index("## What it never does"):TEXT.index("## `run`")]
+    assert "engine" in never

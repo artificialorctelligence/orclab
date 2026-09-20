@@ -341,6 +341,83 @@ What `/orc-code` scaffolds on day one for this tier, each piece from FastAPI's o
   `request` argument must be explicitly passed to your endpoint, or slowapi won't be able to
   hook into it."* The scaffold puts it on `/token`; the number is the project's.
 
+## Containers
+
+Runs in a container: **yes** — confirmed live 2026-09-20. Both halves' tests, every `/orc-test`
+step in both languages, `lint_on_write` and `vite build` run inside; what does not is the two
+dev servers, which bind ports the `compose.yaml` does not publish.
+
+**One image, one service.** `/orc-test` runs one service named `orclab` for every language it
+finds, so both toolchains live in one image. Node goes into the Python image rather than the
+other way round because the Python version is the tighter one — the toolchain table names
+3.14.7, and `python:3.14` *is* 3.14.7 — while any Node ≥ 22.12 satisfies Vite, Vitest and
+StrykerJS. How Node gets in, from primary sources. The official `node` image's Dockerfile
+downloads the release tarball from nodejs.org, checks its SHA-256 against the GPG-signed
+`SHASUMS256.txt`, and unpacks it into `/usr/local`. What lands there is the tarball's own
+layout, listed from `node-v24.21.0-linux-x64.tar.xz` on this machine: `bin/node`,
+`lib/node_modules/{npm,corepack}`, and `bin/npm` and `bin/npx` as symlinks into it. A build
+stage from that image and `COPY --from` carries the verified binary over. Docker: *"The `COPY
+--from` flag lets you copy files from an image, a build stage, or a named context"*; Podman's
+Containerfile: *"copy files from a named previous build stage"* — so the stage is named, the
+form both engines document.
+`node:24-trixie` is Node 24.21.0 LTS "Krypton" on the same Debian trixie as `python:3.14`,
+so the binary meets the C library it was built against. NodeSource's apt repository is the
+other route; its own README lists Debian only up to 12 bookworm, and it is a downloaded
+script run as root — `security-discipline` rule 3's shape — so not this one.
+
+The `Dockerfile` `/orc-code` writes when the user says yes to the container question — base
+image and tag from the official `python` and `node` images' own tag lists, the two toolchains,
+and every tool `skills/orc-test/languages/python.md` names (pytest, pytest-cov, mutmut,
+pip-audit) plus ruff, which `lint_on_write` runs:
+
+```dockerfile
+FROM node:24-trixie AS nodejs
+FROM python:3.14
+COPY --from=nodejs /usr/local/bin/node /usr/local/bin/node
+COPY --from=nodejs /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
+RUN pip install --no-cache-dir "fastapi[standard]" sqlmodel pytest pytest-cov mutmut pip-audit ruff
+```
+
+Not run here — the first project records it. `python:3.14`, not `-slim`, for the reason
+`stack-python-desktop`'s Containers section gives (the README's own recommendation, and
+`buildpack-deps`' compiler for any wheel that needs building). The `pip install` line is each
+tool's own documented install (PyPI today: pytest 9.1.1, pytest-cov 7.1.0, mutmut 3.8.0,
+pip-audit 2.10.1, ruff 0.16.8), plus the back end's two dependencies from `## Toolchain`,
+because the image is where the Python dependencies live — `compose run --rm` discards the
+container after every command, so a `pip install` inside it is gone by the next one; a
+dependency added to `pyproject.toml` goes on this line too, then `<engine> compose build
+orclab` — the same rebuild picks up a new tool version, since the line is unpinned.
+`/usr/local/include/node` is not copied: only a native addon build needs it, and this
+stack has none.
+
+**Which JS tools the image installs: none.** They are the project's own `devDependencies` in
+`web/package.json`, installed into `web/node_modules` — inside the mounted tree, so they
+survive the container and are the same files the host sees. `oxlint` is in the `react-ts`
+template already (`^1.83.0`, its `package.json` on `main`); `vitest` 5.0.1,
+`@vitest/coverage-v8` 5.0.1, `@stryker-mutator/core` 10.0.0 and
+`@stryker-mutator/vitest-runner` 10.0.0 are added by the project (`languages/javascript.md`
+picks Vitest when `vitest` is in `package.json`). `npm audit` and `npx` ship with npm, which
+came over with Node. The one command that installs anything is the project's own `npm
+install`, run through the container once — `<engine> compose run --rm --workdir $PWD/web
+orclab npm install` from the project root — and again when `package.json` changes;
+`lint_on_write` then finds `web/node_modules/.bin/oxlint` by path. Host and container are both
+`linux-x64-gnu`, so oxlint's platform binary package is the same either side. Vitest 5.0.1
+wants Node `^22.12.0 || ^24.0.0 || >=26.0.0`, Stryker `>=22.0.0`, oxlint `^20.19.0 ||
+>=22.12.0` (each package's `engines` on the npm registry today): 24.21.0 satisfies all three.
+
+The `compose.yaml` is the one in `skills/orc-test/SKILL.md`'s Containers section, unchanged.
+What cannot happen inside: reaching `npm run dev` (:5173) or `fastapi dev` (:8000) from a
+browser — the compose file publishes no port, so the dev loop is the host's, on a host venv
+and `node_modules` as `## Build, run, test` shows, or a `ports:` line the first project adds
+and records. The container is a development environment, not what ships: `## Deployment` is
+unchanged, and a production image is a separate, deferred BACKLOG entry. The proposal
+`/orc-code` makes for this stack's container question: **no**, because Node and Python are
+the two toolchains most likely already on a dev machine, and each half's install is one
+command from `## Toolchain`; say yes when the machine's Node is below 22.12 or its Python
+below 3.10 and neither is yours to upgrade.
+
 ## Presence
 
 Presence is how the app reaches the person when its tab is not in front — or is closed. A web page
@@ -394,13 +471,15 @@ serving `web/dist` and the API on one port; FastAPI's deployment page lists what
 *"Security - HTTPS, Running on startup, Restarts, Replication"*, i.e. a reverse proxy holding the
 certificate, and a service manager. Static hosting — Vite: *"You may deploy this `dist` folder to any
 of your preferred platforms"* (GitHub Pages, Netlify, Cloudflare, …) — is only for a front end with no
-back end, or whose API is at another origin (then CORS is the back end's job). Containers (Docker)
-are deliberately parked (v18 spec §6); no default here.
+back end, or whose API is at another origin (then CORS is the back end's job). Shipping a
+container is deliberately parked (v18 spec §6, still so under v23); no default here —
+`## Containers` above is the development environment, not the deployed unit.
 
 ## Sources (live on 2026-09-12)
 
 - Lint — where code-discipline lands (2026-09-13): `https://raw.githubusercontent.com/oxc-project/oxc/main/crates/oxc_linter/src/rules/eslint/{max_depth,max_lines_per_function,no_empty}.rs`, `.../apps/oxlint/src/command/lint.rs` (`--deny-warnings`), `https://raw.githubusercontent.com/vitejs/vite/main/packages/create-vite/template-react-ts/_oxlintrc.json`; ESLint defaults `https://raw.githubusercontent.com/eslint/eslint/main/docs/src/rules/{max-depth,max-lines-per-function,no-empty}.md`; `https://docs.astral.sh/ruff/rules/`, `https://docs.astral.sh/ruff/settings/`, `https://raw.githubusercontent.com/microsoft/pyright/main/docs/configuration.md`; versions from `https://pypi.org/pypi/<name>/json`
 - Security — where security-discipline lands (2026-09-19): `https://api.github.com/repos/oxc-project/oxc/contents/crates/oxc_linter/src/rules` (no `security/`), `.../rules/react`, `.../rules/eslint`; `https://raw.githubusercontent.com/oxc-project/oxc/main/crates/oxc_linter/src/rules/react/{no_danger,jsx_no_script_url}.rs`, `.../eslint/no_eval.rs`; `https://oxc.rs/docs/guide/usage/linter/config.html` (categories; `correctness` is the default), `https://oxc.rs/docs/guide/usage/linter/rules/react/no-danger.html`; `https://react.dev/reference/react-dom/components/common` (`dangerouslySetInnerHTML`); `https://registry.npmjs.org/eslint-plugin-security`, `https://raw.githubusercontent.com/eslint-community/eslint-plugin-security/main/README.md`, `https://registry.npmjs.org/oxlint`; `https://docs.astral.sh/ruff/rules/` (the flake8-bandit table), `.../rules/assert/`, `.../rules/subprocess-without-shell-equals-true/`, `https://docs.astral.sh/ruff/settings/`; `https://vite.dev/guide/env-and-mode`, `https://raw.githubusercontent.com/vitejs/vite/main/packages/create-vite/template-react-ts/_gitignore`; FastAPI `https://fastapi.tiangolo.com/tutorial/security/`, `/tutorial/security/oauth2-jwt/`, `/tutorial/bigger-applications/`, `/tutorial/handling-errors/`, `/advanced/settings/`, `/advanced/middleware/`, `/deployment/https/`, `/features/`, `/reference/fastapi/` (`debug`); `https://starlette.dev/exceptions/`; `https://slowapi.readthedocs.io/en/latest/`, `https://raw.githubusercontent.com/laurents/slowapi/master/README.md`; versions from `https://pypi.org/pypi/<name>/json` for `ruff`, `pydantic-settings`, `pyjwt`, `pwdlib`, `slowapi`; the fixture runs: ruff 0.16.8 in a scratch venv and `npx oxlint@1.83.0`, on this machine
+- Containers (2026-09-20): tags `https://raw.githubusercontent.com/docker-library/official-images/master/library/python` and `.../library/node`; `https://raw.githubusercontent.com/docker-library/docs/master/python/README.md`, `.../node/README.md` (variants); `https://raw.githubusercontent.com/nodejs/docker-node/main/24/trixie/Dockerfile` (GPG-checked `SHASUMS256.txt`, `tar -xJf … -C /usr/local --strip-components=1`); the tarball's layout: `https://nodejs.org/dist/v24.21.0/node-v24.21.0-linux-x64.tar.xz` listed with `tar -t` on this machine; `https://nodejs.org/dist/index.json` (24.21.0 is LTS "Krypton"); `https://docs.docker.com/reference/dockerfile/#copy---from`; `https://raw.githubusercontent.com/containers/common/main/docs/Containerfile.5.md` (`COPY --from=name`); NodeSource `https://raw.githubusercontent.com/nodesource/distributions/master/DEV_README.md` (DEB supported versions, the setup script); `https://raw.githubusercontent.com/vitejs/vite/main/packages/create-vite/template-react-ts/package.json` (`oxlint` in `devDependencies`); `engines` and versions from `https://registry.npmjs.org/<pkg>` for `vitest`, `@vitest/coverage-v8`, `@stryker-mutator/core`, `@stryker-mutator/vitest-runner`, `oxlint`; the Python lines' sources are in `stack-python-desktop`'s Containers entry (pytest, pytest-cov, mutmut, pip-audit, ruff install pages; `https://pypi.org/pypi/<name>/json`)
 - Versions: `https://registry.npmjs.org/<pkg>` for `react`, `vite`, `create-vite`, `vitest`, `next`, `react-router`, `jest`; `https://nodejs.org/dist/index.json`; `https://pypi.org/pypi/<pkg>/json` for `fastapi`, `django`, `uvicorn`, `sqlmodel`, `sqlalchemy`, `pytest`; `https://www.python.org/downloads/`; `https://react.dev/versions`
 - React: `https://react.dev/learn/creating-a-react-app`, `/learn/build-a-react-app-from-scratch`, `/learn` (Quick Start), `/learn/thinking-in-react`
 - Vite: `https://vite.dev/guide/`, `/config/server-options`, `/guide/static-deploy`; template files via `https://api.github.com/repos/vitejs/vite/contents/packages/create-vite/template-react-ts` and `https://raw.githubusercontent.com/vitejs/vite/main/packages/create-vite/template-react-ts/{package.json,_gitignore}`; `https://vitest.dev/guide/`

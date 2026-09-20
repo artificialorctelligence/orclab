@@ -3,9 +3,8 @@
 import json
 import pathlib
 import re
-import shutil
 
-from .. import lcov, stryker
+from .. import lcov, probe, stryker
 from ..model import Coverage, Finding, Mutation
 from ..runner import run
 
@@ -23,7 +22,7 @@ _UNREADABLE = ["audit output not understood — see above"]
 
 
 def audit_unavailable(root):
-    return None if shutil.which("dotnet") else "dotnet not installed"
+    return None if probe.which("dotnet") else "dotnet not installed"
 
 
 def audit_cmd(root):
@@ -71,7 +70,7 @@ _WARN = re.compile(r"^(?P<file>[^(]+)\((?P<line>\d+),\d+\): warning (?P<code>xUn
 
 
 def missing(root):
-    return [t for t in TOOLS if shutil.which(t) is None]
+    return [t for t in TOOLS if not probe.which(t)]
 
 
 def test_cmd(root, target):
@@ -92,7 +91,7 @@ def coverage_parse(root, out):
 
 
 def mutation_unavailable(root, target=None):
-    if shutil.which("dotnet-stryker") is None:
+    if not probe.which("dotnet-stryker"):
         return "Stryker.NET not installed — dotnet tool install -g dotnet-stryker"
     return None
 

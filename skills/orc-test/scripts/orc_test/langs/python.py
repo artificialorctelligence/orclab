@@ -8,7 +8,6 @@ a mutants/ at the directory pytest runs from.
 """
 
 import ast
-import importlib.util
 import json
 import os
 import pathlib
@@ -16,7 +15,7 @@ import shutil
 
 import tomllib
 
-from .. import lcov
+from .. import lcov, probe
 from ..detect import SKIP_DIRS
 from ..model import Coverage, Finding, Mutation, Survivor
 from ..runner import run
@@ -49,7 +48,7 @@ def audit_nothing(root):
 
 
 def audit_unavailable(root):
-    return None if importlib.util.find_spec("pip_audit") else "pip-audit not installed"
+    return None if probe.python_module("pip_audit") else "pip-audit not installed"
 
 
 def audit_cmd(root):
@@ -92,7 +91,7 @@ MUTMUT_DIFFS = pathlib.Path(__file__).parents[1] / "mutmut_diffs.py"
 
 
 def missing(root):
-    return [t for t in TOOLS if importlib.util.find_spec(t) is None]
+    return [t for t in TOOLS if not probe.python_module(t)]
 
 
 def _has_tests(base):
@@ -138,7 +137,7 @@ def coverage_parse(root, out):
 
 
 def mutation_unavailable(root, target=None):
-    if importlib.util.find_spec("mutmut") is None:
+    if not probe.python_module("mutmut"):
         return "mutmut not installed — pip install mutmut"
     if _mutmut_config(root, target) is None:
         where = pathlib.Path(root) / (target or ".")
@@ -202,7 +201,9 @@ def _diffs(root, alive):
     if not alive:
         return {}
     stdin = "".join(f"{key} {file}\n" for key, file in alive)
-    out = run(["python3", str(MUTMUT_DIFFS)], cwd=root, input=stdin).stdout
+    # the script's text, not its path: inside a container only the project dir is mounted, not
+    # Orclab's own plugin directory where MUTMUT_DIFFS lives (v23)
+    out = run(["python3", "-c", MUTMUT_DIFFS.read_text()], cwd=root, input=stdin).stdout
     blocks = (b.partition("\n") for b in ("\n" + out).split("\n# ")[1:])
     return {key: diff.rstrip("\n") for key, _, diff in blocks}
 

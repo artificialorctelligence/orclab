@@ -211,6 +211,70 @@ line (Android: cleartext off by default since API 28, the system trust store onl
 turns certificate checking off is a finding on both phones at once (rule 8), and an API key
 belongs on a server, not in the framework or the bundle — the Android skill's API-key paragraph.
 
+## Containers
+
+Runs in a container: **yes** for the shared module and the Android app, **no** for the iOS
+half — confirmed live 2026-09-20. `./gradlew :shared:check`, `:androidApp:bundleRelease`,
+every `/orc-test` step for Kotlin and `lint_on_write`'s detekt run inside; the iOS framework
+and the iOS app cannot, for the reason the toolchain table already quotes — *"To create iOS
+applications, you need a macOS host with Xcode installed"* — and a Linux container is not
+one. Nothing in the container changes the Mac question: `stack-ios-native`'s "The Mac
+requirement" and Codemagic (`## Build, run, test`) hold as before.
+
+**Why the Android half is whole, not partial.** The shared module declares iOS targets
+(`iosArm64()` and the rest, the layout table), and the build runs on a Linux host. Kotlin's
+DSL reference settles what happens: *"A target that is not supported by the current host is
+ignored during building and, therefore, not published."* So `:shared:check` inside runs
+`commonTest` for the Android target and skips the iOS ones — exactly what it does on this
+machine today — and `iosMain` is neither compiled nor linted there; the Swift app's tests are
+`languages/swift.md`'s and run on the Mac.
+
+The `Dockerfile` `/orc-code` writes when the user says yes to the container question is
+`stack-android-native`'s, unchanged — the same JDK 17 (Kotlin 2.4.20's table allows Gradle up
+to 9.7.0 and AGP 8.5.2–9.3.1; Gradle 9 runs on *"a JVM version between 17 and 26"* and AGP 8.x
+*"requires JDK 17"*, the jdks page), the same SDK packages, and the same
+one tool that is not a Gradle plugin, detekt; that skill's Containers section says why each
+line is what it is, and where `cimg/android` and the other third-party SDK images stand:
+
+```dockerfile
+FROM eclipse-temurin:17-jdk
+ENV ANDROID_HOME=/opt/android-sdk
+ENV PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends unzip \
+    && rm -rf /var/lib/apt/lists/*
+RUN wget -q -O /tmp/cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-15859902_latest.zip \
+    && echo "4e4c464f145a7512b57d088ac6c278c03c9eea610886b35a5e0804e74eedf583 /tmp/cmdline-tools.zip" | sha256sum -c - \
+    && mkdir -p $ANDROID_HOME/cmdline-tools \
+    && unzip -q /tmp/cmdline-tools.zip -d $ANDROID_HOME/cmdline-tools \
+    && mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest \
+    && rm /tmp/cmdline-tools.zip
+RUN yes | sdkmanager --licenses >/dev/null \
+    && sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+RUN wget -q -O /tmp/detekt.zip https://github.com/detekt/detekt/releases/download/v1.23.8/detekt-cli-1.23.8.zip \
+    && echo "ff9f9258879ff2ec4349114740221498afec46a85cf6302c9f80b06eb4429501 /tmp/detekt.zip" | sha256sum -c - \
+    && unzip -q /tmp/detekt.zip -d /opt \
+    && ln -s /opt/detekt-cli-1.23.8/bin/detekt-cli /usr/local/bin/detekt \
+    && rm /tmp/detekt.zip
+ENV GRADLE_USER_HOME=/cache/gradle
+```
+
+Not run here — the first project records it. Kover, Pitest and dependency-check are Gradle
+plugins in the project's build files, resolved into the `GRADLE_USER_HOME` that the last line
+points at `/cache/gradle`; the `compose.yaml` is the one in `skills/orc-test/SKILL.md`'s
+Containers section plus the named volume `cache:/cache` that the Android skill's section
+shows and explains (Gradle's cache would otherwise be refilled on every `compose run --rm`).
+Two things this stack adds to that section's list of what cannot happen inside: the Xcode
+script phase that runs `:shared:embedAndSignAppleFrameworkForXcode` (it runs *in* Xcode, on
+the Mac), and the multi-module audit caveat — `/orc-test audit` reads the root project's
+dependency list until `dependencyCheckAggregate` is wired (`### Dependency audit`) — which the
+container does not change. The emulator, a USB device and the Play upload are the host's, as
+in the Android skill. The proposal `/orc-code` makes for this stack's container question:
+**no**, for the Android skill's reasons — Android Studio (with the KMP plugin) is already
+the install, the image is a second SDK beside it, and the emulator cannot move into it — and
+because the container covers one of this stack's two halves; say yes on a Linux box with no
+Android Studio that only builds and tests the shared module and the Android app.
+
 ## Presence
 
 Presence is how the app stays visible and reachable when it is not in front — a notification on
@@ -306,3 +370,4 @@ multiplatform library calls on iOS goes in the *app's* `PrivacyInfo.xcprivacy` (
 - Beyond mobile (2026-09-12): `https://kotlinlang.org/docs/multiplatform/compose-native-distribution.html`, `https://kotlinlang.org/docs/multiplatform/compose-desktop-tray.html`, `https://kotlinlang.org/docs/wasm-overview.html`, `https://raw.githubusercontent.com/JetBrains/compose-multiplatform/master/README.md`, `https://raw.githubusercontent.com/JetBrains/compose-multiplatform-core/jb-main/compose/ui/ui/src/desktopMain/kotlin/androidx/compose/ui/window/Tray.desktop.kt`
 - Storage: `https://kotlinlang.org/docs/multiplatform/multiplatform-ktor-sqldelight.html`, `https://sqldelight.github.io/sqldelight/latest/`, `https://api.github.com/repos/sqldelight/sqldelight/releases/latest`, `https://raw.githubusercontent.com/russhwolf/multiplatform-settings/main/README.md`, `https://api.github.com/repos/russhwolf/multiplatform-settings/releases/latest`
 - Building without a Mac: `https://docs.codemagic.io/yaml-quick-start/building-a-kmm-app/`. Store rules themselves: the two native skills' tables and `skills/orc-package/ingredients/`.
+- Containers (2026-09-20): `https://kotlinlang.org/docs/multiplatform/multiplatform-dsl-reference.html` (a target the host cannot build is ignored); the image, its sources and detekt: `stack-android-native`'s Containers sources

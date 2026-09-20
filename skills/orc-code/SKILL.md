@@ -50,14 +50,21 @@ question `$ARGUMENTS` already answered.
    ticked web, so I'll assume yes — right?"; desktop or mobile only → "Nothing you ticked
    accepts connections, so I'll assume no — right?". The answer is which of
    `security-discipline`'s two tiers the scaffold builds to: *Every project*, or *Reachable by
-   strangers*. It is not recorded anywhere — what step 6 scaffolds is the record, and from then
+   strangers*. It is not recorded anywhere — what step 7 scaffolds is the record, and from then
    on the code says which tier it is (a route handler is a route handler).
-5. **Starting point**: "Would you like a minimal example, a basic scaffold with common features,
+5. **Container**: "Run this project's toolchain in a container, so nothing has to be installed on this machine?"
+   The proposed answer is no — most toolchains are already on a dev machine — unless the stack
+   skill's `## Containers` section says to propose yes for this stack (a toolchain unusual on a
+   dev machine). A stack whose section says "Runs in a container: **no**" skips the container question;
+   say why in one sentence from that section. The container is a development environment,
+   not what ships: it holds the toolchain and every `/orc-test` tool, and what it produces
+   is ordinary project files.
+6. **Starting point**: "Would you like a minimal example, a basic scaffold with common features,
    or something specific — describe your use case."
 
-Once all five are answered:
+Once all six are answered:
 
-6. **Scaffold**: create the project directory (if it doesn't already exist), initialize the
+7. **Scaffold**: create the project directory (if it doesn't already exist), initialize the
    language's standard tooling (e.g. `npm init`, `cargo init`, a Maven/Gradle project layout,
    `python -m venv` + `pyproject.toml`, whatever is standard for the confirmed language), and
    write starter files reflecting the confirmed stack and starting point.
@@ -66,12 +73,21 @@ Once all five are answered:
    the `.gitignore` entries the Security section's `### Secrets` names. If the answer to step 4
    was yes, scaffold what that section's `### Reachable by strangers` lists for this stack: the
    auth layer, the public/private split, error handling that returns no internals, transport.
-   `/orc-code` names no framework itself; the stack skill does.
-7. **Verify**: run the stack's standard build/test command (e.g. `mvn compile`, `npm run build`,
+   `/orc-code` names no framework itself; the stack skill does. If the answer to step 5 was yes,
+   write the `Dockerfile` from the stack skill's `## Containers` section and the `compose.yaml`
+   from `skills/orc-test/SKILL.md`'s `## Containers` — plus whatever the stack skill's section
+   adds to it (a build-cache volume, for the Android stacks) — both at the project root, both
+   committed; the compose service is named `orclab`, and that name is what `/orc-test` and
+   `lint_on_write` recognise.
+8. **Verify**: run the stack's standard build/test command (e.g. `mvn compile`, `npm run build`,
    `cargo build`, `python -m py_compile` or the project's own test command) and confirm it exits
    cleanly. If it fails, fix the issue before continuing — do not report this flow as complete
-   until the verification command actually passes.
-8. **Report**: tell the user what was created, the exact command to run it, and any relevant next
+   until the verification command actually passes. When the project opted into a container, build
+   the image first — `<engine> compose build orclab` — then run the verification command *through*
+   it — `<engine> compose run --rm -T --workdir <project> orclab <cmd>`, the same prefix
+   `/orc-test` uses — so "exits cleanly" means clean in the environment that will be used; a
+   build failure here is the report, not a reason to try the host.
+9. **Report**: tell the user what was created, the exact command to run it, and any relevant next
    steps.
 
 ## Add-to-Existing Flow
@@ -355,5 +371,5 @@ ask directly in the New-Project Flow's step 3 instead of guessing. A row's **Kno
 names the background skill that holds the stack's current toolchain, project layout, store
 rules, and the facets every stack skill answers — presence, UI, storage (v18 spec §3) and
 security (v22). When a
-row has one, its scaffold step follows that file rather than this one's generic step 6. A row
+row has one, its scaffold step follows that file rather than this one's generic step 7. A row
 marked *stub* is not a default to propose; it is a name to research.

@@ -1,4 +1,5 @@
-"""`.orclab/test.yaml` — optional, project-owned. Thresholds and per-language command overrides."""
+"""`.orclab/test.yaml` — optional, project-owned. Thresholds, per-language command overrides,
+and the per-checkout container override (v23)."""
 
 import pathlib
 
@@ -11,7 +12,7 @@ class BadConfig(Exception):
 
 def load(root):
     path = pathlib.Path(root) / ".orclab" / "test.yaml"
-    cfg = {"coverage": 80, "tce": 70, "languages": {}}
+    cfg = {"coverage": 80, "tce": 70, "languages": {}, "container": True, "runner": None}
     if not path.exists():
         return cfg
     try:
@@ -28,4 +29,9 @@ def load(root):
         except (ValueError, TypeError):
             raise BadConfig(f"{path}: {k!r} must be an integer, got {data[k]!r}")
     cfg["languages"] = dict(data.get("languages") or {})
+    cfg["container"] = data.get("container", True) is not False
+    runner = data.get("runner")
+    if runner is not None and runner not in ("docker", "podman"):
+        raise BadConfig(f"{path}: runner must be docker or podman, got {runner!r}")
+    cfg["runner"] = runner
     return cfg

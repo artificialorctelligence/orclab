@@ -1,6 +1,7 @@
 import pathlib
 from types import SimpleNamespace
 
+from orc_test import probe
 from orc_test.langs import java
 
 
@@ -50,7 +51,7 @@ def test_lint_maps_main_target_to_test_dir(tmp_path, monkeypatch):
         return SimpleNamespace(stdout='{"files": []}', returncode=0)
 
     monkeypatch.setattr(java, "run", fake_run)
-    monkeypatch.setattr(java.shutil, "which", lambda tool: "/usr/bin/pmd")
+    monkeypatch.setattr(probe, "which", lambda tool: True)
 
     java.lint(tmp_path, "src/main/java/com/x", tmp_path)
 
@@ -66,7 +67,7 @@ def test_lint_other_target_used_as_given(tmp_path, monkeypatch):
         return SimpleNamespace(stdout='{"files": []}', returncode=0)
 
     monkeypatch.setattr(java, "run", fake_run)
-    monkeypatch.setattr(java.shutil, "which", lambda tool: "/usr/bin/pmd")
+    monkeypatch.setattr(probe, "which", lambda tool: True)
 
     java.lint(tmp_path, "src/test/java/com/x", tmp_path)
 
@@ -87,7 +88,7 @@ def test_mutation_unavailable_no_build_file_at_all(tmp_path):
 
 def test_missing_maven_reports_only_mvn_no_duplication(tmp_path, monkeypatch):
     (tmp_path / "pom.xml").write_text("<project/>")
-    monkeypatch.setattr(java.shutil, "which", lambda tool: None if tool == "mvn" else "/usr/bin/" + tool)
+    monkeypatch.setattr(probe, "which", lambda tool: tool != "mvn")
     assert java.missing(tmp_path) == ["mvn"]
     assert java.missing(tmp_path) == ["mvn"]
 
@@ -95,7 +96,7 @@ def test_missing_maven_reports_only_mvn_no_duplication(tmp_path, monkeypatch):
 def test_missing_gradle_with_wrapper_never_reports_gradle(tmp_path, monkeypatch):
     (tmp_path / "build.gradle.kts").write_text("")
     (tmp_path / "gradlew").write_text("")
-    monkeypatch.setattr(java.shutil, "which", lambda tool: None)
+    monkeypatch.setattr(probe, "which", lambda tool: False)
     assert "gradle" not in java.missing(tmp_path)
 
 

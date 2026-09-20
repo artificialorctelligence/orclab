@@ -2,7 +2,7 @@ import json
 import pathlib
 import textwrap
 
-from orc_test import langs
+from orc_test import langs, probe
 from orc_test.langs import python as py
 
 FIX = pathlib.Path(__file__).parent / "fixtures"
@@ -10,15 +10,15 @@ FIX = pathlib.Path(__file__).parent / "fixtures"
 
 def test_registered_first_and_mutation_needs_mutmut(tmp_path, monkeypatch):
     assert langs.ALL[0] is py and py.KEY == "python"
-    monkeypatch.setattr(py.importlib.util, "find_spec", lambda name: None)
+    monkeypatch.setattr(probe, "python_module", lambda name: False)
     assert py.mutation_unavailable(tmp_path) == "mutmut not installed — pip install mutmut"
-    monkeypatch.setattr(py.importlib.util, "find_spec", lambda name: object())
+    monkeypatch.setattr(probe, "python_module", lambda name: True)
     (tmp_path / "pyproject.toml").write_text("[tool.mutmut]\nsource_paths = ['pkg/']\n")
     assert py.mutation_unavailable(tmp_path) is None
 
 
 def test_mutation_unavailable_names_the_missing_tool_mutmut_section(tmp_path, monkeypatch):
-    monkeypatch.setattr(py.importlib.util, "find_spec", lambda name: object())
+    monkeypatch.setattr(probe, "python_module", lambda name: True)
     (tmp_path / "pyproject.toml").write_text("[tool.pytest.ini_options]\n")
     why = py.mutation_unavailable(tmp_path, "src")
     assert why.startswith(f"no [tool.mutmut] found in any pyproject.toml at or above {tmp_path / 'src'}")
@@ -146,7 +146,7 @@ def test_diffs_asks_one_process_for_every_survivor(monkeypatch, tmp_path):
     monkeypatch.setattr(py, "run", lambda cmd, cwd, input: seen.append((cmd, input)) or
                         type("R", (), {"stdout": out})())
     d = py._diffs(tmp_path, [("a.x_f__mutmut_1", "a.py"), ("a.x_f__mutmut_2", "a.py")])
-    assert len(seen) == 1 and seen[0][0][:2] == ["python3", str(py.MUTMUT_DIFFS)]
+    assert len(seen) == 1 and seen[0][0] == ["python3", "-c", py.MUTMUT_DIFFS.read_text()]
     assert seen[0][1] == "a.x_f__mutmut_1 a.py\na.x_f__mutmut_2 a.py\n"
     assert d == {"a.x_f__mutmut_1": "--- a.py\n-x\n+y", "a.x_f__mutmut_2": "--- a.py\n-x\n+z"}
     assert py._diffs(tmp_path, []) == {} and len(seen) == 1
@@ -325,5 +325,5 @@ def test_audit_nothing_is_a_pyproject_without_a_project_table(tmp_path):
 
 
 def test_audit_unavailable_names_pip_audit(monkeypatch):
-    monkeypatch.setattr(py.importlib.util, "find_spec", lambda name: None)
+    monkeypatch.setattr(probe, "python_module", lambda name: False)
     assert "pip-audit" in py.audit_unavailable("/x")

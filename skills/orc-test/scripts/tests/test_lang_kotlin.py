@@ -1,4 +1,4 @@
-from orc_test import detect
+from orc_test import detect, probe
 from orc_test.langs import java, kotlin
 
 
@@ -50,7 +50,7 @@ def test_arcmutate_caveat_needs_both_licence_and_plugin(tmp_path):
 
 def test_missing_reports_gradle_only_without_the_wrapper(tmp_path, monkeypatch):
     repo = _gradle_kotlin(tmp_path)
-    monkeypatch.setattr(kotlin.shutil, "which", lambda name: "/usr/bin/java" if name == "java" else None)
+    monkeypatch.setattr(probe, "which", lambda name: name == "java")
     assert kotlin.missing(repo) == ["gradle"]
     (repo / "gradlew").write_text("#!/bin/sh\n")
     assert kotlin.missing(repo) == []

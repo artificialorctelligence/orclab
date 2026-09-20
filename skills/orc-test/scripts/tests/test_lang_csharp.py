@@ -1,5 +1,6 @@
 import pathlib
 
+from orc_test import probe
 from orc_test.langs import csharp as cs
 from orc_test.model import Coverage, Mutation
 
@@ -12,9 +13,9 @@ _UNREADABLE = ["audit output not understood — see above"]
 def test_audit_tool_and_command(monkeypatch):
     assert cs.AUDIT_TOOL == ("dotnet", cs.TOOLS["dotnet"])
     assert cs.audit_cmd("/x") == ["dotnet", "list", "package", "--vulnerable", "--include-transitive", "--format", "json"]
-    monkeypatch.setattr(cs.shutil, "which", lambda tool: None)
+    monkeypatch.setattr(probe, "which", lambda tool: False)
     assert "dotnet" in cs.audit_unavailable("/x")
-    monkeypatch.setattr(cs.shutil, "which", lambda tool: "/usr/bin/dotnet")
+    monkeypatch.setattr(probe, "which", lambda tool: True)
     assert cs.audit_unavailable("/x") is None
 
 
@@ -76,9 +77,9 @@ def test_coverage_parse_no_report(tmp_path):
 
 
 def test_mutation_needs_stryker_tool(tmp_path, monkeypatch):
-    monkeypatch.setattr(cs.shutil, "which", lambda name: None)
+    monkeypatch.setattr(probe, "which", lambda name: False)
     assert "dotnet tool install -g dotnet-stryker" in cs.mutation_unavailable(tmp_path)
-    monkeypatch.setattr(cs.shutil, "which", lambda name: "/usr/bin/dotnet-stryker")
+    monkeypatch.setattr(probe, "which", lambda name: True)
     assert cs.mutation_unavailable(tmp_path) is None
     cmd = cs.mutation_cmd(tmp_path, "src/App", tmp_path / "out")
     assert cmd[:3] == ["dotnet", "stryker", "--reporter"] and "--with-baseline" in cmd

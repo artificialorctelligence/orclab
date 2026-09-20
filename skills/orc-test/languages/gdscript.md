@@ -9,11 +9,19 @@ for what it found.
 `project.godot` at the root or up to two directories down.
 
 ## Run
-gdUnit4 6.2.1's own CLI runner: `./addons/gdUnit4/runtest.sh -a <path>` (default `test`), which
-needs `GODOT_BIN` set to a Godot 4.x binary. It exits 0 on a green suite, **100 on test failures,
-101 on warnings** — both are non-zero, so the pass/fail check needs no special case. It writes
-JUnit XML to `reports/results.xml`. GUT 9.6.1 is a known alternative, not wired in here — a
-project on GUT instead sets its own runner in `.orclab/test.yaml`'s `test:` override.
+gdUnit4 6.2.1's own CLI runner: `./addons/gdUnit4/runtest.sh --headless --ignoreHeadlessMode -a
+<path>` (default `test`), which needs `GODOT_BIN` set to a Godot 4.x binary. The two flags are
+the pair gdmutant passes for every mutant, so `run`, `coverage` and mutation see the same suite,
+on the host and inside a container (v23): `runtest.sh` hands every other argument to Godot,
+`--headless` needs no display, and without `--ignoreHeadlessMode` gdUnit4's CI runner exits
+**103** under `--headless` (*"Headless mode is not supported!"*) — confirmed live 2026-09-20 in
+`https://raw.githubusercontent.com/MikeSchulze/gdUnit4/master/addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd`.
+The cost is the one that file names: *"Godot 'InputEvents' are not transported by the Godot
+engine in headless mode"*, so a test that drives input does not run under this command; gdUnit4's
+own Action runs those under `xvfb-run` with `--display-driver x11`. It exits 0 on a green suite,
+**100 on test failures, 101 on warnings** — all non-zero, so the pass/fail check needs no special
+case. It writes JUnit XML to `reports/results.xml`. GUT 9.6.1 is a known alternative, not wired in
+here — a project on GUT instead sets its own runner in `.orclab/test.yaml`'s `test:` override.
 
 ## Coverage
 nano-coverage (github.com/IgorBayerl/nano-coverage-godot), **alpha, built from source** — it

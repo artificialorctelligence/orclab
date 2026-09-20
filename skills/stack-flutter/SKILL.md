@@ -6,8 +6,8 @@ user-invocable: false
 
 # Flutter (Dart) — the cross-platform mobile stack
 
-**Checked against live sources on 2026-09-11.** Flutter stable **3.47.4** (released that day;
-Dart **3.13.3**), from Flutter's own release feed. Every version and default below has a date;
+**Checked against live sources on 2026-09-11; the release re-read 2026-09-20.** Flutter stable
+**3.47.5** (2026-09-18; Dart **3.13.4**), from Flutter's own release feed. Every version and default below has a date;
 Flutter ships a stable every ~quarter, so anything here older than one is suspect —
 `orclab:currency-discipline` says re-check, and the "Sources" section says where.
 
@@ -29,8 +29,8 @@ native-only (`stack-android-native`, `stack-ios-native`).
 
 | Thing | Current | Where it was read |
 |---|---|---|
-| Flutter stable | 3.47.4 (2026-09-11) | `storage.googleapis.com/flutter_infra_release/releases/releases_linux.json` — the feed `flutter upgrade` reads |
-| Dart | 3.13.3, bundled with Flutter | same |
+| Flutter stable | 3.47.5 (2026-09-18; read 2026-09-20) | `storage.googleapis.com/flutter_infra_release/releases/releases_linux.json` — the feed `flutter upgrade` reads |
+| Dart | 3.13.4, bundled with Flutter | same |
 | Android: default `compileSdk` / `targetSdk` / `minSdk` | **36 / 36 / 24** | `FlutterExtension.kt` on the `stable` branch |
 | Android: default NDK | **28.2.13676358** (r28) | same |
 | Android: supported API levels | 24–37 | docs.flutter.dev supported platforms |
@@ -369,6 +369,121 @@ Dart layer adds the one loosening the platforms cannot see —
 secret store. Rule 5's shape, a URL another app handed the app, is the native skills' rule read
 from Dart: validate, match the app's few paths, refuse the rest.
 
+## Containers
+
+Runs in a container: **yes** for Android, **no** for iOS — confirmed live 2026-09-20.
+`flutter analyze`, `flutter test`, every `/orc-test` step for Dart, `lint_on_write`'s
+`dart analyze` and `flutter build appbundle` run inside; `flutter build ipa` cannot, for the
+reason `### Building without a Mac` gives — *"Apple's toolchain runs only on macOS"* — and a
+Linux container is not a Mac. Nothing here changes that section: Codemagic is still where the
+`.ipa` is built.
+
+**Flutter's own docs say nothing about containers, and the one image people reach for is
+ending.** docs.flutter.dev's install pages (`/install`, where `get-started/install/linux`
+redirects; `/install/manual`, dated 2026-07-31; the Android setup page, 2026-06-08) mention
+neither Docker nor a container, read live — the install is a tarball on `PATH`. The image CI
+guides use, `ghcr.io/cirruslabs/flutter`, is a `git clone` of the SDK on top of
+`ghcr.io/cirruslabs/android-sdk` (its `sdk/Dockerfile`), and its README now leads with
+*"This repostiry will stop updating images starting May 1st 2026 due to Cirrus Labs winding
+down operations after an acquisition"* — so not that. The Dockerfile below does what the
+manual-install page does, on top of `stack-android-native`'s image: that skill's Containers
+section says why the JDK is Eclipse Temurin 17 and the SDK is Google's own zip with Google's
+checksum, and this section adds only the Flutter lines.
+
+The `Dockerfile` `/orc-code` writes when the user says yes to the container question — the
+Android skill's base and SDK packages, plus the NDK and CMake the toolchain table's Android
+row lists (Flutter's template pins `flutter.ndkVersion`, so AGP wants that NDK present rather
+than fetching it into a container that is then discarded), and Flutter's own stable tarball
+with the SHA-256 from Flutter's own release feed — the file `flutter upgrade` reads
+(`releases_linux.json`: `3.47.5`, released 2026-09-18, Dart 3.13.4 — the toolchain table's
+row). Every tool `skills/orc-test/languages/dart.md` names is
+either in the SDK or a project dependency, so the image installs no Dart tool:
+
+```dockerfile
+FROM eclipse-temurin:17-jdk
+ENV ANDROID_HOME=/opt/android-sdk
+ENV PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:/opt/flutter/bin
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl git unzip xz-utils zip libglu1-mesa \
+    && rm -rf /var/lib/apt/lists/*
+RUN wget -q -O /tmp/cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-15859902_latest.zip \
+    && echo "4e4c464f145a7512b57d088ac6c278c03c9eea610886b35a5e0804e74eedf583 /tmp/cmdline-tools.zip" | sha256sum -c - \
+    && mkdir -p $ANDROID_HOME/cmdline-tools \
+    && unzip -q /tmp/cmdline-tools.zip -d $ANDROID_HOME/cmdline-tools \
+    && mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest \
+    && rm /tmp/cmdline-tools.zip
+RUN yes | sdkmanager --licenses >/dev/null \
+    && sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358" "cmake;3.22.1"
+RUN wget -q -O /tmp/flutter.tar.xz https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.47.5-stable.tar.xz \
+    && echo "2132e990f236f8d22e7c6314b29a191a95b10d7cbcfec9b4e2e303d996652cbb /tmp/flutter.tar.xz" | sha256sum -c - \
+    && tar -xf /tmp/flutter.tar.xz -C /opt \
+    && rm /tmp/flutter.tar.xz
+ENV BOT=true
+RUN flutter precache --android
+ENV GRADLE_USER_HOME=/cache/gradle PUB_CACHE=/cache/pub
+```
+
+Not run here — the first project records it. Why each Flutter line:
+
+- **The apt line** is the manual-install page's own, verbatim: *"sudo apt-get install -y curl
+  git unzip xz-utils zip libglu1-mesa"*. `git` is not optional — the launcher
+  (`bin/internal/shared.sh`) exits with *"Unable to find git in your PATH"* without it, and
+  with *"The Flutter directory is not a clone of the GitHub project"* if the SDK has no
+  `.git`, which the tarball carries (the same page's path: `tar -xf`, then `flutter --version`).
+- **The tarball** is 1.58 GB (its `Content-Length`); this machine's SDK (3.47.4, with more
+  than the Android artifacts cached) is 2.3 GB on disk. The URL is the feed's `base_url` plus the
+  release's `archive`, the checksum its `sha256`. `/opt/flutter/bin` on `PATH` is the page's
+  instruction; `dart` is in the same directory, which is what `lint_on_write`'s `.dart` line
+  and `/orc-test`'s `dart run mutation_test` call.
+- **`BOT=true`.** The launcher prints *"Woah! You appear to be trying to run flutter as
+  root"* on every run when `EUID` is 0 unless `/.dockerenv` exists (Docker creates it, Podman
+  does not) or one of `CI`, `BOT`, `CONTINUOUS_INTEGRATION` is `true` — its own condition,
+  read from `shared.sh`. `BOT` is the narrowest of the three.
+- **`flutter precache --android`** at build time — the first `flutter` run populates the
+  SDK's own `bin/cache` (the Dart SDK, then the Android engine artifacts `precache --android`
+  asks for — the Cirrus Dockerfile's line), which this way lands in the image, not in a
+  container that is thrown away. Not `flutter doctor` in the Dockerfile: its output would be
+  discarded with the layer, and its exit code in an image with no Chrome or GTK was not seen
+  here — a non-zero one would fail the build for a line nobody reads. Run it through the
+  container once instead (`<engine> compose run --rm orclab flutter doctor`), the check the
+  toolchain section says to run first on any machine; it finds the JDK through `JAVA_HOME`
+  (`java.dart`: Android Studio's bundle first, *"the JAVA_HOME env variable, if set"* second)
+  and the SDK through `ANDROID_HOME` (`android_sdk.dart`). What it says about the licences
+  that `sdkmanager --licenses` already accepted was not seen here — if it asks again,
+  `yes | flutter doctor --android-licenses` is the setup page's own command.
+- **`PUB_CACHE`**, set *after* the precache so the tool's own packages stay in the image:
+  *"By default, this directory is located under `$HOME/.pub-cache`"* (pub's environment
+  variables page), which `compose run --rm` would discard. The project's packages —
+  `mutation_test`, added with `dart pub add --dev mutation_test` as `languages/dart.md`
+  says, and everything else in `pubspec.yaml` — resolve into it through `flutter pub get`, run
+  through the container once (`<engine> compose run --rm orclab flutter pub get` from the
+  project root) and again when the pubspec changes. One consequence to know: the tree's
+  `.dart_tool/package_config.json` records absolute `rootUri`s into whichever cache resolved
+  it (`file:///home/<user>/.pub-cache/…` on a host run, `file:///cache/pub/…` inside), so a
+  run on the other side starts with its own `flutter pub get`. `flutter test --coverage` and
+  `flutter pub outdated --json` (the audit) are the SDK's own.
+
+**The `compose.yaml`** is the one in `skills/orc-test/SKILL.md`'s Containers section plus the
+named volume `cache:/cache` the Android skill's Containers section shows and explains — here
+it holds both Gradle's cache (the Android build's plugins and wrapper) and pub's.
+
+What cannot happen inside: **`flutter run`** on anything — the emulator needs the host's KVM
+(the Android skill: Google's own container recipe passes `--device /dev/kvm`; this compose
+file passes no device) and a USB phone is not passed either, so `flutter devices` inside has
+nothing to list (inference from the compose file; not run); **`flutter build ipa`** and
+everything under `ios/` that Xcode does, the Mac's (Codemagic's); the **App Store and Play uploads**, the ingredients' steps from the host;
+and the desktop and web targets of `## Beyond mobile`, whose GTK and browser are not in
+this image (a Linux desktop build would need the Linux setup page's packages, `libgtk-3-dev`
+among them, added — not done; the first project that wants it adds them). What *can*:
+`flutter build appbundle` signs inside, since `android/key.properties` and the keystore are in
+the mounted tree. The proposal `/orc-code` makes for this stack's container question: **no**,
+because the toolchain row installs Android Studio and the Flutter SDK on the host anyway (the
+`.ipa` needs a Mac, `flutter run` needs the emulator, and both halves are configured in the
+same tree), so the image — 211 MB of JDK image, ~480 MB of SDK, 2.2 GB of NDK, 1.58 GB of
+Flutter — is a second copy of most of it that cannot run the app. Say yes on a machine with no
+Android Studio that only needs `flutter test` and `flutter build appbundle`, or whose Flutter
+must not move while the host's is upgraded.
+
 ## Presence
 
 Presence is how the app stays visible and reachable when it is not in front. On a phone that is
@@ -558,3 +673,4 @@ that is `stack-unity`'s or `stack-godot`'s concern.
 - Building without a Mac (2026-09-12) — Codemagic: `https://docs.codemagic.io/yaml-quick-start/building-a-flutter-app/`, `https://docs.codemagic.io/yaml-code-signing/signing-ios/`, `https://docs.codemagic.io/yaml-publishing/app-store-connect/`, `https://docs.codemagic.io/billing/pricing/`; GitHub Actions: `https://docs.github.com/en/actions/reference/runners/github-hosted-runners`, `https://docs.github.com/en/billing/managing-billing-for-your-products/about-billing-for-github-actions`, `https://docs.github.com/en/billing/reference/actions-runner-pricing`, `https://docs.github.com/en/actions/how-tos/deploy/deploy-to-third-party-platforms/sign-xcode-applications`, image contents `https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md` and `https://github.com/actions/runner-images/blob/main/README.md`; Xcode Cloud: `https://developer.apple.com/xcode-cloud/`; EAS (why it is not an option): `https://docs.expo.dev/build/setup/`, `https://docs.expo.dev/build/introduction/`, `https://docs.expo.dev/build-reference/limitations/`, `https://docs.expo.dev/build-reference/ios-builds/`
 - Beyond mobile (2026-09-12) — desktop: `https://docs.flutter.dev/platform-integration/desktop`, `https://docs.flutter.dev/platform-integration/linux/setup`, `https://docs.flutter.dev/platform-integration/linux/building`, `https://docs.flutter.dev/deployment/linux`, the embedder header `https://raw.githubusercontent.com/flutter/flutter/stable/engine/src/flutter/shell/platform/linux/public/flutter_linux/fl_view.h`; web: `https://docs.flutter.dev/platform-integration/web`, `https://docs.flutter.dev/platform-integration/web/faq`, `https://docs.flutter.dev/platform-integration/web/wasm`, `https://docs.flutter.dev/platform-integration/web/initialization`, renderer defaults in `https://raw.githubusercontent.com/flutter/flutter/stable/packages/flutter_tools/lib/src/web/compile.dart`, the renderers-page removal via `https://api.github.com/repos/flutter/website/commits?path=sites/docs/src/content/platform-integration/web/renderers.md`, `https://api.flutter.dev/flutter/material/SelectionArea-class.html`
 - Facets — storage: `https://pub.dev/packages/sqflite`, `https://raw.githubusercontent.com/tekartik/sqflite/master/sqflite/README.md`, `https://pub.dev/packages/sqflite_common_ffi`, `https://pub.dev/packages/drift`, `https://drift.simonbinder.eu/setup/`, `https://drift.simonbinder.eu/platforms/`, `https://pub.dev/packages/shared_preferences`, `https://raw.githubusercontent.com/flutter/packages/main/packages/shared_preferences/shared_preferences/README.md`
+- Containers (2026-09-20): Flutter's install pages read for any container mention — `https://docs.flutter.dev/install` (where `/get-started/install/linux` redirects), `https://docs.flutter.dev/install/manual` (the apt line, tarball, `PATH`), `https://docs.flutter.dev/platform-integration/android/setup` (SDK components, `--android-licenses`); the release feed `https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json` (3.47.5, archive path, `sha256`), the tarball's `Content-Length` (1.58 GB); `https://github.com/cirruslabs/docker-images-flutter` (README wind-down note, `sdk/Dockerfile`: `git clone`, `precache --android`); the launcher `bin/internal/shared.sh` and `packages/flutter_tools/lib/src/android/{java.dart,android_sdk.dart}` in this machine's SDK / on `stable` (root warning and its `BOT`/`CI`/`/.dockerenv` condition, `git` and `.git` checks, `JAVA_HOME`, `ANDROID_HOME`); `https://dart.dev/tools/pub/environment-variables` (`PUB_CACHE`); a `.dart_tool/package_config.json` on this machine (`rootUri` form); `du` of this machine's Flutter SDK (2.3 GB); the Android image, the NDK/CMake auto-install, the emulator and the cache volume: `stack-android-native`'s Containers sources

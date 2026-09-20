@@ -46,7 +46,11 @@ answered:
    app that runs only on your own machine or phone, no. It guesses from the platforms you ticked
    and asks you to confirm, and the answer decides which security rules the new project is built
    to from the start.
-6. Would you like a minimal example, a basic **scaffold** (a skeleton project with the standard
+6. Whether to run the project's tools inside a container, so nothing has to be installed on your
+   machine — it proposes no unless the stack is one that's unusual to have installed, and skips
+   the question for a stack that can't (iOS needs a Mac). The container is only where the tools
+   live while you develop; what you ship is the ordinary project files.
+7. Would you like a minimal example, a basic **scaffold** (a skeleton project with the standard
    files and folders for that stack already in place, but no real features yet) with common
    features, or something specific — describe your use case?
 
@@ -80,7 +84,9 @@ and whether to run another round), plus:
   own build or test command before calling the job done, and won't report it as finished until
   that command actually passes. It also writes the project's lint and security-check settings,
   and — when you said strangers can reach it — the pieces those rules need from day one: a
-  login layer, a public folder separate from the code, error pages that give nothing away.
+  login layer, a public folder separate from the code, error pages that give nothing away — and,
+  if you said yes to the container, a `Dockerfile` and a `compose.yaml` at the project root,
+  committed, that the test command and the on-write linter then use.
 - **Existing project**: whatever `feature-dev`'s own workflow changes — `/orc-code` doesn't touch
   anything beyond what that plugin does.
 - **Quality mode**: if the project doesn't already have a lint configuration (settings for the
