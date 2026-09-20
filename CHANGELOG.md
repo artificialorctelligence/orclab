@@ -2,6 +2,58 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.23.0] - 2026-09-20
+
+### Added
+- A project can run its whole toolchain in a container instead of on this machine. `/orc-code`
+  asks at scaffold — "Run this project's toolchain in a container, so nothing has to be
+  installed on this machine?" — proposing no unless the stack's skill says otherwise, and
+  skipping the question for a stack that cannot (iOS needs a Mac). Yes writes a `Dockerfile`
+  from the stack skill and a `compose.yaml` with a service named `orclab` that mounts the
+  project at its own host path, both committed; the compose service is the record, so a clone
+  keeps the opt-in. The container is a development environment, never what ships.
+- `/orc-test` runs every command through `<engine> compose run` from its one chokepoint, builds
+  the image once, and checks each tool's presence *inside* — the runner, coverage, mutation,
+  audit and lint tools alike. The report's first line says `detected: Python (in container)`.
+  Nothing is ever silently run on the host instead: no engine on PATH prints
+  `container runner not found — install podman or docker — skipped`; a failed image build
+  prints its output and `container build failed — see above`, exit 1. `.orclab/test.yaml`
+  overrides per checkout: `container: false`, `runner: docker|podman`. `/orc-git`'s gates
+  inherit all of it.
+- `lint_on_write` lints a containerised project through the same `compose run` prefix, with
+  its own copy of the detection (hooks duplicate rather than import); no engine means no lint,
+  never the host.
+- `## Containers` in all nine stack skills, from live research: Python and web run inside
+  (`python:3.14` with every `/orc-test` tool baked in; Node added to the Python image for
+  the web stack); the four mobile stacks' Android half runs inside (the SDK built from
+  Google's own command-line-tools zip with its published SHA-256, a named cache volume so
+  Gradle is not re-downloaded per command), the iOS half cannot; Godot runs headless inside;
+  iOS and Unity cannot (macOS; Unity's licence terms). Podman is the default engine — it runs
+  as your own user with nothing to join, where Docker's `docker` group is root-equivalent —
+  and Docker Engine the alternative; both from Mint's own apt, no Docker Desktop.
+- The live check on this machine, through real rootless Podman: a FastAPI scaffold built in
+  24 s, `detected: Python (in container), JS/TS (web/) (in container)`, coverage and TCE
+  100%, the audit, all three refusal cases, and the hook firing inside.
+
+### Changed
+- `/orc-test`'s Godot test command passes gdUnit4's `--headless --ignoreHeadlessMode` on the
+  host as well as inside a container (without them gdUnit4 exits 103 headless); a test that
+  drives input events no longer runs under `/orc-test run` — gdUnit4's own answer for those is
+  xvfb.
+
+### Fixed
+- podman-compose 1.0.6 exits 0 when the image build fails (it logs `exit code: 125` and
+  discards it), so a broken Dockerfile would have run the tests in the previous image — found
+  by the live check; the build check reads that line too.
+- Compose fills `${PWD}` from the calling process's environment, not its working directory, so
+  under `--cwd <other project>` the mount would have been the wrong directory; the engine is now
+  called with `PWD` set to the project root.
+- The mutation survivor-diff helper was sent into the container by its path in Orclab's own
+  directory, which is not mounted there; it is sent as text now, so survivors keep their diffs.
+- BACKLOG #58–#63: the v23 record; devcontainer and deploy-as-container deferred by direflail's
+  call; the `GODOT_BIN` host-side check; a mutmut currency line; and #63, found on the way —
+  Stryker 10 rejects the flag `/orc-test` passes, so no JS/TS project gets a TCE today.
+
 ## [0.22.0] - 2026-09-20
 
 ### Added
