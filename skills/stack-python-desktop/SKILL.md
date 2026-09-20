@@ -233,6 +233,73 @@ app's own outbound calls: certificate validation stays on (`S501` above flags
 anyone with the binary has it — so it is either fine to be public or it goes through
 `keyring` after the user signs in.
 
+## Containers
+
+Runs in a container: **yes** — confirmed live 2026-09-20. The tests, every `/orc-test` step,
+`lint_on_write` and the Linux build run inside; the app itself does not — a container has no
+screen, so a window is shown on the host and tested headless inside.
+
+The `Dockerfile` `/orc-code` writes when the user says yes to the container question — base
+image and tag from the official `python` image's own tag list (`3.14` is `3.14.7` on Debian
+trixie today, the same 3.14.7 the toolchain table names; `3.14.7` pins it), the toolchain
+(PySide6), and every tool `skills/orc-test/languages/python.md` names (pytest, pytest-cov,
+mutmut, pip-audit) plus ruff, which `lint_on_write` runs:
+
+```dockerfile
+FROM python:3.14
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        libgl1 libegl1 libxkbcommon0 libfontconfig1 libfreetype6 libx11-6 libdbus-1-3 \
+    && apt-get dist-clean
+RUN pip install --no-cache-dir pyside6 pytest pytest-cov mutmut pip-audit ruff
+ENV QT_QPA_PLATFORM=offscreen
+```
+
+Not run here — the first project records it. Why each line, so the next reader can check it:
+
+- **`python:3.14`, not `-slim`.** The default tag is built on `buildpack-deps`, which the image's
+  README recommends (*"we highly recommend using the default image of this repository"*) and
+  whose trixie Dockerfile installs `gcc`, `g++` and `make` — the C compiler a `pyside6-deploy`
+  build inside needs (Nuitka compiles). `pip` is in the image (`--with-ensurepip`), and the
+  README's own example is `pip install --no-cache-dir`; `apt-get dist-clean` is the base
+  image's own idiom.
+- **The seven apt packages** are the system libraries the PySide6 6.11.2 wheel's Qt links and
+  the base image does not carry — read with `objdump -p` off the `manylinux_2_34_x86_64` wheel,
+  downloaded from PyPI on this machine: `libQt6Gui.so.6` needs `libEGL.so.1`, `libGL.so.1`,
+  `libfontconfig.so.1`, `libfreetype.so.6`, `libX11.so.6` and `libxkbcommon.so.0`, and pulls in
+  `libQt6DBus.so.6`, which needs `libdbus-1.so.3`; ICU is inside the wheel, glib and zlib are
+  in the base image. Each `.so` was mapped to its trixie package on packages.debian.org. Not
+  checked: whether a widget test wants a font package (`fonts-dejavu-core`) — the first
+  project says.
+- **One `pip install`** — each tool's own documented line (`pip install -U pytest`,
+  `pip install pytest-cov`, `pip install mutmut`, `python -m pip install pip-audit`,
+  `pip install ruff`), unpinned like the host's; PyPI today: pytest 9.1.1, pytest-cov 7.1.0,
+  mutmut 3.8.0, pip-audit 2.10.1, ruff 0.16.8. **PySide6 is on the line because the image is
+  where the project's dependencies live**: `compose run --rm` throws the container away after
+  every command, so a `pip install` inside it is gone by the next one, and the host's `.venv/`
+  is another Python. A dependency the project adds to `pyproject.toml` goes on this line too,
+  then `<engine> compose build orclab`. The tests import `src/<package>` with no install:
+  `pythonpath = ["src"]` under `[tool.pytest.ini_options]` — pytest's reference: *"Sets list of
+  directories that should be added to the python search path."*
+- **`QT_QPA_PLATFORM=offscreen`** is what makes a `QApplication` start with no display. Qt's
+  QPA page: *"The QT_QPA_PLATFORM environment variable and the -platform command line argument
+  allow you to override this default"*; `QGuiApplication`'s reference lists `offscreen` among
+  the platform plugin names, and the wheel ships it (`PySide6/Qt/plugins/platforms/
+  libqoffscreen.so`, listed from the wheel). Set in the image so every test run, and every
+  mutant's, inherits it; on the host the app picks `xcb` or `wayland` as before.
+
+The `compose.yaml` is the one in `skills/orc-test/SKILL.md`'s Containers section, unchanged.
+What cannot happen inside: showing a window or a tray icon (nothing draws it; the `Presence`
+section's desktop-environment checks are host questions), the Windows and macOS artifacts
+(`## Build, run, test`: each OS builds its own, and this image is Linux), and the Security
+section's `keyring` stores, which do not run in a container. So `python -m <package>` runs on
+the host, and the pyside6-deploy step is the Linux `.bin` only. The proposal `/orc-code` makes
+for this stack's container question: **no**, because the toolchain is one venv — Python and
+pip are on any dev machine, and Qt arrives inside the PySide6 wheel (*"No Qt installation is
+required"*, above) — so the container saves nothing an install would cost; say yes when the
+machine's Python is too old for the wheel (3.10–3.14 today), or to keep the Qt wheels (80 MB
+downloaded for `PySide6_Essentials` alone) off it.
+
 ## Presence
 
 The tray icon is how a desktop app stays visible and reachable when none of its windows is in
@@ -354,6 +421,7 @@ Direct download of the `.exe`/`.app` is a channel with no store rules at all.
 
 - Lint — where code-discipline lands (2026-09-13): `https://docs.astral.sh/ruff/rules/`, `https://docs.astral.sh/ruff/settings/`, `https://raw.githubusercontent.com/microsoft/pyright/main/docs/configuration.md`; versions from `https://pypi.org/pypi/<name>/json`
 - Security — where security-discipline lands (2026-09-19): `https://docs.astral.sh/ruff/rules/` (the flake8-bandit table, 73 rows), `https://docs.astral.sh/ruff/rules/assert/`, `.../rules/subprocess-without-shell-equals-true/`, `.../rules/start-process-with-partial-path/`, `.../rules/hardcoded-password-string/`, `.../rules/suspicious-non-cryptographic-random-usage/`, `https://docs.astral.sh/ruff/settings/` (`lint.extend-select`, `lint.ignore`, `lint.per-file-ignores`); `https://pypi.org/pypi/ruff/json`, `https://pypi.org/pypi/keyring/json`, `https://raw.githubusercontent.com/jaraco/keyring/main/README.rst`; the fixture run: ruff 0.16.8 in a scratch venv on this machine
+- Containers (2026-09-20): tags `https://raw.githubusercontent.com/docker-library/official-images/master/library/python`; `https://raw.githubusercontent.com/docker-library/docs/master/python/README.md` (image variants, `--no-cache-dir` example); `https://raw.githubusercontent.com/docker-library/python/master/3.14/trixie/Dockerfile` (`FROM buildpack-deps:trixie`, `--with-ensurepip`, `apt-get dist-clean`); `https://raw.githubusercontent.com/docker-library/buildpack-deps/master/debian/trixie/Dockerfile` (`gcc`, `g++`, `make`, `libglib2.0-dev`, `zlib1g-dev`); the wheel's own linkage: `pip download --no-deps --only-binary=:all: --python-version 3.14 --platform manylinux_2_34_x86_64 pyside6_essentials` and `objdump -p` on `libQt6Core/Gui/Widgets/DBus.so.6` and `plugins/platforms/libqoffscreen.so`, on this machine; package names `https://packages.debian.org/trixie/amd64/<pkg>/filelist` for `libgl1`, `libegl1`, `libxkbcommon0`, `libfontconfig1`, `libfreetype6`, `libx11-6`, `libdbus-1-3`; Qt `https://doc.qt.io/qt-6/qpa.html`, `https://doc.qt.io/qt-6/qguiapplication.html` (`platformName`, `-platform`); install lines `https://docs.pytest.org/en/stable/getting-started.html`, `https://raw.githubusercontent.com/pytest-dev/pytest-cov/master/README.rst`, `https://raw.githubusercontent.com/boxed/mutmut/main/README.rst`, `https://raw.githubusercontent.com/pypa/pip-audit/main/README.md`, `https://docs.astral.sh/ruff/installation/`; `https://docs.pytest.org/en/stable/reference/reference.html` (`pythonpath`); versions from `https://pypi.org/pypi/<name>/json`
 - Python: `https://www.python.org/downloads/`; tkinter docs `https://docs.python.org/3/library/tkinter.html`; sqlite3 docs `https://docs.python.org/3/library/sqlite3.html`; What's New 3.13/3.14 `https://docs.python.org/3/whatsnew/3.13.html`, `.../3.14.html`; bundled Tk/SQLite `https://raw.githubusercontent.com/python/cpython/3.14/PCbuild/get_externals.bat`, `.../3.14/Mac/BuildScript/build-installer.py`; macOS notes `https://docs.python.org/3/using/mac.html`
 - PySide6: `https://pypi.org/project/PySide6/` (+ `/pypi/PySide6/json` for wheel tags); getting started `https://doc.qt.io/qtforpython-6/gettingstarted.html`, FAQ `https://doc.qt.io/qtforpython-6/faq/whatisqt.html`; deployment `https://doc.qt.io/qtforpython-6/deployment/index.html`, `.../deployment-pyside6-deploy.html`, `.../deployment-pyinstaller.html`, `.../deployment-briefcase.html`; Qt 6.11 platforms `https://doc.qt.io/qt-6/supported-platforms.html`; `https://doc.qt.io/qt-6/qsystemtrayicon.html`; `https://doc.qt.io/qt-6/qstyle.html`; LGPL `https://doc.qt.io/qt-6/lgpl.html`, `https://www.qt.io/qt-licensing`
 - GTK / PyGObject: `https://pypi.org/project/PyGObject/`; `https://pygobject.gnome.org/getting_started.html`; `https://www.gtk.org/docs/installations/windows/`, `.../macos/`, `https://www.gtk.org/docs/language-bindings/python/`; `https://docs.gtk.org/gtk4/` (4.23.4 docs; 4.24.0 tagged 2026-09-11 per GitLab releases API), `https://docs.gtk.org/gtk3/class.StatusIcon.html`, `https://docs.gtk.org/gtk4/migrating-3to4.html`; GTK licence `https://gitlab.gnome.org/GNOME/gtk/-/raw/main/COPYING`; AppIndicator libraries `https://github.com/AyatanaIndicators/libayatana-appindicator` (marked OBSOLETE), `https://github.com/AyatanaIndicators/libayatana-appindicator-glib`
