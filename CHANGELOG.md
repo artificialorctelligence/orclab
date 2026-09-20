@@ -2,6 +2,36 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.24.0] - 2026-09-20
+
+### Added
+- PHP as a web back-end stack. `stack-php` is the tenth stack skill — a PHP server that
+  emits JSON for an API or a React front end, or HTML — built on Slim 4 with `slim/psr7`,
+  OpenAPI generated from `zircote/swagger-php` attributes (the contract a consuming app's
+  client is written against), PHPUnit, PCOV, Infection, PHPStan and `composer audit`, with
+  Laravel + Scramble stubbed as the runner-up. Unlike the other nine, every command in it
+  was run in a container on the machine that wrote it: its Containers section is the first
+  that says "run here", and it proposes yes to `/orc-code`'s container question.
+- `/orc-test` learns PHP: a project with `composer.json` gets PHPUnit, clover coverage,
+  Infection mutation testing (with `--with-uncovered`, so an untested file counts against the
+  score and its mutants appear as survivors) and `composer audit --locked`, all through the
+  project's own `vendor/bin`; `vendor/` is skipped in detection. `languages/php.md` records
+  the first real run. Four fixtures captured from that run, each with a README.
+- `lint_on_write` lints every `.php` file Claude writes with the project's `vendor/bin/phpstan`
+  when it has a `phpstan.neon`, `phpstan.neon.dist` or `phpstan.dist.neon`.
+- `/orc-code`'s web row offers PHP as an alternative back end, for a host that serves PHP and
+  nothing else.
+- `docs/handoffs/2026-09-20-php-first-project.md`: instructions for the separate session that
+  builds the first real PHP project — what to answer, what Orclab could not verify about
+  DreamHost and must be recorded for BACKLOG #64, the OpenAPI contract for #65, and what to
+  report back to #50.
+
+### Changed
+- BACKLOG: #50 resolved; #64 (shared-hosting publishing, written from the first real
+  deployment) and #65 (cross-project dependencies, evidenced by the first session whose
+  project calls another project's API) opened; `composer.json` joins #6's list of version
+  files `/orc-version` does not yet write.
+
 ## [0.23.0] - 2026-09-20
 
 ### Added
