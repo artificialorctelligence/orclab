@@ -26,8 +26,9 @@ _JACOCO = "org.jacoco:jacoco-maven-plugin"
 # OWASP dependency-check 13.0.0, a build plugin: "installed" when the build file names it.
 _DC_GRADLE = ('plugins { id("org.owasp.dependencycheck") version "13.0.0" } and '
               'dependencyCheck { formats = listOf("JSON") } in build.gradle(.kts)')
-AUDIT_TOOL = ("dependency-check", "declare org.owasp:dependency-check-maven 13.0.0 under <plugins> in "
-              f"pom.xml, or {_DC_GRADLE}")
+AUDIT_TOOL = ("dependency-check",
+              ("declare org.owasp:dependency-check-maven 13.0.0 under <plugins> in "
+               f"pom.xml, or {_DC_GRADLE}"))
 _UNREADABLE = ["audit output not understood — see above"]
 
 
@@ -73,21 +74,23 @@ def audit_cmd(root):
     return _gradle_audit_cmd(root)
 
 
+def _vulns_of(dep, seen):
+    for v in dep.get("vulnerabilities", []):
+        key = (dep["fileName"], v["name"])
+        if key in seen:
+            continue
+        seen.add(key)
+        yield f"{dep['fileName']}: {v['name']} ({v.get('severity', 'unscored')}) — fix not reported by dependency-check"
+
+
 def audit_findings(stdout, returncode):
     # The report decides, not the exit code: failBuildOnCVSS defaults to 11 (never fails) and the
     # report is written before that check either way. dependency-check names no fixed version —
     # it matches CPEs against the NVD — so the line ends at the advisory. seen: a shaded or
     # multi-CPE jar can list one CVE more than once.
     try:
-        out, seen = [], set()
-        for dep in json.loads(stdout)["dependencies"]:
-            for v in dep.get("vulnerabilities", []):
-                key = (dep["fileName"], v["name"])
-                if key in seen:
-                    continue
-                seen.add(key)
-                out.append(f"{dep['fileName']}: {v['name']} ({v.get('severity', 'unscored')}) — fix not reported by dependency-check")
-        return out
+        seen = set()
+        return [line for dep in json.loads(stdout)["dependencies"] for line in _vulns_of(dep, seen)]
     except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
         return _UNREADABLE
 

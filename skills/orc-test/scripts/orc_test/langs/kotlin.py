@@ -7,7 +7,13 @@ from .. import jacoco, licence, pitest
 from ..detect import SKIP_DIRS
 from ..model import Coverage, Finding, Mutation
 from ..runner import run
-from .java import _DC_GRADLE, _find_build_gradle, _gradle_audit_cmd, _gradle_audit_unavailable, audit_findings  # noqa: F401 — audit_findings is this module's too
+from .java import (  # noqa: F401 — audit_findings is this module's too
+    _DC_GRADLE,
+    _find_build_gradle,
+    _gradle_audit_cmd,
+    _gradle_audit_unavailable,
+    audit_findings,
+)
 
 KEY = "kotlin"
 LABEL = "Kotlin"

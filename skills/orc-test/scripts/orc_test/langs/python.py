@@ -58,6 +58,17 @@ def audit_cmd(root):
     return ["python3", "-m", "pip_audit", "-f", "json", "--progress-spinner", "off", "."]
 
 
+def _vulns_of(dep, seen):
+    for v in dep.get("vulns", []):
+        key = (dep["name"], dep["version"], v.get("id", "?"))
+        if key in seen:
+            continue
+        seen.add(key)
+        ids = ", ".join([v.get("id", "?")] + v.get("aliases", []))
+        fix = ", ".join(v.get("fix_versions", [])) or "none published"
+        yield f"{dep['name']} {dep['version']}: {ids} — fix {fix}"
+
+
 def audit_findings(stdout, returncode):
     # Valid-but-wrong-shape JSON (a dependency missing name/version, a top-level int, a vulns
     # entry that isn't a dict, ...) must land on the sentinel too, not crash the caller — "raises
@@ -69,18 +80,8 @@ def audit_findings(stdout, returncode):
         # JSON ("No known vulnerabilities found" / "Found N known vulnerabilities in M packages",
         # seen live 2026-09-19); read from the first `{`, the way csharp.py does.
         data, _ = json.JSONDecoder().raw_decode(stdout, stdout.index("{"))
-        deps = data.get("dependencies", [])
-        out, seen = [], set()
-        for dep in deps:
-            for v in dep.get("vulns", []):
-                key = (dep["name"], dep["version"], v.get("id", "?"))
-                if key in seen:
-                    continue
-                seen.add(key)
-                ids = ", ".join([v.get("id", "?")] + v.get("aliases", []))
-                fix = ", ".join(v.get("fix_versions", [])) or "none published"
-                out.append(f"{dep['name']} {dep['version']}: {ids} — fix {fix}")
-        return out
+        seen = set()
+        return [line for dep in data.get("dependencies", []) for line in _vulns_of(dep, seen)]
     except (json.JSONDecodeError, KeyError, TypeError, AttributeError, ValueError):
         return _UNREADABLE
 

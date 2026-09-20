@@ -33,28 +33,35 @@ def audit_cmd(root):
     return ["dotnet", "list", "package", "--vulnerable", "--include-transitive", "--format", "json"]
 
 
+def _packages(data):
+    """Every top-level and transitive package dict, across every project and target framework —
+    one package is listed once per framework and per project, so the caller dedupes."""
+    for proj in data["projects"]:
+        for fw in proj.get("frameworks", []):
+            yield from fw.get("topLevelPackages", []) + fw.get("transitivePackages", [])
+
+
+def _vulns_of(pkg, seen):
+    for v in pkg.get("vulnerabilities", []):
+        key = (pkg["id"], pkg["resolvedVersion"], v["advisoryurl"])
+        if key in seen:
+            continue
+        seen.add(key)
+        yield (f"{pkg['id']} {pkg['resolvedVersion']}: {v['advisoryurl'].rpartition('/')[2]}"
+               f" ({v.get('severity') or 'unscored'}) — fix not reported by NuGet")
+
+
 def audit_findings(stdout, returncode):
     # dotnet exits 0 with vulnerable packages (NuGet/Home#11315, closed not-planned; the runner
     # fails only on a `problems` entry of level error) — so the report decides, and a reported
     # error (no restore, unreachable source) is the sentinel, not a clean pass. Restore chatter
-    # may precede the JSON on .NET 10 (auto-restore), hence raw_decode from the first brace. seen:
-    # one package is listed once per target framework and per project.
+    # may precede the JSON on .NET 10 (auto-restore), hence raw_decode from the first brace.
     try:
         data, _ = json.JSONDecoder().raw_decode(stdout, stdout.index("{"))
         if any(p["level"] == "error" for p in data.get("problems", [])):
             return _UNREADABLE
-        out, seen = [], set()
-        for proj in data["projects"]:
-            for fw in proj.get("frameworks", []):
-                for pkg in fw.get("topLevelPackages", []) + fw.get("transitivePackages", []):
-                    for v in pkg.get("vulnerabilities", []):
-                        key = (pkg["id"], pkg["resolvedVersion"], v["advisoryurl"])
-                        if key in seen:
-                            continue
-                        seen.add(key)
-                        out.append(f"{pkg['id']} {pkg['resolvedVersion']}: {v['advisoryurl'].rpartition('/')[2]}"
-                                   f" ({v.get('severity') or 'unscored'}) — fix not reported by NuGet")
-        return out
+        seen = set()
+        return [line for pkg in _packages(data) for line in _vulns_of(pkg, seen)]
     except (json.JSONDecodeError, KeyError, TypeError, AttributeError, ValueError):
         return _UNREADABLE
 
