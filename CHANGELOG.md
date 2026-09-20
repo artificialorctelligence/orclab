@@ -2,6 +2,54 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.22.0] - 2026-09-20
+
+### Added
+- `security-discipline`, a background skill: nine rules in two tiers — what every project
+  owes (secrets out of the repo and the artifact, dependencies audited, downloads verified,
+  least permission) and what a project strangers can reach owes on top (every network input
+  hostile, every route authenticated, errors that leak nothing, encrypted transport, rate
+  limits) — each traced to OWASP Top 10:2025, ASVS 5.0 or the CWE Top 25, read live
+  2026-09-19. Every rule says where it lands: linted, scaffolded, `audit`, or reviewed.
+- `## Security — where security-discipline lands` in all nine stack skills, from live research:
+  the security ruleset in each stack's linter config (or "none free" and what was checked),
+  the dependency-audit tool, where secrets live on each platform, and what the exposed tier
+  scaffolds. Security is the fourth facet every stack skill answers, after v18's presence, UI
+  and storage. `hooks/scripts/tests/test_security_discipline.py` fails if a stack skill is
+  ever added without the section.
+- `/orc-test audit`: checks every dependency a project declares against the public
+  vulnerability lists, one line per language — pip-audit, `npm audit`, OWASP dependency-check
+  (Maven and Gradle), `dotnet list package --vulnerable`, `dart pub outdated`; Swift and
+  GDScript honestly "none free". Never installs a tool; an audit it cannot read fails the gate
+  rather than passing silently; a project that declares nothing to audit is "not available",
+  not red (BACKLOG #54). Fixtures captured from real runs where the tool is on this machine,
+  hand-built from the tool's documented schema where not, and each README says which.
+- `/orc-git push`, `cp` and `release` run `/orc-test audit` beside the v21 gate: a
+  known-vulnerable dependency stops the push with the package and, where the tool reports it,
+  the version that fixes it.
+- `/orc-code`'s New-Project Flow asks one more question after platforms — "Will anyone you
+  didn't invite be able to reach this?" — with the answer proposed from what was ticked. The
+  scaffold writes the stack's security lint config and `.gitignore` entries, and for the
+  exposed tier the pieces the rules need from day one. Nothing is recorded in a file: the
+  scaffold is the record. Quality mode wraps `code-modernization:modernize-harden` with an
+  availability check and a by-hand fallback.
+- `test-discipline` rule 1 names the scenario people forget: at every trust boundary, a test
+  that the hostile case is refused.
+
+### Fixed
+- `/orc-test audit`'s Python and JavaScript parsers read the tool's JSON past the summary line
+  pip-audit and npm print on stderr, which `run.py` merges ahead of stdout — every real Python
+  and npm audit had been "not understood". Found by the live scaffold check, not the fixtures,
+  which had been captured from stdout alone; their READMEs now say so.
+- The Java/Kotlin audit removes the previous run's dependency-check report before the build,
+  so a build that fails before writing cannot pass on a stale clean report.
+
+### Changed
+- BACKLOG #48–#57 record v22, its live check, and what it surfaced: PHP as v23 (#50, with
+  the DreamHost facts confirmed live), the Gradle multi-module audit gap (#51), Unity's Lint
+  block possibly never reaching its compiler (#52), multiplayer game servers (#53), and three
+  `audit` edge cases (#55–#57).
+
 ## [0.21.0] - 2026-09-16
 
 ### Added
