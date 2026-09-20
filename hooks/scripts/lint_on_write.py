@@ -65,6 +65,20 @@ NODE_BIN = "node_modules/.bin"
 # the one shape Orclab itself writes.
 SERVICE_RE = re.compile(r"^services:\s*$(?:\n(?!\S).*)*?^  orclab:\s*$", re.MULTILINE)
 RUNNERS = ("docker", "podman")
+# PyYAML's boolean spellings for false that skills/orc-test/scripts/orc_test/config.py's real
+# `yaml.safe_load` would also accept here (`data.get("container", True) is not False`)
+FALSE_WORDS = ("false", "no", "off")
+
+
+def _override_value(text, key):
+    """The value after `key:` on its own line in `.orclab/test.yaml`, comment and surrounding
+    whitespace stripped - a hand-rolled stand-in for the one or two lines this hook cares about,
+    since real YAML parsing needs PyYAML (config.py has it; this hook does not)."""
+    for raw in text.splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if line.startswith(key + ":"):
+            return line[len(key) + 1:].strip()
+    return None
 
 
 def container_prefix(root):
@@ -76,10 +90,10 @@ def container_prefix(root):
         return []
     override = pathlib.Path(root) / ".orclab" / "test.yaml"
     text = override.read_text(errors="replace") if override.is_file() else ""
-    if re.search(r"^container:\s*false\s*$", text, re.MULTILINE):
+    if (_override_value(text, "container") or "").lower() in FALSE_WORDS:
         return []
-    m = re.search(r"^runner:\s*(\w+)\s*$", text, re.MULTILINE)
-    names = (m.group(1),) if m else RUNNERS
+    runner = _override_value(text, "runner")
+    names = (runner,) if runner else RUNNERS
     engine = next((n for n in names if shutil.which(n)), None)
     if engine is None:
         return None
@@ -106,7 +120,9 @@ def _ruff_section(pyproject):
 
 
 def command_for(path):
-    """(cwd, argv) to lint `path`, or None when the project has not configured a linter for it."""
+    """(cwd, argv, header) to lint `path`, or None when the project has not configured a linter
+    for it, or its container status can't be established. `header` is the two tokens worth
+    naming in the exit-2 message - the linter itself, never the container-engine prefix."""
     ext = pathlib.Path(path).suffix
     if ext not in LINTERS:
         return None
@@ -123,15 +139,21 @@ def command_for(path):
     if local.exists():
         argv = [str(local)] + argv[1:]
 
+    # container status is a property of the git root, not of `root` (which may be a nested
+    # sub-project's own config dir) - and it can't be told apart from "not containerised"
+    # without one, so no git root means no lint, same as no engine on PATH.
     git_root = invoking_root(root)
-    prefix = container_prefix(git_root) if git_root else []
+    if git_root is None:
+        return None
+    prefix = container_prefix(git_root)
     if prefix is None:
         return None
     if not prefix and not local.exists() and shutil.which(tool) is None:
         return None
 
     cwd = pathlib.Path(git_root) if prefix else root
-    return cwd, prefix + argv + [str(pathlib.Path(path).resolve())]
+    header = " ".join(argv[:2])
+    return cwd, prefix + argv + [str(pathlib.Path(path).resolve())], header
 
 
 def main():
@@ -147,13 +169,13 @@ def main():
         found = command_for(path)
         if found is None:
             return 0
-        root, argv = found
+        root, argv, header = found
         cp = subprocess.run(argv, check=False, cwd=root, capture_output=True, text=True, timeout=TIMEOUT)
         if cp.returncode == 0:
             return 0
         lines = (cp.stdout + cp.stderr).strip().splitlines()
         report = "\n".join(lines[:MAX_LINES]) + (f"\n… {len(lines) - MAX_LINES} more lines" if len(lines) > MAX_LINES else "")
-        print(f"orclab lint_on_write: `{' '.join(argv[:2])}` on {path} exited {cp.returncode} - "
+        print(f"orclab lint_on_write: `{header}` on {path} exited {cp.returncode} - "
               f"code-discipline's checkable rules, from the project's own config. Set {OFF}=1 to disable.\n"
               f"{report}", file=sys.stderr)
         return 2

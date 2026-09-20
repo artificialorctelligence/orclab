@@ -246,6 +246,7 @@ def test_containerised_project_lints_through_compose_run(tmp_path, run):
     r = run(f, bin_dir=bin_dir)
     assert r.returncode == 2
     assert f"compose run --rm -T --workdir {tmp_path} orclab ruff check --no-fix" in r.stderr
+    assert "`ruff check`" in r.stderr    # the header names the linter, never the engine prefix
 
 
 def test_container_false_in_test_yaml_lints_on_the_host(tmp_path, run):
@@ -258,6 +259,55 @@ def test_container_false_in_test_yaml_lints_on_the_host(tmp_path, run):
     bin_dir = fake_tool(tmp_path / "bin", "ruff", 1, "src/a.py:1:1: E999 fake finding")
     r = run(f, bin_dir=bin_dir)
     assert r.returncode == 2 and "compose run" not in r.stderr
+
+
+def test_container_false_with_yaml_boolean_spelling_and_a_comment_lints_on_the_host(tmp_path, run):
+    """`False` (YAML's capitalised spelling of false) and a trailing comment - both of which the
+    real `yaml.safe_load` in config.py accepts - must not be missed by the hand-rolled scan."""
+    src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
+    (tmp_path / "compose.yaml").write_text(COMPOSE)
+    (tmp_path / ".orclab").mkdir()
+    (tmp_path / ".orclab" / "test.yaml").write_text("container: False  # note\n")
+    f = src / "a.py"
+    f.write_text("x = 1\n")
+    bin_dir = fake_tool(tmp_path / "bin", "ruff", 1, "src/a.py:1:1: E999 fake finding")
+    r = run(f, bin_dir=bin_dir)
+    assert r.returncode == 2 and "compose run" not in r.stderr
+
+
+def test_runner_with_a_comment_is_honored_over_the_default_order(tmp_path, run):
+    """`runner: podman  # note` must win even with `docker` also on PATH - a missed comment strip
+    would silently fall back to the default RUNNERS order (docker first), the opposite of what
+    the user wrote."""
+    src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
+    (tmp_path / "compose.yaml").write_text(COMPOSE)
+    (tmp_path / ".orclab").mkdir()
+    (tmp_path / ".orclab" / "test.yaml").write_text("runner: podman  # note\n")
+    f = src / "a.py"
+    f.write_text("x = 1\n")
+    bin_dir = tmp_path / "enginebin"
+    bin_dir.mkdir()
+    for name in ("docker", "podman"):
+        engine = bin_dir / name
+        engine.write_text('#!/bin/sh\necho "argv: $*"\nexit 1\n')
+        engine.chmod(engine.stat().st_mode | stat.S_IEXEC)
+    r = run(f, bin_dir=bin_dir)
+    assert r.returncode == 2
+    assert f"compose run --rm -T --workdir {tmp_path} orclab ruff check --no-fix" in r.stderr
+    assert "docker compose" not in r.stderr
+
+
+def test_a_file_outside_any_git_repo_fails_open(tmp_path, run):
+    """No git root means container status can't be established - fail open rather than guess,
+    same as an exception anywhere else in this hook."""
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    (proj / "pyproject.toml").write_text("[tool.ruff]\n")
+    f = proj / "a.py"
+    f.write_text("x = 1\n")
+    bin_dir = fake_tool(tmp_path / "bin", "ruff", 1, "would have complained")
+    r = run(f, bin_dir=bin_dir)
+    assert r.returncode == 0
 
 
 def test_containerised_project_with_no_engine_says_nothing(tmp_path, run):
@@ -279,3 +329,4 @@ def test_as_a_process_findings_are_exit_2_on_stderr(tmp_path):
                          input=json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(f)}}),
                          capture_output=True, text=True, env={"PATH": f"{bin_dir}:/usr/bin:/bin"})
     assert out.returncode == 2 and "E722" in out.stderr and out.stdout == ""
+
