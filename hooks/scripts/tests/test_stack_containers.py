@@ -7,7 +7,9 @@ import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 HEADING = "## Containers"
-EXPECTED = {"stack-python-desktop", "stack-web"}   # each stack task adds its skill's directory name here
+# each stack task adds its skill's directory name here
+EXPECTED = {"stack-python-desktop", "stack-web",
+            "stack-android-native", "stack-kotlin-multiplatform", "stack-flutter", "stack-react-native"}
 
 
 @pytest.mark.parametrize("stack", sorted(EXPECTED))

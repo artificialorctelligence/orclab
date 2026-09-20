@@ -260,6 +260,142 @@ A CA for a development server belongs in `<debug-overrides>`, which the platform
 when `android:debuggable` is true — `AcceptsUserCertificates`' own advice. And the API-key
 paragraph above: the bundle is not a secret store.
 
+## Containers
+
+Runs in a container: **yes** — confirmed live 2026-09-20. `./gradlew lint test`, every `/orc-test`
+step, `lint_on_write`'s detekt and `bundleRelease` run inside; what cannot is anything that
+needs a phone or a screen — the emulator, `installDebug`, `connectedAndroidTest` and the Play
+upload — which stay on the host.
+
+**No Android SDK image comes from Google or a foundation, so the `Dockerfile` builds one from
+their downloads.** GitHub's `android` organisation has no repository matching "docker" (its
+search API, read live: `total_count` 0), and Google's one container project,
+`android-emulator-container-scripts`, is the emulator, not the SDK (below). What exists is
+third-party, each someone else's arrangement of Google's own zip: CircleCI's `cimg/android`
+(Docker Hub, `2026.08.1` pushed 2026-08-03, 3.42 GB compressed — the most maintained, a CI
+vendor's convenience image), `mingc/android-build-box` (5.94 GB, 2026-08-10),
+`thyrlian/android-sdk` (last pushed 2024-09-29), and Cirrus Labs' `ghcr.io/cirruslabs/android-sdk`,
+whose sibling Flutter repository's README now says *"This repostiry will stop updating images
+starting May 1st 2026 due to Cirrus Labs winding down operations after an acquisition"*. So the
+Dockerfile does what they do, from the sources they read: the JDK from the Eclipse Foundation's
+official `eclipse-temurin` image, and the SDK from Google's command-line tools zip, checked
+against the SHA-256 on Google's download page (`security-discipline` rule 3), with `sdkmanager`
+fetching the rest. JDK **17**, because the toolchain table's AGP 9.4 needs *"JDK 17 or newer"*,
+Gradle 9.6 runs on *"a JVM version between 17 and 26"*, and React Native (whose image reuses
+this one) *"currently recommends version 17"*.
+
+The `Dockerfile` `/orc-code` writes when the user says yes to the container question — base
+image and tag from the `eclipse-temurin` image's own tag list (`17-jdk` is `17.0.20_8-jdk`
+on Ubuntu 26.04 "resolute" today, 211 MB compressed on Docker Hub), Google's command-line
+tools and the SDK packages the toolchain table names (Platform 36, Build-Tools 36.0.0,
+Platform-Tools), and every tool `skills/orc-test/languages/kotlin.md` names that is not a
+Gradle plugin — which is detekt alone:
+
+```dockerfile
+FROM eclipse-temurin:17-jdk
+ENV ANDROID_HOME=/opt/android-sdk
+ENV PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends unzip \
+    && rm -rf /var/lib/apt/lists/*
+RUN wget -q -O /tmp/cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-15859902_latest.zip \
+    && echo "4e4c464f145a7512b57d088ac6c278c03c9eea610886b35a5e0804e74eedf583 /tmp/cmdline-tools.zip" | sha256sum -c - \
+    && mkdir -p $ANDROID_HOME/cmdline-tools \
+    && unzip -q /tmp/cmdline-tools.zip -d $ANDROID_HOME/cmdline-tools \
+    && mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest \
+    && rm /tmp/cmdline-tools.zip
+RUN yes | sdkmanager --licenses >/dev/null \
+    && sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+RUN wget -q -O /tmp/detekt.zip https://github.com/detekt/detekt/releases/download/v1.23.8/detekt-cli-1.23.8.zip \
+    && echo "ff9f9258879ff2ec4349114740221498afec46a85cf6302c9f80b06eb4429501 /tmp/detekt.zip" | sha256sum -c - \
+    && unzip -q /tmp/detekt.zip -d /opt \
+    && ln -s /opt/detekt-cli-1.23.8/bin/detekt-cli /usr/local/bin/detekt \
+    && rm /tmp/detekt.zip
+ENV GRADLE_USER_HOME=/cache/gradle
+```
+
+Not run here — the first project records it. Why each line, so the next reader can check it:
+
+- **`eclipse-temurin:17-jdk`.** Its Dockerfile (`adoptium/containers`, `17/jdk/ubuntu/resolute`)
+  is `FROM ubuntu:26.04`, downloads Adoptium's tarball, checks its GPG signature and SHA-256,
+  and sets `JAVA_HOME=/opt/java/openjdk` on `PATH` — the JDK a terminal build uses, per the
+  jdks page: *"the `JAVA_HOME` environment variable (if set) determines which JDK runs the
+  Gradle scripts"*. `wget` is in the image; `unzip` is not, hence the one apt line.
+- **The command-line tools.** The Android Studio download page lists
+  `commandlinetools-linux-15859902_latest.zip`, 181.8 MB, with the SHA-256 that is in the
+  `RUN`. The unzip-and-move is the sdkmanager page's own instruction — *"In the unzipped
+  `cmdline-tools` directory, create a sub-directory called `latest`"* and move the contents in.
+  `ANDROID_HOME` is the variable Google names (*"Sets the path to the SDK installation
+  directory"*; `ANDROID_SDK_ROOT` *"is deprecated"*), the one the Install paragraph above
+  already asks for; `sdkmanager` uses *"the SDK containing this tool"*, so no `--sdk_root`.
+- **Licences, then packages.** `sdkmanager --licenses` *"prompts you to accept any licenses that
+  haven't already been accepted"*; `yes` answers the prompt. Then the three packages the
+  toolchain table names, in the page's own syntax (`"platforms;android-36"`,
+  `"build-tools;36.0.0"`, `"platform-tools"`) — about 300 MB on disk (135 + 147 + 22 MB,
+  measured on this machine's SDK; the tools themselves 174 MB). Not installed: the NDK and
+  CMake, which a pure Kotlin app does not use. A project with native code adds
+  `"ndk;28.2.13676358" "cmake;3.22.1"` to the line (2.2 GB and 60 MB here), because otherwise
+  AGP fetches them at build time — *"Android Gradle Plugin 4.2.0+ can automatically install
+  the required NDK and CMake the first time you build your project if their licenses have
+  been accepted in advance"* — into a container that is discarded after the command.
+- **detekt** is the one tool on the language page that is not a Gradle plugin: `/orc-test`'s
+  test lint and `lint_on_write`'s `.kt` line both call `detekt` on `PATH`. The zip is the CLI
+  page's *"Direct Download (Any OS)"* form; v1.23.8 (2025-02-21) is the latest non-prerelease
+  on GitHub and the version the Lint section names. detekt publishes no checksum, so the
+  SHA-256 on that line was computed here from the release asset on 2026-09-20 — pinned so a
+  changed download fails, not vendor-attested. The unzipped script is `bin/detekt-cli`; the
+  symlink gives it the name both callers use.
+- **Kover, Pitest (and Arcmutate), dependency-check: installed by nothing here.** They are
+  Gradle plugins in the project's own build file (`## Lint`, `### Dependency audit`,
+  `languages/kotlin.md`), resolved by Gradle like any dependency; the wrapper likewise
+  downloads its own distribution (`gradle-9.6.0-bin.zip` is 141 MB). All of it lands in the
+  Gradle User Home — *"By default, the Gradle User Home (`~/.gradle` …)"* holds the wrapper
+  distributions and the dependency cache, and *"It can be set with the environment variable
+  `GRADLE_USER_HOME`"* (Gradle 9.7.1 docs) — which is why the last line moves it to
+  `/cache/gradle`: `compose run --rm` throws the container away after every command, so a
+  cache inside the image's filesystem would be refilled from the network on every `/orc-test`
+  step. dependency-check's NVD copy goes with it — its Gradle plugin's convention is
+  `"${project.gradle.gradleUserHomeDir}/dependency-check-data/11.0"` (`DataExtension.groovy`
+  on `main`) — so the 20-minute first download happens once.
+
+**The `compose.yaml`** is the one in `skills/orc-test/SKILL.md`'s Containers section with one
+addition for that cache: a named volume, which Compose defines as *"persistent data stores
+implemented by the container engine"*, declared at the top level and granted to the service
+(the Compose volumes reference); `podman-compose` 1.0.6 creates it on first use (`assert_volume`
+in its source: `podman volume inspect <name> || podman volume create <name>`):
+
+```yaml
+services:
+  orclab:
+    build: .
+    volumes:
+      - .:${PWD}
+      - cache:/cache
+    working_dir: ${PWD}
+volumes:
+  cache:
+```
+
+The volume is the engine's, not the project's: it survives `compose run --rm`, and
+`<engine> volume rm` empties it. A plugin version bump in the build file resolves through it
+like any dependency; the image is rebuilt (`<engine> compose build orclab`) when the Dockerfile
+changes — a newer platform, a newer detekt — and there is nothing unpinned in it.
+
+What cannot happen inside: **the emulator** — Google's own recipe for it in a container,
+`android-emulator-container-scripts`, is *"still an experimental feature"* and runs with
+`--device /dev/kvm` because *"KVM must be enabled on your host"*; the compose file above passes
+no device, and a USB phone is not passed either, so `installDebug`, `connectedAndroidTest` and
+`adb devices` are the host's. **The Play upload** — the Play ingredient's step, from the host,
+with credentials that are never in the image. What *can*: `bundleRelease` signs inside, because
+`keystore.properties` and the `.jks` are in the mounted working tree (the Secrets section's
+rule that they are git-ignored is unchanged; the mount is the tree, not the repository). The
+proposal `/orc-code` makes for this stack's container question: **no**, because the toolchain
+row already installs Android Studio, which brings the SDK, a JDK and the emulator; the image is
+a second SDK beside it (211 MB of JDK image plus ~480 MB of SDK, 2.2 GB more for native code),
+and the emulator — the thing that makes Android development need an Android machine — cannot
+move into it. Say yes on a machine with no Android Studio that only needs to build and test, or
+one with no JDK 17.
+
 ## Presence
 
 No project has been built with these facets yet; the first one corrects them. Presence is how
@@ -419,3 +555,4 @@ own Gradle export; the Play ingredient applies to it unchanged.
 - Facets (2026-09-12) — presence: `https://developer.android.com/develop/ui/views/notifications`, `https://developer.android.com/develop/ui/compose/notifications`, `.../compose/notifications/create-notification`, `.../compose/notifications/notification-permission`, `.../compose/notifications/progress-centric`, `.../compose/notifications/live-update`, `https://developer.android.com/reference/androidx/core/app/NotificationCompat.Builder`; foreground services: `https://developer.android.com/develop/background-work/services/fgs`, `.../fgs/service-types`, `.../fgs/declare`, `.../fgs/launch`; `https://developer.android.com/about/versions/16/behavior-changes-16`
 - Facets — UI: `https://developer.android.com/develop/ui/compose/bom` (where `/jetpack/compose/bom` redirects), `https://developer.android.com/develop/ui/compose/bom/bom-mapping`, `https://developer.android.com/develop/ui/compose/migrate/interoperability-apis`
 - Facets — storage: `https://developer.android.com/training/data-storage/room`, `https://developer.android.com/jetpack/androidx/releases/room3`, `https://developer.android.com/jetpack/androidx/releases/room`, `https://developer.android.com/topic/libraries/architecture/datastore`, `https://developer.android.com/jetpack/androidx/releases/datastore`, `https://developer.android.com/training/data-storage/shared-preferences`, `https://developer.android.com/training/data-storage/app-specific`, `https://developer.android.com/reference/android/content/Context`
+- Containers (2026-09-20): Google's `android` org via `https://api.github.com/search/repositories?q=org:android+docker` (0 results); third-party images: `https://hub.docker.com/v2/repositories/cimg/android/tags` (sizes, push dates), `https://github.com/CircleCI-Public/cimg-android`, `https://hub.docker.com/v2/repositories/mingc/android-build-box/tags`, `https://hub.docker.com/v2/repositories/thyrlian/android-sdk/tags`, `https://raw.githubusercontent.com/cirruslabs/docker-images-flutter/master/README.md` (the wind-down note); JDK: `https://raw.githubusercontent.com/docker-library/official-images/master/library/eclipse-temurin` (`17-jdk` → `17.0.20_8-jdk-resolute`), `https://raw.githubusercontent.com/adoptium/containers/main/17/jdk/ubuntu/resolute/Dockerfile`, `https://hub.docker.com/v2/repositories/library/eclipse-temurin/tags/17-jdk` (211 MB), `https://developer.android.com/build/jdks` (`JAVA_HOME`), `https://docs.gradle.org/9.6.0/userguide/compatibility.html` (JVM 17–26); SDK: `https://developer.android.com/studio` (the zip, 181.8 MB, and its SHA-256), `https://developer.android.com/tools/sdkmanager` (`latest`, `--licenses`, package syntax), `https://developer.android.com/tools/variables` (`ANDROID_HOME`), `https://developer.android.com/studio/projects/install-ndk` (auto-install, default CMake), `sdkmanager --list` and `du` on this machine's SDK 2026-09-20 (package names, on-disk sizes); emulator: `https://raw.githubusercontent.com/google/android-emulator-container-scripts/master/README.md` (KVM, `--device /dev/kvm`, experimental); Gradle cache: `https://docs.gradle.org/current/userguide/directory_layout.html` (`GRADLE_USER_HOME`), `https://raw.githubusercontent.com/dependency-check/dependency-check-gradle/main/src/main/groovy/org/owasp/dependencycheck/gradle/extension/DataExtension.groovy` (data directory convention), `https://services.gradle.org/distributions/gradle-9.6.0-bin.zip` (141 MB, `Content-Length`); the volume: `https://docs.docker.com/reference/compose-file/volumes/`, `https://github.com/containers/podman-compose/blob/v1.0.6/podman_compose.py` (`assert_volume`); detekt: `https://detekt.dev/docs/gettingstarted/cli` (the direct-download form), `https://api.github.com/repos/detekt/detekt/releases/latest` (v1.23.8, assets), SHA-256 of `detekt-cli-1.23.8.zip` computed on this machine 2026-09-20 (no checksum published)
