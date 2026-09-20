@@ -7,9 +7,9 @@ import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 HEADING = "## Containers"
-# each stack task adds its skill's directory name here
 EXPECTED = {"stack-python-desktop", "stack-web",
-            "stack-android-native", "stack-kotlin-multiplatform", "stack-flutter", "stack-react-native"}
+            "stack-android-native", "stack-kotlin-multiplatform", "stack-flutter", "stack-react-native",
+            "stack-ios-native", "stack-godot", "stack-unity"}
 
 
 @pytest.mark.parametrize("stack", sorted(EXPECTED))
@@ -24,7 +24,6 @@ def test_stack_skill_has_the_containers_section(stack):
     assert "container question" in body, stack
 
 
-@pytest.mark.xfail(strict=True, reason="until Task 7 lands the ninth section; Task 7 removes this marker")
 def test_every_stack_skill_is_expected():
     stacks = {p.parent.name for p in (ROOT / "skills").glob("stack-*/SKILL.md")}
     assert stacks == EXPECTED

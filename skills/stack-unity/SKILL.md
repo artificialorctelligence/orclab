@@ -282,6 +282,42 @@ Multiplayer Center) is the *Reachable by strangers* tier on its server, and no s
 covers a game server yet; BACKLOG #53 — `stack-godot`'s section quotes what Godot's own docs
 already say about it.
 
+## Containers
+
+Runs in a container: **no** — confirmed live 2026-09-20, by Unity's licence, not its engine. The
+editor itself can run without a screen — the command-line reference's `-batchmode` (*"runs
+command line arguments without the need for human interaction"*) and `-nographics` (*"Unity
+doesn't initialize the graphics device. You can then run automated workflows on machines that
+don't have a GPU"*) are the toolchain table's headless-build row — but an editor running in a
+container is a second machine, and the licence this skill assumes, Unity Personal ("When this is
+the stack"), has no route onto one. Three of Unity's own pages, read live 2026-09-20: the
+licence-compliance FAQ — *"Can I use my license key for a separate build machine? No. Running
+Unity on more than one machine at the same time is not allowed. A separate license is required
+for build machines"*; the product Unity sells for that machine, Unity Build Server, in its terms
+(last updated 2026-06-30) — *"You may not use Unity Build Server with the Unity Personal tier of
+the Unity Software"*, and *"you must purchase a separate 'Unity Build Server' subscription in
+order to use Unity Build Server"*; and the activation a machine with no Hub has, manual
+activation (`-createManualActivationFile`, then `-manualLicenseFile`), whose manual page says
+*"It doesn't support Unity Pro assigned seats, Unity Personal, or floating license
+subscriptions. To activate a license for Unity Personal, log in to the Unity Hub."* The
+`-serial` argument is for *"your paid Unity license"*. So on Personal nothing of this stack's
+toolchain runs inside, because the toolchain is the editor and the editor cannot be licensed
+there: not the build, not the tests, not the analyzer.
+
+What exists, and is not researched into a default: **GameCI**, the community's images —
+`unityci/editor` on Docker Hub, *"Dockerised Unity Editor made for continuous integration"*,
+*"established empirically by the community"* (its docs), 13.9 million pulls, an image per editor
+version and platform module (`unityci/editor:ubuntu-6000.6.2f1-android-3.2.2`, pushed
+2026-09-18, 8.09 GB compressed; `-ios-`, `-mac-mono-` and the others likewise). Its
+Personal-licence route is to activate in the Hub on a real machine and paste the resulting
+`.ulf` file's contents into the CI's secret store (`UNITY_LICENSE`, its activation page), and its
+own docs count seats — *"This is not an issue for free licenses, but for paid licenses, you will
+need to be mindful of starting too many parallel jobs as activation will fail"*. That is a
+working CI practice which the licence text above does not name; whether Unity permits it on
+Personal is not a question this skill answers, and a project that wants it reads Unity's current
+terms first (`currency-discipline`) — a Pro seat plus a Build Server subscription is the route
+Unity documents. `/orc-code` skips the container question for this stack.
+
 ## Presence
 
 Not researched; unlikely to be needed.
@@ -434,6 +470,7 @@ the window is decorated *"across various compositors"* under Wayland; no signing
 
 ## Sources (live on 2026-09-11; facets 2026-09-12)
 
+- Containers (2026-09-20): `https://docs.unity3d.com/6000.6/Documentation/Manual/EditorCommandLineArguments.html` (`-batchmode`, `-nographics`, `-serial`, `-createManualActivationFile`, `-manualLicenseFile`), `https://docs.unity3d.com/6000.6/Documentation/Manual/ManualActivationGuide.html` (not for Personal), `https://unity.com/pages/license-compliance` (the build-machine FAQ), `https://unity.com/legal/terms-of-service/build-server` (Build Server terms, 2026-06-30), `https://docs.unity.com/licensing/manual/Requirements` (*"The Unity Hub isn't required if you use Unity in a headless state, such as a build server"*); GameCI — `https://raw.githubusercontent.com/game-ci/documentation/main/docs/08-docker/01-docker-images.mdx` (the source of `https://game.ci/docs/docker/versions` and its siblings, which render by script), `https://game.ci/docs/github/activation` (`UNITY_LICENSE`, the `.ulf`), `https://hub.docker.com/v2/repositories/unityci/editor/` and `.../tags/?name=6000.6.2f1-android` (pulls, push date, size)
 - Security — where security-discipline lands (2026-09-19): Sonar's default-on rule `https://raw.githubusercontent.com/SonarSource/sonar-dotnet/master/analyzers/src/SonarAnalyzer.Core/Analyzers/DiagnosticDescriptorFactory.cs`, `https://raw.githubusercontent.com/SonarSource/sonar-dotnet/master/analyzers/rspec/cs/Sonar_way_profile.json`, `.../rspec/cs/S{2068,6418,2612,2077,5773,5766,4036,4830,4423,5332,2053,3329,4790,5542,2245,4507,5443,6444}.json` and `S4830.html`; `https://api.nuget.org/v3-flatcontainer/sonaranalyzer.csharp/10.34.0.3385/sonaranalyzer.csharp.10.34.0.3385.nupkg` (one DLL, `analyzers/SonarAnalyzer.CSharp.dll`); SecurityCodeScan: `https://api.nuget.org/v3/registration5-gz-semver2/securitycodescan.vs2019/index.json` (5.6.7, 2022-09-05), `https://api.github.com/repos/security-code-scan/security-code-scan` and `.../commits?per_page=1` (default branch `vs2019`, last commit 2022-11-11); Unity analyzers: `https://docs.unity3d.com/6000.6/Documentation/Manual/roslyn-analyzers.html`, `https://docs.unity3d.com/6000.6/Documentation/Manual/install-existing-analyzer.html`, `https://docs.unity3d.com/6000.6/Documentation/Manual/analyzer-scope-and-diagnostics.html` (`.ruleset` only; no `.editorconfig` on the page), the ruleset schema `https://learn.microsoft.com/en-us/visualstudio/code-quality/how-to-create-a-custom-rule-set?view=visualstudio` (`RuleSet`/`Rules`/`Rule`, `ToolsVersion`; the page Unity's links to, 2026-09-19), `https://docs.unity3d.com/6000.6/Documentation/Manual/scripting-ide-support.html` (generated `.csproj`; the `Microsoft.Unity.Analyzers` note), `https://docs.unity3d.com/Packages/com.unity.ide.visualstudio@2.0/manual/using-visual-studio-editor.html` (*Regenerate project files*); Player Settings: `https://docs.unity3d.com/6000.6/Documentation/Manual/class-PlayerSettingsAndroid.html` (*Allow downloads over HTTP*, *Internet Access*, *Write Permission*, *Minify*, the keystore-password note), `https://docs.unity3d.com/6000.6/Documentation/Manual/class-PlayerSettingsiOS.html` (*Allow downloads over HTTP*), `https://docs.unity3d.com/6000.6/Documentation/ScriptReference/PlayerSettings-insecureHttpOption.html`, `https://docs.unity3d.com/6000.6/Documentation/ScriptReference/PlayerSettings.Android-keystorePass.html`, `https://docs.unity3d.com/6000.6/Documentation/ScriptReference/PlayerSettings.Android-useCustomKeystore.html`; `https://docs.unity3d.com/6000.6/Documentation/ScriptReference/Networking.UnityWebRequestAssetBundle.GetAssetBundle.html` (`crc`), `https://docs.unity3d.com/6000.6/Documentation/ScriptReference/Networking.CertificateHandler.ValidateCertificate.html`; `https://docs.unity3d.com/6000.6/Documentation/ScriptReference/PlayerPrefs.html` (*without encryption*); `https://docs.unity3d.com/6000.6/Documentation/Manual/upm-lifecycle.html` (Deprecated state); `https://raw.githubusercontent.com/github/gitignore/main/Unity.gitignore`; `https://docs.unity3d.com/6000.6/Documentation/Manual/multiplayer.html`
 - Lint — where code-discipline lands (2026-09-13): `https://raw.githubusercontent.com/SonarSource/sonar-dotnet/master/analyzers/rspec/cs/S{134,138,108,2486}.json`, `.../analyzers/src/SonarAnalyzer.Core/Rules/{FunctionNestingDepthBase,MethodsShouldNotHaveTooManyLinesBase}.cs` (defaults 3 and 80), `.../Configuration/ParameterLoader.cs` (parameters from `SonarLint.xml`), `https://api.nuget.org/v3-flatcontainer/sonaranalyzer.csharp/index.json`, `https://raw.githubusercontent.com/dotnet/docs/main/docs/fundamentals/code-analysis/quality-rules/ca1031.md`, `https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/compiler-options/errors-warnings`, `https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.debug.assert`
 - Current editor: `https://unity.com/releases/editor/whats-new`

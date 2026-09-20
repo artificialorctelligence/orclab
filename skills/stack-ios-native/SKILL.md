@@ -310,6 +310,26 @@ other apps to directly delete content or access sensitive information about the 
 `URLComponents`, match against the few paths the app defines, refuse the rest. And the API-key
 paragraph above: the bundle is not a secret store.
 
+## Containers
+
+Runs in a container: **no** — confirmed live 2026-09-20. Every build, test run, archive and
+simulator needs macOS with Xcode ("The Mac requirement, stated once", above), and a container on
+this machine is a Linux machine: there is no iOS SDK for Linux and never has been, so nothing in
+`## Build, run, test` — `xcodebuild … test`, `archive`, `-exportArchive` — can run inside one, and
+neither can `/orc-test`'s app-target path (`skills/orc-test/languages/swift.md`: `xcodebuild
+test`, `xcrun xccov`, and Muter, whose README says it *"can run only on macOS 10.15 or higher"*,
+read live 2026-09-20). What could run headless in a container is the one part that already runs
+on Linux: a local `Package.swift` layer (the layout table's optional row), whose `swift test`
+needs no Xcode. Its image is the official `swift` image on Docker Hub — `6.4-trixie` is Swift
+6.4.0 on Debian trixie, pushed 2026-09-19, 1.41 GB compressed (`6.4-trixie-slim`, 118 MB, is the
+runtime without the compiler, so not for tests) — and SwiftLint 0.65.1's release assets include
+`swiftlint_linux_amd64.zip` (67 MB), so a package's tests and its lint could run inside; no
+Dockerfile is written for it, because a package layer without the app it serves is not this
+stack, and nothing measures its mutation score off a Mac. The container-shaped answer that
+exists for the app itself is the cloud Mac: "Building without a Mac" above rents one by the
+minute (Codemagic's `mac_mini_m2` by default), which is a machine somewhere else, not a container
+here. `/orc-code` skips the container question for this stack.
+
 ## Presence
 
 No project has been built with these facets yet; the first one corrects them. Presence is how
@@ -453,6 +473,12 @@ Store ingredient applies to it unchanged, including the privacy manifest and the
 
 ## Sources (live on 2026-09-11; facets and no-Mac builds 2026-09-12)
 
+- Containers (2026-09-20): the official `swift` image's tags
+  `https://hub.docker.com/v2/repositories/library/swift/tags/?name=6.4` (`6.4-trixie`,
+  `6.4-trixie-slim`, pushed 2026-09-19); SwiftLint's release assets
+  `https://api.github.com/repos/realm/SwiftLint/releases/tags/0.65.1`
+  (`swiftlint_linux_amd64.zip`); Muter's README
+  `https://raw.githubusercontent.com/muter-mutation-testing/muter/master/README.md` (macOS only)
 - Security — where security-discipline lands (2026-09-19; Apple documentation pages read through
   their JSON form, as for the facets) — SwiftLint: `https://realm.github.io/SwiftLint/rule-directory.html`
   (0.65.1; 102 default, 149 opt-in, 5 analyzer rules, no security rule),

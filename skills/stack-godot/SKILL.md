@@ -234,6 +234,117 @@ state"*, *"Add safety checks and rate limits to actions that can be triggered fr
 a game whose server other players reach is the *Reachable by strangers* tier there, and no
 stack skill covers a game server yet; BACKLOG #53.
 
+## Containers
+
+Runs in a container: **yes** — confirmed live 2026-09-20. gdUnit4's suite, every `/orc-test`
+step, `lint_on_write`'s `gdlint` and the headless Linux export run inside; what cannot is the
+editor and the game window — nothing draws them — and the Android and iOS exports, which stay
+on the host (below).
+
+**No Godot image comes from the Godot Foundation, so the `Dockerfile` builds one from its
+downloads.** Docker Hub's search for "godot" returns no official image (`is_official` false on
+every result, read through Hub's API); what exists is community — `barichello/godot-ci`, the one
+CI users share (1.13 million pulls; `4.7.2` and `mono-4.7.2` pushed 2026-08-18, 2.58 GB
+compressed: Ubuntu noble with a JDK, the Android SDK, `butler` and `rsync` for itch.io and Pages
+deploys), and a long tail of personal ones under 45,000 pulls. gdUnit4's own GitHub Action
+(`godot-gdunit-labs/gdUnit4-action`) uses no image either: it downloads the editor zip from
+`godotengine/godot-builds` onto `ubuntu-latest`. So the Dockerfile does what both do — Godot's
+own release zip and templates, checked against the `SHA512-SUMS.txt` Godot publishes beside them
+(`security-discipline` rule 3) — on the official `python` image, because two of the three tools
+below are `pip` installs.
+
+The `Dockerfile` `/orc-code` writes when the user says yes to the container question — base
+image and tag from the official `python` image's tag list (`3.14` is 3.14.7 on Debian trixie,
+pushed 2026-09-19, 415 MB compressed — the same base `stack-python-desktop`'s section uses),
+Godot 4.7.2 and its Linux export templates from the `godot-builds` release, and every tool
+`skills/orc-test/languages/gdscript.md` names that is not an addon in the project (gdmutant for
+mutation; gdlint, from gdtoolkit, for test lint and `lint_on_write`):
+
+```dockerfile
+FROM python:3.14
+RUN wget -q -O /tmp/godot.zip https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip \
+    && echo "9aa00f7a605200940bce3027a567b782f49bd8e940dd06ae9e987bd65aee1b1467edd56ed84fcdcbdd44354bf613bdbb4e5d2913e925850368e150c59ed54c65  /tmp/godot.zip" | sha512sum -c - \
+    && unzip -q /tmp/godot.zip -d /tmp \
+    && mv /tmp/Godot_v4.7.2-stable_linux.x86_64 /usr/local/bin/godot \
+    && rm /tmp/godot.zip
+RUN wget -q -O /tmp/templates.tpz https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz \
+    && echo "ca4d71c4d7b81dfc15d1a98baa07534aa95b03fdda78a0075b06672e1648d2e5f40980c9adc28d23e1b92e732ee7bf3461997aa804af74ec2fcd7a93ccb84079  /tmp/templates.tpz" | sha512sum -c - \
+    && mkdir -p /root/.local/share/godot/export_templates/4.7.2.stable \
+    && unzip -q -j /tmp/templates.tpz 'templates/version.txt' 'templates/linux_*.x86_64' -d /root/.local/share/godot/export_templates/4.7.2.stable \
+    && rm /tmp/templates.tpz
+RUN pip install --no-cache-dir 'gdmutant==0.1.*' gdtoolkit
+ENV GODOT_BIN=/usr/local/bin/godot
+```
+
+Not run here — the first project records it. Why each line, so the next reader can check it:
+
+- **`python:3.14`**, because gdmutant and gdtoolkit are PyPI packages (gdmutant 0.1.2 needs
+  Python ≥ 3.12, gdtoolkit 4.5.0 ≥ 3.7 — their PyPI metadata) and the default tag's
+  `buildpack-deps` base already has `wget` and `unzip`; `pip install --no-cache-dir` is the
+  image README's own form. Nothing else is needed for Godot: the 4.7.2 Linux binary, downloaded
+  and checked on this machine, links only glibc (`objdump -p`: `librt`, `libpthread`, `libdl`,
+  `libm`, `libc`), and `--headless --version` ran on it with no display and no other library —
+  X11, Wayland, Vulkan and audio are loaded at runtime only when a display server is asked for.
+- **The editor zip**, 78 MB, unzips to one 146 MB executable, placed on `PATH` as `godot` — the
+  name gdmutant looks for (*"on your PATH so a plain `godot --version` works, or pass `--godot
+  <full-path>`"*, its README) — and named again by the last line's `GODOT_BIN`, which is what
+  gdUnit4's `runtest.sh` reads (*"Set the environment variable: export GODOT_BIN=/path/to/godot"*,
+  its own error text). The two SHA-512 lines are Godot's `SHA512-SUMS.txt` for the release. The
+  export templates are a 1.28 GB download of which the Linux x86_64 pair is 140 MB, so the
+  `unzip -j` pattern keeps only those and `version.txt` (the archive holds 35 files, 1.98 GB
+  unpacked — every platform's templates, Android's 204 MB `android_source.zip` among them). They
+  go where the editor looks — Godot's data-paths page: editor data is `~/.local/share/godot/` on
+  Linux and *"contains export templates"*; the `4.7.2.stable` directory name is the form
+  `barichello/godot-ci`'s Dockerfile uses (`${GODOT_VERSION}.${RELEASE_NAME}`); `/root` because
+  a `compose run` runs as the image's root user, which rootless Podman maps to you on the host.
+- **The headless export** is the toolchain table's own line — `godot --headless --export-release
+  "Linux" build/game.x86_64` — and the command-line reference's *"Enable headless mode
+  (--display-driver headless --audio-driver Dummy). Useful for servers"*, with its *"export
+  templates must be installed for the editor"* the reason the second `RUN` exists. An Android
+  export inside needs what the toolchain table lists — JDK 17, the SDK, NDK r28b — which is
+  `stack-android-native`'s Dockerfile plus `templates/android_*` in the `unzip` pattern and the
+  editor settings that point Godot at them; none of it is in this image, so the Android and iOS
+  exports are the host's (iOS was always the Mac's).
+- **A fresh checkout needs one import first** — `languages/gdscript.md`'s caveat — and inside it
+  is `<engine> compose run --rm orclab godot --headless --import`, which writes `.godot/` into the
+  mounted tree, so it is done once per checkout, not per run.
+- **gdUnit4 refuses `--headless` unless told not to**, and the container has no display. Its CI
+  runner (`GdUnitTestCIRunner.gd`, read live 2026-09-20): when `DisplayServer.get_name() ==
+  "headless"` it prints *"Headless mode is not supported!"* and exits 103, unless
+  `--ignoreHeadlessMode` is passed — *"tests that use UI interaction do not work correctly in
+  headless mode. Godot 'InputEvents' are not transported by the Godot engine in headless mode"*.
+  gdUnit4's own Action does not go headless: it runs `runtest.sh` under `xvfb-run` with
+  `--display-driver x11 --rendering-driver opengl3`, a virtual X server plus software GL.
+  gdmutant goes the other way for every mutant it runs — its gdUnit4 command is `godot
+  --headless --path <project> -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a <tests> -rc 1
+  --ignoreHeadlessMode` (`adapters/gdscript/runner.py` in the 0.1.2 sdist) — so mutation runs
+  inside as it is. The test run does not yet: `/orc-test`'s command is
+  `./addons/gdUnit4/runtest.sh -a test` (`gdscript.py`'s `test_cmd`), and `runtest.sh` passes
+  every argument through to Godot, so the containerised project sets `languages: gdscript: test:
+  "./addons/gdUnit4/runtest.sh --headless --ignoreHeadlessMode -a test"` in `.orclab/test.yaml`
+  for `run`; `coverage` reuses the module's own command, which does not carry the flags, so it
+  does not yet run inside — the two flags belong in `gdscript.py`, beside gdmutant's. A test
+  that drives input stays on the host either way.
+- **`GODOT_BIN` is set in the image, and the host mirrors it.** `/orc-test` checks the variable
+  on the host on purpose (`gdscript.py`'s `missing()`: *"GODOT_BIN is a host environment
+  variable"*) and forwards its value to gdmutant as `--godot`, and `compose run` passes no host
+  variable in; so the host also has `export GODOT_BIN=/usr/local/bin/godot` — the image's path,
+  which is where the command runs — or the report says `GODOT_BIN` is missing.
+- **gdUnit4 and nano-coverage are addons in the project** (`addons/gdUnit4`,
+  `addons/nano_coverage`), in the mounted tree; nothing to install. `audit` has no tool
+  (`### Dependency audit`, above).
+
+The `compose.yaml` is the one in `skills/orc-test/SKILL.md`'s Containers section, unchanged.
+What cannot happen inside: the editor and the game (no display), a test that sends input events
+(gdUnit4's own warning above), the Android export (no JDK or SDK in the image, and the
+`GODOT_ANDROID_KEYSTORE_RELEASE_*` variables the Secrets section names would need passing in
+too), and the iOS export (macOS). The proposal `/orc-code` makes for this stack's container
+question: **no**, because the toolchain is one ~150 MB executable that runs on any Linux ("When
+this is the stack"), the image adds a 1.28 GB template download and two `pip` installs the host
+does in one line, and the editor — where a Godot project is mostly worked on — cannot move into
+it. Say yes for a machine that only runs the suite and the Linux export, a CI runner's shape, or
+to keep the Godot binary and the Python tools off it.
+
 ## Presence
 
 Not researched; unlikely to be needed.
@@ -376,6 +487,7 @@ default; arm64 if a Pi 5 could run it) and ship.
 
 ## Sources (live on 2026-09-11; facets 2026-09-12)
 
+- Containers (2026-09-20): `https://docs.godotengine.org/en/stable/tutorials/export/exporting_projects.html#exporting-from-the-command-line`, `https://docs.godotengine.org/en/stable/tutorials/editor/command_line_tutorial.html` (`--headless`, `--import`, `--export-release`; *"export templates must be installed"*), `https://docs.godotengine.org/en/stable/tutorials/io/data_paths.html` (editor data *"contains export templates"*, `~/.local/share/godot/`); Docker Hub — `https://hub.docker.com/v2/search/repositories/?query=godot` (no `is_official` result), `https://hub.docker.com/v2/repositories/barichello/godot-ci/` and `.../tags/?ordering=last_updated` (pulls, `4.7.2` push date and size), `https://raw.githubusercontent.com/abarichello/godot-ci/master/Dockerfile` (the templates path form), `https://hub.docker.com/v2/repositories/library/python/tags/3.14`, `https://raw.githubusercontent.com/docker-library/python/master/3.14/trixie/Dockerfile` (`FROM buildpack-deps:trixie`), `https://raw.githubusercontent.com/docker-library/buildpack-deps/master/debian/trixie/Dockerfile` (`unzip`) and `.../debian/trixie/curl/Dockerfile` (`wget`); Godot's release — `https://api.github.com/repos/godotengine/godot-builds/releases/tags/4.7.2-stable` (asset names and sizes), `https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/SHA512-SUMS.txt`, the editor zip itself (downloaded here, SHA-512 checked, `objdump -p`, `--headless --version`), and the `.tpz`'s central directory (read by HTTP range request: 35 entries, the `linux_*.x86_64` and `android_*` names and sizes); gdUnit4 — `https://raw.githubusercontent.com/MikeSchulze/gdUnit4/master/addons/gdUnit4/runtest.sh` (`GODOT_BIN`, pass-through arguments), `.../addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd` (`--ignoreHeadlessMode`, exit 103), `https://raw.githubusercontent.com/godot-gdunit-labs/gdUnit4-action/master/action.yml`, `.../.gdunit4_action/unit-test/index.js` (`xvfb-run`, `--display-driver x11`), `.../.gdunit4_action/godot-install/action.yml` (the zip from `godot-builds`); gdmutant — `https://raw.githubusercontent.com/kphutt/gdmutant/main/README.md` (`--godot`, PATH), `https://pypi.org/pypi/gdmutant/json` (0.1.2, `>=3.12`) and its sdist's `gdmutant/adapters/gdscript/runner.py` (the headless gdUnit4 command); `https://pypi.org/pypi/gdtoolkit/json` (4.5.0, `>=3.7`)
 - Security — where security-discipline lands (2026-09-19): gdlint's rule list `https://github.com/Scony/godot-gdscript-toolkit/wiki/3.-Linter` and `https://raw.githubusercontent.com/Scony/godot-gdscript-toolkit/master/gdtoolkit/linter/__init__.py` (`DEFAULT_CONFIG`); `https://docs.godotengine.org/en/stable/classes/class_projectsettings.html` (the `debug/gdscript/warnings/*` keys, `unsafe_cast`; the `network/*` keys — no plain-HTTP switch); `https://docs.godotengine.org/en/stable/classes/class_tlsoptions.html` (`client`, `client_unsafe`), `https://docs.godotengine.org/en/stable/classes/class_httpclient.html` (`connect_to_host`); `https://docs.godotengine.org/en/stable/tutorials/export/exporting_pcks.html` (*Security concerns*, `load_resource_pack`); `https://docs.godotengine.org/en/stable/classes/class_editorexportplatformandroid.html` (`permissions/*`, `keystore/release_*` env vars, `user_data_backup/allow`); `https://docs.godotengine.org/en/stable/tutorials/scripting/c_sharp/c_sharp_basics.html` (.NET SDK, `.csproj`); `https://docs.godotengine.org/en/stable/tutorials/export/exporting_projects.html` (`export_presets.cfg`, `.godot/export_credentials.cfg`, PCK versus ZIP); `https://raw.githubusercontent.com/godotengine/godot/master/editor/version_control/editor_vcs_interface.cpp` (the default `.gitignore`); `https://docs.godotengine.org/en/stable/classes/index.html` (no keychain class), `https://docs.godotengine.org/en/stable/classes/class_crypto.html`, `https://docs.godotengine.org/en/stable/classes/class_configfile.html` (`save_encrypted`, `load_encrypted`), `https://docs.godotengine.org/en/stable/classes/class_os.html` (`get_environment`); `https://docs.godotengine.org/en/stable/engine_details/development/compiling/compiling_with_script_encryption_key.html` (PCK encryption; the `contributing/...` path is a 404 on `stable`); `https://docs.godotengine.org/en/stable/tutorials/networking/high_level_multiplayer.html` (*Secure multiplayer design*)
 - Lint — where code-discipline lands (2026-09-13): `https://raw.githubusercontent.com/Scony/godot-gdscript-toolkit/master/gdtoolkit/linter/__init__.py` (`max-nested-blocks`/`max-statements` commented out), `https://pypi.org/pypi/gdtoolkit/json`, `https://docs.godotengine.org/en/stable/classes/class_projectsettings.html` (`debug/gdscript/warnings/*`), `https://docs.godotengine.org/en/stable/classes/class_@gdscript.html` (`assert`); C# as in `stack-unity`
 - Download / current version: `https://godotengine.org/download/linux/`
