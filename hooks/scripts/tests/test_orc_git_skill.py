@@ -53,8 +53,8 @@ def test_merge_still_runs_run_not_coverage():
 
 def test_the_bare_listing_names_the_gate_on_push_and_release():
     listing = section(SKILL, "Bare invocation (no arguments)")
-    assert "push the current branch, after /orc-test coverage passes" in listing
-    assert "after /orc-test analyze passes" in listing
+    assert "push the current branch, after /orc-test coverage and audit pass" in listing
+    assert "after /orc-test analyze and audit pass" in listing
 
 
 def test_the_family_table_names_the_dependency_on_orc_test():
@@ -78,3 +78,26 @@ def test_the_page_says_when_the_tests_run_and_what_stops_a_push():
     assert "under 80%" in never and "under 70%" in never
     assert "never writes tests on its own" in never
     assert "can't measure" in never or "cannot measure" in never
+
+
+def test_push_runs_audit_beside_coverage_and_a_vulnerable_dependency_stops_it():
+    body = section(SKILL, "push")
+    audit_cmd = f'{RUN_PY} --cwd <repo root> audit'
+    assert audit_cmd in body
+    assert body.index("nothing to push") < body.index(audit_cmd) < body.index("git push -u origin")
+    for phrase in ["vulnerable", "not available", "nothing is pushed"]:
+        assert phrase in body, phrase
+
+
+def test_release_runs_audit_too():
+    body = section(SKILL, "release [tag]")
+    assert f'{RUN_PY} --cwd <repo root> audit' in body
+
+
+def test_listing_and_page_name_the_audit():
+    listing = section(SKILL, "Bare invocation (no arguments)")
+    assert "after /orc-test coverage and audit pass" in listing
+    changes = section(PAGE, "What it changes")
+    assert "known vulnerabilit" in changes
+    never = section(PAGE, "What it will never do without asking")
+    assert "known vulnerabilit" in never

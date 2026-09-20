@@ -23,9 +23,10 @@ as a fact rather than a surprise:
 |---|---|
 | `commit`, `push`, `branch`, `switch`, `merge` | `repo`, `pr`, `release` |
 
-One dependency cuts across the table: `push` and `release` run `/orc-test` before they touch a
-remote (v21). That is Orclab's own, not a host's, so the left column still works against any
-host — but it no longer works without the rest of the plugin.
+One dependency cuts across the table: `push` and `release` run `/orc-test` (coverage or analyze,
+then audit) before they touch a remote (v21; audit added v22). That is Orclab's own, not a
+host's, so the left column still works against any host — but it no longer works without the
+rest of the plugin.
 
 The name under-describes the right-hand column. It is not renamed: renaming a shipped command for
 a hypothetical second forge is speculative work, and the day a second forge is real is the day
@@ -59,14 +60,14 @@ List the available subcommands:
 /orc-git subcommands:
   repo <url>          — connect the current project to a GitHub repo
   commit [text]        — stage everything and commit with a drafted message
-  push                 — push the current branch, after /orc-test coverage passes
+  push                 — push the current branch, after /orc-test coverage and audit pass
   commit-push [text]   — commit, then push (alias: cp)
   cp [text]            — alias for commit-push
   branch <name>        — switch to a branch, creating it if it doesn't exist (alias: switch)
   switch <name>        — alias for branch
   merge <branch>       — land a finished branch into the current one, tests before and after
   pr <id>              — check out an existing pull request by number
-  release [tag]        — push a tag and create the GitHub Release for it, after /orc-test analyze passes (default: newest local tag)
+  release [tag]        — push a tag and create the GitHub Release for it, after /orc-test analyze and audit pass (default: newest local tag)
 ```
 
 Stop here — do not proceed to any subcommand logic on a bare invocation.
@@ -133,8 +134,21 @@ Stop here — do not proceed to any subcommand logic on a bare invocation.
    python3 "${CLAUDE_PLUGIN_ROOT}/skills/orc-test/scripts/run.py" --cwd <repo root> coverage
    ```
    (`git rev-parse --show-toplevel` is the repo root.) `/orc-test` runs every language's own
-   suite and holds each to 80% line coverage; a red suite is a failed gate too. Three outcomes:
-   - **It exits 0 with every gate ✓** — continue to the push.
+   suite and holds each to 80% line coverage; a red suite is a failed gate too.
+
+   and then the dependency audit:
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/skills/orc-test/scripts/run.py" --cwd <repo root> audit
+   ```
+   `audit` checks every dependency the project declares against the public advisory lists —
+   `security-discipline` rule 2. A `✗ N vulnerable` line is a failed gate exactly like coverage:
+   show the report (each line names the package and the version that fixes it), say "bump the
+   named packages", and stop — **nothing is pushed**. `audit not available` or `missing <tool> —
+   skipped` is carried into the report and the push continues, the same as a `not measurable`
+   coverage line.
+
+   Three outcomes:
+   - **It exits 0 with every gate ✓** — both commands — continue to the push.
    - **It exits non-zero** — show its report and say what fixes it: a `tests failed; coverage
      not measured` line means fix the failing tests first; a `✗ (min 80)` line, with the files
      under it, means run `/orc-test generate` — and stop: **nothing is pushed**.
@@ -265,8 +279,20 @@ and reversible.
    the suite notices — held at 70% TCE per language, plus a lint of the test files. It takes
    minutes on a small project and longer on a large one; say so before running it. A release
    is the one push whose artifact other people download, which is why it gets the slow check.
+
+   and then the dependency audit:
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/skills/orc-test/scripts/run.py" --cwd <repo root> audit
+   ```
+   `audit` checks every dependency the project declares against the public advisory lists —
+   `security-discipline` rule 2. A `✗ N vulnerable` line is a failed gate exactly like coverage:
+   show the report (each line names the package and the version that fixes it), say "bump the
+   named packages", and stop — **nothing is pushed**. `audit not available` or `missing <tool> —
+   skipped` is carried into the report and the push continues, the same as a `not measurable`
+   coverage line.
+
    Three outcomes, in the same shape as `push`'s gate but ending in `analyze`'s own line: exit 0
-   with every gate ✓ → continue. Exit non-zero → show the report, which ends with a `gates
+   with every gate ✓ — both commands — continue. Exit non-zero → show the report, which ends with a `gates
    failed:` line naming what to do — `gates failed: tests — fix the failing tests first` for a
    red suite, otherwise `gates failed: coverage` and/or `tce`, followed by `— run /orc-test
    generate to repair` — → stop, nothing pushed, nothing released, `generate` not started. Exit

@@ -13,12 +13,12 @@ out the individual git and GitHub commands yourself.
 |---|---|
 | `/orc-git repo <url>` | Connects the current project to the GitHub repository at `<url>` |
 | `/orc-git commit [text]` | Stages every change in the project and commits it, with a message it writes for you |
-| `/orc-git push` | Runs the project's tests with coverage first, then pushes the branch you're on to its remote copy |
+| `/orc-git push` | Runs the project's tests with coverage and checks its dependencies for known vulnerabilities first, then pushes the branch you're on to its remote copy |
 | `/orc-git commit-push [text]` (alias: `/orc-git cp [text]`) | Commits, then pushes |
 | `/orc-git branch <name>` (alias: `/orc-git switch <name>`) | Switches you to branch `<name>`, creating it first if it doesn't exist yet |
 | `/orc-git merge <branch>` | Merges `<branch>` into the branch you're currently on |
 | `/orc-git pr <id>` | Checks out an existing pull request (a proposed set of changes someone opened on GitHub) by its number |
-| `/orc-git release [tag]` | Runs the project's tests with coverage and mutation testing first, then pushes your current branch's commits and a version tag, and publishes the GitHub Release for it (uses the most recent tag if you don't name one) |
+| `/orc-git release [tag]` | Runs the project's tests with coverage and mutation testing, and checks its dependencies for known vulnerabilities, first, then pushes your current branch's commits and a version tag, and publishes the GitHub Release for it (uses the most recent tag if you don't name one) |
 
 Typing `/orc-git` by itself lists all of these. Typing a word it doesn't recognize, or leaving out
 a `<url>`/`<name>`/`<branch>`/`<id>` a subcommand needs, gets you this same list instead of a
@@ -48,7 +48,8 @@ Every other subcommand runs immediately once you type it — nothing else is ask
   uncommitted beforehand, or review the commit afterward, if you want to check exactly what went
   in.
 - `push` (and the push half of `commit-push`/`cp`): first runs the project's whole test suite
-  and measures coverage — every language the project has, each held to 80% — then pushes your
+  and measures coverage — every language the project has, each held to 80% — and checks every
+  dependency the project uses against the public lists of known vulnerabilities, then pushes your
   current branch to its remote copy on GitHub. The test run leaves a report under `.orclab/test/`
   and changes nothing else.
 - `repo`: writes `.orclab/git-repo.json` recording the connected URL, and adds a line for
@@ -70,13 +71,15 @@ Every other subcommand runs immediately once you type it — nothing else is ask
 - It will never push, merge, or release on its own initiative without telling you first and
   waiting for a yes — only when you type the command yourself does it skip that and run right
   away.
-- It will never push while the tests fail or coverage is under 80%, and never release while
-  the tests fail, coverage is under 80% or mutation testing scores under 70%. It stops and shows
-  you the test report, and tells you what would fix it. It never writes tests on its own —
+- It will never push while the tests fail or coverage is under 80%, or while any dependency has
+  a known vulnerability (it names the package and the version that fixes it), and never release
+  while the tests fail, coverage is under 80% or mutation testing scores under 70%. It stops and
+  shows you the test report, and tells you what would fix it. It never writes tests on its own —
   `/orc-test generate` does that, and only when you ask; there is no way to tell `/orc-git` to skip
   the check, and if you want to push past a failing one, plain `git push` is the way, on purpose.
 - When it can't measure — the project has no coverage tool installed, or no language it
-  recognises — it says so in the report and pushes anyway. It never installs anything.
+  recognises — or the project's language has no dependency-audit tool — it says so in the report
+  and pushes anyway. It never installs anything.
 - It will never merge into your current branch while you have uncommitted changes sitting
   around, or while the branch being merged does. It stops and tells you what's uncommitted
   instead.
