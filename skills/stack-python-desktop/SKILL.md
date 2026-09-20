@@ -84,7 +84,7 @@ its own: it writes one file at the project root and reads it on every later run.
 
 | Path | What |
 |---|---|
-| `pyproject.toml` | Name, **`version`** (single source — `/orc-version` bumps it), `dependencies = ["pyside6"]`, `[project.scripts]` entry point. |
+| `pyproject.toml` | Name, **`version`** (single source — `/orc-version` bumps it), `dependencies = ["pyside6"]`, `[project.scripts]` entry point, and `[tool.pytest.ini_options]` with `pythonpath = ["src"]` so the tests import the package with no install (pytest's reference: *"Sets list of directories that should be added to the python search path"*; what a container run relies on — the Containers section below). |
 | `src/<package>/__main__.py`, `main.py` | The app; `main.py` holds `if __name__ == "__main__":` because pyside6-deploy looks for it there by default. |
 | `src/<package>/ui/` | Widgets, or `.ui` files from Qt Designer compiled by `pyside6-uic`. |
 | `tests/` | pytest. |
@@ -278,9 +278,9 @@ Not run here — the first project records it. Why each line, so the next reader
   where the project's dependencies live**: `compose run --rm` throws the container away after
   every command, so a `pip install` inside it is gone by the next one, and the host's `.venv/`
   is another Python. A dependency the project adds to `pyproject.toml` goes on this line too,
-  then `<engine> compose build orclab`. The tests import `src/<package>` with no install:
-  `pythonpath = ["src"]` under `[tool.pytest.ini_options]` — pytest's reference: *"Sets list of
-  directories that should be added to the python search path."*
+  then `<engine> compose build orclab` — the same rebuild picks up a new tool version, since
+  the line is unpinned. The tests import `src/<package>` with no install: the layout table's
+  `pythonpath = ["src"]` (its `pyproject.toml` row), which is why that row carries it.
 - **`QT_QPA_PLATFORM=offscreen`** is what makes a `QApplication` start with no display. Qt's
   QPA page: *"The QT_QPA_PLATFORM environment variable and the -platform command line argument
   allow you to override this default"*; `QGuiApplication`'s reference lists `offscreen` among

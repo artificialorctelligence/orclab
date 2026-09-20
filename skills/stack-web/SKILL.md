@@ -351,14 +351,15 @@ dev servers, which bind ports the `compose.yaml` does not publish.
 finds, so both toolchains live in one image. Node goes into the Python image rather than the
 other way round because the Python version is the tighter one — the toolchain table names
 3.14.7, and `python:3.14` *is* 3.14.7 — while any Node ≥ 22.12 satisfies Vite, Vitest and
-StrykerJS. How Node gets in, from primary sources: the official `node` image's Dockerfile
+StrykerJS. How Node gets in, from primary sources. The official `node` image's Dockerfile
 downloads the release tarball from nodejs.org, checks its SHA-256 against the GPG-signed
-`SHASUMS256.txt` and unpacks it into `/usr/local` — `bin/node`, `lib/node_modules/{npm,corepack}`,
-`bin/npm` and `bin/npx` as symlinks into it (the tarball's own layout, listed from
-`node-v24.21.0-linux-x64.tar.xz` on this machine). A build stage from that image and `COPY
---from` carries the verified binary over — Docker: *"The `COPY --from` flag lets you copy files
-from an image, a build stage, or a named context"*; Podman's Containerfile: *"copy files from a
-named previous build stage"* — so the stage is named, which both engines document.
+`SHASUMS256.txt`, and unpacks it into `/usr/local`. What lands there is the tarball's own
+layout, listed from `node-v24.21.0-linux-x64.tar.xz` on this machine: `bin/node`,
+`lib/node_modules/{npm,corepack}`, and `bin/npm` and `bin/npx` as symlinks into it. A build
+stage from that image and `COPY --from` carries the verified binary over. Docker: *"The `COPY
+--from` flag lets you copy files from an image, a build stage, or a named context"*; Podman's
+Containerfile: *"copy files from a named previous build stage"* — so the stage is named, the
+form both engines document.
 `node:24-trixie` is Node 24.21.0 LTS "Krypton" on the same Debian trixie as `python:3.14`,
 so the binary meets the C library it was built against. NodeSource's apt repository is the
 other route; its own README lists Debian only up to 12 bookworm, and it is a downloaded
@@ -387,7 +388,8 @@ pip-audit 2.10.1, ruff 0.16.8), plus the back end's two dependencies from `## To
 because the image is where the Python dependencies live — `compose run --rm` discards the
 container after every command, so a `pip install` inside it is gone by the next one; a
 dependency added to `pyproject.toml` goes on this line too, then `<engine> compose build
-orclab`. `/usr/local/include/node` is not copied: only a native addon build needs it, and this
+orclab` — the same rebuild picks up a new tool version, since the line is unpinned.
+`/usr/local/include/node` is not copied: only a native addon build needs it, and this
 stack has none.
 
 **Which JS tools the image installs: none.** They are the project's own `devDependencies` in
