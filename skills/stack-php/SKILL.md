@@ -7,10 +7,30 @@ user-invocable: false
 # PHP — a web back end
 
 No project has been built with this yet; the first one corrects it. Unlike the other stack
-skills, every command below was run in a container on the machine that wrote it (2026-09-DD),
+skills, every command below was run in a container on the machine that wrote it (2026-09-20),
 so "not run here" appears only in `## Deployment`.
 
 **Checked against live sources on 2026-09-20**; anything older than one release is suspect — re-check `## Sources`.
+
+## Toolchain, as of 2026-09-20
+
+Every version here is what the tool itself printed inside the image on 2026-09-20 — `php -v`,
+`composer --version`, `composer show`, `php --ri pcov` — not what a registry page said.
+
+| Thing | Installed | The one install line |
+|---|---|---|
+| PHP | **8.5.10** (cli, NTS; Debian trixie) | `FROM php:8.5-cli` — the official image; nothing is installed on the host |
+| Composer | **2.10.3** (2026-08-27) | `COPY --from=docker.io/library/composer:2 /usr/bin/composer /usr/local/bin/composer` in the `Dockerfile` |
+| Slim | **4.15.3**, with `slim/psr7` **1.8.0** | `composer require slim/slim:"4.*" slim/psr7` |
+| swagger-php (OpenAPI from attributes) | **6.9.0** | `composer require zircote/swagger-php`; `vendor/bin/openapi src` prints the document |
+| PHPUnit | **13.3.4** | `composer require --dev phpunit/phpunit` |
+| Infection (mutation testing) | **0.35.4** | `composer require --dev infection/infection` — needs `config.allow-plugins` for `infection/extension-installer` in `composer.json`, or a non-interactive install fails |
+| PHPStan (static analysis) | **2.2.14** | `composer require --dev phpstan/phpstan` |
+| PCOV (coverage driver) | **1.0.12** | `RUN pecl install pcov-1.0.12 && docker-php-ext-enable pcov` in the `Dockerfile` |
+
+The project's own version lives in `composer.json`'s `version` key. `/orc-version` does not edit
+`composer.json` yet — `versionfiles.py`'s `KNOWN_FORMATS` has no entry for it (BACKLOG #6, where
+`composer.json` was added on 2026-09-20) — so bump it by hand until it does.
 
 ## The stack decision
 
@@ -96,6 +116,142 @@ development … It should not be used on a public network"*, so production is Ap
 and without a router the `.htaccess`, the request parsing and the JSON headers are written by
 hand — the parts Slim's three lines are.
 
+## Build, run, test
+
+Every line below was run on 2026-09-20 inside the container, from the project root, as
+`podman compose run --rm -T --workdir "$PWD" orclab <command>` — `podman` is the engine on
+this machine; `docker compose run` takes the same words. That prefix is written once here and
+implied for the rest of the block.
+
+```bash
+composer install                                  # once, and after every composer.json change; writes vendor/ and composer.lock
+php -S localhost:8080 -t public                   # dev server: php.net's built-in server, document root public/ (its Example #2 is `-t foo/`)
+vendor/bin/phpunit                                # tests: OK (2 tests, 2 assertions)
+vendor/bin/phpunit --coverage-clover .orclab/test/php/clover.xml --coverage-html .orclab/test/php/html
+vendor/bin/infection --no-interaction --no-progress --threads=max --with-uncovered   # mutation; the JSON log lands where infection.json5's logs.json says
+composer audit --format=json --locked             # dependency advisories from Packagist; exit 0 clean, 1 with findings
+vendor/bin/phpstan analyse --no-progress --error-format=raw          # static analysis at phpstan.neon's level; a single file: append its path
+vendor/bin/openapi src                            # the OpenAPI document from the attributes, YAML to stdout; -o openapi.yaml writes it
+```
+
+What each one printed, so the reader knows what right looks like. `composer install` on a
+project with no `composer.lock` resolves and writes one first; it ends with
+`infection/extension-installer: No extensions found`, which is normal. `phpunit` with the
+coverage flags prints `Runtime: PHP 8.5.10 with PCOV 1.0.12` — the same line without `with
+PCOV` means the driver is missing and no report will be written. `infection` ends with a
+`Metrics:` block (`Mutation Score Indicator (MSI)`, `Mutation Code Coverage`, `Covered Code
+MSI`) and exits 0 whatever the score unless `--min-msi` is given; it has **no `--logger-json`
+option** (its options page lists `--logger-text`, `--logger-html`, `--logger-summary-json`,
+`--logger-github`, `--logger-gitlab`), so the full JSON log is the `logs.json` key in
+`infection.json5` — `.orclab/test/php/infection.json` in Orclab's layout. `--with-uncovered` is
+there because Infection's default since 0.31 mutates covered code only (*"--only-covered … was
+removed in Infection 0.31.0, use --with-uncovered instead"*): without it a class no test reaches
+is simply absent from the count, and the sample's untested route handler gave `2 mutants, MSI
+100%` — with it, `10 mutants, 8 not covered, MSI 20%`, which is the number that means what
+`/orc-test`'s other languages mean by it. `composer audit --format=json` prints one JSON object
+to stdout: `advisories` is a dict keyed by package name when there are findings and an empty
+list when there are none. `phpstan … --error-format=raw` prints one `path:line:message` per
+finding to stdout and exits 1; nothing but a `Note: Using configuration file …` line on stderr
+when clean, exit 0. The dev server answered `GET /greet?name=Ada` with `{"greeting":"Hello,
+Ada"}` from inside the container — but see `## Containers` for why a browser on the host cannot
+reach it.
+
+Three things the run taught about the tests themselves. PHPUnit marks a test with no
+assertions *risky* and still exits 0; Infection's own initial run does not — it writes its own
+PHPUnit configuration, fails on a risky test, and stops with *"Project tests must be in a
+passing state before running Infection"*. So an assertion-free test blocks mutation testing
+outright, which makes PHPUnit's risky check the test-smell lint this stack has. Second, PHPUnit
+13 runs with PCOV and needs no mode switch or `-d` option; Infection passes `-d
+pcov.directory=<src>` itself. Third, `composer.lock` should be committed: `composer audit
+--locked` reads it, and `composer install` from it gives every machine the same `vendor/`;
+`vendor/`, `.orclab/` and `.phpunit.cache/` are git-ignored.
+
+Coverage, mutation and audit through `/orc-test`: not yet — this section records the commands
+that ran; `skills/orc-test/languages/php.md` and the `php.py` language module are v24's next
+tasks, and until they land `/orc-test` does not know PHP exists.
+
+## Containers
+
+Runs in a container: **yes** — run here 2026-09-20. Every command in `## Build, run, test`
+ran inside; what did not is reaching the dev server from a browser on the host.
+
+The `Dockerfile` the run ended with, which `/orc-code` writes when the user says yes to the
+container question:
+
+```dockerfile
+FROM php:8.5-cli
+COPY --from=docker.io/library/composer:2 /usr/bin/composer /usr/local/bin/composer
+RUN apt-get update && apt-get install -y unzip
+RUN pecl install pcov-1.0.12 && docker-php-ext-enable pcov
+```
+
+Line by line, and where each came from. `FROM php:8.5-cli` — the official `php` image's tag
+list; its README says the `-cli` variant *"contains the PHP CLI tool with default mods"*, which
+is all a development container runs. `COPY --from=docker.io/library/composer:2 …` — the
+`composer` image README's own multi-stage line is `COPY --from=composer /usr/bin/composer
+/usr/bin/composer`; the registry prefix is this machine's (see the record below), and
+`/usr/local/bin` is where the `php` image already puts `php`. `RUN apt-get update && apt-get
+install -y unzip` — Composer's introduction page: *"For decompressing files, Composer relies on
+tools like 7z (or 7zz), gzip, tar, unrar, unzip and xz"*; the `php` image ships neither `unzip`
+nor `7z` nor the `zip` extension, and Packagist's archives are zips, so without this line
+`composer install` cannot unpack a single package. `RUN
+pecl install pcov-1.0.12 && docker-php-ext-enable pcov` — the `php` README's pattern for a PECL
+extension, with the version pinned because the README says *"It is strongly recommended that
+users use an explicit version number in their pecl install invocations"*; PCOV because PHPUnit
+names *"the PCOV or Xdebug extensions"* and Infection *"Xdebug, phpdbg, or pcov"*, and PCOV
+needs no mode switch. Its 1.0.12 release (2024-12-04) predates PHP 8.5 and had never been built
+against it by Orclab before today; it compiled cleanly in the image (`PCOV version => 1.0.12`
+from `php --ri pcov`), so the Xdebug fallback was not needed.
+
+The `compose.yaml` is the one in `skills/orc-test/SKILL.md`'s Containers section, unchanged.
+The project's dependencies live in `vendor/` inside the mounted tree, not in the image, so
+`composer install` is run through the container once, and again after every `composer.json`
+change; a new tool version is a `composer update` in the same place. Only the two things the
+`Dockerfile` names — Composer itself and the coverage extension — need `<engine> compose build
+orclab` to change. What cannot happen inside: reaching `php -S localhost:8080` from a browser —
+the compose file publishes no port, so the dev loop is either the host's PHP or a `ports:` line
+the first project adds and records. The container is a development environment, not what
+ships; `## Deployment` is the shared host's own PHP.
+
+The proposal `/orc-code` makes for this stack's container question: **yes** — PHP is the
+toolchain unusual on a dev machine, and this machine's apt has 8.3 where the host runs 8.5:
+Ubuntu 24.04's own `php` package is 8.3 (`apt-cache madison php`, 2026-09-20), and the 8.5.10
+on this host came from a third-party PPA (Ondřej Surý's) that had to be added first. A machine
+without that PPA has a PHP two branches behind the image's, and the tests' coverage driver and
+the mutation runner are a PECL build on top of that.
+
+**The record of the run, 2026-09-20.** Build: the first `podman compose build orclab` pulled
+`php:8.5-cli` (580 MB) and `composer:2` (228 MB) and took about 5 s of pull plus 5–10 s of
+build per attempt; the final image `localhost/v24check_orclab` is **607 MB**. Three fixes were
+needed before every tool ran, each a finding:
+
+1. **`COPY --from=composer:2` failed on Podman 4.9.3** with *"no stage or image found with that
+   name"*. `FROM php:8.5-cli` had resolved because `/etc/containers/registries.conf.d/shortnames.conf`
+   aliases `php` to `docker.io/library/php`; there is no `composer` alias and no
+   `unqualified-search-registries` on this machine, so a bare name in `COPY --from` has nowhere
+   to go (the `composer` README's bare `COPY --from=composer` assumes an engine that fills in
+   Docker Hub). The fix is the fully-qualified name, which needs no alias on either engine.
+2. **`composer install` failed with** *"The zip extension and unzip/7z commands are both
+   missing"* — the `php:8.5-cli` image has neither. The `docker-php-ext-install zip` route
+   (with `libzip-dev`) also worked, but Composer then warned *"As there is no 'unzip' nor '7z'
+   command installed zip files are being unpacked using the PHP zip extension … any UNIX
+   permissions (e.g. executable) defined in the archives will be lost"*, so the line is
+   `unzip`, the tool Composer's own page names, and the warning is gone.
+3. **`podman compose build` exits 0 when the build fails** — the first attempt printed `exit
+   code: 125` and the shell saw 0, exactly the podman-compose 1.0.6 quirk `skills/orc-test/SKILL.md`
+   records. Read the build output for `COMMIT` and `Successfully tagged`; do not trust the exit
+   code.
+
+Not fixes but findings, recorded once here and in the fixture READMEs: Infection refuses a
+risky test and has no `--logger-json`; its default omits uncovered code (`--with-uncovered`
+above); `composer audit`'s `advisories` changes type between clean and not; and Composer 2.10
+**refuses to lock a version with a published advisory** (`policy.advisories.block` defaults to
+true — *"any package versions affected by security advisories will be blocked and cannot be used
+during a composer update/require/delete commands"*), so the vulnerable fixture needed
+`composer update --no-blocking` to exist at all. Clover's `file name=` and Infection's
+`originalFilePath` are absolute container paths, which under Orclab's `compose.yaml` are the
+same paths on the host.
+
 ## Sources (live on 2026-09-20)
 
 - Runtime: `https://www.php.net/supported-versions.php` (8.5's row: 20 Nov 2025, active until 31 Dec 2027, security until 31 Dec 2029; the "active support" definition); `https://raw.githubusercontent.com/docker-library/docs/master/php/README.md` (the `8.5-cli` tag list at 8.5.10-trixie, the CLI/FPM/Apache variant descriptions, `pecl install` + `docker-php-ext-enable`, *"It is strongly recommended that users use an explicit version number in their `pecl install` invocations"*); `https://raw.githubusercontent.com/docker-library/docs/master/composer/README.md` (`COPY --from=composer /usr/bin/composer /usr/bin/composer` under "multi-stage builds"); `https://raw.githubusercontent.com/docker-library/official-images/master/library/composer` (tags `2.10.3, 2.10, 2, latest`); `https://pecl.php.net/rest/r/pcov/allreleases.xml` and `.../1.0.12.xml` (PCOV 1.0.12 stable, 2024-12-04); `https://raw.githubusercontent.com/krakjoe/pcov/develop/README.md` (`pcov.enabled`, `pcov.directory` defaults); `https://launchpad.net/~ondrej/+archive/ubuntu/php/+sourcepub/17837310/+listing-archive-extra` (pcov 1.0.12 built as `php8.5-pcov`, the evidence it compiles on 8.5 before Task 2's build proves it)
@@ -103,4 +259,5 @@ hand — the parts Slim's three lines are.
 - Framework, chosen: `https://www.slimframework.com/docs/v4/` (the micro-framework paragraph, "How does it work?"), `/docs/v4/start/installation.html` (requirements; `composer require slim/slim:"4.*"`; the PSR-7 list with `slim/psr7`), `/docs/v4/start/web-servers.html` (`php -S`, Apache `.htaccess`, Nginx `root /path/to/public`), `/docs/v4/deployment/deployment.html` ("Deploying to a shared server", `displayErrorDetails` false), `/docs/v4/objects/response.html` ("Returning JSON"), `/docs/v4/objects/routing.html` (invokable class routes, `::class`), `/docs/v4/objects/request.html` (`getQueryParams()`); `https://zircote.github.io/swagger-php/guide/` (what it is), `/guide/installation.html` (`composer require zircote/swagger-php`), `/guide/using-attributes.html` (attributes preferred; nesting), `/guide/minimum-requirements.html` (the one-`Info`-one-`Get` minimal document and where attributes may go), `/guide/generating-openapi-documents.html` (`./vendor/bin/openapi app -o openapi.yaml`, `--format`, the `Builder` API)
 - Framework, alternatives: `https://laravel.com/docs/13.x/installation` ("Laravel the API Backend"; the Node/NPM sentence; `laravel new` + `npm install && npm run build`; `composer global require laravel/installer`), `https://laravel.com/docs/13.x/deployment` (PHP ≥ 8.3 and the extension list; Nginx; FrankenPHP; `php artisan reload`; no "shared"); `https://scramble.dedoc.co/` (the "without … annotations" sentence; OpenAPI 3.1.0); `https://symfony.com/doc/current/setup.html` (PHP 8.4 or higher; `symfony new … --version="8.1.*"`; `composer create-project symfony/skeleton:"8.1.*"`), `https://symfony.com/doc/current/setup/web_server_configuration.html` (`public/` as document root; the `public_html/` sentence; `symfony/apache-pack`); `https://api-platform.com/docs/symfony/` (`symfony composer require api`, `doctrine:database:create`); `https://www.php.net/manual/en/features.commandline.webserver.php` (the built-in server's warning)
 - Tool set: `https://docs.phpunit.de/en/13.0/installation.html` (*"PHPUnit 13 requires PHP 8.4"*; `composer require --dev phpunit/phpunit`), `/en/13.0/cli-options.html` (`--coverage-clover <file>`, `--coverage-text`, `--coverage-xml`, `--fail-on-risky`), `/en/13.0/configuration.html` (`bootstrap`, `cacheDirectory`, `<source><include><directory suffix=".php">src</directory>`), `/en/13.0/risky-tests.html` (*"By default, PHPUnit is strict about tests that do not test anything: tests that do not perform assertions"*); `https://infection.github.io/guide/command-line-options.html` (`--logger-text`, `--logger-html`, `--logger-summary-json`, `--logger-github`, `--logger-gitlab`, `--min-msi`, `--coverage`, `--no-progress`, `--static-analysis-tool`; no `--logger-json` — the full JSON log is the `logs.json` config key); `https://phpstan.org/user-guide/getting-started` (`composer require --dev phpstan/phpstan`; `vendor/bin/phpstan analyse src tests`), `https://phpstan.org/user-guide/command-line-usage` (`--level`, `--configuration`, `--error-format`, exit code 0 means no errors), `https://phpstan.org/user-guide/output-format` (`table`, `raw`, `checkstyle`, `json`, `prettyJson`, `junit`, `github`, …), `https://phpstan.org/user-guide/rule-levels` (`--level max` as the alias for the highest level; level 10 is the top today), `https://phpstan.org/config-reference` (`phpstan.neon` lookup order; `parameters: level:` and `paths:`); `https://getcomposer.org/doc/03-cli.md` (`audit`: exit `0` no issues, `1` findings or missing packages; `--format` table/plain/json/summary; `--locked`; `--abandoned`; `--no-dev`), `https://getcomposer.org/doc/06-config.md` (`allow-plugins`: *"Defaults to {} which does not allow any plugins to be loaded"*, and the interactive prompt); `https://raw.githubusercontent.com/phpstan/phpstan-phpunit/2.0.x/README.md` and `https://raw.githubusercontent.com/phpstan/phpstan-strict-rules/2.0.x/README.md` (neither has an assertion-free-test rule; PHPUnit's own risky-test check is that rule); Packagist searches `https://packagist.org/search.json?q=phpunit%20assertion%20rule` and `?q=test%20without%20assertion` (nothing relevant)
+- The live run (2026-09-20, `## Build, run, test` and `## Containers`): `https://raw.githubusercontent.com/docker-library/docs/master/php/README.md` again, its "PHP Core Extensions" example (`apt-get install -y … && docker-php-ext-install -j$(nproc) gd`) and "How to install more PHP extensions"; `https://raw.githubusercontent.com/docker-library/docs/master/composer/README.md` (the bare `COPY --from=composer` line under multi-stage builds); `https://getcomposer.org/doc/00-intro.md` (*"For decompressing files, Composer relies on tools like 7z (or 7zz), gzip, tar, unrar, unzip and xz"*); `https://getcomposer.org/doc/03-cli.md` (`audit`: `0 No issues; 1 Found packages matching dependency policies or failed due to missing required packages`; `--locked`: *"Audit packages from the lock file, regardless of what is currently in vendor dir"*; `--no-blocking`: *"Disables all policy based dependency blocking during this command"*; `--no-security-blocking` deprecated for it); `https://getcomposer.org/doc/06-config.md` (`policy.advisories.block`, the successor of `audit.block-insecure`: *"Defaults to true. If true, any package versions affected by security advisories will be blocked and cannot be used during a composer update/require/delete commands, unless the security advisories are ignored"*); `https://infection.github.io/guide/command-line-options.html` again (`--with-uncovered`: *"Allow mutation of code not covered by tests"*; `--only-covered`: *"This option was removed in Infection 0.31.0, use --with-uncovered instead"*); `https://www.php.net/manual/en/features.commandline.webserver.php` again (`-t` for the document root; Example #2 `php -S localhost:8000 -t foo/`); `https://packagist.org/api/security-advisories/?packages[]=guzzlehttp/guzzle` (fifteen advisories, fourteen covering 7.4.0); this machine's `/etc/containers/registries.conf.d/shortnames.conf` and `registries.conf` (a `php` alias, no `composer` alias, no `unqualified-search-registries`) and `apt-cache madison php` (noble's own 2:8.3, the PPA's 2:8.4, `php8.5-cli` 8.5.10 installed from the PPA)
 - Versions: `https://repo.packagist.org/p2/<vendor>/<name>.json` and `https://packagist.org/packages/<vendor>/<name>.json` for `phpunit/phpunit` 13.3.4 (2026-09-15, PHP ≥ 8.4.1), `infection/infection` 0.35.4 (2026-09-02, PHP ^8.3; requires the `infection/extension-installer` Composer plugin), `phpstan/phpstan` 2.2.14 (2026-09-12), `slim/slim` 4.15.3, `slim/psr7` 1.8.0, `zircote/swagger-php` 6.9.0, `laravel/framework` v13.32.0, `laravel/laravel` v13.10.1, `dedoc/scramble` v0.13.45, `symfony/framework-bundle` v8.1.7 (2026-09-14, PHP ≥ 8.4.1), `api-platform/core` v5.0.0, `phpstan/phpstan-strict-rules` 2.0.12, `phpstan/phpstan-phpunit` 2.0.18, `composer/composer` 2.10.3 (2026-08-27)

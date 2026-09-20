@@ -1,0 +1,43 @@
+PHPUnit 13.3.4 with PCOV 1.0.12 on PHP 8.5.10, captured 2026-09-20 from a real run inside the
+`v24check_orclab` image (Orclab's own `stack-php` sample: two classes in `src/`, two tests), not
+hand-built. From the sample's root, with `compose.yaml` mounting the tree at its own host path:
+
+    podman compose run --rm -T --workdir "$PWD" orclab composer install
+    podman compose run --rm -T --workdir "$PWD" orclab vendor/bin/phpunit \
+        --coverage-clover .orclab/test/php/clover.xml --coverage-html .orclab/test/php/html
+    cp .orclab/test/php/clover.xml <fixtures>/clover.xml
+
+Exit code 0; PHPUnit printed `OK (2 tests, 2 assertions)` and `Runtime: PHP 8.5.10 with PCOV
+1.0.12` — the same run without a coverage driver prints `Runtime: PHP 8.5.10` and no report, so
+that line is how a missing driver shows up.
+
+Top-level shape, as seen: `<coverage generated=...>` → `<project timestamp= name="Clover
+Coverage">` → **`<package name="App">`** (one per PHP namespace — a layer the plan's sketch did
+not have) → `<file name="...">`, each holding a `<class>` with its own `<metrics>`, one `<line
+num= type= count=/>` per method or statement (`type="method"` lines also carry `name=`,
+`visibility=`, `complexity=`, `crap=`), and a closing per-file `<metrics ... statements=
+coveredstatements= .../>`; then a per-project `<metrics files= ... statements= coveredstatements=
+.../>` directly under `<project>`. `file name=` is the **absolute** path inside the container,
+which under Orclab's `compose.yaml` is the same absolute path on the host.
+
+The first `<file>` element, verbatim (an untested class — every count is 0):
+
+    <file name="/tmp/claude-1000/-home-direflail-projects-orclab/160c7351-df67-4ae1-83ec-fec473ac6565/scratchpad/v24check/src/GreetAction.php">
+      <class name="App\GreetAction" namespace="App">
+        <metrics complexity="2" methods="1" coveredmethods="0" conditionals="0" coveredconditionals="0" statements="4" coveredstatements="0" elements="5" coveredelements="0"/>
+      </class>
+      <line num="19" type="method" name="__invoke" visibility="public" complexity="2" crap="6" count="0"/>
+      <line num="21" type="stmt" count="0"/>
+      <line num="22" type="stmt" count="0"/>
+      <line num="23" type="stmt" count="0"/>
+      <line num="25" type="stmt" count="0"/>
+      <metrics loc="28" ncloc="28" classes="1" methods="1" coveredmethods="0" conditionals="0" coveredconditionals="0" statements="4" coveredstatements="0" elements="5" coveredelements="0"/>
+    </file>
+
+The second file, `Greeting.php`, is fully covered (`statements="1" coveredstatements="1"`), so
+the fixture exercises both the covered and the untouched-file path; the project total is
+`statements="5" coveredstatements="1"` — 20%.
+
+This is a file PHPUnit writes, not stdout, so there is nothing of stderr in it; the run's own
+console output (the `OK` line, the "Generating code coverage report … done" lines) goes to
+stdout, which `run.py` merges with stderr at run time.

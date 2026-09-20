@@ -1,0 +1,57 @@
+Composer 2.10.3 on PHP 8.5.10, captured 2026-09-20 from a real run inside the `v24check_orclab`
+image, not hand-built. A throw-away directory held one `composer.json` requiring
+`guzzlehttp/guzzle` at exactly `7.4.0` — a version Packagist's advisory API
+(`https://packagist.org/api/security-advisories/?packages[]=guzzlehttp/guzzle`, read the same
+day) lists inside fourteen advisories' `affectedVersions` — and the image was run directly on
+that directory (a second `podman compose` project would have built a second image):
+
+    podman run --rm -v "$PWD:$PWD" -w "$PWD" v24check_orclab composer update --no-install --no-blocking
+    podman run --rm -v "$PWD:$PWD" -w "$PWD" v24check_orclab composer audit --format=json --locked \
+        > composer_audit.json
+
+**Exit code 1** — Composer's CLI page: `1 Found packages matching dependency policies or failed
+due to missing required packages`. The clean twin, `composer_audit_clean.json`, is exit 0.
+
+`--no-blocking` is there because the first `composer update` **refused**: *"found
+guzzlehttp/guzzle[7.4.0] but these were not loaded, because they are affected by security
+advisories"* — Composer 2.10's `policy.advisories.block` defaults to true (its config page:
+*"any package versions affected by security advisories will be blocked and cannot be used during
+a composer update/require/delete commands, unless the security advisories are ignored"*), and
+the CLI page's `--no-blocking`: *"Disables all policy based dependency blocking during this
+command"*. So on a current Composer a lock file can only reach this state by opting out, or by
+an advisory published after the lock was written — which is the case `composer audit` is for.
+
+Top-level shape, as seen: a **dict** with three keys, `advisories`, `abandoned`, `filter`.
+`advisories` is a **dict keyed by package name** — `{"guzzlehttp/guzzle": [ … 14 entries … ]}` —
+where the clean capture has an empty list (PHP's empty array); `abandoned` and `filter` are `[]`
+here. Each advisory entry, the first one verbatim:
+
+    {
+        "advisoryId": "PKSA-gcrk-3vtt-1r14",
+        "packageName": "guzzlehttp/guzzle",
+        "affectedVersions": ">=8.0.0,<8.0.1|<7.15.2",
+        "title": "Guzzle: Noncanonical host can bypass host-based checks",
+        "cve": "CVE-2026-69246",
+        "link": "https://github.com/advisories/GHSA-v5mv-p594-2x33",
+        "reportedAt": "2026-08-03T21:07:26+00:00",
+        "sources": [
+            {
+                "name": "GitHub",
+                "remoteId": "GHSA-v5mv-p594-2x33"
+            }
+        ],
+        "severity": "high"
+    }
+
+`affectedVersions` is Composer's own constraint syntax (`|` is OR, `,` is AND). All fourteen
+entries carry a `cve` string; what the key holds for an advisory without a CVE was not seen
+here, so a parser should not depend on it being a string. The plan's sketch named `advisoryId`,
+`affectedVersions`, `cve`, `title`, `link`; the file also carries `packageName`, `reportedAt`,
+`sources`, `severity`.
+
+`>` captures stdout only, and the JSON is all of stdout. stderr carried one line from Composer —
+`Composer could not detect the root package (orclab/v24audit) version, defaulting to '1.0.0'.
+See https://getcomposer.org/root-version` — which `run.py` merges into stdout at run time, so
+the parser has to find the JSON among such lines rather than assume the whole capture is JSON
+(the same thing pip-audit's stderr summary did to `langs/python.py`, per
+`pip_audit.json.README`). The throw-away directory was deleted after the capture.
