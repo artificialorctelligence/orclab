@@ -104,3 +104,21 @@ def test_test_discipline_names_the_hostile_scenario():
     td = (ROOT / "skills" / "test-discipline" / "SKILL.md").read_text()
     r1 = td[td.index("## 1. "):td.index("## 2. ")]
     assert "trust boundary" in r1 and "unauthenticated" in r1
+
+
+def test_new_project_flow_asks_container_after_exposure_and_before_starting_point():
+    flow = TEXT[TEXT.index("## New-Project Flow"):TEXT.index("## Add-to-Existing Flow")]
+    q = "Run this project's toolchain in a container, so nothing has to be installed on this machine?"
+    assert q in flow
+    assert flow.index("didn't invite") < flow.index(q) < flow.index("minimal example")
+    for phrase in ["compose.yaml", "`orclab`", "Dockerfile", "## Containers", "skips the container question",
+                   "not what ships", "Once all six are answered"]:
+        assert phrase in flow, phrase
+
+
+def test_scaffold_and_verify_run_through_the_container():
+    flow = TEXT[TEXT.index("## New-Project Flow"):TEXT.index("## Add-to-Existing Flow")]
+    scaffold = flow[flow.index("**Scaffold**"):flow.index("**Verify**")]
+    verify = flow[flow.index("**Verify**"):flow.index("**Report**")]
+    assert "Dockerfile" in scaffold and "compose.yaml" in scaffold
+    assert "compose run" in verify or "through the container" in verify
