@@ -10,7 +10,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[3]
 SKILL = ROOT / "skills" / "security-discipline" / "SKILL.md"
 HEADING = "## Security — where security-discipline lands"
 SUBHEADINGS = ["### Static analysis", "### Dependency audit", "### Secrets", "### Reachable by strangers"]
-EXPECTED = {"stack-android-native", "stack-flutter", "stack-ios-native", "stack-kotlin-multiplatform", "stack-python-desktop", "stack-react-native", "stack-web"}   # each stack task adds its skill's directory name here
+EXPECTED = {"stack-android-native", "stack-flutter", "stack-godot", "stack-ios-native", "stack-kotlin-multiplatform", "stack-python-desktop", "stack-react-native", "stack-unity", "stack-web"}   # every shipped stack skill; a new one is added here with its section
 
 
 def _frontmatter():
@@ -63,7 +63,6 @@ def test_stack_skill_has_the_security_section(stack):
     assert re.search(r"confirmed live 2026-\d\d-\d\d", body), stack
 
 
-@pytest.mark.xfail(strict=True, reason="until Task 8 lands the ninth stack section; Task 8 removes this marker")
 def test_every_stack_skill_is_expected():
     """A stack skill added later must be listed here, so it cannot ship without the section."""
     stacks = {p.parent.name for p in (ROOT / "skills").glob("stack-*/SKILL.md")}

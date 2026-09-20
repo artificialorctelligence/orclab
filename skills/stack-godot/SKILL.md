@@ -91,6 +91,146 @@ gdscript/warnings/return_value_discarded=2   # rule 6's nearest lint: a discarde
 The .NET edition's C# follows `stack-unity`'s section. Rules 2, 3 and 5 (`assert` is *"only
 executed in debug builds"* — `push_error` and return) are reviewed.
 
+## Security — where security-discipline lands
+
+`security-discipline`'s rules for this stack, confirmed live 2026-09-19;
+no project has been through this yet, and the first one corrects it. A single-player game is the
+*Every project* tier — it accepts no connections — so rules 1–4 apply in full, and of 5–9 only
+rule 8's client half: whether the game checks the certificate of the server it talks to. The
+Android and iOS exports are that platform's app, so the platform halves — the keystore,
+cleartext and the system trust store on Android; the signing identity and App Transport Security
+on iOS — are `stack-android-native`'s and `stack-ios-native`'s Security sections, read against
+the Gradle project under `android/build/` and the Xcode project the iOS export writes; nothing
+is re-derived here. This section covers only what Godot itself adds: its linter, its addon
+store, `user://`, the export presets and the `.pck`.
+
+### Static analysis
+
+**None free.** gdlint's rule list (the gdtoolkit wiki's *3. Linter* page, read live 2026-09-19)
+is name checks (fourteen, `function-name` to `load-constant-name`), basic checks
+(`duplicated-load`, `expression-not-assigned`, `unnecessary-pass`, `unused-argument`,
+`comparison-with-itself`), class checks (`private-method-call`, `class-definitions-order`),
+design checks (`max-public-methods`, `function-arguments-number`, and `max-returns` in the
+`DEFAULT_CONFIG` the Lint section cites), format checks (`max-file-lines`,
+`trailing-whitespace`, `max-line-length`, `mixed-tabs-and-spaces`) and `no-elif-return` /
+`no-else-return` — nothing for a credential in a script, a certificate check turned off, a query
+built from a string or a download run unchecked, and `linter/__init__.py` (read live the same
+day) has no other keys. The engine's `debug/gdscript/warnings/*` severities are type and flow
+warnings — the five `unsafe_*` ones fire *"when a Variant value is cast to a non-Variant"* and
+its kin, not on anything here. So `gdlintrc` and `project.godot` stay exactly as the Lint
+section left them, and rules 1, 3, 4 and 8's client half are **reviewed, not linted** in
+GDScript:
+
+- **Rule 8's client half** has one signature: `TLSOptions.client_unsafe()` — *"Creates an unsafe
+  TLS client configuration where certificate validation is optional"*; *"Using this
+  configuration for purposes other than testing is not recommended"* — handed to `HTTPRequest`,
+  `HTTPClient` or `StreamPeerTLS`. `TLSOptions.client()` *"validates certificates and their
+  common names"* (*"the default CA list will be used if null"*); what a request with no
+  `tls_options` at all does, the `HTTPClient` page does not say (`TLSOptions` and `HTTPClient`
+  class pages, read live 2026-09-19). The check is Orclab's own, before any export:
+  `grep -rn client_unsafe --include='*.gd' --include='*.cs' .` prints nothing. Godot has no
+  switch that refuses plain `http://`; an `HTTPRequest` to an `http://` URL is a finding on
+  sight — on Android the platform's cleartext default catches it (the native skill), on desktop
+  nothing does.
+- **Rule 3** in Godot's own words, from *Exporting packs, patches, and mods* (read live
+  2026-09-19): loading a `.pck` at runtime through `ProjectSettings.load_resource_pack()` *"is a
+  security vulnerability"* when *"a user downloads a mod with malicious code"* or *"a malicious
+  program already exists on an end user's PC and has replaced the PCK file"*, and the page's
+  answer is the rule's standard — *"consider using asymmetric cryptography. You could store the
+  public key in the main PCK, and sign patch or expansion PCK files with the private key. See
+  the Crypto class"*. A `load_resource_pack` on bytes that arrived over the network with no
+  signature check before it is the finding.
+- **Rules 1 and 4:** a token typed into a `.gd` file (rule 1 — Secrets says where it goes
+  instead); a `permissions/*` boolean ticked in the Android preset that the code does not call
+  (rule 4 — 153 of them plus `permissions/custom_permissions` in the
+  `EditorExportPlatformAndroid` reference, read live 2026-09-19; the reference states no
+  defaults, so what a new preset ticks was not checked here).
+
+The .NET edition's C# is a real .NET SDK project — *"you must have installed the .NET SDK"*,
+and a NuGet package goes in *"the .csproj file located in the project root"* (*C# basics*, read
+live 2026-09-19) — so `stack-unity`'s Security section's Sonar rules apply here through the
+`PackageReference` form its Lint section shows, not the DLL-in-`Assets/` form Unity needs.
+
+### Dependency audit
+
+None free: Godot addons have no advisory database — `skills/orc-test/languages/gdscript.md`,
+`## Audit`, says what was checked (the Asset Library's submission and usage pages), and
+`/orc-test audit` prints `audit not available` with that sentence (rule 2). An addon under
+`addons/` is vendored source, so it is read, not audited. The .NET edition's NuGet packages are
+the exception: `dotnet list package --vulnerable --include-transitive --format json`
+(`skills/orc-test/languages/csharp.md`, `## Audit`) reads the real `.csproj`.
+
+### Secrets
+
+Three kinds of secret, three places, none of them under `res://` (rule 1; each claim confirmed
+live 2026-09-19 against the page named):
+
+- **The keystore password and any export credential.** Godot already splits them out:
+  `export_presets.cfg` — *"There is nothing in here that you would normally have to keep
+  secret"* — is committed, and `.godot/export_credentials.cfg` — *"This file contains export
+  options that are considered confidential, like passwords and encryption keys"*; *"should
+  generally not be committed to version control"* (*Exporting projects*) — is not, and the
+  editor's own `.gitignore` (`create_vcs_metadata_files` in `editor_vcs_interface.cpp`, read
+  live) writes exactly `.godot/` and `/android/`, so the credentials file is ignored from the
+  first commit. A headless export reads them from the environment instead —
+  `GODOT_ANDROID_KEYSTORE_RELEASE_PATH`, `_USER`, `_PASSWORD` (the `EditorExportPlatformAndroid`
+  reference) — which is where a CI puts them. The `.jks` itself is not covered: the preset holds
+  only its path and Godot's default ignores neither `*.jks` nor `*.keystore`, so both go in
+  `.gitignore` on day one. The iOS signing identity never touches this machine — the iOS export
+  is archived on the Mac (the toolchain table); `stack-ios-native`'s Secrets says the rest.
+- **A token the game holds for its user.** Godot has no binding to the platform keychains: the
+  class reference has `Crypto` — *"Provides access to advanced cryptographic functionalities"*:
+  random bytes, RSA keys, HMAC — and `ConfigFile`, and nothing named for the Keychain or the
+  Android Keystore (the class index, read live). The nearest thing is a `ConfigFile` under
+  `user://` saved with `save_encrypted(path, key)` — *"Saves the contents of the ConfigFile
+  object to the AES-256 encrypted file specified as a parameter, using the provided key to
+  encrypt it"* — or `save_encrypted_pass`, read back with `load_encrypted` /
+  `load_encrypted_pass` (`ConfigFile` class page) — and the key is the problem it does not
+  solve: a key in a script is in the `.pck`, below, so this protects the file from another user
+  of the machine and from a hand-edit, not from someone who has the game. On Android the
+  preset's `user_data_backup/allow` — *"allows the application to participate in the backup and
+  restore infrastructure"* — decides whether `user://` goes to the cloud; `stack-android-native`'s
+  reason for keeping a token out of Auto Backup applies, so it stays off for a game that holds
+  one. A game that needs the platform's real store writes a GDExtension or an Android/iOS plugin
+  against the native skill's API; none has been written here, and until one is the scaffold
+  stores no token.
+- **An API key for a service the game calls.** The `.pck` is public: *"Not readable and writable
+  using tools normally present on the user's operating system, even though there are third-party
+  tools to extract and create PCK files"* (*Exporting projects*), and the export dialog's PCK
+  encryption changes the effort, not the fact — it *"will not work if you use official,
+  precompiled export templates"*, needs templates compiled with the key in
+  `SCRIPT_AES256_ENCRYPTION_KEY`, and *"the key needs to be stored in the binary, but if it's
+  compiled, optimized and without symbols, it would take some effort to find it"* (*Compiling
+  with PCK encryption key*). So a key in `res://` is a key everyone has. It lives on a server the
+  game calls — the *Reachable by strangers* tier of whatever stack that is — or it is one
+  designed to ship (the Android skill's Maps-key case). During development
+  `OS.get_environment("NAME")` — *"Returns the value of the given environment variable, or an
+  empty string if variable doesn't exist"* — reads it from the shell and never from a file under
+  `res://`; and *"On macOS, applications do not have access to shell environment variables"*, so
+  an exported macOS build reads nothing that way (`OS` class page).
+
+`.gitignore`: Godot's own two lines plus `*.jks`, `*.keystore`, and `.env` the day one exists.
+Never in the exported artifact: the credentials file, the keystore, `.git`, and any value that
+was ever a literal in a script, which is there by construction. Whether the exporter can ever
+pick up `.godot/export_credentials.cfg` was not checked; nothing lints the `.pck`, so the first
+project lists one once (the PCK tool the export page links, or `unzip -l` on a ZIP-format
+export) and records the answer here.
+
+### Reachable by strangers
+
+This stack does not accept connections: n/a — a single-player game has no route to
+authenticate, no error to sanitise and no rate to limit; the service it talks to carries rules
+5–9 in its own stack. What still applies is rule 8's client half, per platform as the native
+skills say it, plus Godot's own two above: `TLSOptions.client_unsafe()` anywhere in the project
+is a finding, and an `http://` URL in an `HTTPRequest` is one on sight. And the API-key
+paragraph: the `.pck` is not a secret store. **Multiplayer is out of scope here.** Godot's own
+*High-level multiplayer* page (read live 2026-09-19) says rules 5 and 9 in its words — *"treat
+all client input as untrusted"*, *"Validate RPC arguments before applying them to the game
+state"*, *"Add safety checks and rate limits to actions that can be triggered frequently"* — so
+a game whose server other players reach is the *Reachable by strangers* tier there, and no
+stack skill covers a game server yet; no BACKLOG entry exists for it, and the first multiplayer
+game opens one.
+
 ## Presence
 
 Not researched; unlikely to be needed.
@@ -233,6 +373,7 @@ default; arm64 if a Pi 5 could run it) and ship.
 
 ## Sources (live on 2026-09-11; facets 2026-09-12)
 
+- Security — where security-discipline lands (2026-09-19): gdlint's rule list `https://github.com/Scony/godot-gdscript-toolkit/wiki/3.-Linter` and `https://raw.githubusercontent.com/Scony/godot-gdscript-toolkit/master/gdtoolkit/linter/__init__.py` (`DEFAULT_CONFIG`); `https://docs.godotengine.org/en/stable/classes/class_projectsettings.html` (the `debug/gdscript/warnings/*` keys, `unsafe_cast`); `https://docs.godotengine.org/en/stable/classes/class_tlsoptions.html` (`client`, `client_unsafe`), `https://docs.godotengine.org/en/stable/classes/class_httpclient.html` (`connect_to_host`); `https://docs.godotengine.org/en/stable/tutorials/export/exporting_pcks.html` (*Security concerns*, `load_resource_pack`); `https://docs.godotengine.org/en/stable/classes/class_editorexportplatformandroid.html` (`permissions/*`, `keystore/release_*` env vars, `user_data_backup/allow`); `https://docs.godotengine.org/en/stable/tutorials/scripting/c_sharp/c_sharp_basics.html` (.NET SDK, `.csproj`); `https://docs.godotengine.org/en/stable/tutorials/export/exporting_projects.html` (`export_presets.cfg`, `.godot/export_credentials.cfg`, PCK versus ZIP); `https://raw.githubusercontent.com/godotengine/godot/master/editor/version_control/editor_vcs_interface.cpp` (the default `.gitignore`); `https://docs.godotengine.org/en/stable/classes/index.html` (no keychain class), `https://docs.godotengine.org/en/stable/classes/class_crypto.html`, `https://docs.godotengine.org/en/stable/classes/class_configfile.html` (`save_encrypted`, `load_encrypted`), `https://docs.godotengine.org/en/stable/classes/class_os.html` (`get_environment`); `https://docs.godotengine.org/en/stable/engine_details/development/compiling/compiling_with_script_encryption_key.html` (PCK encryption; the `contributing/...` path is a 404 on `stable`); `https://docs.godotengine.org/en/stable/tutorials/networking/high_level_multiplayer.html` (*Secure multiplayer design*)
 - Lint — where code-discipline lands (2026-09-13): `https://raw.githubusercontent.com/Scony/godot-gdscript-toolkit/master/gdtoolkit/linter/__init__.py` (`max-nested-blocks`/`max-statements` commented out), `https://pypi.org/pypi/gdtoolkit/json`, `https://docs.godotengine.org/en/stable/classes/class_projectsettings.html` (`debug/gdscript/warnings/*`), `https://docs.godotengine.org/en/stable/classes/class_@gdscript.html` (`assert`); C# as in `stack-unity`
 - Download / current version: `https://godotengine.org/download/linux/`
 - Exporting for Android: `https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_android.html`;
