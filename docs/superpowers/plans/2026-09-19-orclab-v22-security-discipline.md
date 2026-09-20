@@ -456,13 +456,14 @@ def test_stack_skill_has_the_security_section(stack):
     assert re.search(r"confirmed live 2026-\d\d-\d\d", body), stack
 
 
+@pytest.mark.xfail(strict=True, reason="until Task 8 lands the ninth stack section; Task 8 removes this marker")
 def test_every_stack_skill_is_expected():
     """A stack skill added later must be listed here, so it cannot ship without the section."""
     stacks = {p.parent.name for p in (ROOT / "skills").glob("stack-*/SKILL.md")}
     assert stacks == EXPECTED
 ```
 
-Run: `python3 -m pytest -q hooks/scripts/tests/test_security_discipline.py` → red (`SKILL.md` missing; `test_every_stack_skill_is_expected` fails until Task 8 — that is deliberate and is the one red the branch carries between Tasks 3 and 8; note it in each commit message).
+Run: `python3 -m pytest -q hooks/scripts/tests/test_security_discipline.py` → red (`SKILL.md` missing). `test_every_stack_skill_is_expected` is `xfail(strict=True)` until Task 8: it *passes as xfail* while `EXPECTED` is short, and Task 8 removes the marker when the ninth name lands — the suite is green at every task boundary.
 
 - [ ] **Step 2: Research the rule set from the primary sources**
 
@@ -532,7 +533,7 @@ Run: `python3 -m pytest -q hooks/scripts/tests/test_security_discipline.py -k "n
 
 ```bash
 git add skills/security-discipline hooks/scripts/tests/test_security_discipline.py
-git commit -m "security-discipline: N rules in two tiers, traced to OWASP and CWE; the test that every stack skill must carry a Security section (v22 §1) — test_every_stack_skill_is_expected stays red until the ninth stack section lands
+git commit -m "security-discipline: N rules in two tiers, traced to OWASP and CWE; the test that every stack skill must carry a Security section (v22 §1) — test_every_stack_skill_is_expected is xfail until the ninth stack section lands
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
@@ -604,7 +605,7 @@ Each task: (1) read the skill in full and the spec §2; (2) research from primar
 **Files:** the two skills; `EXPECTED |= {"stack-godot", "stack-unity"}`
 
 - [ ] **Research:** GDScript: gdlint's rule list (`https://github.com/Scony/godot-gdscript-toolkit/wiki`) — none security; Godot's own docs on `OS.get_environment`, `ConfigFile` with encryption (`config_file.load_encrypted`), and that an exported `.pck` is readable — the "no secret in the build" rule's concrete form. Unity: Roslyn analyzers for C# security — check whether `SecurityCodeScan` on NuGet is still maintained (last release date) and whether Unity's own package manager can load it (docs.unity3d.com "Roslyn analyzers"); `dotnet list package --vulnerable` for a Unity project's `.csproj` — Task 2's C# finding and whether it applies to Unity-generated projects; Unity's docs on `PlayerPrefs` (not secure) and the secure alternative. Both "Reachable by strangers": n/a for a single-player game; a line on multiplayer being out of scope with a BACKLOG pointer if the research shows it matters.
-- [ ] After the commit, `test_every_stack_skill_is_expected` is green: run the full file `python3 -m pytest -q hooks/scripts/tests/test_security_discipline.py` and say so in the commit message.
+- [ ] Remove the `@pytest.mark.xfail(...)` marker from `test_every_stack_skill_is_expected` (a strict xfail would now fail as XPASS). Run the full file `python3 -m pytest -q hooks/scripts/tests/test_security_discipline.py` → green, and say so in the commit message.
 - [ ] Commit: `stack-godot, stack-unity: Security sections; all nine stack skills now carry one (v22 §2)`.
 
 ---

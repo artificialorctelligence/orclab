@@ -74,3 +74,33 @@ def test_discovery_tells_available_from_installed():
 def test_code_discipline_names_the_quality_mode():
     cd = (ROOT / "skills" / "code-discipline" / "SKILL.md").read_text()
     assert "`/orc-code refactor`'s quality mode" in cd
+
+
+def test_new_project_flow_asks_exposure_after_platforms_and_before_starting_point():
+    flow = TEXT[TEXT.index("## New-Project Flow"):TEXT.index("## Add-to-Existing Flow")]
+    q = "Will anyone you didn't invite be able to reach this?"
+    assert q in flow
+    assert flow.index("Which platforms?") < flow.index(q) < flow.index("minimal example")
+    for phrase in ["I'll assume yes", "I'll assume no", "security-discipline", "not recorded"]:
+        assert phrase in flow, phrase
+
+
+def test_scaffold_writes_the_security_config_and_the_exposed_tier_pieces():
+    flow = TEXT[TEXT.index("## New-Project Flow"):TEXT.index("## Add-to-Existing Flow")]
+    scaffold = flow[flow.index("**Scaffold**"):flow.index("**Verify**")]
+    for phrase in ["## Security — where security-discipline lands", "### Reachable by strangers"]:
+        assert phrase in scaffold, phrase
+
+
+def test_quality_mode_writes_security_config_and_wraps_modernize_harden():
+    q = TEXT[TEXT.index("### Quality mode"):TEXT.index("### Migration mode")]
+    assert "## Security — where security-discipline lands" in q
+    assert "modernize-harden" in q and "Plugin-Discovery Procedure" in q
+    assert q.index("one function at a time") < q.index("modernize-harden") < q.index("/orc-test generate")
+    assert "isn't currently installed" in q or "not installed" in q
+
+
+def test_test_discipline_names_the_hostile_scenario():
+    td = (ROOT / "skills" / "test-discipline" / "SKILL.md").read_text()
+    r1 = td[td.index("## 1. "):td.index("## 2. ")]
+    assert "trust boundary" in r1 and "unauthenticated" in r1

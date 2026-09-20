@@ -1,0 +1,216 @@
+{
+    "reportSchema": "1.1",
+    "scanInfo": {
+        "engineVersion": "13.0.0",
+        "dataSource": [
+            {
+                "name": "NVD CVE Checked",
+                "timestamp": "2026-09-19T10:00:00"
+            }
+        ]
+    },
+    "projectInfo": {
+        "name": "app",
+        "groupID": "com.example",
+        "artifactID": "app",
+        "version": "1.0.0",
+        "reportDate": "2026-09-19T10:00:05.000Z",
+        "credits": {
+            "NVD": "This report contains data retrieved from the National Vulnerability Database: https://nvd.nist.gov"
+        }
+    },
+    "dependencies": [
+        {
+            "isVirtual": false,
+            "fileName": "junit-4.13.2.jar",
+            "filePath": "/home/me/.m2/repository/junit/junit/4.13.2/junit-4.13.2.jar",
+            "md5": "d41d8cd98f00b204e9800998ecf8427e",
+            "sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "evidenceCollected": {
+                "vendorEvidence": [],
+                "productEvidence": [],
+                "versionEvidence": []
+            },
+            "packages": [
+                {
+                    "id": "pkg:maven/junit/junit@4.13.2",
+                    "confidence": "HIGH",
+                    "url": "https://ossindex.sonatype.org/component/pkg:maven/junit/junit@4.13.2"
+                }
+            ]
+        },
+        {
+            "isVirtual": false,
+            "fileName": "commons-io-2.6.jar",
+            "filePath": "/home/me/.m2/repository/commons-io/commons-io/2.6/commons-io-2.6.jar",
+            "md5": "d41d8cd98f00b204e9800998ecf8427e",
+            "sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "evidenceCollected": {
+                "vendorEvidence": [],
+                "productEvidence": [],
+                "versionEvidence": []
+            },
+            "packages": [
+                {
+                    "id": "pkg:maven/commons-io/commons-io@2.6",
+                    "confidence": "HIGH",
+                    "url": "https://ossindex.sonatype.org/component/pkg:maven/commons-io/commons-io@2.6"
+                }
+            ],
+            "vulnerabilityIds": [
+                {
+                    "id": "cpe:2.3:a:apache:commons_io:2.6:*:*:*:*:*:*:*",
+                    "confidence": "HIGHEST",
+                    "url": "https://nvd.nist.gov/vuln/search/results?form_type=Advanced&results_type=overview&search_type=all&cpe_vendor=cpe%3A%2F%3Aapache&cpe_product=cpe%3A%2F%3Aapache%3Acommons_io&cpe_version=cpe%3A%2F%3Aapache%3Acommons_io%3A2.6"
+                }
+            ],
+            "vulnerabilities": [
+                {
+                    "source": "NVD",
+                    "name": "CVE-2021-29425",
+                    "severity": "MEDIUM",
+                    "cvssv3": {
+                        "baseScore": 4.8,
+                        "attackVector": "NETWORK",
+                        "attackComplexity": "HIGH",
+                        "privilegesRequired": "NONE",
+                        "userInteraction": "NONE",
+                        "scope": "UNCHANGED",
+                        "confidentialityImpact": "LOW",
+                        "integrityImpact": "LOW",
+                        "availabilityImpact": "NONE",
+                        "baseSeverity": "MEDIUM",
+                        "version": "3.1"
+                    },
+                    "cwes": [
+                        "CWE-20",
+                        "CWE-22"
+                    ],
+                    "description": "In Apache Commons IO before 2.7, When invoking the method FileNameUtils.normalize with an improper input string, like \"//../foo\", or \"\\\\..\\foo\", the result would be the same value, thus possibly providing access to files in the parent directory, but not further above (thus \"limited\" path traversal), if the calling code would use the result to construct a path value.",
+                    "notes": "",
+                    "references": [
+                        {
+                            "source": "NVD",
+                            "url": "https://lists.apache.org/thread.html/r7c9b8e8fa9e1b5dbb1d1bb6d6d8f1c9c7ebc3d1a@%3Cdev.commons.apache.org%3E",
+                            "name": "[oss-security] 20210413 CVE-2021-29425: Apache Commons IO: limited path traversal"
+                        }
+                    ],
+                    "vulnerableSoftware": [
+                        {
+                            "software": {
+                                "id": "cpe:2.3:a:apache:commons_io:*:*:*:*:*:*:*:*",
+                                "vulnerabilityIdMatched": "true",
+                                "versionStartIncluding": "2.2",
+                                "versionEndExcluding": "2.7"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "source": "OSSINDEX",
+                    "name": "CVE-2021-29425",
+                    "severity": "MEDIUM",
+                    "cvssv3": {
+                        "baseScore": 4.8,
+                        "baseSeverity": "MEDIUM",
+                        "version": "3.1"
+                    },
+                    "cwes": [
+                        "CWE-22"
+                    ],
+                    "description": "[CVE-2021-29425] CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')",
+                    "notes": "",
+                    "references": [
+                        {
+                            "source": "OSSINDEX",
+                            "url": "https://ossindex.sonatype.org/vulnerability/CVE-2021-29425",
+                            "name": "[CVE-2021-29425] CWE-22"
+                        }
+                    ],
+                    "vulnerableSoftware": [
+                        {
+                            "software": {
+                                "id": "cpe:2.3:a:commons-io:commons-io:2.6:*:*:*:*:*:*:*",
+                                "vulnerabilityIdMatched": "true"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "isVirtual": false,
+            "fileName": "snakeyaml-1.30.jar",
+            "filePath": "/home/me/.m2/repository/org/yaml/snakeyaml/1.30/snakeyaml-1.30.jar",
+            "md5": "d41d8cd98f00b204e9800998ecf8427e",
+            "sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "evidenceCollected": {
+                "vendorEvidence": [],
+                "productEvidence": [],
+                "versionEvidence": []
+            },
+            "packages": [
+                {
+                    "id": "pkg:maven/org.yaml/snakeyaml@1.30",
+                    "confidence": "HIGH"
+                }
+            ],
+            "vulnerabilities": [
+                {
+                    "source": "NVD",
+                    "name": "CVE-2022-1471",
+                    "severity": "HIGH",
+                    "cvssv3": {
+                        "baseScore": 8.3,
+                        "baseSeverity": "HIGH",
+                        "version": "3.1"
+                    },
+                    "cwes": [
+                        "CWE-20",
+                        "CWE-502"
+                    ],
+                    "description": "SnakeYaml's Constructor() class does not restrict types which can be instantiated during deserialization.",
+                    "notes": "",
+                    "references": [],
+                    "vulnerableSoftware": [
+                        {
+                            "software": {
+                                "id": "cpe:2.3:a:snakeyaml_project:snakeyaml:*:*:*:*:*:*:*:*",
+                                "vulnerabilityIdMatched": "true",
+                                "versionEndExcluding": "2.0"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "source": "NVD",
+                    "name": "CVE-2022-25857",
+                    "severity": "HIGH",
+                    "cvssv3": {
+                        "baseScore": 7.5,
+                        "baseSeverity": "HIGH",
+                        "version": "3.1"
+                    },
+                    "cwes": [
+                        "CWE-400"
+                    ],
+                    "description": "The package org.yaml:snakeyaml from 0 and before 1.31 are vulnerable to Denial of Service (DoS) due missing to nested depth limitation for collections.",
+                    "notes": "",
+                    "references": [],
+                    "vulnerableSoftware": [
+                        {
+                            "software": {
+                                "id": "cpe:2.3:a:snakeyaml_project:snakeyaml:*:*:*:*:*:*:*:*",
+                                "vulnerabilityIdMatched": "true",
+                                "versionEndExcluding": "1.31"
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

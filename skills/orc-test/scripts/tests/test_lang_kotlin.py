@@ -75,3 +75,16 @@ def test_mutation_unavailable_finds_nested_build_file(tmp_path):
     nested.mkdir()
     (nested / "build.gradle.kts").write_text("plugins { id(\"info.solidsoft.pitest\") }\n")
     assert kotlin.mutation_unavailable(tmp_path) is None
+
+
+def test_audit_is_the_gradle_half_of_java(tmp_path):
+    # Kotlin projects are Gradle projects: same plugin, same task, same report, java.py's parser.
+    assert kotlin.AUDIT_TOOL[0] == "dependency-check" and "build.gradle" in kotlin.AUDIT_TOOL[1]
+    assert kotlin.audit_findings is java.audit_findings
+    _gradle_kotlin(tmp_path)
+    assert "not applied" in kotlin.audit_unavailable(tmp_path)
+    (tmp_path / "build.gradle.kts").write_text('plugins { id("org.owasp.dependencycheck") version "13.0.0" }\n'
+                                               'dependencyCheck { formats = listOf("JSON") }\n')
+    assert kotlin.audit_unavailable(tmp_path) is None
+    assert "gradle dependencyCheckAnalyze" in kotlin.audit_cmd(tmp_path)[2]
+    assert "build/reports/dependency-check-report.json" in kotlin.audit_cmd(tmp_path)[2]

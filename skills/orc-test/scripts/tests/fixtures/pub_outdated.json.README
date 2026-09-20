@@ -1,0 +1,22 @@
+Dart SDK 3.13.3 (stable), captured 2026-09-19 in a scratch package (not hand-built), from a real
+pub.dev resolution, using the pin dart.dev's security-advisories page uses as its own example:
+
+    printf 'name: fix\nenvironment:\n  sdk: ">=3.0.0 <4.0.0"\ndependencies:\n  http: 0.13.0\n' > pubspec.yaml
+    dart pub get                              # exited 0; printed "Dependencies are affected by
+                                              # security advisories: [^0]: https://github.com/
+                                              # advisories/GHSA-4rgh-jx4f-qfcq"
+    dart pub outdated --json > pub_outdated.json   # exited 0
+
+Top-level shape: a **dict** with one key, `packages`, a list. `pub outdated` lists only the
+packages it has something to say about (three of the eleven resolved here: async, http, web),
+each with `package`, `kind` (direct/dev/transitive), `isDiscontinued`, `replacedBy`,
+`isCurrentRetracted`, `isCurrentAffectedByAdvisory` and four version slots `current`,
+`upgradable`, `resolvable`, `latest`, each `{"version": ...}` or null. The advisory's id is
+not in the JSON — only the boolean — which is why the parser's line points at `dart pub get`
+for the URL. Only http is flagged; the two transitive entries have `current: null`, which the
+parser has to tolerate.
+
+The capture above is stdout only. `orc_test.runner.run` merges stderr into stdout, so any prose
+a real `pub outdated` writes there would land ahead of this JSON — `audit_findings` reads from
+the first `{` for exactly that reason; see test_audit_findings_skips_stderr_prefix in
+test_lang_dart.py.

@@ -42,7 +42,11 @@ answered:
    asks whether that sounds right, or whether you'd rather pick something else. If nothing's been
    worked out yet for the combination you picked, it says so plainly and asks what you want
    instead of proposing something unproven.
-5. Would you like a minimal example, a basic **scaffold** (a skeleton project with the standard
+5. Whether anyone you didn't invite will be able to reach it — a public website or API, yes; an
+   app that runs only on your own machine or phone, no. It guesses from the platforms you ticked
+   and asks you to confirm, and the answer decides which security rules the new project is built
+   to from the start.
+6. Would you like a minimal example, a basic **scaffold** (a skeleton project with the standard
    files and folders for that stack already in place, but no real features yet) with common
    features, or something specific — describe your use case?
 
@@ -74,17 +78,22 @@ and whether to run another round), plus:
 - **New project**: creates the project folder (if needed), sets up the language's normal tooling,
   and writes the starter files for the stack and starting point you chose. It runs the project's
   own build or test command before calling the job done, and won't report it as finished until
-  that command actually passes.
+  that command actually passes. It also writes the project's lint and security-check settings,
+  and — when you said strangers can reach it — the pieces those rules need from day one: a
+  login layer, a public folder separate from the code, error pages that give nothing away.
 - **Existing project**: whatever `feature-dev`'s own workflow changes — `/orc-code` doesn't touch
   anything beyond what that plugin does.
 - **Quality mode**: if the project doesn't already have a lint configuration (settings for the
   tool that checks code style and flags likely mistakes) or a mutation-testing configuration
   (settings for the check that deliberately breaks the code in small ways to see whether the
   tests would notice — used by [`/orc-test`](orc-test.md)), it writes one and commits it on its
-  own, separately from the code changes. It then fixes files one at a time — always with the
-  project's tests passing after each one — committing each file or module's fix separately. It
-  leaves architecture-level opinions (whether a module should exist at all, say) as a suggestion
-  for you, not a change it makes.
+  own (the security-check settings are written the same way), separately from the code changes.
+  It then fixes files one at a time — always with the project's tests passing after each one —
+  committing each file or module's fix separately. It leaves architecture-level opinions
+  (whether a module should exist at all, say) as a suggestion for you, not a change it makes.
+  If the `code-modernization` plugin is installed, it also runs that plugin's security scan and
+  applies what holds up; if not, it tells you and reviews the code against the security rules
+  by hand.
 - **Migration mode**: creates `.orclab/modernize/` — a scratch folder holding the migration
   plugin's own working files — and does the actual conversion inside an isolated copy of your
   project, so the work in progress can't disturb whatever you're already doing: either a

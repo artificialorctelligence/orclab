@@ -145,6 +145,10 @@ custom_rules:
     regex: 'catch\s*\{\s*\}'
     message: "an empty catch swallows the error — handle it, or name and comment the suppression"
     severity: error
+  manual_server_trust:       # SwiftLint has no security rule either — see Security below
+    regex: 'URLCredential\(trust:'
+    message: "manual server trust — pinning is fine, accepting a certificate the system rejects is not; name and comment the suppression"
+    severity: error
 ```
 
 Warnings-as-errors is the compiler's: `-warnings-as-errors` (`swiftc`'s `Options.td`), set in
@@ -152,6 +156,159 @@ Xcode as `SWIFT_TREAT_WARNINGS_AS_ERRORS = YES` in the build settings (default `
 `Swift.xcspec` in swift-build, confirmed 2026-09-13). Rules 2, 3 and 5 (`defer`, `precondition`
 over `assert` — the Assert.swift docs say *"To check for invalid usage in Release builds, see
 precondition"*) are reviewed, not linted.
+
+## Security — where security-discipline lands
+
+`security-discipline`'s rules for this stack, confirmed live 2026-09-19;
+no project has been through this yet, and the first one corrects it. A phone app is the
+*Every project* tier — it accepts no connections — so rules 1–4 apply in full, and of 5–9 only
+what a client owes: rule 8's own client half (whether it checks the certificate of the server it
+talks to — which on iOS the platform does, unless the app opts out), and rule 5's *shape* —
+untrusted input reaching the point where it is used — extended here to a URL another app handed
+it, which the rule's text does not name. The server it talks to carries 5–9 in its own stack.
+`stack-kotlin-multiplatform`'s Security section reads this one for `iosApp/`.
+
+### Static analysis
+
+**SwiftLint has no security rule — none free.** Its rule directory for 0.65.1 (read live
+2026-09-19) lists 256 rules — 102 default, 149 opt-in, 5 analyzer — and none is about a
+credential, a certificate, HTTP, cryptography or injection; the one whose name suggests it,
+`legacy_random`, is style: *"Prefer using type.random(in:) over legacy functions"*. What iOS has
+instead is the platform: App Transport Security refuses a plain-HTTP connection at runtime (the
+last subsection), and the App Store rejects an upload without a privacy manifest (the store
+table). So this section adds one rule of Orclab's own, the same shape as the Lint section's
+`empty_catch` — a regex custom rule — for the one client-side rule with a signature in Swift
+code:
+
+- **Rule 8's client half: `manual_server_trust`**, the entry in the Lint section's
+  `.swiftlint.yml` above. Apple's *Performing manual server trust authentication* (read live
+  2026-09-19): in `URLSession`, app code that wants to *"accept server credentials that would
+  otherwise be rejected by the system"* — its example is *"a development server that uses a
+  self-signed certificate"* — implements `urlSession(_:didReceive:completionHandler:)` and
+  answers with `URLCredential(trust: serverTrust)` and `.useCredential`, the page's own listing.
+  Certificate pinning — *"reject credentials that would otherwise be accepted"* — goes through
+  the same call and is tightening, not a finding. So every `URLCredential(trust:` is one or the
+  other; the rule fires on both, and pinning code names and comments the suppression
+  (`// swiftlint:disable:next manual_server_trust`), which is `code-discipline`'s form. The
+  loosening case does not even work while ATS covers the domain — *"You cannot loosen server
+  trust requirements for an ATS-protected domain, but you can tighten them"* — so in
+  `URLSession` it only works alongside an Info.plist exception, and the archive check in the
+  last subsection is the other half of the same rule. Below `URLSession` nothing lints: *"ATS doesn't apply to
+  calls your app makes to lower-level networking interfaces like the Network framework or
+  CFNetwork"* — a project on those is reviewed.
+- **Rules 1, 3, 4 and 5's shape: reviewed, not linted.** SwiftLint reads Swift files only, and
+  there is no linter for the plist or the entitlements. Rule 1 (a token typed into a Swift
+  file); rule 3 (a download run without a check — on iOS also a review rule: 2.5.2, *"Apps should
+  be self-contained in their bundles ... nor may they download, install, or execute code which
+  introduces or changes features or functionality of the app"*, read live 2026-09-19); rule 4,
+  which the template scaffolds — no `.entitlements` file until a capability is added in
+  *Signing & Capabilities*, no usage string until an `INFOPLIST_KEY_NS*UsageDescription` is set
+  (the layout table), so each is a diff someone can see — and whether the code uses what was
+  granted is reviewed; rule 5's shape (a URL from another app, the last subsection).
+
+### Dependency audit
+
+None free: SwiftPM has no advisory check — `skills/orc-test/languages/swift.md`, `## Audit`,
+says what was checked, and `/orc-test audit` prints `audit not available` with that sentence
+(rule 2). Re-read 2026-09-19: swiftlang/swift-package-manager's `main` is still `39b373a`, the
+commit that page names, and `Sources/Commands/PackageCommands/` still holds the same subcommands
+— nothing new. The store table's privacy-manifest row is the nearest thing this stack has to a
+supply-chain check: each package with native code ships its own, and the upload is rejected
+when one is missing.
+
+### Secrets
+
+Three kinds of secret, three places, none of them a source file (rule 1; every quotation below
+confirmed live 2026-09-19 on developer.apple.com unless said otherwise):
+
+- **The signing identity and the upload key.** With the toolchain row's *Automatically manage
+  signing*, the distribution certificate is cloud-managed — *"associated with your Apple
+  Developer Program membership and managed remotely"* (Developer Account Help), and *"Xcode
+  automatically creates and shares cloud-managed certificates among your team, so you don't need
+  to manually export cloud-managed certificates"* (Xcode's *Synchronizing code signing
+  identities* page) — so there is no private key on disk to leak. A manually managed identity
+  sits in the Mac's login keychain, and its export is a password-protected `.p12`: *"Anybody
+  who gets access to the exported signing identity and learns (or guesses) the password can
+  distribute signed software that appears to users and the operating system to come from your
+  Apple Developer account."* That `.p12`, and the App Store Connect API key's `.p8` —
+  downloadable *"a single time"*, *"Apple doesn't keep a copy of the private key"*, and *"Don't
+  share your keys, store keys in a code repository, or include keys in client-side code"* (App
+  Store Connect API, *Creating API Keys*) — go into the build service's secret store, which is
+  where the Building-without-a-Mac section already puts them (Codemagic's Team settings;
+  GitHub's guide base64s the `.p12` and the profile into Actions secrets), never into the
+  working tree. `ExportOptions.plist`, which the layout table says to commit, holds the team id
+  and the export method, not a key.
+- **A token the app holds for its user** (a session, a refresh token): the **Keychain**, through
+  `SecItemAdd` with `kSecClassGenericPassword` — *"an encrypted database called a keychain"*,
+  and on iOS *"An app can access only its own keychain items, or those shared with a group to
+  which the app belongs"* (*Keychain services*; *Keychains*). `Security` is a system framework;
+  nothing to install. Not `UserDefaults` — the Storage section quotes Apple's *"Don't store
+  personal or sensitive information as settings"*. Set `kSecAttrAccessible` on purpose: the
+  default is `kSecAttrAccessibleWhenUnlocked`, and *"A device without a passcode is considered
+  to always be unlocked"*; `kSecAttrAccessibleAfterFirstUnlock` is for a token a background
+  fetch needs; a `ThisDeviceOnly` variant when the token must not follow a backup to a new
+  phone — *"it isn't migrated when restoring another device's backup data"*; and
+  `kSecAttrAccessibleAlways` *"isn't recommended"*. *"Always use the most restrictive option
+  that makes sense for your app"* (*Restricting keychain item accessibility*).
+- **An API key for a service the app calls.** The bundle is public — anyone with the `.ipa` can
+  unpack it — so a key in it is a key everyone has. Google's API-key page
+  (docs.cloud.google.com, dated 2026-09-16, platform-neutral): *"Don't include API keys in
+  client code or commit them to code repositories"*; *"The client should pass requests to the
+  server, which can add the credential and issue the request."* Apple's own line for its API
+  key above says the same. That server is the *Reachable by strangers* tier of whatever stack
+  it is in. Unlike Android there is no vendor-blessed key that ships in the bundle here — none
+  found, and the first project that needs one records it.
+
+`.gitignore`: `*.p12`, `*.p8`, and `.netrc` — the last is where `swift package-registry login`
+stores a registry credential when the macOS keychain is not used (*"SwiftPM will save the
+credentials to the operating system's credential store (e.g., Keychain in macOS) or netrc
+file"*, its registry usage doc), and `swift package init`'s own `.gitignore` already lists it
+alongside `xcuserdata/` and `DerivedData/` (`InitPackage.swift` on `main`, read live
+2026-09-19). Whether Xcode's app template writes a `.gitignore` at all was not checked from
+Linux; the first project on a Mac records it. Never in the built `.ipa`: a `.p12`, a `.p8`, a
+`.netrc`, `.git`, `xcuserdata/`. Nothing lints the archive; the first project lists it once
+(`unzip -l build/ipa/<App>.ipa`) and records the answer here.
+
+### Reachable by strangers
+
+This stack does not accept connections: n/a — a phone app has no route to authenticate, no
+error to sanitise and no rate to limit; the service it talks to carries rules 5–9 in its own
+stack. What still applies is rule 8's client half, which iOS enforces by default: App Transport
+Security is on for every app linked against the iOS 9 SDK or later, *"requires that all HTTP
+connections made with the URL Loading System — typically using the URLSession class — use
+HTTPS"*, demands TLS 1.2 or later, SHA-256 and forward secrecy on top of the certificate
+checks, and *"blocks connections that fail to meet minimum security specifications"* (the
+`NSAppTransportSecurity` key page and *Preventing Insecure Network Connections*, read live
+2026-09-19). A plain `http://` URL fails at runtime with *"App Transport Security has blocked a
+cleartext HTTP (http://) resource load since it is insecure."* Loosening it is an
+`NSAppTransportSecurity` dictionary in the target's Info tab — where the layout table says every
+Info.plist value lives — and every loosening key is a finding in a release build:
+`NSAllowsArbitraryLoads` (*"You must supply a justification during App Store review if you set
+the key's value to YES"*) and the four others on Apple's justification list —
+`NSAllowsArbitraryLoadsForMedia`, `NSAllowsArbitraryLoadsInWebContent`, a per-domain
+`NSExceptionAllowsInsecureHTTPLoads`, a per-domain `NSExceptionMinimumTLSVersion` — which
+*"might trigger additional App Store review for your app"*. The App Review Guidelines
+themselves do not name ATS (read live 2026-09-19; the nearest is 1.6, *"Apps should implement
+appropriate security measures"*): the cost is the justification Apple asks for at submission,
+not a numbered rule. A development server: `NSAllowsLocalNetworking` — *"unqualified domains,
+`.local` domains, and IP addresses"* — is the one exception not on that list, and its page says
+that since iOS 17 a bare IP address needs an `NSExceptionDomains` entry, so run the dev server
+under a `.local` name or over HTTPS rather than carrying an HTTP exception into the archive.
+Pinning (`NSPinnedDomains`, or the delegate `manual_server_trust` watches) tightens and is never
+a finding. The check, on the archived product, beside the store table's usage-string check:
+
+```bash
+plutil -p build/<App>.xcarchive/Products/Applications/<App>.app/Info.plist | grep -A8 NSAppTransportSecurity   # nothing, or only NSAllowsLocalNetworking / NSPinnedDomains
+```
+
+Rule 5's shape, for the one input a phone app does take from a stranger: a URL another app or a
+web page handed it — a custom scheme or a universal link, arriving in SwiftUI through
+`onOpenURL(perform:)`. Apple: *"URL schemes offer a potential attack vector into your app, so
+make sure to validate all URL parameters and discard any malformed URLs"*, and *"don't allow
+other apps to directly delete content or access sensitive information about the user"*
+(*Defining a custom URL scheme for your app*, read live 2026-09-19) — parse with
+`URLComponents`, match against the few paths the app defines, refuse the rest. And the API-key
+paragraph above: the bundle is not a secret store.
 
 ## Presence
 
@@ -296,6 +453,34 @@ Store ingredient applies to it unchanged, including the privacy manifest and the
 
 ## Sources (live on 2026-09-11; facets and no-Mac builds 2026-09-12)
 
+- Security — where security-discipline lands (2026-09-19; Apple documentation pages read through
+  their JSON form, as for the facets) — SwiftLint: `https://realm.github.io/SwiftLint/rule-directory.html`
+  (0.65.1; 102 default, 149 opt-in, 5 analyzer rules, no security rule),
+  `https://realm.github.io/SwiftLint/legacy_random.html`,
+  `https://raw.githubusercontent.com/realm/SwiftLint/main/README.md` (regex custom rules;
+  `swiftlint:disable:next`); Apple — `https://developer.apple.com/documentation/security/keychain-services`,
+  `.../security/keychain-items`, `.../security/keychains`,
+  `.../security/adding-a-password-to-the-keychain`,
+  `.../security/restricting-keychain-item-accessibility`,
+  `.../security/item-attribute-keys-and-values` (the seven accessibility values),
+  `.../security/preventing-insecure-network-connections`,
+  `https://developer.apple.com/documentation/bundleresources/information-property-list/nsapptransportsecurity`,
+  `.../nsapptransportsecurity/nsallowsarbitraryloads`, `.../nsapptransportsecurity/nsallowslocalnetworking`,
+  `https://developer.apple.com/documentation/foundation/performing-manual-server-trust-authentication`,
+  `https://developer.apple.com/documentation/xcode/sharing-your-teams-signing-certificates`,
+  `https://developer.apple.com/help/account/create-certificates/cloud-managed-certificates`,
+  `https://developer.apple.com/documentation/appstoreconnectapi/creating-api-keys-for-app-store-connect-api`,
+  `https://developer.apple.com/documentation/xcode/defining-a-custom-url-scheme-for-your-app`,
+  `https://developer.apple.com/documentation/swiftui/view/onopenurl(perform:)`,
+  `https://developer.apple.com/app-store/review/guidelines/` (2.5.2 and 1.6; no mention of ATS,
+  HTTPS or keychain anywhere on the page); API keys, platform-neutral:
+  `https://docs.cloud.google.com/docs/authentication/api-keys-best-practices`; SwiftPM —
+  `https://github.com/swiftlang/swift-package-manager` (`main` at 39b373a, the commit
+  `skills/orc-test/languages/swift.md` names; `Sources/Commands/PackageCommands/` listed again),
+  `https://raw.githubusercontent.com/swiftlang/swift-package-manager/main/Sources/Workspace/InitPackage.swift`
+  (the `.gitignore` `swift package init` writes),
+  `https://raw.githubusercontent.com/swiftlang/swift-package-manager/main/Documentation/PackageRegistry/PackageRegistryUsage.md`
+  (keychain or `.netrc` for registry credentials)
 - Lint — where code-discipline lands (2026-09-13): `https://raw.githubusercontent.com/realm/SwiftLint/main/Source/SwiftLintBuiltInRules/Rules/{Metrics/NestingRule,RuleConfigurations/NestingConfiguration,Metrics/FunctionBodyLengthRule}.swift`, `.../Models/BuiltInRules.swift` (no empty-catch rule), `https://raw.githubusercontent.com/swiftlang/swift/main/include/swift/Option/Options.td` (`-warnings-as-errors`), `https://raw.githubusercontent.com/swiftlang/swift-build/main/Sources/SWBUniversalPlatform/Specs/Swift.xcspec`, `https://raw.githubusercontent.com/swiftlang/swift/main/stdlib/public/core/Assert.swift`
 - Current releases: `https://developer.apple.com/news/releases/`; Xcode 27 and 26 release notes
   under `https://developer.apple.com/documentation/xcode-release-notes/`

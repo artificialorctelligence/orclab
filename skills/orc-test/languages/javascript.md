@@ -1,7 +1,8 @@
 # JavaScript/TypeScript
 
-Researched on: 2026-09-11 (versions read from the npm registry that day). Last real run: none yet —
-the first project with this language corrects it.
+Researched on: 2026-09-11 (versions read from the npm registry that day). Last real run:
+2026-09-19, on the v22check scaffold (`stack-web`, `web/`): `npx vitest run` — `No test files
+found` (the scaffold ships no test yet); audit below.
 
 ## Detect
 `package.json` at the root or up to two directories down.
@@ -34,6 +35,21 @@ eslint config — not a separate tool invocation of our own. Rules watched for:
 `vitest/expect-expect`, `vitest/no-disabled-tests`, `vitest/no-identical-title`, and the `jest/`
 equivalents. When the plugin isn't in `package.json`'s dependencies (either section), lint is not
 run and the report says so rather than reporting zero findings.
+
+## Audit
+`npm audit --json` (npm ships with Node.js; docs read at npm 11.19.1, fixture captured with the
+npm 10.8.2 installed here), confirmed live 2026-09-19 against
+https://docs.npmjs.com/cli/v11/commands/npm-audit. It reads the lock file — *"By default npm
+requires a package-lock or shrinkwrap in order to run the audit"* — and posts the tree's names
+and versions to the registry's bulk advisory endpoint. Exit code: *"0 exit code if no
+vulnerabilities were found"*; with findings it *"will depend on the audit-level config"*, so
+`cli.py` reads the JSON and ignores the code. One line per vulnerable package: npm keys the
+report by package and reports the vulnerable **range**, not the installed version, so the line
+reads `lodash <=4.17.23: GHSA-…, GHSA-… — fix lodash 4.18.1`; a package vulnerable only through a
+dependency lists that dependency as `via <name>`. A missing lock file comes back as an `ENOLOCK`
+error document, which `cli.py` reports as output not understood — run `npm install` first. Last
+real run: 2026-09-19, on the v22check scaffold (`stack-web`, `web/`): `JS/TS      audit ✓ 0
+vulnerable`, exit 0 (BACKLOG #48).
 
 ## Caveats
 - **`eslint-plugin-vitest` (no `@vitest/` scope) is the abandoned 2024 package.** The maintained

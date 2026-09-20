@@ -101,6 +101,25 @@ bare `@pytest.mark.skip` — checked 2026-09-11 with ruff 0.16.7. `run.py` scans
 `*_test.py` with the stdlib `ast` module for: no assertion (an `assert`, `pytest.raises`, or a
 `.assert_*` call counts), `sleep` calls, `@pytest.mark.skip`/`skipif`, duplicate test names.
 
+## Audit
+pip-audit 2.10.1 (`pip install pip-audit`), confirmed live 2026-09-19 against its README:
+`python3 -m pip_audit -f json --progress-spinner off .` audits the project's declared dependencies
+from `pyproject.toml` — not the environment — and exits 1 when any has a known vulnerability
+(*"pip-audit's exit code cannot be suppressed"*). `run.py` reads the JSON: one line per
+vulnerable package with its advisory ids and the versions that fix it. First resolution can take
+as long as a `pip install`. pip-audit prints a one-line summary on stderr ahead of the JSON
+(`No known vulnerabilities found` / `Found 36 known vulnerabilities in 3 packages`, seen live
+2026-09-19) and `run.py` merges stderr into stdout, so the parser reads from the first `{`. A
+`pyproject.toml` with no `[project]` table is refused by pip-audit — ``ERROR:pip_audit._cli:pyproject
+file pyproject.toml does not contain `project` section`` — so `audit_nothing` checks for the table
+first and reports `audit not available — nothing declared: pyproject.toml has no [project] table`,
+exit 0, before pip-audit (or its install line) is ever consulted: a tool-only pyproject declares
+nothing to audit, and is not a red gate (BACKLOG #54). `requirements.txt` is not read — `-r`
+would be a different command. Last real run: 2026-09-19. On the v22check scaffold (`stack-web`,
+six declared dependencies): `Python     audit ✓ 0 vulnerable`, exit 0. On Orclab itself, whose
+root `pyproject.toml` is tool config only: `Python     audit not available — nothing declared:
+pyproject.toml has no [project] table`, exit 0.
+
 ## Caveats
 - **mutmut copies only `source_paths` and `also_copy` into `mutants/`; the tests are not copied
   unless `also_copy` names them.** Without it the inner pytest says "file or directory not

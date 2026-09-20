@@ -23,6 +23,14 @@ SANDBOX = {"target", "build", ".gradle"}   # Maven/Gradle/Pitest/JaCoCo build ou
 
 _JACOCO = "org.jacoco:jacoco-maven-plugin"
 
+# OWASP dependency-check 13.0.0, a build plugin: "installed" when the build file names it.
+_DC_GRADLE = ('plugins { id("org.owasp.dependencycheck") version "13.0.0" } and '
+              'dependencyCheck { formats = listOf("JSON") } in build.gradle(.kts)')
+AUDIT_TOOL = ("dependency-check",
+              ("declare org.owasp:dependency-check-maven 13.0.0 under <plugins> in "
+               f"pom.xml, or {_DC_GRADLE}"))
+_UNREADABLE = ["audit output not understood — see above"]
+
 
 def _maven(root):
     return (pathlib.Path(root) / "pom.xml").exists()
@@ -30,6 +38,61 @@ def _maven(root):
 
 def _gradle_cmd(root):
     return ["./gradlew"] if (pathlib.Path(root) / "gradlew").exists() else ["gradle"]
+
+
+def _gradle_audit_unavailable(root):
+    build = _find_build_gradle(root)
+    text = build.read_text() if build else ""
+    # formats is build-file config only (no -P for it), so a JSON report has to be asked for there.
+    return None if "org.owasp.dependencycheck" in text and "JSON" in text else "dependency-check plugin not applied"
+
+
+def audit_unavailable(root):
+    if _maven(root):
+        return None if "dependency-check-maven" in (pathlib.Path(root) / "pom.xml").read_text() else "dependency-check plugin not declared"
+    return _gradle_audit_unavailable(root)
+
+
+def _report_cmd(build, report):
+    """The build, then the report on stdout — audit_findings sees stdout only. The build's own
+    output goes to a log beside the report and stands in for it when no report was written, so
+    an audit that never ran lands on the sentinel with the reason printed. The old report goes
+    first: a build that fails before writing (NVD update, plugin resolution) must not leave last
+    run's clean report to be read as today's."""
+    d = report.rpartition("/")[0]
+    log = f"{d}/dependency-check.log"
+    return ["sh", "-c", f"rm -f {report}; mkdir -p {d}; {build} >{log} 2>&1; cat {report} 2>/dev/null || cat {log}"]
+
+
+def _gradle_audit_cmd(root):
+    return _report_cmd(" ".join(_gradle_cmd(root) + ["dependencyCheckAnalyze"]), "build/reports/dependency-check-report.json")
+
+
+def audit_cmd(root):
+    if _maven(root):
+        return _report_cmd("mvn -q org.owasp:dependency-check-maven:check -Dformat=JSON", "target/dependency-check-report.json")
+    return _gradle_audit_cmd(root)
+
+
+def _vulns_of(dep, seen):
+    for v in dep.get("vulnerabilities", []):
+        key = (dep["fileName"], v["name"])
+        if key in seen:
+            continue
+        seen.add(key)
+        yield f"{dep['fileName']}: {v['name']} ({v.get('severity', 'unscored')}) — fix not reported by dependency-check"
+
+
+def audit_findings(stdout, returncode):
+    # The report decides, not the exit code: failBuildOnCVSS defaults to 11 (never fails) and the
+    # report is written before that check either way. dependency-check names no fixed version —
+    # it matches CPEs against the NVD — so the line ends at the advisory. seen: a shaded or
+    # multi-CPE jar can list one CVE more than once.
+    try:
+        seen = set()
+        return [line for dep in json.loads(stdout)["dependencies"] for line in _vulns_of(dep, seen)]
+    except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
+        return _UNREADABLE
 
 
 def missing(root):

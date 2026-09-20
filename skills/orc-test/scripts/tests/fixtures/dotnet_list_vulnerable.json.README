@@ -1,0 +1,29 @@
+dotnet_list_vulnerable.json — from documented schema — verify on first real run.
+
+Hand-built, not captured: no .NET SDK is installed on the machine this was written on
+(2026-09-19). The shape is NuGet's own, read the same day from the renderer that writes it and
+the test that pins its output, both on NuGet.Client's `dev` branch (commit 1e41905, 2026-09-19):
+
+    src/NuGet.Core/NuGet.CommandLine.XPlat/ListPackage/ListPackageJsonRenderer.cs
+        — the property-name constants (`version`, `parameters`, `sources`, `projects`, `path`,
+          `frameworks`, `framework`, `topLevelPackages`, `transitivePackages`, `id`,
+          `requestedVersion`, `resolvedVersion`, `vulnerabilities`, `severity`, `advisoryurl`,
+          `problems`, `level`, `text`) and WriteVulnerabilities, which maps severity 0..3 to
+          "Low", "Moderate", "High", "Critical" and anything else to "".
+    test/NuGet.Core.FuncTests/NuGet.XPlat.FuncTest/XplatListPackageJsonRendererTests.cs
+        — JsonRenderer_ListPackage_Vulnerable_IncludeTransitive_SucceedsAsync: the expected
+          document this fixture's first framework block is copied from (package ids A and D,
+          those three GHSA ids, the `[1.0.0,1.3.0]` requested range), with the test's
+          netcoreapp3.1 renamed to net8.0.
+
+The second framework block (net9.0) is a copy of the first. That is the repeat the real command
+produces for a multi-targeted project — one entry per target framework, and again per project
+in a solution — and it is why `langs/csharp.py`'s `audit_findings` dedupes on
+(id, resolvedVersion, advisoryurl): the fixture should parse to three lines, not six.
+
+Not exercised here, covered inline in test_lang_csharp.py: a `problems` entry of level
+"error" (the only thing that makes the command exit 1 — ListPackageCommandRunner.cs computes
+the exit code from ProblemType.Error alone; vulnerable packages never set it).
+
+Verify against a real `dotnet list package --vulnerable --include-transitive --format json` the
+first time one runs, and replace this file with the capture.

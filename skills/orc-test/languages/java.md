@@ -41,6 +41,45 @@ PMD 7's `category/java/bestpractices.xml` rules `UnitTestShouldIncludeAssert` an
 PMD does not flag `@Disabled` tests — checked 2026-09-11 with PMD 7; the fallback there is a
 plain `grep -rn @Disabled src/test`, not run automatically by `run.py`.
 
+## Audit
+OWASP dependency-check 13.0.0 (released 2026-08-03; Maven Central's `maven-metadata.xml` and
+the Gradle plugin portal both say 13.0.0 — the older jeremylong.github.io mirror of the docs
+still shows 12.1.0, read the dependency-check.github.io one), confirmed live 2026-09-19 against
+https://dependency-check.github.io/DependencyCheck/dependency-check-maven/check-mojo.html and
+https://dependency-check.github.io/DependencyCheck/dependency-check-gradle/configuration.html.
+Maven has no native audit (checked maven.apache.org the same day: the dependency plugin's
+`analyze` is about unused declarations, not advisories). It is a build plugin, so "installed"
+means the build file names it — `cli.py` never adds it:
+
+- Maven: `org.owasp:dependency-check-maven` under `<plugins>` in `pom.xml`, then
+  `mvn -q org.owasp:dependency-check-maven:check -Dformat=JSON`; the report is
+  `target/dependency-check-report.json` (`outputDirectory` default
+  `${project.build.directory}`, *"This generally maps to 'target'"*). `check` runs per module;
+  a multi-module build wants `aggregate`, not wired here.
+- Gradle: `id("org.owasp.dependencycheck") version "13.0.0"` **and**
+  `dependencyCheck { formats = listOf("JSON") }` in `build.gradle(.kts)` — the format is
+  build-file config with no command-line property, so the JSON has to be asked for there — then
+  `./gradlew dependencyCheckAnalyze` (or `gradle`); the report is
+  `build/reports/dependency-check-report.json` (`outputDirectory` default `${buildDir}/reports`).
+  **The plugin block goes in the root build file**: `cli.py` reads the root's report, and a
+  plugin applied only in a subproject (`app/build.gradle.kts`) writes `app/build/reports/…`
+  instead — the audit then fails loud (log printed, "output not understood"), not silently. A
+  multi-module Gradle build wants `dependencyCheckAggregate`, not wired here either.
+
+Exit code: ignored. `failBuildOnCVSS` — *"The default is 11 which means since the CVSS scores
+are 0-10, by default the build will never fail"* — and the report is written before that check
+in any case, so `audit_findings` reads the report. Because `cli.py` only sees the command's
+stdout, the command is a one-line `sh -c` that removes any previous report, sends the build's
+own output to `dependency-check.log` beside it and then prints the report; when no report was
+written (NVD update failed, plugin did not resolve) the log is printed instead and lands on
+"output not understood" with the reason above it — last run's report is never read as today's. One
+line per (jar, advisory): `commons-io-2.6.jar: CVE-2021-29425 (MEDIUM) — fix not reported by
+dependency-check` — it matches CPEs against the NVD and names no fixed version; one CVE listed
+by two sources (NVD and OSS Index) for the same jar is one line. **The first run downloads the
+NVD: *"it may take 20 minutes or more"*, and the docs recommend an NVD API key
+(`nvdApiKeyEnvironmentVariable`, never `-DnvdApiKey=` — *"Maven debug logging could expose the
+API Key"*).** Subsequent runs within seven days take seconds. Last real run: none yet.
+
 ## Caveats
 - **The JUnit 5 support for Pitest is a `<dependency>` nested inside the `pitest-maven` plugin's
   own `<plugin>` block, not a project dependency and not a CLI flag.** It does not go in the

@@ -33,6 +33,59 @@ CAVEATS = [
 ]
 SANDBOX = {"mutants", ".coverage", "__pycache__", ".pytest_cache"}   # mutmut/pytest-cov's own scratch
 
+AUDIT_TOOL = ("pip-audit", "pip install pip-audit")
+_UNREADABLE = ["audit output not understood — see above"]
+
+
+def audit_nothing(root):
+    # audit_cmd's `.` reads the [project] table and nothing else — pip-audit refuses a pyproject
+    # without one ("does not contain `project` section", seen live on Orclab 2026-09-19; BACKLOG
+    # #54). requirements.txt is deliberately not consulted: `-r` would be a different audit_cmd.
+    try:
+        data = tomllib.loads((pathlib.Path(root) / "pyproject.toml").read_text())
+    except (OSError, tomllib.TOMLDecodeError):
+        data = {}
+    return None if "project" in data else "nothing declared: pyproject.toml has no [project] table"
+
+
+def audit_unavailable(root):
+    return None if importlib.util.find_spec("pip_audit") else "pip-audit not installed"
+
+
+def audit_cmd(root):
+    # `.` audits the project's own declared dependencies (pyproject.toml), not whatever happens to
+    # be in the environment; README: "audit a local Python project at the given path".
+    return ["python3", "-m", "pip_audit", "-f", "json", "--progress-spinner", "off", "."]
+
+
+def _vulns_of(dep, seen):
+    for v in dep.get("vulns", []):
+        key = (dep["name"], dep["version"], v.get("id", "?"))
+        if key in seen:
+            continue
+        seen.add(key)
+        ids = ", ".join([v.get("id", "?")] + v.get("aliases", []))
+        fix = ", ".join(v.get("fix_versions", [])) or "none published"
+        yield f"{dep['name']} {dep['version']}: {ids} — fix {fix}"
+
+
+def audit_findings(stdout, returncode):
+    # Valid-but-wrong-shape JSON (a dependency missing name/version, a top-level int, a vulns
+    # entry that isn't a dict, ...) must land on the sentinel too, not crash the caller — "raises
+    # nothing" per the interface. seen/dedupe: pip-audit lists the same advisory twice for one
+    # package when it comes from more than one source (found in the real captured fixture); the
+    # ✗ N count is a count of distinct vulnerabilities, not of records.
+    try:
+        # runner.run merges stderr, and pip-audit prints its one-line summary there before the
+        # JSON ("No known vulnerabilities found" / "Found N known vulnerabilities in M packages",
+        # seen live 2026-09-19); read from the first `{`, the way csharp.py does.
+        data, _ = json.JSONDecoder().raw_decode(stdout, stdout.index("{"))
+        seen = set()
+        return [line for dep in data.get("dependencies", []) for line in _vulns_of(dep, seen)]
+    except (json.JSONDecodeError, KeyError, TypeError, AttributeError, ValueError):
+        return _UNREADABLE
+
+
 _IGNORE = "--ignore-glob=*mutants/*"        # root and nested: each suite's mutmut has its own mutants/
 _KILLED = {1, 3, 36, 24, -24, 152, 255}     # mutmut's status_by_exit_code: "killed" and "timeout"
 MUTMUT_DIFFS = pathlib.Path(__file__).parents[1] / "mutmut_diffs.py"

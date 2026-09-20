@@ -45,6 +45,19 @@ assertion-free test specifically; `run.py` runs it over the test path and keeps 
 whose file is a test file — a path component equal to `Tests`/`tests`/`Test`/`test`, or a
 filename ending in `Tests.swift`/`Test.swift`.
 
+## Audit
+None free. SwiftPM has no advisory check — checked 2026-09-19 against
+https://github.com/swiftlang/swift-package-manager (main at 39b373a; latest release
+swift-6.4.0-RELEASE, 2026-09-15): every `swift package` subcommand under
+`Sources/Commands/PackageCommands/` was listed, and the two that sound like it are not —
+`audit-binary-artifact` is *"Audit a static library binary artifact for undefined symbols"*, and
+`generate-sbom` writes a CycloneDX/SPDX bill of materials without checking it against anything.
+A code search for "advisory" and "vulnerabilit" across the repo hits only the SBOM schemas, the
+registry server specification (a "Scan for vulnerabilities" step a *registry* may run on
+publish) and a `PackageCollectionsModel.CVE` record that package collections may carry — nothing
+the package manager checks on the consumer's side. `/orc-test audit` prints
+`audit not available` with this sentence; the first tool that appears corrects it.
+
 ## Caveats
 - **Muter has two open bugs (muter#307, #310, 2026) where an SPM project always scores 0%.**
   Treat a 0% TCE score on an SPM package as this bug, not a real result, until a real run says

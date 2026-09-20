@@ -21,6 +21,11 @@ CAVEATS = [("Muter has two open bugs (muter#307, #310, 2026) where SPM projects 
            "Muter's per-mutant detail is not parsed yet — survivors are listed per file."]
 SANDBOX = {".build"}   # SPM build output
 
+AUDIT_TOOL = None
+AUDIT_NONE = ("SwiftPM has no advisory check — checked 2026-09-19 against swiftlang/swift-package-manager's "
+              "package subcommands (audit-binary-artifact checks undefined symbols, generate-sbom lists "
+              "packages without checking them) and Swift 6.4.0")
+
 
 def _xcodeproj(root):
     """First .xcodeproj bundle at root, one, or two directories down (skipping SKIP_DIRS)."""

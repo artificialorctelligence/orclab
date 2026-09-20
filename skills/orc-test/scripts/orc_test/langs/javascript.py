@@ -18,6 +18,46 @@ CAVEATS = [("Stryker's incremental file is reports/stryker-incremental.json; com
            "to .gitignore, either is fine, but do not delete it between runs.")]
 SANDBOX = {"reports", ".stryker-tmp"}   # legitimate even when committed, per the caveat above
 
+AUDIT_TOOL = ("npm", "install Node.js (https://nodejs.org) — npm ships with it")
+_UNREADABLE = ["audit output not understood — see above"]
+
+
+def audit_unavailable(root):
+    return None if shutil.which("npm") else "npm not installed"
+
+
+def audit_cmd(root):
+    # Reads package-lock.json ("npm requires a package-lock or shrinkwrap in order to run the
+    # audit"); without one npm prints an ENOLOCK error JSON, which lands on the sentinel.
+    return ["npm", "audit", "--json"]
+
+
+def _fix(v):
+    fix = v.get("fixAvailable")
+    if isinstance(fix, dict):
+        return f"{fix['name']} {fix['version']}"
+    return "npm audit fix" if fix else "none published"
+
+
+def audit_findings(stdout, returncode):
+    # npm keys `vulnerabilities` by package and gives the vulnerable `range`, not the installed
+    # version (languages/javascript.md). A `via` entry is an advisory dict, or a bare package name
+    # when the vulnerability is inherited from a dependency; both are named. Exit code is not
+    # consulted: npm's is tunable by --audit-level, the output is not.
+    try:
+        # runner.run merges stderr, and an .npmrc can make npm print a warning line there ahead
+        # of the JSON (e.g. "npm warn config shrinkwrap ...", seen live 2026-09-19) — read from
+        # the first `{`, the way python.py and csharp.py do.
+        data, _ = json.JSONDecoder().raw_decode(stdout, stdout.index("{"))
+        vulns = data["vulnerabilities"]
+        out = []
+        for name, v in vulns.items():
+            ids = [x["url"].rpartition("/")[2] if isinstance(x, dict) else f"via {x}" for x in v["via"]]
+            out.append(f"{name} {v['range']}: {', '.join(dict.fromkeys(ids))} — fix {_fix(v)}")
+        return out
+    except (json.JSONDecodeError, KeyError, TypeError, AttributeError, ValueError):
+        return _UNREADABLE
+
 
 def _deps(root):
     pkg = pathlib.Path(root) / "package.json"

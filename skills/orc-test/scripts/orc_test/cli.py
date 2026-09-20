@@ -16,7 +16,9 @@ _PYTEST_SUMMARY = re.compile(r"(\d+) passed|(\d+) failed|(\d+) error")
 # What every mutation tool may legitimately touch, whatever the language. A language module adds
 # its own leftovers via an optional top-level `SANDBOX: set[str]` (path prefixes), alongside the
 # other optional module members: `CAVEATS_FOR(root)`, `coverage_unavailable(root)`,
-# `mutation_cwd(root, target)`. Anything a tracked file gains outside the union of the two is the
+# `mutation_cwd(root, target)`, `audit_nothing(root)` (a reason the project declares nothing to
+# audit, e.g. a tool-only pyproject.toml — "not available", never red, checked before the tool
+# is; BACKLOG #54). Anything a tracked file gains outside the union of the two is the
 # suite writing to the real tree under a planted defect (test-discipline rule 4; BACKLOG #34).
 _SANDBOX = {".orclab"}
 
@@ -151,6 +153,40 @@ def cmd_coverage(args):
     return 1 if failed else 0
 
 
+def _audit_line(mod, d):
+    """One language's audit line (plus indented findings), and whether it failed the gate."""
+    if getattr(mod, "AUDIT_TOOL", None) is None:
+        return f"{mod.LABEL:<10} audit not available — {mod.AUDIT_NONE}", False
+    nothing = getattr(mod, "audit_nothing", lambda r: None)(d)
+    if nothing:   # before the tool check: never "install X" for a tool that will then refuse the project
+        return f"{mod.LABEL:<10} audit not available — {nothing}", False
+    why = mod.audit_unavailable(d)
+    if why:
+        tool, install = mod.AUDIT_TOOL
+        return f"{mod.LABEL}: missing {tool} — {install} — skipped", False
+    cp = run(mod.audit_cmd(d), cwd=d)
+    findings = mod.audit_findings(cp.stdout, cp.returncode)
+    if findings == ["audit output not understood — see above"]:
+        # Not a vulnerability count — an audit we could not read must not pass a push silently,
+        # so this fails the gate too, just not as "N vulnerable" (it is not a finding).
+        print(cp.stdout[-3000:])
+        return f"{mod.LABEL}: audit output not understood — see above", True
+    mark = "✗" if findings else "✓"
+    lines = [f"{mod.LABEL:<10} audit {mark} {len(findings)} vulnerable"] + [f"    {f}" for f in findings]
+    return "\n".join(lines), bool(findings)
+
+
+def cmd_audit(args):
+    _root, _cfg, usable = _resolve(args)
+    failed, blocks = False, []
+    for m, d, _target in usable:
+        block, bad = _audit_line(m, d)
+        failed |= bad
+        blocks.append(block)
+    print("\n" + "\n".join(blocks) if blocks else "nothing audited")
+    return 1 if failed else 0
+
+
 def _source_count(d, mod, target):
     base = pathlib.Path(d) / (target or ".")
     skip = detect.SKIP_DIRS | getattr(mod, "SKIP_DIRS", set())   # the language's own vendored dirs
@@ -271,7 +307,7 @@ def main(argv=None):
     p.set_defaults(fn=cmd_run, path=None, no_mutation=False)   # no subcommand means `run`
     sub = p.add_subparsers(dest="cmd")
     for name, fn in (("detect", cmd_detect), ("run", cmd_run), ("coverage", cmd_coverage),
-                     ("analyze", cmd_analyze)):
+                     ("audit", cmd_audit), ("analyze", cmd_analyze)):
         sp = sub.add_parser(name)
         sp.add_argument("path", nargs="?")
         sp.add_argument("--no-mutation", action="store_true")

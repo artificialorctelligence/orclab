@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "parameters": "--vulnerable --include-transitive",
+  "sources": [
+    "https://api.nuget.org/v3/index.json"
+  ],
+  "projects": [
+    {
+      "path": "/home/me/App/App.csproj",
+      "frameworks": [
+        {
+          "framework": "net8.0",
+          "topLevelPackages": [
+            {
+              "id": "A",
+              "requestedVersion": "[1.0.0,1.3.0]",
+              "resolvedVersion": "1.0.0",
+              "vulnerabilities": [
+                {
+                  "severity": "High",
+                  "advisoryurl": "https://github.com/advisories/GHSA-g8j6-m4p7-5rfq"
+                },
+                {
+                  "severity": "Moderate",
+                  "advisoryurl": "https://github.com/advisories/GHSA-v76m-f5cx-8rg4"
+                }
+              ]
+            }
+          ],
+          "transitivePackages": [
+            {
+              "id": "D",
+              "resolvedVersion": "1.1.0",
+              "vulnerabilities": [
+                {
+                  "severity": "Critical",
+                  "advisoryurl": "https://github.com/advisories/GHSA-5c66-x4wm-rjfx"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "framework": "net9.0",
+          "topLevelPackages": [
+            {
+              "id": "A",
+              "requestedVersion": "[1.0.0,1.3.0]",
+              "resolvedVersion": "1.0.0",
+              "vulnerabilities": [
+                {
+                  "severity": "High",
+                  "advisoryurl": "https://github.com/advisories/GHSA-g8j6-m4p7-5rfq"
+                },
+                {
+                  "severity": "Moderate",
+                  "advisoryurl": "https://github.com/advisories/GHSA-v76m-f5cx-8rg4"
+                }
+              ]
+            }
+          ],
+          "transitivePackages": [
+            {
+              "id": "D",
+              "resolvedVersion": "1.1.0",
+              "vulnerabilities": [
+                {
+                  "severity": "Critical",
+                  "advisoryurl": "https://github.com/advisories/GHSA-5c66-x4wm-rjfx"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
