@@ -1,0 +1,60 @@
+Infection 0.35.4 with PCOV 1.0.12 on PHP 8.5.10 and PHPUnit 13.3.4, captured 2026-09-20 from a
+real run inside the `v24check_orclab` image (Orclab's own `stack-php` sample: `src/Greeting.php`,
+one method with one ternary, tested; `src/GreetAction.php`, the Slim route handler, untested),
+not hand-built. The two tests were weakened on purpose first — `assertSame('Hello, world', …)`
+and `assertSame('Hello, Ada', …)` each replaced by `assertIsString(…)` — so that one mutant
+escapes; the tests were restored afterwards. From the sample's root:
+
+    podman compose run --rm -T --workdir "$PWD" orclab composer install
+    podman compose run --rm -T --workdir "$PWD" orclab vendor/bin/infection \
+        --no-interaction --no-progress --threads=max --with-uncovered
+    cp .orclab/test/php/infection.json <fixtures>/infection.json
+
+Exit code 0 (Infection exits 0 whatever the score unless `--min-msi` is given). **There is no
+`--logger-json` option** (Infection's command-line-options page, read 2026-09-20, lists
+`--logger-text`, `--logger-html`, `--logger-summary-json`, `--logger-github`, `--logger-gitlab`;
+`--logger-summary-json` holds only the `stats` block). The full log is written where the
+sample's `infection.json5` says — `"logs": {"json": ".orclab/test/php/infection.json"}` — and
+that is the file this fixture is.
+
+`--with-uncovered` is deliberate. Its page: *"Allow mutation of code not covered by tests"*, and
+of the old `--only-covered`: *"This option was removed in Infection 0.31.0, use --with-uncovered
+instead"* — so since 0.31 the **default mutates covered code only**: the same weakened run
+without the flag gave `totalMutantsCount: 2, msi: 50, uncovered: []`, never looking at
+`GreetAction.php`. Stryker's and PITest's parsers here count `NoCoverage` as alive ("no test
+reaches it"), so the flag is what makes PHP's number mean the same thing.
+
+Top-level shape, as seen — a **dict** with nine keys:
+`stats`, `escaped`, `timeouted`, `killed`, `killedByStaticAnalysis`, `errored`, `syntaxErrors`,
+`uncovered`, `ignored`. All but `stats` are lists of mutant entries.
+
+`stats` counters, by name and value in this capture: `totalMutantsCount` 10, `killedCount` 1,
+`killedByStaticAnalysisCount` 0, `notCoveredCount` 8, `escapedCount` 1, `errorCount` 0,
+`syntaxErrorCount` 0, `skippedCount` 0, `ignoredCount` 0, `timeOutCount` 0, `msi` 10,
+`mutationCodeCoverage` 20, `coveredCodeMsi` 50. `msi` counts uncovered mutants as not killed;
+`coveredCodeMsi` ignores them.
+
+Each mutant entry has three keys: `mutator`, `diff`, `processOutput` (the PHPUnit output for
+that mutant — a failure for a killed one, a pass for an escaped one, and the empty string for
+an uncovered one, which never ran). `mutator` is a dict of `mutatorName`,
+`originalSourceCode`, `mutatedSourceCode` (both whole files), `originalFilePath` (**absolute**,
+inside the container — the same path on the host under Orclab's `compose.yaml`) and
+`originalStartLine`. The one `escaped` entry, its long fields elided:
+
+    "mutator": {
+      "mutatorName": "Ternary",
+      "originalFilePath": "/tmp/claude-1000/-home-direflail-projects-orclab/160c7351-df67-4ae1-83ec-fec473ac6565/scratchpad/v24check/src/Greeting.php",
+      "originalStartLine": 11
+    },
+    "diff": "@@ @@\n {\n     public function greet(string $name): string\n     {\n-        return $name === '' ? 'Hello, world' : \"Hello, $name\";\n+        return $name === '' ? \"Hello, $name\" : 'Hello, world';\n     }\n }"
+
+The eight `uncovered` entries are all in `GreetAction.php` (`FalseValue`, `DecrementInteger`,
+`IncrementInteger`, `ArrayItemRemoval`, `Coalesce`, `Ternary`, `ArrayItemRemoval`,
+`MethodCallRemoval`); the one `killed` entry is `PublicVisibility` on `Greeting.php:9`.
+
+Two things the run taught that a parser should know. Infection's initial test run writes its
+own PHPUnit configuration and **fails on a risky test** — commenting an assertion out entirely
+(the plan's first idea) stopped the run with "Project tests must be in a passing state" and
+PHPUnit's `This test did not perform any assertions`, which is why the weakening above keeps an
+assertion. And this is a file Infection writes, not stdout: the console output (the banner, the
+`[notice]` lines, the `Metrics:` block) is stdout, which `run.py` merges with stderr at run time.

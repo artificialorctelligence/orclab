@@ -10,7 +10,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[3]
 SKILL = ROOT / "skills" / "security-discipline" / "SKILL.md"
 HEADING = "## Security — where security-discipline lands"
 SUBHEADINGS = ["### Static analysis", "### Dependency audit", "### Secrets", "### Reachable by strangers"]
-EXPECTED = {"stack-android-native", "stack-flutter", "stack-godot", "stack-ios-native", "stack-kotlin-multiplatform", "stack-python-desktop", "stack-react-native", "stack-unity", "stack-web"}   # every shipped stack skill; a new one is added here with its section
+EXPECTED = {"stack-android-native", "stack-flutter", "stack-godot", "stack-ios-native", "stack-kotlin-multiplatform", "stack-php", "stack-python-desktop", "stack-react-native", "stack-unity", "stack-web"}   # every shipped stack skill; a new one is added here with its section
 
 
 def _frontmatter():

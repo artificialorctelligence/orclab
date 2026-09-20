@@ -1,0 +1,35 @@
+Composer 2.10.3 on PHP 8.5.10, captured 2026-09-20 from a real run inside the `v24check_orclab`
+image against Orclab's own `stack-php` sample (Slim 4.15.3, slim/psr7 1.8.0, swagger-php 6.9.0,
+PHPUnit 13.3.4, Infection 0.35.4, PHPStan 2.2.14 — 75 packages in `composer.lock`), not
+hand-built. From the sample's root:
+
+    podman compose run --rm -T --workdir "$PWD" orclab composer install
+    podman compose run --rm -T --workdir "$PWD" orclab composer audit --format=json --locked \
+        > composer_audit_clean.json
+
+**Exit code 0** — Composer's CLI page (read 2026-09-20): `0 No issues; 1 Found packages
+matching dependency policies or failed due to missing required packages.` `--locked`: *"Audit
+packages from the lock file, regardless of what is currently in vendor dir"*, so it works
+before `composer install` and gives the same answer after it.
+
+Top-level shape, as seen: a **dict** with three keys, every one an **empty list**:
+
+    {
+        "advisories": [],
+        "abandoned": [],
+        "filter": []
+    }
+
+That is the trap this fixture exists for: with findings (`composer_audit.json`, captured the
+same day) `advisories` is a **dict keyed by package name** — PHP's `json_encode` turns an empty
+associative array into `[]`, not `{}`. A parser that does `for name, entries in
+advisories.items()` breaks on the clean project; check `if not advisories` first, or accept
+both. `filter` is not on the CLI page's description of the output; it was empty here and is
+recorded only because it is present.
+
+`>` captures stdout only, and the JSON above is all of stdout. On this project stderr was empty
+apart from podman-compose's own lines (`>>>> Executing external compose provider …`, `exit code:
+0`); on a project without a `version` in `composer.json` Composer adds `Composer could not detect
+the root package (…) version, defaulting to '1.0.0'` on stderr (seen on the vulnerable capture).
+`run.py` merges stderr into stdout at run time, so the parser must find the JSON among those
+lines rather than assume the whole capture is JSON.

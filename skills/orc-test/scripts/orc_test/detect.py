@@ -7,7 +7,7 @@ import re
 import shlex
 import subprocess
 
-SKIP_DIRS = {"node_modules", ".git", "venv", ".venv", "mutants", "build", "dist", "__pycache__"}
+SKIP_DIRS = {"node_modules", ".git", "venv", ".venv", "mutants", "build", "dist", "__pycache__", "vendor"}
 MAX_DEPTH = 2
 
 

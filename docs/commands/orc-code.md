@@ -39,9 +39,10 @@ answered:
 3. Which platforms — any combination of Linux, Windows, Mac, Android, iOS, web?
 4. Once it knows the type and platforms, it proposes a **stack** — the language and toolkit the
    project will actually be built with, for example "Python" or "Kotlin + Jetpack Compose" — and
-   asks whether that sounds right, or whether you'd rather pick something else. If nothing's been
-   worked out yet for the combination you picked, it says so plainly and asks what you want
-   instead of proposing something unproven.
+   asks whether that sounds right, or whether you'd rather pick something else. For a web app it
+   can also build the server side in PHP, for a host that serves PHP and nothing else. If
+   nothing's been worked out yet for the combination you picked, it says so plainly and asks what
+   you want instead of proposing something unproven.
 5. Whether anyone you didn't invite will be able to reach it — a public website or API, yes; an
    app that runs only on your own machine or phone, no. It guesses from the platforms you ticked
    and asks you to confirm, and the answer decides which security rules the new project is built

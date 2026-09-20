@@ -9,7 +9,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[3]
 HEADING = "## Containers"
 EXPECTED = {"stack-python-desktop", "stack-web",
             "stack-android-native", "stack-kotlin-multiplatform", "stack-flutter", "stack-react-native",
-            "stack-ios-native", "stack-godot", "stack-unity"}
+            "stack-ios-native", "stack-godot", "stack-unity", "stack-php"}
 
 
 @pytest.mark.parametrize("stack", sorted(EXPECTED))

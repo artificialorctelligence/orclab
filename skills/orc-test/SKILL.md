@@ -33,7 +33,7 @@ Typing `/orc-test` with no subcommand means `run`.
 By marker file, at the project root or up to two directories down: `pyproject.toml`/`setup.py`
 → Python; `package.json` → JavaScript/TypeScript; `pom.xml`/`build.gradle` → Java (Kotlin if
 `.kt` files exist); `*.csproj` → C#; `pubspec.yaml` → Dart; `Package.swift`/`*.xcodeproj` →
-Swift; `project.godot` → GDScript. Every hit runs, from the directory its marker was found in
+Swift; `project.godot` → GDScript; `composer.json` → PHP. Every hit runs, from the directory its marker was found in
 — a marker under `app/` means that language's tools run with `app/` as their working directory,
 and a `path` is made relative to it. The first line of every report is `detected: …`, naming
 that directory when it is not the root (`Dart (app/)`), so a wrong guess is visible. What each

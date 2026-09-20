@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1789936350">
+  <project timestamp="1789936350" name="Clover Coverage">
+    <package name="App">
+      <file name="/tmp/claude-1000/-home-direflail-projects-orclab/160c7351-df67-4ae1-83ec-fec473ac6565/scratchpad/v24check/src/GreetAction.php">
+        <class name="App\GreetAction" namespace="App">
+          <metrics complexity="2" methods="1" coveredmethods="0" conditionals="0" coveredconditionals="0" statements="4" coveredstatements="0" elements="5" coveredelements="0"/>
+        </class>
+        <line num="19" type="method" name="__invoke" visibility="public" complexity="2" crap="6" count="0"/>
+        <line num="21" type="stmt" count="0"/>
+        <line num="22" type="stmt" count="0"/>
+        <line num="23" type="stmt" count="0"/>
+        <line num="25" type="stmt" count="0"/>
+        <metrics loc="28" ncloc="28" classes="1" methods="1" coveredmethods="0" conditionals="0" coveredconditionals="0" statements="4" coveredstatements="0" elements="5" coveredelements="0"/>
+      </file>
+      <file name="/tmp/claude-1000/-home-direflail-projects-orclab/160c7351-df67-4ae1-83ec-fec473ac6565/scratchpad/v24check/src/Greeting.php">
+        <class name="App\Greeting" namespace="App">
+          <metrics complexity="2" methods="1" coveredmethods="1" conditionals="0" coveredconditionals="0" statements="1" coveredstatements="1" elements="2" coveredelements="2"/>
+        </class>
+        <line num="9" type="method" name="greet" visibility="public" complexity="2" crap="2" count="2"/>
+        <line num="11" type="stmt" count="2"/>
+        <metrics loc="14" ncloc="14" classes="1" methods="1" coveredmethods="1" conditionals="0" coveredconditionals="0" statements="1" coveredstatements="1" elements="2" coveredelements="2"/>
+      </file>
+    </package>
+    <metrics files="2" loc="42" ncloc="42" classes="2" methods="2" coveredmethods="1" conditionals="0" coveredconditionals="0" statements="5" coveredstatements="1" elements="7" coveredelements="2"/>
+  </project>
+</coverage>

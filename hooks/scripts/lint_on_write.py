@@ -13,7 +13,8 @@ only when both hold: the tool is on PATH, and the project has that tool's config
 between the written file and the repo root. No config, no run - a project that has not adopted
 the rules is not nagged about them, and this hook has no rules to contribute; they are all in
 the config. C# has no per-file linter that finishes in seconds (`dotnet build` is the analyzer),
-so `.cs` is left to the build.
+so `.cs` is left to the build. PHP's is PHPStan, run from the project's own `vendor/bin` when
+present, same as the JS linters run from `node_modules/.bin`.
 
 Contract: read the hook payload as JSON on stdin. Findings go to stderr with exit 2 - the one way
 a PostToolUse hook's output reaches Claude (the docs: "exit 2 instead so Claude sees the stderr
@@ -54,10 +55,12 @@ LINTERS = {
     ".swift": (".swiftlint.yml", "swiftlint", ["swiftlint", "lint", "--quiet"]),
     ".dart": ("analysis_options.yaml", "dart", ["dart", "analyze", "--fatal-infos"]),
     ".gd": ("project.godot", "gdlint", ["gdlint"]),
+    ".php": ("phpstan.neon", "phpstan", ["phpstan", "analyse", "--no-progress", "--error-format=raw"]),
 }
 # ESLint projects (Expo) instead of oxlint ones: same rules, different config file and binary
 ESLINT = ("eslint.config.js", "eslint", ["eslint"])
 NODE_BIN = "node_modules/.bin"
+VENDOR_BIN = "vendor/bin"   # Composer's, for .php
 
 # v23: a containerised project (compose.yaml with an `orclab` service at the git root) lints
 # through the container. A deliberate copy of skills/orc-test/scripts/orc_test/container.py's
@@ -132,12 +135,17 @@ def command_for(path):
     root = _config_dir(path, config, _ruff_section if ext == ".py" else lambda p: True)
     if root is None and ext == ".py":
         root = _config_dir(path, "ruff.toml")
+    if root is None and ext == ".php":
+        # PHPStan's own config-reference lookup order (phpstan.org/config-reference): phpstan.neon,
+        # then phpstan.neon.dist, then phpstan.dist.neon
+        dirs = (_config_dir(path, name) for name in ("phpstan.neon.dist", "phpstan.dist.neon"))
+        root = next((d for d in dirs if d is not None), None)
     if root is None and ext in (".ts", ".tsx", ".js", ".jsx"):
         config, tool, argv = ESLINT
         root = _config_dir(path, config)
     if root is None:
         return None
-    local = root / NODE_BIN / tool
+    local = root / (VENDOR_BIN if ext == ".php" else NODE_BIN) / tool
     if local.exists():
         argv = [str(local)] + argv[1:]
 
