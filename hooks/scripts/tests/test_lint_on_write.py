@@ -276,13 +276,13 @@ def test_container_false_with_yaml_boolean_spelling_and_a_comment_lints_on_the_h
 
 
 def test_runner_with_a_comment_is_honored_over_the_default_order(tmp_path, run):
-    """`runner: podman  # note` must win even with `docker` also on PATH - a missed comment strip
-    would silently fall back to the default RUNNERS order (docker first), the opposite of what
+    """`runner: docker  # note` must win even with `podman` also on PATH - a missed comment strip
+    would silently fall back to the default RUNNERS order (podman first), the opposite of what
     the user wrote."""
     src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
     (tmp_path / "compose.yaml").write_text(COMPOSE)
     (tmp_path / ".orclab").mkdir()
-    (tmp_path / ".orclab" / "test.yaml").write_text("runner: podman  # note\n")
+    (tmp_path / ".orclab" / "test.yaml").write_text("runner: docker  # note\n")
     f = src / "a.py"
     f.write_text("x = 1\n")
     bin_dir = tmp_path / "enginebin"
@@ -294,7 +294,23 @@ def test_runner_with_a_comment_is_honored_over_the_default_order(tmp_path, run):
     r = run(f, bin_dir=bin_dir)
     assert r.returncode == 2
     assert f"compose run --rm -T --workdir {tmp_path} orclab ruff check --no-fix" in r.stderr
-    assert "docker compose" not in r.stderr
+    assert "podman compose" not in r.stderr
+
+
+def test_the_engine_sees_pwd_as_the_git_root(tmp_path, run):
+    """compose.yaml's `${PWD}` is read from the environment; `cwd=` alone leaves the session's
+    PWD in place, which is wherever Claude's shell sits, not necessarily this project."""
+    src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
+    (tmp_path / "compose.yaml").write_text(COMPOSE)
+    f = src / "a.py"
+    f.write_text("x = 1\n")
+    bin_dir = tmp_path / "enginebin"
+    bin_dir.mkdir()
+    engine = bin_dir / "podman"      # python, not sh: a shell rewrites PWD to its real cwd on start
+    engine.write_text('#!/usr/bin/env python3\nimport os\nprint("pwd:", os.environ.get("PWD"))\nraise SystemExit(1)\n')
+    engine.chmod(engine.stat().st_mode | stat.S_IEXEC)
+    r = run(f, bin_dir=bin_dir, env_extra={"PWD": "/somewhere/else"})
+    assert r.returncode == 2 and f"pwd: {tmp_path}" in r.stderr
 
 
 def test_a_file_outside_any_git_repo_lints_on_the_host_as_before(tmp_path, run):

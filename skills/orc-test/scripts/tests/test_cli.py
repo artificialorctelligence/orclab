@@ -129,7 +129,7 @@ def test_runner_missing_skips_the_language_and_never_runs_on_the_host(tmp_path, 
     (git_only / "git").symlink_to(cli.shutil.which("git"))
     monkeypatch.setenv("PATH", str(git_only))
     code, out = run(["run"], repo, capsys)
-    assert code == 0 and "Python: container runner not found — install docker or podman — skipped" in out
+    assert code == 0 and "Python: container runner not found — install podman or docker — skipped" in out
     assert "$ python3 -m pytest" not in out
 
 

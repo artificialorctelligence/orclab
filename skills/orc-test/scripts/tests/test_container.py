@@ -30,11 +30,16 @@ def test_compose_without_orclab_service_is_not_the_record(tmp_path):
 
 def test_orclab_service_is_the_record_and_runner_is_the_first_on_path(tmp_path, monkeypatch):
     (tmp_path / "compose.yaml").write_text(COMPOSE)
-    monkeypatch.setenv("PATH", f"{fake_runner(tmp_path, 'podman')}:{os.environ['PATH']}")
-    monkeypatch.setattr(container, "RUNNERS", ("docker", "podman"))
     monkeypatch.setattr(container.shutil, "which", lambda n: str(tmp_path / "bin" / n) if n == "podman" else None)
     c = container.detect(tmp_path, {"container": True, "runner": None})
     assert c == container.Container(root=tmp_path, runner="podman")
+
+
+def test_podman_is_the_default_when_both_engines_are_installed(tmp_path, monkeypatch):
+    """The order SKILL.md's Containers section settles (2026-09-20): podman first."""
+    (tmp_path / "compose.yaml").write_text(COMPOSE)
+    monkeypatch.setattr(container.shutil, "which", lambda n: f"/usr/bin/{n}")
+    assert container.detect(tmp_path, {"container": True, "runner": None}).runner == "podman"
 
 
 def test_runner_override_wins_even_when_absent_from_path(tmp_path, monkeypatch):
@@ -73,6 +78,22 @@ def test_run_prefixes_when_a_container_is_active(tmp_path, monkeypatch, capsys):
     cp = runner.run(["python3", "-c", "print(1)"], cwd=tmp_path / "sub")
     assert cp.stdout.strip() == f"argv: compose run --rm -T --workdir {tmp_path / 'sub'} orclab python3 -c print(1)"
     assert capsys.readouterr().out.startswith("$ docker compose run --rm -T --workdir")
+
+
+def test_run_sets_pwd_to_the_root_for_compose_interpolation(tmp_path, monkeypatch):
+    """compose.yaml's `${PWD}` comes from the environment, and `cwd=` does not rewrite the
+    inherited PWD - under `--cwd <project>` it would be the shell's directory, not the project."""
+    seen = {}
+    monkeypatch.setattr(runner.subprocess, "run", lambda cmd, **kw: seen.update(kw) or None)
+    monkeypatch.setenv("PWD", "/somewhere/else")
+    runner.use(container.Container(root=tmp_path, runner="podman"))
+    runner.run(["pytest"], cwd=tmp_path / "sub")
+    assert seen["env"]["PWD"] == str(tmp_path) and seen["cwd"] == str(tmp_path)
+    runner.run_on_host(container.build_cmd(runner.active()), cwd=tmp_path)   # build interpolates too
+    assert seen["env"]["PWD"] == str(tmp_path)
+    runner.use(None)
+    runner.run(["pytest"], cwd=tmp_path)
+    assert seen["env"] is None
 
 
 def test_run_is_unchanged_without_a_container(tmp_path, capsys):

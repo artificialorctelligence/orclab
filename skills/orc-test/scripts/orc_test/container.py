@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 import yaml
 
-RUNNERS = ("docker", "podman")     # default order when .orclab/test.yaml names none; Task 4's research may reorder
+RUNNERS = ("podman", "docker")     # default order when .orclab/test.yaml names none — SKILL.md "Containers" says why
 SERVICE = "orclab"
 
 

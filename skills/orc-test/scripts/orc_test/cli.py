@@ -56,7 +56,7 @@ def _resolve(args):
     print("detected: " + (", ".join(_name(m, d, root) + suffix for m, d in found) or "no supported language"))
     if c and c.runner is None:
         for m, _d in found:
-            print(f"{m.LABEL}: container runner not found — install docker or podman — skipped")
+            print(f"{m.LABEL}: container runner not found — install podman or docker — skipped")
         return root, cfg, []
     if c and found:
         cp = runner.run_on_host(container.build_cmd(c), cwd=root)   # the engine itself is a host command

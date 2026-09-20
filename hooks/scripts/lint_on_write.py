@@ -64,7 +64,7 @@ NODE_BIN = "node_modules/.bin"
 # detection, by the rule in orclab_shared.py's docstring; no PyYAML here, a regex is enough for
 # the one shape Orclab itself writes.
 SERVICE_RE = re.compile(r"^services:\s*$(?:\n(?!\S).*)*?^  orclab:\s*$", re.MULTILINE)
-RUNNERS = ("docker", "podman")
+RUNNERS = ("podman", "docker")     # the order skills/orc-test/SKILL.md "Containers" settles
 # PyYAML's boolean spellings for false that skills/orc-test/scripts/orc_test/config.py's real
 # `yaml.safe_load` would also accept here (`data.get("container", True) is not False`)
 FALSE_WORDS = ("false", "no", "off")
@@ -169,7 +169,9 @@ def main():
         if found is None:
             return 0
         root, argv, header = found
-        cp = subprocess.run(argv, check=False, cwd=root, capture_output=True, text=True, timeout=TIMEOUT)
+        # compose.yaml's `${PWD}` is read from the environment, which `cwd=` does not rewrite
+        env = {**os.environ, "PWD": str(root)}
+        cp = subprocess.run(argv, check=False, cwd=root, env=env, capture_output=True, text=True, timeout=TIMEOUT)
         if cp.returncode == 0:
             return 0
         lines = (cp.stdout + cp.stderr).strip().splitlines()

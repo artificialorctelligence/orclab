@@ -51,10 +51,101 @@ languages:
     test: make check
 ```
 
+## Containers
+
+A project can run its whole toolchain in a container instead of on this machine (v23). The
+record is a `compose.yaml` at the project root with a service named `orclab` — committed, so a
+clone keeps it — whose Dockerfile installs the language's toolchain *and* every tool this
+command needs, so a run inside never installs anything. Inside, the project is mounted at its
+own host path, so every path in every report is valid on both sides:
+
+```yaml
+services:
+  orclab:
+    build: .
+    volumes:
+      - .:${PWD}
+    working_dir: ${PWD}
+```
+
+Every command runs as `<engine> compose run --rm -T --workdir <dir> orclab <cmd>`, after one
+`<engine> compose build orclab`; the first line of the report says
+`detected: Python (in container)`. `${PWD}` is filled in from the environment of the process
+that calls the engine — Compose: *"You can use existing environment variables from your host
+machine or from the shell environment where you execute docker compose commands"* — so `run.py`
+sets `PWD` to the project root before every call (a child's `cwd` does not rewrite the `PWD` it
+inherited; under `--cwd` that would be the wrong directory). Running `compose` by hand, do it
+from the project root.
+Nothing else in the file is engine-specific: `.:${PWD}` is the short volume syntax (*"a host
+path on the platform hosting containers (bind mount)"*, *"the relative path is resolved from
+the Compose file's parent directory"*) and `working_dir` *"overrides the container's working
+directory which is specified by the image"* — both confirmed live 2026-09-20 on the Compose
+services reference.
+
+**The engine — confirmed live 2026-09-20.** Podman is the default, Docker Engine the alternative;
+with both installed Podman is used. The reason, in one sentence: Podman runs as your own user with
+nothing to join — a file it writes into the project *"is actually owned by your user on the
+host"* — while Docker Engine's daemon runs as root, and the `docker` group that lets you use it
+without `sudo` *"grants root-level privileges to the user"* — and, the daemon writing as root,
+the files a run leaves in the tree (`.orclab/test/`, `mutants/`) come out root-owned unless the
+image sets a user (inference from those two pages, not yet seen on this machine). Neither is
+free of a second package: on Ubuntu-derived Mint, `compose` is a separate apt package for both.
+
+- **Podman** — `sudo apt install podman podman-compose` (Mint 22.3's apt: `podman` 4.9.3,
+  `podman-compose` 1.0.6; podman.io's install page says Mint follows the Ubuntu steps, which are
+  `sudo apt-get -y install podman`). `podman compose` is *"a thin wrapper around an external
+  compose provider such as docker-compose or podman-compose"* — it runs one or the other and
+  points it at Podman; with neither installed it fails with *"looking up compose provider
+  failed"*. Rootless is the default: it needs a range in `/etc/subuid` and `/etc/subgid` for
+  your user (`grep $USER /etc/subuid` shows it; this machine already had one before either
+  engine was installed), and nothing to join or start. `podman-compose` 1.0.6's source, read
+  for the four facts the code depends on: `run` accepts `--rm`, `-T` and `--workdir`, always
+  attaches stdin (`-i`), fills `${PWD}` from the environment, and does **not** build a missing
+  image — which is why the command runs `compose build` first.
+- **Docker Engine** — `sudo apt install docker.io docker-compose-v2` (Mint's apt: 29.1.3 and
+  2.40.3; `docker.io` only *suggests* the compose plugin, so name both), then
+  `sudo usermod -aG docker $USER` and log out and in. Docker's own repository is the other route
+  (`docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin`), with the
+  page's note that Mint is *"not officially supported (though it may work)"*. Rootless Docker
+  exists (`dockerd-rootless-setuptool.sh install`, from `docker-ce-rootless-extras`, needing
+  `uidmap`) but is a separate setup, not the default. `docker compose run`'s reference:
+  `--rm` *"Automatically remove the container when it exits"*, `-T` *"Disable pseudo-TTY
+  allocation"*, `-w, --workdir` *"Working directory inside the container"*, `-i` default `true`
+  *"Keep STDIN open even if not attached"* (the mutation step feeds stdin). It does not say
+  `run` builds a missing image — only `--build` *"Build image before starting container"* — so
+  the explicit `compose build` covers Docker too. Docker Engine's licence is unchanged by the
+  Desktop terms — *"The licensing and distribution terms for Docker and Moby open-source
+  projects, such as Docker Engine, aren't changing"* — and Docker Desktop is not needed on Linux.
+
+`.orclab/test.yaml` overrides per checkout: `container: false` runs on the host here even though
+the repo is containerised; `runner: docker` (or `podman`) names the engine. Nothing is ever
+silently run on the host instead: no engine on PATH prints
+`<Language>: container runner not found — install podman or docker — skipped`; an image that
+does not build prints its output and `container build failed — see above`, exit 1 —
+never the host. The engine is a tool like any other: this command never installs it.
+
+Sources: https://docs.docker.com/reference/cli/docker/compose/run/ ·
+https://docs.docker.com/reference/compose-file/interpolation/ ·
+https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/ ·
+https://docs.docker.com/reference/compose-file/services/ ·
+https://docs.docker.com/reference/compose-file/build/ ·
+https://docs.docker.com/engine/install/ubuntu/ ·
+https://docs.docker.com/engine/install/linux-postinstall/ ·
+https://docs.docker.com/engine/security/rootless/ ·
+https://docs.docker.com/subscription/desktop-license/ ·
+https://podman.io/docs/installation ·
+https://docs.podman.io/en/latest/markdown/podman-compose.1.html ·
+https://github.com/containers/podman/blob/v4.9.3/cmd/podman/compose.go ·
+https://github.com/containers/common/blob/v0.57.0/pkg/config/default.go ·
+https://github.com/containers/podman-compose/blob/v1.0.6/podman_compose.py ·
+https://github.com/containers/podman/blob/main/docs/tutorials/rootless_tutorial.md ·
+https://packages.ubuntu.com/noble-updates/amd64/docker-compose-v2/filelist ·
+`apt-cache policy` / `apt-cache depends` on Mint 22.3, 2026-09-20.
+
 ## What it never does
 
-Install a tool (it names the missing one and its install line, and skips that language). Run
-git. Guess a language it cannot see a marker for.
+Install a tool — the container engine included — (it names the missing one and its install line,
+and skips that language). Run git. Guess a language it cannot see a marker for.
 
 ## `run` — does the code work?
 
