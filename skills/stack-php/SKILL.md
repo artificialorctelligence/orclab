@@ -12,6 +12,15 @@ so "not run here" appears only in `## Deployment`.
 
 **Checked against live sources on 2026-09-20**; anything older than one release is suspect — re-check `## Sources`.
 
+## When this is the stack
+
+A web back end written in PHP — an API alone, an API behind a React front end from `stack-web`,
+or a program that serves HTML pages itself. The concern that picks it over the row's default
+(`stack-web`'s FastAPI back end in Python) is the host: it serves PHP and nothing else — shared
+hosting, Apache or PHP-FPM pointed at one directory, no process of the project's own to keep
+running — which is DreamHost, the case that opened this stack. When there is a front end it is
+`stack-web`'s React and Vite, unchanged; only the half that answers requests is this skill's.
+
 ## Toolchain, as of 2026-09-20
 
 Every version here is what the tool itself printed inside the image on 2026-09-20 — `php -v`,
@@ -116,6 +125,48 @@ development … It should not be used on a public network"*, so production is Ap
 and without a router the `.htaccess`, the request parsing and the JSON headers are written by
 hand — the parts Slim's three lines are.
 
+## Project layout — where things live
+
+One repository, one Composer project; `public/` is the only directory the web server is pointed
+at, and everything else sits beside it where a browser cannot reach it. The paths are the sample
+project's (`## Build, run, test`, run 2026-09-20), which follow Slim's own deployment page —
+*"create a .htaccess file in your web server root directory (usually named htdocs, public,
+public_html or www)"* — and Composer's PSR-4 autoloading.
+
+| Path | What |
+|---|---|
+| `composer.json` | The project: its name, its dependencies, `autoload` (`"App\\": "src/"`) and `autoload-dev` (`"Tests\\": "tests/"`), and its `version` key — which `/orc-version` does not yet write (BACKLOG #6; `versionfiles.py`'s `KNOWN_FORMATS` has no entry for it), so it is bumped by hand until it does. Without the key, Composer prints *"could not detect the root package … version, defaulting to '1.0.0'"* (seen 2026-09-20 on `composer audit`). |
+| `composer.lock` | Committed. The exact versions `composer install` gives every machine, and what `composer audit --locked` reads — it works before `vendor/` exists. |
+| `public/index.php` | The document root, and the only file in it: builds the Slim app, adds the routing and error middleware, declares each route as `$app->get('/greet', GreetAction::class)`, and runs it. The host serves `public/` and nothing above it. |
+| `src/` | The `App\` namespace: one invokable class per route (`GreetAction.php`, carrying the OpenAPI attributes) and the classes it calls (`Greeting.php`). |
+| `tests/` | PHPUnit, `Tests\` namespace, `*Test.php`. |
+| `phpunit.xml` | PHPUnit's configuration: `bootstrap`, the `<source>` directory coverage counts, `cacheDirectory` (`.phpunit.cache/`, git-ignored). |
+| `infection.json5` | Infection's: `source.directories`, `logs.json` (where the mutation log lands — `.orclab/test/php/infection.json` in Orclab's layout). |
+| `phpstan.neon` | PHPStan's `level` and `paths` (`## Lint` below). |
+| `vendor/` | Git-ignored; written by `composer install`, and where every tool's executable lives (`vendor/bin/…`). |
+| `openapi.yaml` | **The contract** — see below. |
+
+**The contract.** `vendor/bin/openapi src -o openapi.yaml` reads the attributes on the classes in
+`src/` — `#[OA\Get(path: '/greet')]`, its `#[OA\Parameter]`s, its `#[OA\Response]` — and writes
+one file that describes every route the API has: its path, what it takes, what it answers with.
+That file is what another project's client is written against. A phone app that calls this API
+either hand-writes its calls by reading `openapi.yaml`, or feeds it to a generator that writes
+the calling code in the app's own language; either way the app's idea of the API *is* this file,
+and a change to a route that changes this file is the change that breaks that app — not the PHP
+behind it. So the file is committed, regenerated whenever a route or an attribute changes, and
+named in the project's README as the place a consuming project looks (BACKLOG #65, which holds
+whether Orclab ever records more than that sentence). The command's default output is YAML; the
+extension of the `-o` name picks the format (*"the tool will use the file extension to determine
+the format"*), so `openapi.json` is the same document if a generator wants JSON.
+
+**With a `stack-web` front end:** the Vite project sits in `web/` at the repository root, exactly
+as `stack-web`'s Layout places it, and `vite build` writes `web/dist`. In production `public/`
+serves that build — the static files are copied (or symlinked) into `public/` so the host's
+Apache serves them directly, with the API's routes under a prefix such as `/api` that the
+`.htaccess` rewrite sends to `index.php`; the front end calls the API at its own origin. Which of
+copy or symlink, and the exact rewrite, is the first project's to record — none has run
+(`## Deployment`).
+
 ## Build, run, test
 
 Every line below was run on 2026-09-20 inside the container, from the project root, as
@@ -153,7 +204,7 @@ to stdout: `advisories` is a dict keyed by package name when there are findings 
 list when there are none. `phpstan … --error-format=raw` prints one `path:line:message` per
 finding to stdout and exits 1; nothing but a `Note: Using configuration file …` line on stderr
 when clean, exit 0. The dev server answered `GET /greet?name=Ada` with `{"greeting":"Hello,
-Ada"}` from inside the container — but see `## Containers` for why a browser on the host cannot
+Ada"}` from inside the container — but see the Containers section for why a browser on the host cannot
 reach it.
 
 Three things the run taught about the tests themselves. PHPUnit marks a test with no
@@ -166,9 +217,10 @@ pcov.directory=<src>` itself. Third, `composer.lock` should be committed: `compo
 --locked` reads it, and `composer install` from it gives every machine the same `vendor/`;
 `vendor/`, `.orclab/` and `.phpunit.cache/` are git-ignored.
 
-Coverage, mutation and audit through `/orc-test`: not yet — this section records the commands
-that ran; `skills/orc-test/languages/php.md` and the `php.py` language module are v24's next
-tasks, and until they land `/orc-test` does not know PHP exists.
+Coverage, mutation and audit through `/orc-test`: yes, since 2026-09-20 — a project with a
+`composer.json` is detected as PHP, and `skills/orc-test/scripts/orc_test/langs/php.py` runs the
+`phpunit`, `infection --with-uncovered` and `composer audit --format=json --locked` lines above
+(`skills/orc-test/languages/php.md` is the record, with what each run printed).
 
 ## Lint — where code-discipline lands
 
@@ -235,6 +287,132 @@ PHPStan's own lookup order — and when one is found, runs the project's own `ve
 (falling back to `phpstan` on PATH) as `analyse --no-progress --error-format=raw` on every `.php`
 file Claude writes, through the container when the project has one.
 
+## Security — where security-discipline lands
+
+`security-discipline`'s rules for this stack, confirmed live 2026-09-20;
+no project has been through this yet — the sample the tools ran on is not a project — and the
+first one corrects it. This stack is the *Reachable by strangers* tier by definition — a PHP
+back end is at a URL, and on shared hosting it is at a URL from the moment it is uploaded — so
+all nine rules apply.
+The sample's `public/index.php` already carries the one line this section's rule 7 asks for,
+`$app->addErrorMiddleware(false, true, true)`; everything else below is what the first project
+adds.
+
+### Static analysis
+
+PHPStan at `level: max` (`## Lint`) is a type checker, and its ten levels contain no security
+rule: the rule-levels page has no "secret", "injection" or "SQL" (searched 2026-09-20), so
+neither rule 1's hardcoded-secret check nor rule 5's string-built-SQL check is linted in this
+stack — both are reviewed. `phpstan/phpstan-strict-rules` 2.0.12 (not in the sample's
+`composer.json`; `composer require --dev phpstan/phpstan-strict-rules`, and with
+`phpstan/extension-installer` *"you're all set"*) adds two rules that touch security by the way
+PHP is: `disallowedBacktick` — *"Disallow usage of backtick operator (`` $ls = `ls -la` ``)"*,
+PHP's shortest way to run a shell command, the OS-command half of rule 5 — and
+`disallowedLooseComparison` — *"Disallow loose comparison via `==` and `!=`"*, which is how a
+token or a hash gets compared to something it does not equal (PHP's loose rules are what
+`declare(strict_types=1)` in `## Lint` refuses at the type level). The SQL half of rule 5 is a
+convention the review holds: every query is a PDO prepared statement with the values bound —
+php.net: *"If an application exclusively uses prepared statements, the developer can be sure
+that no SQL injection will occur (however, if other portions of the query are being built up
+with unescaped input, SQL injection is still possible)"* — and a query with a `.` or an
+interpolated `$` in its string is a finding.
+
+### Dependency audit
+
+`composer audit --format=json --locked`, exit 0 when clean and 1 with findings — Composer's CLI
+page: *"0 No issues; 1 Found packages matching dependency policies or failed due to missing
+required packages"*. Both were run on 2026-09-20 in the image: the sample's own 75-package
+`composer.lock` — `{"advisories": [], "abandoned": [], "filter": []}`, **exit 0** — and a
+throw-away lock holding `guzzlehttp/guzzle` 7.4.0 — fourteen advisories under
+`advisories["guzzlehttp/guzzle"]`, **exit 1**, and reachable only through `composer update
+--no-blocking`, because Composer 2.10 refuses to lock an advised version at all (`Containers`
+below). Both captures are `skills/orc-test/scripts/tests/fixtures/composer_audit*.json`
+with their READMEs. **`/orc-test audit` runs it** for any project with a `composer.json`:
+`skills/orc-test/scripts/orc_test/langs/php.py` returns `["composer", "audit", "--format=json",
+"--locked"]` as the audit command, and `skills/orc-test/languages/php.md`'s `## Audit` records
+the two JSON shapes it parses. Composer ships inside the official `composer` image the
+`Dockerfile` copies from (rule 2: nothing to install).
+
+### Secrets
+
+Every secret — a database password, an API key for a service the back end calls, the JWT
+signing key, Web Push's VAPID private key — is an environment variable or a line in a `.env`
+file that lives **above `public/`**, beside `composer.json`, where the web server cannot serve
+it; it is read with `getenv()` — *"Gets the value of a single or all environment variables"*
+(php.net, confirmed live 2026-09-20) — or through `vlucas/phpdotenv` 5.7.0 (2026-08-24,
+BSD-3-Clause; Packagist: *"Loads environment variables from `.env` to `$_ENV` and `$_SERVER`
+automagically, and optionally to `getenv()`"*), which is how a shared host with no way to set
+process environment gets one. `.env` is in `.gitignore` before it exists; the sample's
+`.gitignore` (`vendor/`, `.orclab/`, `.phpunit.cache/`) gets the line the day the first secret
+does. Never in `composer.json` — it is committed and, as `## Deployment` will find, uploaded.
+Never in `public/`: a `.env` there is one URL away from everyone. Slim's own Doctrine cookbook
+puts database credentials in a `settings.php` array; that file is fine as the *reader* of the
+environment, not as the holder of the values. The `.git` directory is not uploaded either
+(rule 1's ASVS 13.4.1 line): the deployed unit is `public/`, `src/`, `vendor/` and the
+`.env`, not the repository.
+
+### Reachable by strangers
+
+What the framework gives for each exposed-tier rule, from Slim's own pages (confirmed live
+2026-09-20) — and where it gives nothing, the package or the host that does:
+
+- **Auth (rule 6):** Slim ships no authentication; its packaged middleware is *"routing, error
+  handling, method overriding, output buffering, body parsing, and content length"* (its docs
+  index, 2026-09-20). The JWT middleware for it is `jimtools/jwt-auth` 3.0.1 (2026-03-17, MIT,
+  PHP 8.2–8.5) — *"a PSR-15 compliant JSON Web Token authentication middleware, which take a
+  JWT from the headers or cookies"*; the successor Packagist names for the abandoned
+  `tuupola/slim-jwt-auth` — over `firebase/php-jwt` 7.1.1 (2026-09-14). *"If a token is not
+  found or there is an error when validating and decoding it, the server will respond with
+  `401 Unauthorized`"*; its `isSecure` option *"enforces all requests to be HTTPS"* (default
+  true, with `relaxed` defaulting to `localhost`, `127.0.0.1`, `::1`). **The public/private
+  split** is Slim's route-group middleware: *"`$app->group('/path', function
+  (RouteCollectorProxy $group) { … })->add(new ExampleMiddleware())`"* — private routes live in
+  the group that carries the JWT middleware and are authenticated by being there; a public
+  route lives outside it. The token-issuing route (`/token`, a password checked against a
+  stored hash) is public by living outside. The ownership check inside a handler is reviewed,
+  not scaffolded.
+- **Input (rule 5):** Slim validates nothing. `getQueryParams()` *"retrieves all query
+  parameters from the URI of an HTTP request as an associative array"*, `getParsedBody()`
+  gives the body *"in native PHP format"* once `addBodyParsingMiddleware()` has parsed the
+  JSON, and the request page says nothing about validation (checked 2026-09-20). So the door
+  is the handler's first lines, and the sample already shows the shape: `$name =
+  $request->getQueryParams()['name'] ?? ''` then `is_string($name) ? $name : ''` — every
+  value read from the request is type-checked and bounded before it is used, and a body is
+  read into a typed object, never passed on as the array it arrived as. Then PDO prepared
+  statements for the database (above). The OpenAPI attributes describe the input; they do not
+  enforce it — swagger-php generates a document, not a validator.
+- **Errors (rule 7):** `$app->addErrorMiddleware($displayErrorDetails, $logErrors,
+  $logErrorDetails)` — Slim's page on the first argument: *"Should be set to false in
+  production"*; the sample passes `false, true, true`, so the caller gets Slim's generic
+  response (rendered by content type — *"will call the appropriate ErrorRenderer for the
+  supported content types"*: JSON for a JSON client) and the log gets the detail. Underneath
+  Slim, PHP itself: `display_errors` *"determines whether errors should be printed to the
+  screen as part of the output"*, its bundled *"php.ini-production sets it to Off"*, and the
+  manual's note is *"This is a feature to support your development and should never be used on
+  production systems"*; `log_errors` on, *"You're strongly advised to use error logging in
+  place of error displaying on production web sites"* (php.net, confirmed live 2026-09-20). On
+  DreamHost that is a `phprc` file — its php.ini page: *"A php.ini (phprc) file lets you
+  override DreamHost's default PHP settings"* — with `display_errors = Off` and `log_errors =
+  On`; what the host's default is was not checked.
+- **Transport (rule 8):** the host's. DreamHost's HTTPS page: *"When you add an SSL certificate
+  to your website in the panel, DreamHost automatically redirects the URL visitors use to view
+  your site from HTTP to HTTPS"*, with an `.htaccess` for *"the rare cases where DreamHost's
+  automatic panel redirect doesn't cover your site's setup"* (confirmed live 2026-09-20). The
+  page does not mention HSTS (checked); the header is one `.htaccess` line the first project
+  writes and records. In the app, `jwt-auth`'s `isSecure` (above) refuses a token over plain
+  HTTP as a second lock.
+- **Rate limits (rule 9):** Slim has none and names none. `symfony/rate-limiter` v8.1.6
+  (2026-08-07, MIT, PHP ≥ 8.4.1) is the PHP component — *"A 'rate limiter' controls how
+  frequently some event (e.g. an HTTP request or a login attempt) is allowed to happen"* — but
+  its page documents it inside a Symfony app (a `framework.rate_limiter` config block, state in
+  *"the `cache.rate_limiter` cache pool"*), and its own warning is *"By definition, the Symfony
+  rate limiters require Symfony to be booted in a PHP process. This makes them not useful to
+  protect against DoS attacks"* — for that it names *"Apache mod_ratelimit"*, which on shared hosting is the
+  host's to have or not (DreamHost: not checked). Using the component standalone in Slim, with
+  a storage every request shares, was not checked here; the limiter on `/token` that rule 9
+  says is never optional is the first project's to build and record, and until it does this is
+  the one exposed-tier rule this stack does not yet answer.
+
 ## Containers
 
 Runs in a container: **yes** — run here 2026-09-20. Every command in `## Build, run, test`
@@ -250,7 +428,7 @@ RUN apt-get update && apt-get install -y unzip
 RUN pecl install pcov-1.0.12 && docker-php-ext-enable pcov
 ```
 
-Line by line, and where each came from. `FROM php:8.5-cli` — the official `php` image's tag
+Line by line, and where each came from (every page confirmed live 2026-09-20). `FROM php:8.5-cli` — the official `php` image's tag
 list; its README says the `-cli` variant *"contains the PHP CLI tool with default mods"*, which
 is all a development container runs. `COPY --from=docker.io/library/composer:2 …` — the
 `composer` image README's own multi-stage line is `COPY --from=composer /usr/bin/composer
@@ -317,6 +495,61 @@ during a composer update/require/delete commands"*), so the vulnerable fixture n
 `originalFilePath` are absolute container paths, which under Orclab's `compose.yaml` are the
 same paths on the host.
 
+## Presence
+
+A back end has no screen; it reaches a person through whatever is in front of them. With a
+`stack-web` front end that is the browser's push subscription, as `stack-web`'s `## Presence`
+describes it — the page registers a service worker, the browser hands it a `PushSubscription`,
+and *this* side stores it and sends to it. The PHP side of Web Push is `minishlink/web-push`
+v11.0.0 (2026-07-23, MIT; Packagist, confirmed live 2026-09-20): *"Web Push library for PHP"*,
+`composer require minishlink/web-push`, `$webPush->sendOneNotification($subscription,
+$payload)`, with VAPID keys (*"These keys must be safely stored and should not change"*) — the
+private key is a secret (`### Secrets`). Its README requires *"PHP 8.2+"* and the `mbstring`,
+`curl` and `openssl` extensions, *"bcmath and/or gmp (optional but better for performance)"*;
+whether the `php:8.5-cli` image or the host ships each was not checked. Without a front end, the
+reach is email, which is the host's mail setup and not this skill's. A PHP process on shared
+hosting runs only while a request is being answered, so anything that must happen *later* — a
+scheduled push — is the host's cron calling a PHP script (DreamHost's cron: not checked), not a
+worker the app keeps alive.
+
+## Storage
+
+Storage is what the app keeps on the server. **PDO** is PHP's own database layer, with prepared
+statements — *"the only feature that PDO will emulate for drivers that don't support them. This
+ensures that an application will be able to use the same data access paradigm regardless of the
+capabilities of the database"* (php.net, confirmed live 2026-09-20) — so the database is a DSN
+string and the code is the same. **SQLite** (`pdo_sqlite`, a file beside `composer.json`, above
+`public/`) is right for one host serving one site, and needs nothing from the host but the
+`pdo_sqlite` driver (whether DreamHost's PHP has it: not checked). **MySQL or MariaDB**
+(`pdo_mysql`) where the host provides it — DreamHost does: *"You can create a MySQL
+database from the DreamHost panel"*, one hostname and *"a MySQL user for each database so that
+any compromised site or credentials cannot be used to access your other databases"*, and on its
+shared servers `CREATE DATABASE`, `GRANT` and `REVOKE` *"are not available for scripting"* —
+*"Their functionality is available instead through the DreamHost control panel"* — and a
+database *"is created using character set utf8mb3"* (help.dreamhost.com, confirmed live
+2026-09-20; the MySQL version it runs was not on either page). Slim itself recommends no
+database: its one storage page is the Doctrine cookbook, `composer require doctrine/orm:^3.0
+doctrine/dbal:^4.0 symfony/cache` with `'driver' => 'pdo_mysql'` in a settings array — an ORM
+the v24 decision deliberately did not put before the first JSON route (`## The stack decision`).
+Concern that picks MySQL over SQLite: the host's MySQL is on another machine, and more than one
+process writes at once. External databases are out of scope.
+
+## Deployment
+
+**Shared-hosting publishing is not yet written.** BACKLOG #64 holds it, and it is written from
+the first real deployment, not before one — no `orc-package` ingredient exists for this row, and
+nothing in this section has been run. What #64 knows, confirmed live 2026-09-19 and not since:
+DreamHost's PHP-version page lists 8.5, 8.4, 8.3 and 8.2 as selectable per domain; DreamHost's
+own page has the Composer install steps for a shared account; orcshot.org is set to 8.5. What
+Slim's deployment page says the shape is (`## The stack decision`): an `.htaccess` in the web
+root rewriting to `public/`, and *"upload all the files that make up your Slim project to the
+webserver. As you are on shared hosting, this is probably done via FTP"*. Nothing about what is
+uploaded, how, whether `composer install` runs on the host or `vendor/` is uploaded, where
+`.env` goes, or what a first deploy actually takes has been run; the first project records those
+in its own `RELEASING.md` through `release-checklist`, and #64 becomes an ingredient from those
+lines. The container in `## Containers` is the development environment, not what ships; what
+ships is the host's own PHP.
+
 ## Sources (live on 2026-09-20)
 
 - Runtime: `https://www.php.net/supported-versions.php` (8.5's row: 20 Nov 2025, active until 31 Dec 2027, security until 31 Dec 2029; the "active support" definition); `https://raw.githubusercontent.com/docker-library/docs/master/php/README.md` (the `8.5-cli` tag list at 8.5.10-trixie, the CLI/FPM/Apache variant descriptions, `pecl install` + `docker-php-ext-enable`, *"It is strongly recommended that users use an explicit version number in their `pecl install` invocations"*); `https://raw.githubusercontent.com/docker-library/docs/master/composer/README.md` (`COPY --from=composer /usr/bin/composer /usr/bin/composer` under "multi-stage builds"); `https://raw.githubusercontent.com/docker-library/official-images/master/library/composer` (tags `2.10.3, 2.10, 2, latest`); `https://pecl.php.net/rest/r/pcov/allreleases.xml` and `.../1.0.12.xml` (PCOV 1.0.12 stable, 2024-12-04); `https://raw.githubusercontent.com/krakjoe/pcov/develop/README.md` (`pcov.enabled`, `pcov.directory` defaults); `https://launchpad.net/~ondrej/+archive/ubuntu/php/+sourcepub/17837310/+listing-archive-extra` (pcov 1.0.12 built as `php8.5-pcov`, the evidence it compiles on 8.5 before Task 2's build proves it)
@@ -326,4 +559,5 @@ same paths on the host.
 - Tool set: `https://docs.phpunit.de/en/13.0/installation.html` (*"PHPUnit 13 requires PHP 8.4"*; `composer require --dev phpunit/phpunit`), `/en/13.0/cli-options.html` (`--coverage-clover <file>`, `--coverage-text`, `--coverage-xml`, `--fail-on-risky`), `/en/13.0/configuration.html` (`bootstrap`, `cacheDirectory`, `<source><include><directory suffix=".php">src</directory>`), `/en/13.0/risky-tests.html` (*"By default, PHPUnit is strict about tests that do not test anything: tests that do not perform assertions"*); `https://infection.github.io/guide/command-line-options.html` (`--logger-text`, `--logger-html`, `--logger-summary-json`, `--logger-github`, `--logger-gitlab`, `--min-msi`, `--coverage`, `--no-progress`, `--static-analysis-tool`; no `--logger-json` — the full JSON log is the `logs.json` config key); `https://phpstan.org/user-guide/getting-started` (`composer require --dev phpstan/phpstan`; `vendor/bin/phpstan analyse src tests`), `https://phpstan.org/user-guide/command-line-usage` (`--level`, `--configuration`, `--error-format`, exit code 0 means no errors), `https://phpstan.org/user-guide/output-format` (`table`, `raw`, `checkstyle`, `json`, `prettyJson`, `junit`, `github`, …), `https://phpstan.org/user-guide/rule-levels` (`--level max` as the alias for the highest level; level 10 is the top today), `https://phpstan.org/config-reference` (`phpstan.neon` lookup order; `parameters: level:` and `paths:`); `https://getcomposer.org/doc/03-cli.md` (`audit`: exit `0` no issues, `1` findings or missing packages; `--format` table/plain/json/summary; `--locked`; `--abandoned`; `--no-dev`), `https://getcomposer.org/doc/06-config.md` (`allow-plugins`: *"Defaults to {} which does not allow any plugins to be loaded"*, and the interactive prompt); `https://raw.githubusercontent.com/phpstan/phpstan-phpunit/2.0.x/README.md` and `https://raw.githubusercontent.com/phpstan/phpstan-strict-rules/2.0.x/README.md` (neither has an assertion-free-test rule; PHPUnit's own risky-test check is that rule); Packagist searches `https://packagist.org/search.json?q=phpunit%20assertion%20rule` and `?q=test%20without%20assertion` (nothing relevant)
 - The live run (2026-09-20, `## Build, run, test` and `## Containers`): `https://raw.githubusercontent.com/docker-library/docs/master/php/README.md` again, its "PHP Core Extensions" example (`apt-get install -y … && docker-php-ext-install -j$(nproc) gd`) and "How to install more PHP extensions"; `https://raw.githubusercontent.com/docker-library/docs/master/composer/README.md` (the bare `COPY --from=composer` line under multi-stage builds); `https://getcomposer.org/doc/00-intro.md` (*"For decompressing files, Composer relies on tools like 7z (or 7zz), gzip, tar, unrar, unzip and xz"*); `https://getcomposer.org/doc/03-cli.md` (`audit`: `0 No issues; 1 Found packages matching dependency policies or failed due to missing required packages`; `--locked`: *"Audit packages from the lock file, regardless of what is currently in vendor dir"*; `--no-blocking`: *"Disables all policy based dependency blocking during this command"*; `--no-security-blocking` deprecated for it); `https://getcomposer.org/doc/06-config.md` (`policy.advisories.block`, the successor of `audit.block-insecure`: *"Defaults to true. If true, any package versions affected by security advisories will be blocked and cannot be used during a composer update/require/delete commands, unless the security advisories are ignored"*); `https://infection.github.io/guide/command-line-options.html` again (`--with-uncovered`: *"Allow mutation of code not covered by tests"*; `--only-covered`: *"This option was removed in Infection 0.31.0, use --with-uncovered instead"*); `https://www.php.net/manual/en/features.commandline.webserver.php` again (`-t` for the document root; Example #2 `php -S localhost:8000 -t foo/`); `https://packagist.org/api/security-advisories/?packages[]=guzzlehttp/guzzle` (fifteen advisories, fourteen covering 7.4.0); this machine's `/etc/containers/registries.conf.d/shortnames.conf` and `registries.conf` (a `php` alias, no `composer` alias, no `unqualified-search-registries`) and `apt-cache madison php` (noble's own 2:8.3, the PPA's 2:8.4, `php8.5-cli` 8.5.10 installed from the PPA)
 - Versions: `https://repo.packagist.org/p2/<vendor>/<name>.json` and `https://packagist.org/packages/<vendor>/<name>.json` for `phpunit/phpunit` 13.3.4 (2026-09-15, PHP ≥ 8.4.1), `infection/infection` 0.35.4 (2026-09-02, PHP ^8.3; requires the `infection/extension-installer` Composer plugin), `phpstan/phpstan` 2.2.14 (2026-09-12), `slim/slim` 4.15.3, `slim/psr7` 1.8.0, `zircote/swagger-php` 6.9.0, `laravel/framework` v13.32.0, `laravel/laravel` v13.10.1, `dedoc/scramble` v0.13.45, `symfony/framework-bundle` v8.1.7 (2026-09-14, PHP ≥ 8.4.1), `api-platform/core` v5.0.0, `phpstan/phpstan-strict-rules` 2.0.12, `phpstan/phpstan-phpunit` 2.0.18, `composer/composer` 2.10.3 (2026-08-27)
+- Layout, Security, Presence, Storage, Deployment (Task 5, 2026-09-20): `https://www.slimframework.com/docs/v4/` (the docs index; the six packaged middleware — *"routing, error handling, method overriding, output buffering, body parsing, and content length"* — and no authentication, validation or rate-limiting page), `/docs/v4/concepts/middleware.html` (*"Middleware is a layer that sits between the client request and the server response"*; `$app->add()`, route middleware, `$app->group('/path', …)->add(…)`; LIFO order), `/docs/v4/middleware/error-handling.html` (`addErrorMiddleware($displayErrorDetails, $logErrors, $logErrorDetails)`; *"Should be set to false in production"*; `setDefaultErrorHandler`; *"will call the appropriate ErrorRenderer for the supported content types"*), `/docs/v4/objects/request.html` (`getQueryParams()` *"as an associative array"*, `getParsedBody()` *"into a native PHP format"*; no validation sentence), `/docs/v4/cookbook/` (five pages; the one database page is Doctrine), `/docs/v4/cookbook/database-doctrine.html` (`composer require doctrine/orm:^3.0 doctrine/dbal:^4.0 symfony/cache`; `'driver' => 'pdo_mysql'`; credentials in `settings.php`), `/docs/v4/deployment/deployment.html` again ("Deploying to a shared server"); `https://www.php.net/manual/en/pdo.prepared-statements.php` (*"If an application exclusively uses prepared statements, the developer can be sure that no SQL injection will occur…"*; *"the only feature that PDO will emulate for drivers that don't support them"*), `https://www.php.net/manual/en/errorfunc.configuration.php` (`display_errors`: *"determines whether errors should be printed to the screen"*, *"php.ini-production sets it to Off"*, *"should never be used on production systems"*; `log_errors`: *"strongly advised to use error logging in place of error displaying on production web sites"*), `https://www.php.net/manual/en/function.getenv.php` (*"Gets the value of a single or all environment variables"*); `https://phpstan.org/user-guide/rule-levels` again (no "secret", "injection" or "SQL" on the page), `https://raw.githubusercontent.com/phpstan/phpstan-strict-rules/2.0.x/README.md` again (`disallowedBacktick`, `disallowedLooseComparison`; the install lines); `https://raw.githubusercontent.com/JimTools/jwt-auth/main/README.md` (*"a PSR-15 compliant JSON Web Token authentication middleware, which take a JWT from the headers or cookies"*; `composer require jimtools/jwt-auth`; route-level `->addMiddleware($middleware)`), `https://raw.githubusercontent.com/JimTools/jwt-auth/main/docs/options.rst` (`isSecure` *"enforces all requests to be HTTPS"*, default true; `relaxed` default `["localhost", "127.0.0.1", "::1"]`; `attribute` default `token`), `https://raw.githubusercontent.com/JimTools/jwt-auth/main/docs/overview.rst` (*"If a token is not found or there is an error when validating and decoding it, the server will respond with `401 Unauthorized`"* — its examples still use the `Tuupola\Middleware` names of v1); `https://raw.githubusercontent.com/symfony/symfony-docs/8.1/rate_limiter.rst` and `https://symfony.com/doc/current/rate_limiter.html` (the definition sentence; the `framework.rate_limiter` config; *"By definition, the Symfony rate limiters require Symfony to be booted in a PHP process. This makes them not useful to protect against DoS attacks"*, naming `Apache mod_ratelimit`; *"By default, all limiters use the `cache.rate_limiter` cache pool"*; 429 with `Retry-After`); `https://raw.githubusercontent.com/web-push-libs/web-push-php/master/README.md` (*"Web Push library for PHP"*; *"PHP 8.2+"* with bcmath/gmp, mbstring, curl, openssl; `sendOneNotification`; VAPID *"These keys must be safely stored and should not change"*); `https://help.dreamhost.com/hc/en-us/articles/221691727-Creating-a-MySQL-database` (*"You can create a MySQL database from the DreamHost panel"*; one hostname and one user per database), `https://help.dreamhost.com/hc/en-us/articles/115000263911-MySQL-limitations-due-to-shared-hosting` (`CREATE DATABASE`, `GRANT`, `REVOKE` *"are not available for scripting"*; routines and triggers not on shared; `utf8mb3`), `https://help.dreamhost.com/hc/en-us/articles/115003505112-Force-your-site-to-redirect-to-HTTPS-SSL` (*"DreamHost automatically redirects … from HTTP to HTTPS"*; `.htaccess` for the rest; no HSTS on the page), `https://help.dreamhost.com/hc/en-us/articles/214200688-php-ini-overview` (*"A php.ini (phprc) file lets you override DreamHost's default PHP settings"*); Packagist `https://packagist.org/packages/<vendor>/<name>.json` for `minishlink/web-push` v11.0.0 (2026-07-23, MIT, PHP ≥ 8.2), `vlucas/phpdotenv` v5.7.0 (2026-08-24, BSD-3-Clause, and its description sentence), `jimtools/jwt-auth` 3.0.1 (2026-03-17, MIT, PHP ~8.2–~8.5), `tuupola/slim-jwt-auth` (3.8.0, 2023-10-20; `abandoned: jimtools/jwt-auth`), `firebase/php-jwt` v7.1.1 (2026-09-14, BSD-3-Clause), `symfony/rate-limiter` v8.1.6 (2026-08-07, MIT, PHP ≥ 8.4.1); Orclab's own `skills/orc-test/scripts/orc_test/langs/php.py` (line 153, the audit command) and `skills/orc-test/scripts/tests/fixtures/composer_audit.json.README` / `composer_audit_clean.json.README` (the two runs and their exit codes); BACKLOG #64 and #65 via `/orc-todo show`
 - Lint (Task 4, `## Lint`): `https://phpstan.org/user-guide/rule-levels` again, this time for each level's own wording (level 0 *"always undefined variables"*, level 1 *"possibly undefined variables"*, level 3 *"return types, types assigned to properties"*, level 6 *"report missing typehints"*, level 8 *"report calling methods and accessing properties on nullable types"*, level 9 *"be strict about explicit `mixed` type"*, level 10 *"be even more strict about the `mixed` type — reports errors even for implicit mixed"*) and the `--level max` alias sentence; `https://github.com/phpstan/phpstan-strict-rules` README's rule table (`checkAlwaysTrueInstanceof`, `checkAlwaysTrueCheckTypeFunctionCall`, `checkAlwaysTrueStrictComparison`, and the rest — no empty-`catch` or nesting/length rule among them); `https://github.com/PHPCSStandards/PHP_CodeSniffer/wiki/Customisable-Sniff-Properties` (`Generic.Metrics.NestingLevel`: `nestingLevel` default 5, `absoluteNestingLevel` default 10; `Generic.Metrics.CyclomaticComplexity`: `complexity` default 10, `absoluteComplexity` default 20); `https://phpstan.org/config-reference` again, its automatic config-file lookup order (`phpstan.neon`, then `phpstan.neon.dist`, then `phpstan.dist.neon`); `https://www.php.net/manual/en/language.types.declarations.php#language.types.declarations.strict` (coercive mode: *"By default, PHP will coerce values of the wrong type into the expected scalar type declaration if possible"*; strict mode: *"In strict mode, only a value corresponding exactly to the type declaration will be accepted, otherwise a `TypeError` will be thrown"*)

@@ -84,6 +84,7 @@ Stacks:
 - **stack-ios-native** — native iOS work (Swift, SwiftUI, Xcode).
 - **stack-kotlin-multiplatform** — Kotlin Multiplatform work shared between native Android and
   iOS apps.
+- **stack-php** — PHP web back-end work (an API alone or behind a React front end).
 - **stack-python-desktop** — Python desktop work (PySide6/Qt, tray icon, local storage).
 - **stack-react-native** — React Native work (Expo).
 - **stack-unity** — Unity game work (C#).
