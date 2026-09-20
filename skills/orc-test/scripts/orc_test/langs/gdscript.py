@@ -41,7 +41,11 @@ def missing(root):
 
 
 def test_cmd(root, target):
-    return ["./addons/gdUnit4/runtest.sh", "-a", target or "test"]
+    # runtest.sh passes every other argument through to Godot. --headless so the run needs no
+    # display (a container has none); --ignoreHeadlessMode because gdUnit4's CI runner otherwise
+    # exits 103 under --headless (GdUnitTestCIRunner.gd, 2026-09-20) — the pair gdmutant already
+    # passes for every mutant, so run, coverage and mutation see the same suite, host or container.
+    return ["./addons/gdUnit4/runtest.sh", "--headless", "--ignoreHeadlessMode", "-a", target or "test"]
 
 
 def coverage_unavailable(root):

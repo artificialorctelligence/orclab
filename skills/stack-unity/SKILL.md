@@ -290,8 +290,8 @@ command line arguments without the need for human interaction"*) and `-nographic
 doesn't initialize the graphics device. You can then run automated workflows on machines that
 don't have a GPU"*) are the toolchain table's headless-build row — but an editor running in a
 container is a second machine, and the licence this skill assumes, Unity Personal ("When this is
-the stack"), has no route onto one. Three of Unity's own pages, read live 2026-09-20: the
-licence-compliance FAQ — *"Can I use my license key for a separate build machine? No. Running
+the stack"), has no route onto one that Unity documents. Three of Unity's own pages, read
+live 2026-09-20: the licence-compliance FAQ — *"Can I use my license key for a separate build machine? No. Running
 Unity on more than one machine at the same time is not allowed. A separate license is required
 for build machines"*; the product Unity sells for that machine, Unity Build Server, in its terms
 (last updated 2026-06-30) — *"You may not use Unity Build Server with the Unity Personal tier of
@@ -301,8 +301,9 @@ activation (`-createManualActivationFile`, then `-manualLicenseFile`), whose man
 *"It doesn't support Unity Pro assigned seats, Unity Personal, or floating license
 subscriptions. To activate a license for Unity Personal, log in to the Unity Hub."* The
 `-serial` argument is for *"your paid Unity license"*. So on Personal nothing of this stack's
-toolchain runs inside, because the toolchain is the editor and the editor cannot be licensed
-there: not the build, not the tests, not the analyzer.
+toolchain runs inside by any route Unity documents, because the toolchain is the editor and
+the editor's documented activations do not reach a container: not the build, not the tests,
+not the analyzer.
 
 What exists, and is not researched into a default: **GameCI**, the community's images —
 `unityci/editor` on Docker Hub, *"Dockerised Unity Editor made for continuous integration"*,

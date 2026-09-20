@@ -11,8 +11,11 @@ def test_gdunit4_runner_and_godot_bin(tmp_path, monkeypatch):
     (tmp_path / "addons" / "gdUnit4").mkdir(parents=True)
     (tmp_path / "addons" / "gdUnit4" / "runtest.sh").write_text("")
     monkeypatch.setenv("GODOT_BIN", "/opt/godot")
-    assert gd.test_cmd(tmp_path, None) == ["./addons/gdUnit4/runtest.sh", "-a", "test"]
-    assert gd.test_cmd(tmp_path, "test/player") == ["./addons/gdUnit4/runtest.sh", "-a", "test/player"]
+    # --headless --ignoreHeadlessMode: what gdmutant passes per mutant; without the second gdUnit4
+    # exits 103 under the first (v23, containers) — the same command on the host and inside
+    headless = ["./addons/gdUnit4/runtest.sh", "--headless", "--ignoreHeadlessMode"]
+    assert gd.test_cmd(tmp_path, None) == [*headless, "-a", "test"]
+    assert gd.test_cmd(tmp_path, "test/player") == [*headless, "-a", "test/player"]
     assert gd.missing(tmp_path) == []
     monkeypatch.delenv("GODOT_BIN")
     assert gd.missing(tmp_path) == ["GODOT_BIN"]

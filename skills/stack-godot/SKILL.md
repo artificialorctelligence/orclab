@@ -317,14 +317,12 @@ Not run here — the first project records it. Why each line, so the next reader
   `--display-driver x11 --rendering-driver opengl3`, a virtual X server plus software GL.
   gdmutant goes the other way for every mutant it runs — its gdUnit4 command is `godot
   --headless --path <project> -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a <tests> -rc 1
-  --ignoreHeadlessMode` (`adapters/gdscript/runner.py` in the 0.1.2 sdist) — so mutation runs
-  inside as it is. The test run does not yet: `/orc-test`'s command is
-  `./addons/gdUnit4/runtest.sh -a test` (`gdscript.py`'s `test_cmd`), and `runtest.sh` passes
-  every argument through to Godot, so the containerised project sets `languages: gdscript: test:
-  "./addons/gdUnit4/runtest.sh --headless --ignoreHeadlessMode -a test"` in `.orclab/test.yaml`
-  for `run`; `coverage` reuses the module's own command, which does not carry the flags, so it
-  does not yet run inside — the two flags belong in `gdscript.py`, beside gdmutant's. A test
-  that drives input stays on the host either way.
+  --ignoreHeadlessMode` (`adapters/gdscript/runner.py` in the 0.1.2 sdist) — and since
+  2026-09-20 so does `/orc-test`: its command is `./addons/gdUnit4/runtest.sh --headless
+  --ignoreHeadlessMode -a test` (`gdscript.py`'s `test_cmd`, which `run` and `coverage` share;
+  `runtest.sh` hands the flags to Godot and gdUnit4), so the suite runs inside as it is, with
+  nothing set per checkout. The one cost is on the host too: a test that drives input events
+  does not run under `/orc-test run` anywhere — gdUnit4's own guidance for those is `xvfb-run`.
 - **`GODOT_BIN` is set in the image, and the host mirrors it.** `/orc-test` checks the variable
   on the host on purpose (`gdscript.py`'s `missing()`: *"GODOT_BIN is a host environment
   variable"*) and forwards its value to gdmutant as `--godot`, and `compose run` passes no host
@@ -336,7 +334,7 @@ Not run here — the first project records it. Why each line, so the next reader
 
 The `compose.yaml` is the one in `skills/orc-test/SKILL.md`'s Containers section, unchanged.
 What cannot happen inside: the editor and the game (no display), a test that sends input events
-(gdUnit4's own warning above), the Android export (no JDK or SDK in the image, and the
+(gdUnit4's own warning above — and not under `/orc-test run` on the host either), the Android export (no JDK or SDK in the image, and the
 `GODOT_ANDROID_KEYSTORE_RELEASE_*` variables the Secrets section names would need passing in
 too), and the iOS export (macOS). The proposal `/orc-code` makes for this stack's container
 question: **no**, because the toolchain is one ~150 MB executable that runs on any Linux ("When
