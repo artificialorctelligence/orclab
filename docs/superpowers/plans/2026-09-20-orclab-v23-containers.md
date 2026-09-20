@@ -464,7 +464,7 @@ In `_resolve`, after `found = detect.languages(root, mods)` and before the `dete
 
 - [ ] **Step 5: `_dirty` stays on the host** — in `cli.py`, `_dirty` calls `run(["git", "status", "--porcelain"], cwd=root)`; change it to `runner.run_on_host(...)` (git is the host's; the container has no `.git` view it should be trusted with). Add to `test_cli_analyze.py` (or `test_cli.py`) one test: with a fake container active (`runner.use(container.Container(root=repo, runner="docker"))` and a fake `docker` on PATH), `cli._dirty(repo, set())` runs `$ git status --porcelain` — assert the printed command does not start with `$ docker`.
 
-- [ ] **Step 6: every `missing()` through `probe`**
+- [ ] **Step 6: every `missing()` through `probe` — and every other "is the tool here" check too.** Task 2's review (2026-09-20) found the spec named only `missing()`, but `audit_unavailable`, `mutation_unavailable` and `lint`'s own tool checks ask the same question and would ask it of the host: `python.py` (`find_spec("pip_audit")`, `find_spec("mutmut")`), `java.py` (`which("pmd")`), `csharp.py` (two), `javascript.py` (one), `kotlin.py` (one), `dart.py` (one), `swift.py` (two), `gdscript.py` (two). Every one of those becomes `probe.which` / `probe.python_module` as well — a containerised Python project whose host lacks mutmut must not say "mutmut not installed" when the image has it. Also: `_resolve` builds the image only when `found` is non-empty (`if c and found:`), and `probe.which` quotes the tool name with `shlex.quote`.
 
 Each module: `from .. import probe` and
 
