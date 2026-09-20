@@ -3665,7 +3665,7 @@ the push before the history leaves the machine. It waits for a real case — the
 not built") names it as "a BACKLOG entry citing this spec", and no project has yet leaked a
 secret into Orclab-managed history; `secret-hygiene` holds the recovery procedure when one does.
 
-## #50: PHP as a /orc-code alternative on the web row — v24, spec written 2026-09-20
+## #50: PHP as a /orc-code alternative on the web row — v24 (RESOLVED 2026-09-20)
 
 direflail is putting an API on DreamHost, which serves PHP and nothing else; the request that
 became v22 (#48) started as "add PHP to `/orc-code`", and direflail's decision was that the
@@ -3706,6 +3706,72 @@ constraints (shared hosting, JSON first, OpenAPI from code), runner-up stubbed. 
 this entry promised for `/orc-test audit` is now something `/orc-test` can actually run rather
 than a sentence in a skill. Opens #64 (shared-hosting publishing) and #65 (cross-project
 dependencies); `composer.json` goes on #6's list.
+
+**Resolved for real, not just tracked.** v24 shipped: `skills/stack-php/SKILL.md`, PHP support in
+`/orc-test` (`skills/orc-test/scripts/orc_test/langs/php.py`, four captured fixtures), a `.php`
+row in `lint_on_write`, and PHP on the Defaults Table's web row — each proven against a real,
+uncommitted sample project (`v24check`) run live inside a Podman container, not assumed.
+
+**The framework:** Slim 4 (`slim/slim` 4.15.3, `slim/psr7` 1.8.0, `zircote/swagger-php` 6.9.0) —
+"the easiest option that meets all three of spec §2's constraints on a first-party page: Slim's
+own deployment docs have a section headed 'Deploying to a shared server', its JSON response is
+three lines, and swagger-php produces a valid OpenAPI document from one `#[OA\Info]` and one
+`#[OA\Get]`/`#[OA\Response]` pair on the handler" (Task 1 report). Laravel 13 + Scramble was
+stubbed as runner-up; Symfony/API Platform and plain PHP were each given a sentence on which
+constraint they lost.
+
+**The image's Dockerfile**, as it ended up after Task 2's live fixes:
+```dockerfile
+FROM php:8.5-cli
+COPY --from=docker.io/library/composer:2 /usr/bin/composer /usr/local/bin/composer
+RUN apt-get update && apt-get install -y unzip
+RUN pecl install pcov-1.0.12 && docker-php-ext-enable pcov
+```
+Three fixes Task 2 needed to reach it, each recorded with its reason: (1) `COPY --from=composer:2`
+→ `docker.io/library/composer:2` — Podman resolves `FROM php:8.5-cli` through its own
+`shortnames.conf` but has no alias for a bare `composer`, so the short name in `COPY --from` had
+nowhere to go on either engine; (2) `RUN apt-get update && apt-get install -y unzip` — `php:8.5-cli`
+ships neither `unzip`/`7z` nor the `zip` extension, and installing the extension instead made
+Composer warn that unpacking through it loses executable-bit permissions, so `unzip` is the
+smaller, warning-free fix; (3) not a Dockerfile fix but a procedural one — `podman compose build`
+exits 0 even when the underlying build failed, so its output has to be read for
+`COMMIT`/`Successfully tagged` rather than trusted by exit code.
+
+**The real `/orc-test analyze` and `audit` output**, run live in the container against the
+`v24check` sample (Task 3 Step 7), verbatim:
+```
+PHP        coverage 20.0% (1/5 lines) ✗ (min 80)
+      0.0%  <SCRATCH>/src/GreetAction.php
+    html report: <SCRATCH>/.orclab/test/php/html
+           TCE 20.0% ✗ (min 70)    lint: not run — no test-specific lint exists for PHP (no PHPStan rule reports an assertion-free test)
+    note: vendor/bin/phpunit, infection and phpstan are the project's own require-dev packages; `composer install` once, and again when composer.json changes.
+    note: Infection needs a coverage driver (pcov or xdebug) loaded in the PHP that runs it.
+
+gates failed: coverage, tce
+```
+```
+PHP        audit ✓ 0 vulnerable
+```
+Both coverage and TCE gates failing on the sample was honest, not a bug: `Greeting.php` is tested
+(1/1), the invokable `GreetAction.php` route handler is not (0/4) — the PHP twin of
+`python.md`'s "route handler is not mutated usefully" caveat Task 1 flagged in advance.
+
+**The live `lint_on_write` hook run** (Task 4 Step 6), stderr's opening line verbatim (paths
+abbreviated to `.../v24check`):
+```
+orclab lint_on_write: `.../v24check/vendor/bin/phpstan analyse` on .../v24check/src/Bad.php exited 1 - code-discipline's checkable rules, from the project's own config. Set ORCLAB_LINT_ON_WRITE_OFF=1 to disable.
+```
+PHPStan, run through the project's own `vendor/bin/phpstan` (preferred over PATH the same way JS
+linters already prefer `node_modules/.bin`), reported the undefined-variable and always-true-
+condition findings on the deliberately bad `Bad.php`; exit code 2.
+
+**#64 and #65 remain open.** #64 (shared-hosting publishing) waits for the first-project session
+that actually deploys the API to DreamHost and records what a real upload takes, through
+`release-checklist`, in its own `RELEASING.md`. #65 (cross-project dependencies) waits for the
+first session that works on a project calling another project's API — the orcweather session that
+adds a client against this PHP API — to either find the contract from `stack-php`'s Layout section
+and close the entry saying a sentence was the record, or stumble on something that becomes the
+entry's material.
 
 ## #51: /orc-test audit on a multi-module Gradle build reads only the root project's dependencies until dependencyCheckAggregate is wired
 
