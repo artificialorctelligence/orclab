@@ -143,9 +143,10 @@ Stop here — do not proceed to any subcommand logic on a bare invocation.
    `audit` checks every dependency the project declares against the public advisory lists —
    `security-discipline` rule 2. A `✗ N vulnerable` line is a failed gate exactly like coverage:
    show the report (each line names the package and the version that fixes it), say "bump the
-   named packages", and stop — **nothing is pushed**. `audit not available` or `missing <tool> —
-   skipped` is carried into the report and the push continues, the same as a `not measurable`
-   coverage line.
+   named packages", and stop — **nothing is pushed**. `audit output not understood — see above`
+   is also a failed gate — the tool's own output is printed above it; stop, same as the
+   vulnerable case, nothing is pushed. `audit not available` or `missing <tool> — skipped` is
+   carried into the report and the push continues, the same as a `not measurable` coverage line.
 
    Three outcomes:
    - **It exits 0 with every gate ✓** — both commands — continue to the push.
@@ -287,9 +288,11 @@ and reversible.
    `audit` checks every dependency the project declares against the public advisory lists —
    `security-discipline` rule 2. A `✗ N vulnerable` line is a failed gate exactly like coverage:
    show the report (each line names the package and the version that fixes it), say "bump the
-   named packages", and stop — **nothing is pushed**. `audit not available` or `missing <tool> —
-   skipped` is carried into the report and the push continues, the same as a `not measurable`
-   coverage line.
+   named packages", and stop — **nothing is pushed, nothing released**. `audit output not
+   understood — see above` is also a failed gate — the tool's own output is printed above it;
+   stop, same as the vulnerable case, nothing is pushed, nothing released. `audit not available`
+   or `missing <tool> — skipped` is carried into the report and the release continues, the same
+   as a `not measurable` coverage line.
 
    Three outcomes, in the same shape as `push`'s gate but ending in `analyze`'s own line: exit 0
    with every gate ✓ — both commands — continue. Exit non-zero → show the report, which ends with a `gates

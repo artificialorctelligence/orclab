@@ -63,8 +63,10 @@ Every other subcommand runs immediately once you type it — nothing else is ask
 - `pr`: checks out the pull request's branch locally. Changes nothing else.
 - `release`: first runs the project's tests with coverage *and* mutation testing — it plants
   small defects in the code one at a time and checks that the tests notice, holding that to
-  70% — which takes minutes; then pushes your current branch's commits and a tag to GitHub, and
-  creates a GitHub Release from it — a public page other people can see, listing what changed.
+  70% — which takes minutes, and checks every dependency the project uses against the public
+  lists of known vulnerabilities; then pushes your current branch's commits and a tag to GitHub,
+  and creates a GitHub Release from it — a public page other people can see, listing what
+  changed.
 
 ## What it will never do without asking
 
@@ -72,9 +74,10 @@ Every other subcommand runs immediately once you type it — nothing else is ask
   waiting for a yes — only when you type the command yourself does it skip that and run right
   away.
 - It will never push while the tests fail or coverage is under 80%, or while any dependency has
-  a known vulnerability (it names the package and the version that fixes it), and never release
-  while the tests fail, coverage is under 80% or mutation testing scores under 70%. It stops and
-  shows you the test report, and tells you what would fix it. It never writes tests on its own —
+  a known vulnerability (it names the package and the version that fixes it) or while the audit
+  tool's output could not be read, and never release while the tests fail, coverage is under 80%
+  or mutation testing scores under 70%. It stops and shows you the test report, and tells you
+  what would fix it. It never writes tests on its own —
   `/orc-test generate` does that, and only when you ask; there is no way to tell `/orc-git` to skip
   the check, and if you want to push past a failing one, plain `git push` is the way, on purpose.
 - When it can't measure — the project has no coverage tool installed, or no language it
