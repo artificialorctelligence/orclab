@@ -201,7 +201,9 @@ def _diffs(root, alive):
     if not alive:
         return {}
     stdin = "".join(f"{key} {file}\n" for key, file in alive)
-    out = run(["python3", str(MUTMUT_DIFFS)], cwd=root, input=stdin).stdout
+    # the script's text, not its path: inside a container only the project dir is mounted, not
+    # Orclab's own plugin directory where MUTMUT_DIFFS lives (v23)
+    out = run(["python3", "-c", MUTMUT_DIFFS.read_text()], cwd=root, input=stdin).stdout
     blocks = (b.partition("\n") for b in ("\n" + out).split("\n# ")[1:])
     return {key: diff.rstrip("\n") for key, _, diff in blocks}
 

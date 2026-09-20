@@ -76,10 +76,10 @@ Every command runs as `<engine> compose run --rm -T --workdir <dir> orclab <cmd>
 `<engine> compose build orclab`; the first line of the report says
 `detected: Python (in container)`. `${PWD}` is filled in from the environment of the process
 that calls the engine — Compose: *"You can use existing environment variables from your host
-machine or from the shell environment where you execute docker compose commands"* — so `run.py`
-sets `PWD` to the project root before every call (a child's `cwd` does not rewrite the `PWD` it
-inherited; under `--cwd` that would be the wrong directory). Running `compose` by hand, do it
-from the project root.
+machine or from the shell environment where you execute docker compose commands"* — so
+`runner.run_on_host` sets `PWD` to the project root before every call (a child's `cwd` does not
+rewrite the `PWD` it inherited; under `--cwd` that would be the wrong directory). Running
+`compose` by hand, do it from the project root.
 Nothing else in the file is engine-specific: `.:${PWD}` is the short volume syntax (*"a host
 path on the platform hosting containers (bind mount)"*, *"the relative path is resolved from
 the Compose file's parent directory"*) and `working_dir` *"overrides the container's working

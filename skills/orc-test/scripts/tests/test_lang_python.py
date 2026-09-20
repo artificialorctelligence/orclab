@@ -146,7 +146,7 @@ def test_diffs_asks_one_process_for_every_survivor(monkeypatch, tmp_path):
     monkeypatch.setattr(py, "run", lambda cmd, cwd, input: seen.append((cmd, input)) or
                         type("R", (), {"stdout": out})())
     d = py._diffs(tmp_path, [("a.x_f__mutmut_1", "a.py"), ("a.x_f__mutmut_2", "a.py")])
-    assert len(seen) == 1 and seen[0][0][:2] == ["python3", str(py.MUTMUT_DIFFS)]
+    assert len(seen) == 1 and seen[0][0] == ["python3", "-c", py.MUTMUT_DIFFS.read_text()]
     assert seen[0][1] == "a.x_f__mutmut_1 a.py\na.x_f__mutmut_2 a.py\n"
     assert d == {"a.x_f__mutmut_1": "--- a.py\n-x\n+y", "a.x_f__mutmut_2": "--- a.py\n-x\n+z"}
     assert py._diffs(tmp_path, []) == {} and len(seen) == 1

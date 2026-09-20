@@ -93,6 +93,8 @@ def container_prefix(root):
     if (_override_value(text, "container") or "").lower() in FALSE_WORDS:
         return []
     runner = _override_value(text, "runner")
+    if runner and runner not in RUNNERS:   # config.py rejects this at load; shutil.which takes a
+        return None                        # path, so an unchecked value could run something else
     names = (runner,) if runner else RUNNERS
     engine = next((n for n in names if shutil.which(n)), None)
     if engine is None:

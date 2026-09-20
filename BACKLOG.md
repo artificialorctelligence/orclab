@@ -4014,10 +4014,10 @@ base images and the `v23check_default` network were deleted afterwards; `podman 
 had the image build going through `runner.run` — i.e. through the `compose run` wrap — where it
 must go through `run_on_host` (the engine is a host command); `${PWD}` in `compose.yaml` is read
 from the *environment* of the process calling the engine, and `cwd=` does not rewrite the
-inherited `PWD`, so `run.py` sets it explicitly; the tool-presence checks that had to move inside
-were more than `missing()` — `audit_unavailable`, `mutation_unavailable` and the hook's on-PATH
-check all asked the host; and gdUnit4 needed `--headless --ignoreHeadlessMode` to run at all
-without a display. **This check found two more.** (1) `podman-compose` 1.0.6 — Mint's apt, the
+inherited `PWD`, so `runner.run_on_host` sets it explicitly; the tool-presence checks that had to
+move inside were more than `missing()` — `audit_unavailable`, `mutation_unavailable` and the
+hook's on-PATH check all asked the host; and gdUnit4 needed `--headless --ignoreHeadlessMode` to
+run at all without a display. **This check found two more.** (1) `podman-compose` 1.0.6 — Mint's apt, the
 version the install line names — **exits 0 when `podman build` fails**: `compose_build` discards
 `build_one`'s result and only logs `exit code: 125` (1.6.0 returns the status; read in both
 sources). The broken-Dockerfile negative "passed" the first time and ran the tests in the *stale*

@@ -344,6 +344,26 @@ def test_containerised_project_with_no_engine_says_nothing(tmp_path, run):
     assert r.returncode == 0    # fail open - the hook never runs a containerised project's linter on the host
 
 
+def test_an_unrecognised_runner_value_lints_nothing(tmp_path, run):
+    """`runner:` outside {docker, podman} - config.py's BadConfig for this same value - must not
+    reach shutil.which, which resolves a path and would run it as the engine. An absolute path
+    to a real executable (standing in for `runner: ./x`) proves it: if the guard is missing, this
+    script is what `compose run` shells out to, and its own marker text shows up in the report."""
+    src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
+    (tmp_path / "compose.yaml").write_text(COMPOSE)
+    (tmp_path / ".orclab").mkdir()
+    rogue = tmp_path / "x"
+    rogue.write_text('#!/bin/sh\necho "ROGUE RAN: $*"\nexit 1\n')
+    rogue.chmod(rogue.stat().st_mode | stat.S_IEXEC)
+    (tmp_path / ".orclab" / "test.yaml").write_text(f"runner: {rogue}\n")
+    f = src / "a.py"
+    f.write_text("x = 1\n")
+    bin_dir = fake_tool(tmp_path / "bin", "ruff", 1, "src/a.py:1:1: E999 fake finding")
+    r = run(f, bin_dir=bin_dir)
+    assert r.returncode == 0
+    assert "compose run" not in r.stderr and "ROGUE RAN" not in r.stderr
+
+
 def test_as_a_process_findings_are_exit_2_on_stderr(tmp_path):
     """The contract Claude Code sees; the one test here that runs the script for real."""
     src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
