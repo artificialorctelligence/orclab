@@ -15,7 +15,7 @@
 - **The record is `compose.yaml` at the project root with a service named `orclab`** (spec §1). Nothing under `.orclab/` records the opt-in — `.orclab/` is git-ignored.
 - **Same-path mount convention:** the container's working directory for every command is the same absolute path as on the host (spec §1); `runner.wrap` passes it explicitly with `--workdir`.
 - **Per-checkout override in `.orclab/test.yaml`:** `container: false` (host run in this checkout) and `runner: docker|podman` (spec §1). Absent `runner`: the first of the research-picked default order that is on PATH.
-- **Never a silent fallback to the host** (spec §2): runner missing → `<Label>: container runner not found — install docker or podman — skipped`; image build fails → its output printed, then `container build failed — see above`, exit 1 from every subcommand.
+- **Never a silent fallback to the host** (spec §2): runner missing → `<Label>: container runner not found — install podman or docker — skipped`; image build fails → its output printed, then `container build failed — see above`, exit 1 from every subcommand.
 - **`/orc-test` never installs a tool — including the engine** (spec §2).
 - **The eight language modules' commands do not change** (spec §2); only how they are run and how their tools' presence is checked.
 - **Hooks duplicate rather than import** (`hooks/scripts/orclab_shared.py`'s docstring): `lint_on_write` gets its own detection, no `sys.path` into a skill, no PyYAML dependency in the hook.
@@ -334,7 +334,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Produces `probe.which(tool) -> bool` — `shutil.which` on the host; `sh -c 'command -v <tool>'` through `runner.run` when a container is active (exit 0 means present).
 - Produces `probe.python_module(name) -> bool` — `importlib.util.find_spec` on the host; `python3 -c "import <name>"` through `runner.run` when active.
 - Produces `cli.ContainerUnavailable(Exception)` — raised by `_resolve` when the image fails to build; `main` prints `container build failed — see above` and returns 1.
-- Produces the lines: `detected: Python (in container)`; `Python: container runner not found — install docker or podman — skipped`.
+- Produces the lines: `detected: Python (in container)`; `Python: container runner not found — install podman or docker — skipped`.
 
 - [ ] **Step 1: `test_probe.py`, red**
 
@@ -389,7 +389,7 @@ def test_runner_missing_skips_the_language_and_never_runs_on_the_host(tmp_path, 
     (repo / "compose.yaml").write_text("services:\n  orclab:\n    build: .\n")
     monkeypatch.setattr(cli.container.shutil, "which", lambda n: None)
     code, out = run(["run"], repo, capsys)
-    assert code == 0 and "Python: container runner not found — install docker or podman — skipped" in out
+    assert code == 0 and "Python: container runner not found — install podman or docker — skipped" in out
     assert "$ python3 -m pytest" not in out
 
 
@@ -451,7 +451,7 @@ In `_resolve`, after `found = detect.languages(root, mods)` and before the `dete
     print("detected: " + (", ".join(_name(m, d, root) + suffix for m, d in found) or "no supported language"))
     if c and c.runner is None:
         for m, _d in found:
-            print(f"{m.LABEL}: container runner not found — install docker or podman — skipped")
+            print(f"{m.LABEL}: container runner not found — install podman or docker — skipped")
         return root, cfg, []
     if c:
         cp = runner.run_on_host(container.build_cmd(c), cwd=root)   # the engine is a host command — never through the (now active) wrap
@@ -640,9 +640,9 @@ Every command runs as `<engine> compose run --rm -T --workdir <dir> orclab <cmd>
 line of the report says `detected: Python (in container)`. The engine, confirmed live
 YYYY-MM-DD: <the research's answer — which is the default, why, the install line for each on
 Ubuntu/Mint, rootless>. `.orclab/test.yaml` overrides per checkout: `container: false` runs on
-the host here even though the repo is containerised; `runner: podman` (or `docker`) names the
+the host here even though the repo is containerised; `runner: docker` (or `podman`) names the
 engine. Nothing is ever silently run on the host instead: no engine on PATH prints
-`<Language>: container runner not found — install docker or podman — skipped`; an image that
+`<Language>: container runner not found — install podman or docker — skipped`; an image that
 does not build prints its output and `container build failed — see above`, exit 1 — never the
 host. The engine is a tool like any other: this command never installs it.
 ```

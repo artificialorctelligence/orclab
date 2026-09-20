@@ -103,7 +103,7 @@ the convention); `.orclab/test/` (inside the project, so both sides see it).
 
 **Checked rather than assumed, and never a silent fallback:**
 
-- The runner is on PATH; if not: `Python: container runner not found — install docker or podman
+- The runner is on PATH; if not: `Python: container runner not found — install podman or docker
   — skipped` — "never installs a tool", applied to the engine itself.
 - The image builds; a failed build is printed and that language is `tests failed; nothing
   measured`. A project that said "container" and got a host run would pass a gate in an
