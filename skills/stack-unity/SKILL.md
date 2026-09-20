@@ -279,8 +279,8 @@ iOS — plus Unity's own two above: *Allow downloads over HTTP* at *Not allowed*
 secret store. **Multiplayer is out of scope here.** A game that *"hosts players locally or over a
 network"* (the *Multiplayer* manual page, read live 2026-09-19, which sends the rest to the
 Multiplayer Center) is the *Reachable by strangers* tier on its server, and no stack skill
-covers a game server yet; no BACKLOG entry exists for it, and the first multiplayer game opens
-one — `stack-godot`'s section quotes what Godot's own docs already say about it.
+covers a game server yet; BACKLOG #53 — `stack-godot`'s section quotes what Godot's own docs
+already say about it.
 
 ## Presence
 

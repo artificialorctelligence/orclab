@@ -3525,3 +3525,217 @@ the same shape as the dirty-tree line would close it: if `git rev-parse <tag>^{c
 and running `analyze` there, is what `merge` step 3 already does for a branch; whether a
 release should measure the tag's tree rather than warn is a decision for whoever picks this up.
 Scope: `release` only; `push` and `cp` always push HEAD, so what they measure is what they push.
+
+## #48: security-discipline: every project's rules and the extra set for one strangers can reach — v22 (RESOLVED 2026-09-19)
+
+Requested by direflail 2026-09-19, while putting an API on DreamHost (which serves PHP and nothing
+else): *"if running this sans framework is going to make us vulnerable, i need to know now. i
+haven't run php in literally 20 years."* Then, generalised: *"security needs to be a part of
+every project. what that means may depend on the project itself (something running locally like
+orcshot doesn't need the security of something sitting out on a webhost where bad actors can
+detect it)."* Asked whether the general rule comes before or after the PHP stack skill: *"B. it
+needs to happen before anything."* PHP is v23 (#50). Design in
+`docs/superpowers/specs/2026-09-19-orclab-v22-security-discipline-design.md`, plan in
+`docs/superpowers/plans/2026-09-19-orclab-v22-security-discipline.md`, executed the same day.
+
+**What should already have covered it, and did not** (the spec's own search, per CLAUDE.md's
+"Before building anything"): every shipped `SKILL.md`, `CLAUDE.md`, `BACKLOG.md` and the bundled
+scripts. `code-discipline` — seven rules on the shape of code, none about trust, input, secrets or
+transport. `test-discipline` — "know the scenarios first", never the hostile one. `secret-hygiene`
+— keeps a credential out of the transcript, not out of the repo or the built artifact.
+`aikido:scan` — a real SAST plugin on this machine, not part of Orclab. `code-modernization`'s
+`security-auditor` / `modernize-harden` — a scanner for existing code, nothing for a project being
+born. Nothing said "this project is reachable by people you did not invite, so these rules apply."
+
+**What shipped**, by spec section. §1: `skills/security-discipline/SKILL.md`, `user-invocable:
+false`, nine rules in two tiers — rules 1–4 *Every project* (no secret in the repo or artifact;
+dependencies audited; anything downloaded or run at runtime verified first; least permission) and
+rules 5–9 *Reachable by strangers* (network input hostile until validated; every route
+authenticates unless deliberately public in the code; no internals in an error; transport
+encrypted and plain HTTP refused; rate limits exist) — each traced to the OWASP Top 10:2025, OWASP
+ASVS 5.0.0 or the 2025 CWE Top 25, read live 2026-09-19; nine and not a hundred for
+`code-discipline`'s reason, a hundred-rule list is not read. §2: `## Security — where
+security-discipline lands` in all nine `skills/stack-*/SKILL.md` (static-analysis ruleset,
+dependency-audit command, where secrets live and the `.gitignore` lines, what the exposed tier
+scaffolds), pinned by `test_every_stack_skill_is_expected`; `/orc-code`'s New-Project Flow asks
+"Will anyone you didn't invite be able to reach this?" with the answer proposed from the platforms
+ticked, scaffolds the security lint config and the exposed tier's pieces, and quality mode wraps
+`code-modernization:modernize-harden` behind an availability check; `test-discipline` names the
+hostile case at every trust boundary. §3: `/orc-test audit` for all eight languages (Swift and
+GDScript say "none free"), joined to `/orc-git push`, `cp` and `release` beside the v21 gate — a
+known-vulnerable dependency stops the push; `lint_on_write` unchanged, since the security rules
+sit in the same linter config. §4: `test_security_discipline.py`, `test_cli_audit.py` plus a
+captured fixture per language with a README saying which were real captures, `test_orc_git_skill.py`
+widened to `audit`, `test_orc_code_skill.py`; `docs/commands/orc-test.md`, `orc-code.md`,
+`orc-git.md` in the same commits as their skills. Not built, by decision: a secret-scan hook over
+git history (#49), runtime protection, penetration testing.
+
+**Verified live 2026-09-19** (spec "Verification", plan Task 11), every line as printed.
+
+*`/orc-test audit` on Orclab itself.* First run: `Python: missing pip-audit — pip install pip-audit
+— skipped`, exit 0 — the command never installs; pip-audit 2.10.1 was installed by hand into the
+user site the suites already use. Second run: ``ERROR:pip_audit._cli:pyproject file pyproject.toml
+does not contain `project` section`` then `Python: audit output not understood — see above`, exit
+1. Orclab's root `pyproject.toml` is tool configuration only and declares no dependencies, so
+pip-audit refuses it, and with the merge `/orc-git push` on Orclab is red until that is settled —
+#54, not fixed here because both fixes are design calls.
+
+*`ruff check --select S .` on Orclab:* `Found 1487 errors.` — 1352 of them `S101` (`assert`, i.e.
+the test suites), 54 `S603`, 48 `S607`, 21 `S404`, 4 `S314`, 4 `S405`, 3 `S310`, 1 `S602`. Under
+`stack-python-desktop`'s own two config lines (`ignore = ["S4"]`, `"tests/**" = ["S101"]`) it is
+still `Found 1462 errors.`, because ruff anchors `tests/**` at the project root and Orclab's tests
+live at `skills/*/scripts/tests/` and `hooks/scripts/tests/`; with `**/tests/**` it is `Found 110
+errors.` (54 `S603`, 48 `S607`, 4 `S314`, 3 `S310`, 1 `S602`; no `S101` outside tests). Orclab's
+own adoption is a quality-mode pass, not done here.
+
+*The scaffold.* `/orc-code` was followed from this branch's `skills/orc-code/SKILL.md` (the
+installed plugin was v0.21.0) with the answers new project, `v22check`, app, web, exposure "yes",
+minimal example, into a scratch directory, per `stack-web`. Node 20.20.2 on this machine satisfies
+Vite 8 (≥ 20.19) but not Vitest 5 (≥ 22.12); network was up. Against `stack-web`'s Security
+section, item by item: static analysis — `web/.oxlintrc.json` with the Lint section's three rules
+plus `react/no-danger` and `react/jsx-no-script-url` (the template's own `react/rules-of-hooks`
+and `react/only-export-components` kept — the section's "written once" block omits them), and
+`pyproject.toml` with `extend-select = [..., "S"]`, `ignore = ["S4"]`, `"tests/**" = ["S101"]`,
+present; dependency audit — present, below; secrets — `app/config.py` `Settings(BaseSettings)`
+with `secret_key: str` and `env_file=".env"`, root `.gitignore` carrying `.env`, present; reachable
+by strangers — auth (`pyjwt` 2.14.0, `pwdlib[argon2]` 0.3.1, `/api/token`, `get_current_user`
+raising 401), the public/private split (`APIRouter(dependencies=[Depends(get_current_user)])`
+beside a bare one), input as a Pydantic model with `Field(min_length=1, max_length=64)`, errors
+(`@app.exception_handler(Exception)` returning `{"error": "internal error", "id": …}`; `debug`
+left `False`), rate limit (`slowapi` 0.1.10, `@limiter.limit("5/minute")` on `/token`), all
+present; transport — absent, as the section says: the redirect and HSTS are the reverse proxy's
+config, "written into the proxy config the scaffold leaves, per proxy, on the first project", and
+no proxy config was written. Every package resolved to the version the skill's table names
+(FastAPI 0.141.1, pydantic-settings 2.15.0, SQLModel 0.0.42). The installed v0.21.0
+`lint_on_write` fired on the first write of `app/main.py` with the project's own config — §3's
+first mechanism, live: `hardcoded-password-string: Possible hardcoded password assigned to:
+"token_type"` on FastAPI's tutorial `token_type: str = "bearer"`; answered with the named
+per-line suppression. `npm run build` exit 0; `npx oxlint --deny-warnings` first failed on the
+template's own 110-line demo `App.tsx` against the Lint section's `max-lines-per-function: 60`
+(replaced by the minimal example, then exit 0); `ruff check .` `All checks passed!`; pytest `3
+passed` with the two hostile-case tests `test-discipline` now names (unauthenticated → 401,
+malformed → 422) — PyJWT 2.14.0 warned `InsecureKeyLengthWarning` on a 26-byte test key, which
+`openssl rand -hex 32` never produces; `npx vitest run`: `No test files found`. After `git init`,
+this branch's `run.py --cwd <scratch>/v22check audit`: `detected: Python, JS/TS (web/)`, then at
+first `Python: audit output not understood — see above` beside `JS/TS      audit ✓ 0 vulnerable`,
+exit 1 — a parser bug, not the scaffold's: `runner.run` merges stderr into stdout and pip-audit
+prints `No known vulnerabilities found` (or `Found 36 known vulnerabilities in 3 packages`, both
+captured live) on stderr ahead of its JSON, so every real Python run was "not understood" and the
+fixture tests, fed pure JSON, could not see it. Fixed in the same pass the way `csharp.py` already
+reads its tool (`raw_decode` from the first `{`), pinned by
+`test_audit_findings_skips_pip_audits_stderr_summary`; rerun: `Python     audit ✓ 0 vulnerable`,
+`JS/TS      audit ✓ 0 vulnerable`, exit 0. The directory was deleted. `/orc-git push` on it, the
+spec's last check, was not run — the scaffold had no remote, and the gate's own live check is #46's.
+
+**Also found on the way**, each its own entry: #51 (the Gradle audit reads only the root project),
+#52 (`stack-unity`'s Lint block may never reach Unity's compiler), #53 (a multiplayer game's
+server has no stack skill), #54 (Orclab's own audit line).
+
+## #49: A secret-scan hook over git history is not built; security-discipline's repo rule is prose plus .gitignore
+
+Today `security-discipline` rule 1 ("no secret in the repo or the built artifact") is prose plus
+the `.gitignore` entries each stack skill's `### Secrets` names, and ruff's `S105`–`S107` on
+the Python side at write time — nothing looks at what is already committed, so a key that
+reached a commit before the rule existed, or through a path the linter does not see, stays in
+history unnoticed. A hook over git history would add that: scanning every commit's content for
+credential shapes on `push` (the way `/orc-git`'s gate already runs `audit` there) and stopping
+the push before the history leaves the machine. It waits for a real case — the v22 spec
+(`docs/superpowers/specs/2026-09-19-orclab-v22-security-discipline-design.md`, §3 "Deliberately
+not built") names it as "a BACKLOG entry citing this spec", and no project has yet leaked a
+secret into Orclab-managed history; `secret-hygiene` holds the recovery procedure when one does.
+
+## #50: PHP as a /orc-code alternative on the web row — v23, starts when v22 ships
+
+direflail is putting an API on DreamHost, which serves PHP and nothing else; the request that
+became v22 (#48) started as "add PHP to `/orc-code`", and direflail's decision was that the
+security rule comes first — *"B. it needs to happen before anything."* This is the second half:
+PHP as an alternative on the Defaults Table's web row, with a `skills/stack-php/SKILL.md` that,
+per CLAUDE.md's "Before the first project builds on a stack ... Orclab has never met", is written
+from live research before the first project, and is born with the `## Security — where
+security-discipline lands` section v22 defined (static-analysis ruleset, dependency-audit
+command for `/orc-test audit` — Composer's `audit` is the candidate to confirm — where secrets
+live, what the exposed tier scaffolds).
+
+**Confirmed live 2026-09-19, so the research does not start from zero:** php.net's supported
+versions table — 8.3 is security-only until 2027-12-31, 8.4 active until 2026-12-31 and then
+security-only, 8.5 supported until 2027-12-31; DreamHost's PHP-version page lists 8.5, 8.4, 8.3
+and 8.2 as selectable per domain; DreamHost's own page has the Composer install steps for a
+shared account; orcshot.org is set to 8.5; Linux Mint 22.3's apt has 8.3. Shared-hosting
+publishing (DreamHost as the confirmed-live example) is a separate task, not PHP-specific, and
+direflail wants it written from a real deployment, not before one. Starts when v22 ships.
+
+## #51: /orc-test audit on a multi-module Gradle build reads only the root project's dependencies until dependencyCheckAggregate is wired
+
+Found writing v22's `/orc-test audit` for Kotlin and Java (#48, plan Tasks 2 and 5):
+`./gradlew dependencyCheckAnalyze` audits the project it is applied to, and `cli.py` reads the
+root project's `build/reports/dependency-check-report.json`, so on a multi-module build the
+audit sees only the root's own dependencies — and the root of a Kotlin Multiplatform project or
+a root-plus-`app/` Android project declares none, so every one of them audits nothing and
+reports it as clean. `skills/orc-test/languages/kotlin.md`'s `## Audit` records the gap in its
+own words: *"A multi-module build wants `dependencyCheckAggregate`, not wired here."* The fix
+is that task — `dependencyCheckAggregate` walks every subproject and writes one report at the
+root — plus a captured fixture from a real multi-module run; until then a Kotlin or Android
+project's audit line is only meaningful when its dependencies are declared at the root.
+
+## #52: stack-unity's Lint block installs analyzers through the .csproj, which Unity's own docs say may never reach its compiler
+
+Found writing `stack-unity`'s Security section (v22, #48, plan Task 8): the skill's Lint section
+(2026-09-13) installs SonarAnalyzer through a `<PackageReference>` in the `.csproj` and sets
+severity in `.editorconfig`, but Unity's own docs, read live 2026-09-19, install an analyzer as
+the DLL itself under `Assets/` with the asset label `RoslynAnalyzer` and set severity through a
+`.ruleset` — Unity regenerates the `.csproj` for the IDE and says of its own analyzers that a
+package reference *"isn't configured automatically in the Unity Editor"*. So the Lint block's
+four shape rules may reach only the IDE and never Unity's compiler or a batch-mode build; the
+Security section says so in its "How the analyzer reaches Unity's compiler is not the `.csproj`"
+paragraph and works around it with `Assets/Default.ruleset`. The first Unity project through
+`/orc-code` settles it — whether Unity 6's compiler loads the Sonar DLL, whether a ruleset
+`Error` stops a batch-mode build, and whether the Lint section's `SonarLint.xml` parameters
+reach the compiler by that path at all — and corrects the Lint section the same day if the
+`.csproj` form is IDE-only, as `skills/stack-unity/SKILL.md` already promises.
+
+## #53: A multiplayer game's server is the Reachable-by-strangers tier and no stack skill covers it; the first multiplayer game researches the server side
+
+Both game skills' Security sections (v22, #48, plan Task 8) scope themselves to the *Every
+project* tier and say multiplayer is out of scope: a game whose server other players reach is
+the *Reachable by strangers* tier on that server, and no stack skill covers a game server.
+Godot's own *High-level multiplayer* page (read live 2026-09-19) states `security-discipline`
+rules 5 and 9 in its words — *"treat all client input as untrusted"*, *"Validate RPC arguments
+before applying them to the game state"*, *"Add safety checks and rate limits to actions that
+can be triggered frequently"* — and Unity's *Multiplayer* page sends a game that *"hosts
+players locally or over a network"* to its Multiplayer Center. What is missing is the server
+side as a stack: where the server runs, what it is written in, how rules 5–9 land in that
+toolchain, and what `/orc-code` scaffolds for it. Per CLAUDE.md's "Before the first project
+builds on a stack ... Orclab has never met", the first multiplayer game writes that from live
+research before its server is built; until then `skills/stack-godot/SKILL.md` and
+`skills/stack-unity/SKILL.md` point here.
+
+## #54: /orc-test audit is red on Orclab itself: pip-audit refuses a pyproject.toml with no [project] table, so /orc-git push on Orclab stops
+
+Found running v22's live verification (#48, plan Task 11 Step 1) on 2026-09-19: `python3
+skills/orc-test/scripts/run.py audit` on Orclab itself prints ``ERROR:pip_audit._cli:pyproject
+file pyproject.toml does not contain `project` section`` and then `Python: audit output not
+understood — see above`, exit 1. Orclab's root `pyproject.toml` holds `[tool.pytest.ini_options]`
+and `[tool.ruff]` only — it is a plugin, its scripts import the standard library, and pytest,
+mutmut, ruff and pip-audit are installed by hand — so it declares nothing for pip-audit to audit,
+and pip-audit's `.` form refuses a pyproject with no `[project]` table. The consequence is
+immediate once v22 merges: `/orc-git push` and `cp` on Orclab go red on every run — the gate
+treats an unreadable audit as a stop, by design (#46's rule, widened to `audit` by v22 §3) — and
+the only way to push Orclab is plain `git push`, the escape that is meant for the exception, not
+the rule. Every consuming project whose `pyproject.toml` exists only to configure tools (a
+plugin, a script collection, a repo whose Python is glue) hits the same line.
+
+Two fixes, each a design call, which is why neither was made in Task 11. (a) Give Orclab's
+`pyproject.toml` a `[project]` table with `dependencies = []`: pip-audit then returns an empty
+`dependencies` list and the line is `Python     audit ✓ 0 vulnerable` — honest, since nothing is
+declared — but `orc_release/versionfiles.py`'s `detect()` says *"pyproject.toml only counts if it
+has a [project] table"*, so from then on `/orc-version` writes a version into a file that has
+never carried Orclab's version (`.claude-plugin/plugin.json` does), a second copy to keep in
+step. (b) Teach `langs/python.py`'s `audit_unavailable` to recognise a `pyproject.toml` with no
+`[project]` table and report it as the gate's "can't measure" outcome (`docs/commands/orc-git.md`:
+*"When it can't measure … it says so in the report and pushes anyway"*), which adds a fifth line
+shape to the four `_audit_line` prints and to `/orc-git`'s gate prose, and has to be phrased so
+that "nothing declared" is not mistaken for "nothing vulnerable". Scope: the Python line only —
+the JS/TS half reads `package-lock.json` and is unaffected, and a project whose `pyproject.toml`
+has a `[project]` table (`stack-web`'s and `stack-python-desktop`'s layout tables both describe
+`pyproject.toml` as holding the name, the `version` `/orc-version` writes and `dependencies`,
+which is that table) audits correctly, shown live the same day on the v22check scaffold.

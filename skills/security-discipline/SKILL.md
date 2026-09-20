@@ -12,7 +12,7 @@ it on trust. The candidate list was the OWASP Top 10:2025, OWASP ASVS 5.0.0 and 
 25, read live on 2026-09-19 (confirmed live 2026-09-19); what survived is what maps to a linter
 rule some stack's tooling has, a piece `/orc-code` scaffolds, or a command — everything else is a
 review item at most, and the reason there are nine and not a hundred is the same as
-`code-discipline`'s: a hundred-rule list is not read (BACKLOG #TBD-v22).
+`code-discipline`'s: a hundred-rule list is not read (BACKLOG #48).
 
 **Every project** — Orcshot's tier: a desktop app, a phone app, a script — anything that runs
 on a machine and talks only to services it chose. Rules 1–4.

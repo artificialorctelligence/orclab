@@ -232,8 +232,7 @@ paragraph: the `.pck` is not a secret store. **Multiplayer is out of scope here.
 all client input as untrusted"*, *"Validate RPC arguments before applying them to the game
 state"*, *"Add safety checks and rate limits to actions that can be triggered frequently"* — so
 a game whose server other players reach is the *Reachable by strangers* tier there, and no
-stack skill covers a game server yet; no BACKLOG entry exists for it, and the first multiplayer
-game opens one.
+stack skill covers a game server yet; BACKLOG #53.
 
 ## Presence
 

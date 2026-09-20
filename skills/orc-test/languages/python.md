@@ -107,7 +107,14 @@ pip-audit 2.10.1 (`pip install pip-audit`), confirmed live 2026-09-19 against it
 from `pyproject.toml` — not the environment — and exits 1 when any has a known vulnerability
 (*"pip-audit's exit code cannot be suppressed"*). `run.py` reads the JSON: one line per
 vulnerable package with its advisory ids and the versions that fix it. First resolution can take
-as long as a `pip install`. Last real run: none yet.
+as long as a `pip install`. pip-audit prints a one-line summary on stderr ahead of the JSON
+(`No known vulnerabilities found` / `Found 36 known vulnerabilities in 3 packages`, seen live
+2026-09-19) and `run.py` merges stderr into stdout, so the parser reads from the first `{`. A
+`pyproject.toml` with no `[project]` table is refused — ``ERROR:pip_audit._cli:pyproject file
+pyproject.toml does not contain `project` section`` — and lands on `audit output not understood`.
+Last real run: 2026-09-19. On the v22check scaffold (`stack-web`, six declared dependencies):
+`Python     audit ✓ 0 vulnerable`, exit 0. On Orclab itself, whose root `pyproject.toml` is tool
+config only: `Python: audit output not understood — see above`, exit 1 (BACKLOG #54).
 
 ## Caveats
 - **mutmut copies only `source_paths` and `also_copy` into `mutants/`; the tests are not copied
