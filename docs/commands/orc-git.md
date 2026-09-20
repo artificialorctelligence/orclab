@@ -74,7 +74,8 @@ Every other subcommand runs immediately once you type it — nothing else is ask
   waiting for a yes — only when you type the command yourself does it skip that and run right
   away.
 - It will never push while the tests fail or coverage is under 80%, or while any dependency has
-  a known vulnerability (it names the package and the version that fixes it) or while the audit
+  a known vulnerability (it names the package and, where the tool reports it, the version that
+  fixes it) or while the audit
   tool's output could not be read, and never release while the tests fail, coverage is under 80%
   or mutation testing scores under 70%. It stops and shows you the test report, and tells you
   what would fix it. It never writes tests on its own —

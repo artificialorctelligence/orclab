@@ -142,7 +142,7 @@ Stop here — do not proceed to any subcommand logic on a bare invocation.
    ```
    `audit` checks every dependency the project declares against the public advisory lists —
    `security-discipline` rule 2. A `✗ N vulnerable` line is a failed gate exactly like coverage:
-   show the report (each line names the package and the version that fixes it), say "bump the
+   show the report (each line names the package and, where the tool reports it, the version that fixes it), say "bump the
    named packages", and stop — **nothing is pushed**. `audit output not understood — see above`
    is also a failed gate — the tool's own output is printed above it; stop, same as the
    vulnerable case, nothing is pushed. `audit not available` or `missing <tool> — skipped` is
@@ -287,7 +287,7 @@ and reversible.
    ```
    `audit` checks every dependency the project declares against the public advisory lists —
    `security-discipline` rule 2. A `✗ N vulnerable` line is a failed gate exactly like coverage:
-   show the report (each line names the package and the version that fixes it), say "bump the
+   show the report (each line names the package and, where the tool reports it, the version that fixes it), say "bump the
    named packages", and stop — **nothing is pushed, nothing released**. `audit output not
    understood — see above` is also a failed gate — the tool's own output is printed above it;
    stop, same as the vulnerable case, nothing is pushed, nothing released. `audit not available`

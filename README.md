@@ -37,7 +37,8 @@ A new install shows up in a fresh session, not the one you ran the install from.
 - [/orc-reload](docs/commands/orc-reload.md) — reinstall the plugin you're developing so a fresh
   session picks up your latest changes.
 - [/orc-test](docs/commands/orc-test.md) — check whether your tests pass, how much they cover,
-  and whether they'd catch a real bug, then fix the weak ones.
+  whether they'd catch a real bug, and whether a dependency has a known vulnerability, then fix
+  the weak ones.
 - [/orc-todo](docs/commands/orc-todo.md) — see and change the project's backlog: list, read, add,
   remove, and order its lanes.
 - [/orc-version](docs/commands/orc-version.md) — bump the project's version, draft its changelog
@@ -68,6 +69,8 @@ Discipline:
 - **release-checklist** — when setting up a release process for a new project, or when an
   existing `RELEASING.md` needs a newly-learned step added.
 - **secret-hygiene** — before running or pasting anything that could surface a credential.
+- **security-discipline** — whenever Claude is about to write or change code, in any language;
+  what every project owes and what one strangers can reach owes on top.
 - **test-discipline** — whenever Claude is about to write or change a test, in any language.
 - **verify-before-asserting** — when a claim Claude made gets challenged, or something turns out
   to behave surprisingly.

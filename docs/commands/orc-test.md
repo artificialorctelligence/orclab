@@ -13,7 +13,7 @@ project is written in, without you telling it which.
 |---|---|
 | `/orc-test` (or `/orc-test run`) | Runs every test suite in the project and reports pass or fail |
 | `/orc-test coverage` | Reports what percent of the code the tests actually exercise, held to a minimum of 80% |
-| `/orc-test audit` | Checks every dependency the project declares against the public list of known vulnerabilities and names any that are affected, with the version that fixes each |
+| `/orc-test audit` | Checks every dependency the project declares against the public list of known vulnerabilities and names any that are affected, with the version that fixes each where the tool reports it |
 | `/orc-test analyze` | Runs coverage, then mutation testing — plants a small, deliberate defect in the code and reruns the tests to see whether any of them notice — and reports a score for that, called TCE (Test Case Effectiveness), held to a minimum of 70%, plus a check over the test files themselves for problems like a test with no assertion or one that's silently skipped |
 | `/orc-test generate` | Writes and fixes tests to repair whatever the last `analyze` found weak |
 | `/orc-test detect` | Lists which languages it found in the project and which command it will use to test each, without running anything |

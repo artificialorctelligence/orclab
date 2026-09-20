@@ -28,7 +28,8 @@ def audit_unavailable(root):
 
 def audit_cmd(root):
     # Verb-first form: .NET 10 added `dotnet package list` as an alias and keeps this one, and
-    # --format json needs SDK 7.0.200+. Transitive packages are not audited unless asked.
+    # --format json needs SDK 7.0.200+. --include-transitive is passed because transitive
+    # packages are not audited by default.
     return ["dotnet", "list", "package", "--vulnerable", "--include-transitive", "--format", "json"]
 
 

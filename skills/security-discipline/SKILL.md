@@ -9,13 +9,14 @@ user-invocable: false
 `code-discipline` says how code is shaped. This says what it must never let in or let out. Nine
 rules in two tiers, each traced to OWASP or CWE so the next reader can judge it rather than take
 it on trust. The candidate list was the OWASP Top 10:2025, OWASP ASVS 5.0.0 and the 2025 CWE Top
-25, read live on 2026-09-19 (confirmed live 2026-09-19); what survived is what maps to a linter
+25, read live on 2026-09-19; what survived is what maps to a linter
 rule some stack's tooling has, a piece `/orc-code` scaffolds, or a command — everything else is a
 review item at most, and the reason there are nine and not a hundred is the same as
 `code-discipline`'s: a hundred-rule list is not read (BACKLOG #48).
 
 **Every project** — Orcshot's tier: a desktop app, a phone app, a script — anything that runs
-on a machine and talks only to services it chose. Rules 1–4.
+on a machine and talks only to services it chose. Rules 1–4, and rule 8's client half if the
+app talks to a server.
 
 **Reachable by strangers** — the tier of anything that accepts a connection from someone you did
 not invite: an API on a web host, a site, a server a phone app talks to. Rules 1–4 and then
@@ -106,7 +107,7 @@ rule's failures — #1 cross-site scripting, #2 SQL injection, #6 path traversal
 injection, #15 deserialization of untrusted data, #22 SSRF. Validation on the client does not
 count (ASVS 2.2.2: *"it must not be relied upon as a security control"*).
 
-**Lands:** two halves. Linted at the sink, where the stack's tool has the rule — Python:
+**Lands:** two halves. Linted at the point where the value is used, where the stack's tool has the rule — Python:
 ruff `S608` (hardcoded-sql-expression), `S602` (subprocess with `shell=True`), `S301`
 (pickle), `S506` (unsafe yaml load); the stack section's `### Static analysis` names the
 ruleset per language, or says "none free". Scaffolded at the door: every route has a
@@ -134,11 +135,12 @@ inside a handler.
 
 The situation: something threw, and the framework's default is about to send the stack trace,
 the failed query, a file path or a version string back over the wire. ASVS 16.5.1: *"a generic
-message is returned to the consumer"* on any unexpected or security-sensitive error, naming *"stack traces, queries, secret keys, and tokens"* as what must not be in it. OWASP A02
+message is returned to the consumer"* on any unexpected or security-sensitive error, naming
+*"stack traces, queries, secret keys, and tokens"* as what must not be in it. OWASP A02
 counts *"Error handling reveals stack traces or other overly informative error messages"* as
-misconfiguration; A10 wants *"a global exception handler in place"* for whatever was missed. The full detail goes to the log; the caller gets a generic message
-and an id to quote. And the process fails closed: a validation error does not let the request
-through (ASVS 16.5.3).
+misconfiguration; A10 wants *"a global exception handler in place"* for whatever was missed.
+The full detail goes to the log; the caller gets a generic message and an id to quote. And the
+process fails closed: a validation error does not let the request through (ASVS 16.5.3).
 
 **Lands:** scaffolded — a last-resort exception handler that logs everything and returns
 nothing but a generic message, and the framework's debug mode off outside development (ASVS

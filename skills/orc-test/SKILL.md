@@ -21,7 +21,7 @@ says so and stops.
 |---|---|---|
 | `run` (or nothing) | Does the code work? | nothing |
 | `coverage` | How much of it do the tests exercise? (gate 80%) | `.orclab/test/<lang>/` |
-| `audit` | Do the dependencies carry a known vulnerability? (gate: none) | nothing |
+| `audit` | Do the dependencies carry a known vulnerability? (gate: any finding) | nothing |
 | `analyze` | Would the tests notice a defect? (coverage + TCE at 70% + lint) | `.orclab/test/<lang>/`, `.orclab/test/analyze.json` |
 | `generate` | Fix what `analyze` found | tests, uncommitted — see below |
 | `detect` | Which languages, and which test command each | nothing |
@@ -71,13 +71,14 @@ HTML report path is printed; per-line detail lives there, not in the summary.
 ## `audit` — are the dependencies known-vulnerable?
 
 `python3 ${CLAUDE_SKILL_DIR}/scripts/run.py audit`. One line per language: `✓ 0 vulnerable`, or
-`✗ N vulnerable` with one indented line per package — name, version, advisory ids, the versions
-that fix it. `languages/<lang>.md`'s `## Audit` says which tool each language uses; a language
-whose tool is not installed prints `missing <tool> — <install line> — skipped` and is not a
-failure; a language with no free audit tool prints `audit not available — <why>` and is not a
-failure either. Exit 1 only when a vulnerable dependency was actually found. `/orc-git push`,
-`cp` and `release` run it before touching a remote (v22; `security-discipline`'s every-project
-rule "dependencies audited").
+`✗ N vulnerable` with one indented line per package — name, version, advisory ids and, where the
+tool reports it, the version that fixes it. `languages/<lang>.md`'s `## Audit` says which tool
+each language uses; a language whose tool is not installed prints `missing <tool> — <install
+line> — skipped` and is not a failure; a language with no free audit tool prints `audit not
+available — <why>` and is not a failure either. Exit 1 only when a vulnerable dependency was
+actually found, or when a tool's output could not be read — that line is printed with the tool's
+own output above it. `/orc-git push`, `cp` and `release` run it before touching a remote (v22;
+`security-discipline`'s every-project rule "dependencies audited").
 
 ## `analyze` — would the tests notice a defect?
 

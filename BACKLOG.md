@@ -3767,3 +3767,90 @@ skills/orc-test/scripts/run.py --cwd . audit`: `detected: Python` then `Python  
 available — nothing declared: pyproject.toml has no [project] table`, exit 0 — where the same
 command had printed `Python: audit output not understood — see above`, exit 1. Fix (a) was not
 taken: Orclab's version stays in `.claude-plugin/plugin.json` alone.
+
+## #55: orc-test audit: cli.py::_resolve gates audit on the test tools, not the audit tool
+
+Found during the v22 whole-branch review (final-fix-report, 2026-09-19), reading `cli.py`'s
+`_resolve`/`_audit_line`/`cmd_audit` together. `cmd_audit` iterates `usable`, and `usable` comes
+entirely from `_resolve` (`cli.py:_resolve`, ~line 37): for each detected language module it
+calls `m.missing(d)` — Python's `TOOLS = {"pytest": ..., "pytest_cov": ...}` — and if anything is
+missing, prints `"{m.LABEL}: missing {tool} — {m.TOOLS[tool]} — skipped"` and excludes that
+module from `usable` entirely, before `cmd_audit` (or any other subcommand) ever sees it.
+
+The consequence: a Python project with `pip-audit` installed but without `pytest-cov` never gets
+audited. `/orc-test audit` (and therefore `/orc-git push`'s audit gate, which runs the same
+`cmd_audit` path) prints `Python: missing pytest_cov — pip install pytest-cov — skipped` and
+nothing else for that language — not `audit not available`, not a vulnerability count, nothing
+that says "audit". The push proceeds. This is a way the security gate `security-discipline` rule
+2 exists to enforce (`dependencies audited`) silently does not run, for a reason that has nothing
+to do with whether dependencies can be audited — the missing tool is a *test* tool, and audit's
+own tool (`AUDIT_TOOL`, `audit_unavailable`) is never consulted.
+
+Scope: this is specific to how `_resolve` builds `usable` — it conflates "can I test this
+language" with "can I do anything at all with this language," and `audit` inherits the narrower
+gate. It does not affect a project where the test tools are present (the common case Orclab's
+own dogfooding has exercised so far), which is likely why the v22 live runs (BACKLOG #48) never
+tripped it. Fix shape: `cmd_audit` needs its own resolution path — one that checks the audit
+tool's own availability (`audit_unavailable`/`audit_nothing`) rather than reusing `_resolve`'s
+test-tool gate, or `_resolve` needs to keep a language usable for audit even when its test tools
+are missing.
+
+## #56: orc-test audit: python.audit_nothing calls a setup.py/requirements.txt-only project green with nothing audited
+
+Found during the v22 whole-branch review (final-fix-report, 2026-09-19), reading
+`skills/orc-test/scripts/orc_test/langs/python.py`'s `audit_nothing` after BACKLOG #54 shipped it.
+`audit_nothing` returns `None` (declares something, audit proceeds) only when `pyproject.toml`
+exists and has a `[project]` table; otherwise it returns `"nothing declared: pyproject.toml has
+no [project] table"`, which `_audit_line` prints as `audit not available — ...` — honest about
+*why*, green on the gate.
+
+The consequence: a project whose dependencies are declared in `setup.py` or `requirements.txt`
+alone — no `pyproject.toml` `[project]` table at all — reports the exact same "nothing declared"
+line as a project with no Python dependencies whatsoever. That is wrong in spirit, not just
+technically: `setup.py`/`requirements.txt`-only is a common, ordinary shape for exactly the kind
+of API/backend project v22's `security-discipline` was written for (a FastAPI service predating
+the `pyproject.toml` convention, or one that never adopted it), and its dependencies are real and
+auditable — `pip-audit -r requirements.txt` reads them directly, no `[project]` table needed.
+Today that project gets "not available," never audited, and the push gate is green.
+
+Scope: this is `audit_nothing`'s own decision procedure, not `audit_cmd`'s `.` form (which
+`#54` correctly restricted to declared-`[project]` pyproject.toml — that fix stands). The fix is
+additive: `audit_cmd` needs a second shape — `["python3", "-m", "pip_audit", "-f", "json",
+"--progress-spinner", "off", "-r", "requirements.txt"]` — chosen when `requirements.txt` exists
+and there is no `[project]` table, with `audit_nothing` only returning "nothing declared" when
+neither shape has anything to read. `setup.py`-only (no `requirements.txt`) is a real remaining
+gap even after that — pip-audit has no direct way to read `install_requires` from `setup.py`
+without invoking it — and may need its own note in `languages/python.md` when this is picked up,
+rather than a promise to solve it silently.
+
+## #57: orc-test audit: yarn/pnpm projects hit npm's ENOLOCK, and javascript.md's advice to fix it is wrong for them
+
+Found during the v22 whole-branch review (final-fix-report, 2026-09-19), reading
+`skills/orc-test/scripts/orc_test/langs/javascript.py`'s `audit_cmd`/`audit_findings` and
+`skills/orc-test/languages/javascript.md`'s Audit section together. `audit_cmd` always runs
+`npm audit --json`, which requires a `package-lock.json` or `npm-shrinkwrap.json` — *"npm requires
+a package-lock or shrinkwrap in order to run the audit"* (the doc quote already in
+`javascript.md`). A project whose lockfile is `yarn.lock` or `pnpm-lock.yaml` instead has no
+`package-lock.json`, so `npm audit` returns an `ENOLOCK` error document, which `audit_findings`
+correctly lands on the `_UNREADABLE` sentinel — but that sentinel fails the gate (`_audit_line`:
+`audit output not understood — see above`, and `cmd_audit` returns 1). The result: a yarn or
+pnpm project gets a red `/orc-git push` gate on every single push, forever, not because of a
+vulnerability but because the audit tool `orc_test` runs doesn't match the project's package
+manager.
+
+`javascript.md`'s Audit section makes it worse, not better: its documented remedy for `ENOLOCK` is
+*"run `npm install` first"* — which is actively wrong advice for a yarn/pnpm project. Running
+`npm install` there either fails outright (workspaces set up for yarn/pnpm) or creates a second,
+unwanted `package-lock.json` alongside the real lockfile, which is exactly the kind of tooling
+confusion a project that deliberately chose yarn or pnpm does not want.
+
+Scope: this bites only an *existing* project that already uses yarn or pnpm — every one of
+Orclab's own stacks that generates a JS/TS project (`stack-web`, `stack-react-native`) scaffolds
+with npm, so a project built through `/orc-code` never hits this. It is real for anyone bringing
+an existing yarn/pnpm codebase under `/orc-test`/`/orc-git`, which is a supported, ordinary case
+— `code-discipline`'s tooling is meant to work on code Orclab didn't scaffold. Fix shape: detect
+the lockfile actually present (`yarn.lock` → `yarn npm audit --json` or `yarn audit --json`
+depending on Yarn version; `pnpm-lock.yaml` → `pnpm audit --json`) and pick the audit command and
+its findings-shape parser accordingly, the same way `_runner` already picks vitest vs. jest from
+`package.json`; then correct `javascript.md`'s remedy line to match whichever manager the
+lockfile names instead of unconditionally naming `npm install`.

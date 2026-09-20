@@ -1,7 +1,8 @@
 # JavaScript/TypeScript
 
-Researched on: 2026-09-11 (versions read from the npm registry that day). Last real run: none yet —
-the first project with this language corrects it.
+Researched on: 2026-09-11 (versions read from the npm registry that day). Last real run:
+2026-09-19, on the v22check scaffold (`stack-web`, `web/`): `npx vitest run` — `No test files
+found` (the scaffold ships no test yet); audit below.
 
 ## Detect
 `package.json` at the root or up to two directories down.
@@ -47,7 +48,8 @@ report by package and reports the vulnerable **range**, not the installed versio
 reads `lodash <=4.17.23: GHSA-…, GHSA-… — fix lodash 4.18.1`; a package vulnerable only through a
 dependency lists that dependency as `via <name>`. A missing lock file comes back as an `ENOLOCK`
 error document, which `cli.py` reports as output not understood — run `npm install` first. Last
-real run: none yet.
+real run: 2026-09-19, on the v22check scaffold (`stack-web`, `web/`): `JS/TS      audit ✓ 0
+vulnerable`, exit 0 (BACKLOG #48).
 
 ## Caveats
 - **`eslint-plugin-vitest` (no `@vitest/` scope) is the abandoned 2024 package.** The maintained
