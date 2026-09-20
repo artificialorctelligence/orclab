@@ -128,10 +128,12 @@ GDScript:
   common names"* (*"the default CA list will be used if null"*); what a request with no
   `tls_options` at all does, the `HTTPClient` page does not say (`TLSOptions` and `HTTPClient`
   class pages, read live 2026-09-19). The check is Orclab's own, before any export:
-  `grep -rn client_unsafe --include='*.gd' --include='*.cs' .` prints nothing. Godot has no
-  switch that refuses plain `http://`; an `HTTPRequest` to an `http://` URL is a finding on
-  sight — on Android the platform's cleartext default catches it (the native skill), on desktop
-  nothing does.
+  `grep -rn client_unsafe --include='*.gd' --include='*.cs' .` prints nothing. No switch that
+  refuses plain `http://` was found: the `ProjectSettings` page's `network/*` keys (read live
+  2026-09-19) are `limits/*`, `tls/certificate_bundle_override` and `tls/enable_tls_v1.3`, none
+  of which refuses a URL; so an `HTTPRequest` to an `http://` URL is a finding on sight — on
+  Android the platform's cleartext default catches it (the native skill), on desktop nothing
+  does.
 - **Rule 3** in Godot's own words, from *Exporting packs, patches, and mods* (read live
   2026-09-19): loading a `.pck` at runtime through `ProjectSettings.load_resource_pack()` *"is a
   security vulnerability"* when *"a user downloads a mod with malicious code"* or *"a malicious
@@ -149,7 +151,9 @@ GDScript:
 The .NET edition's C# is a real .NET SDK project — *"you must have installed the .NET SDK"*,
 and a NuGet package goes in *"the .csproj file located in the project root"* (*C# basics*, read
 live 2026-09-19) — so `stack-unity`'s Security section's Sonar rules apply here through the
-`PackageReference` form its Lint section shows, not the DLL-in-`Assets/` form Unity needs.
+`PackageReference` form its Lint section shows, not the DLL-in-`Assets/` form Unity needs, and
+that Lint block's `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` already promotes those
+default-on Warnings to build errors — no `.ruleset` here.
 
 ### Dependency audit
 
@@ -373,7 +377,7 @@ default; arm64 if a Pi 5 could run it) and ship.
 
 ## Sources (live on 2026-09-11; facets 2026-09-12)
 
-- Security — where security-discipline lands (2026-09-19): gdlint's rule list `https://github.com/Scony/godot-gdscript-toolkit/wiki/3.-Linter` and `https://raw.githubusercontent.com/Scony/godot-gdscript-toolkit/master/gdtoolkit/linter/__init__.py` (`DEFAULT_CONFIG`); `https://docs.godotengine.org/en/stable/classes/class_projectsettings.html` (the `debug/gdscript/warnings/*` keys, `unsafe_cast`); `https://docs.godotengine.org/en/stable/classes/class_tlsoptions.html` (`client`, `client_unsafe`), `https://docs.godotengine.org/en/stable/classes/class_httpclient.html` (`connect_to_host`); `https://docs.godotengine.org/en/stable/tutorials/export/exporting_pcks.html` (*Security concerns*, `load_resource_pack`); `https://docs.godotengine.org/en/stable/classes/class_editorexportplatformandroid.html` (`permissions/*`, `keystore/release_*` env vars, `user_data_backup/allow`); `https://docs.godotengine.org/en/stable/tutorials/scripting/c_sharp/c_sharp_basics.html` (.NET SDK, `.csproj`); `https://docs.godotengine.org/en/stable/tutorials/export/exporting_projects.html` (`export_presets.cfg`, `.godot/export_credentials.cfg`, PCK versus ZIP); `https://raw.githubusercontent.com/godotengine/godot/master/editor/version_control/editor_vcs_interface.cpp` (the default `.gitignore`); `https://docs.godotengine.org/en/stable/classes/index.html` (no keychain class), `https://docs.godotengine.org/en/stable/classes/class_crypto.html`, `https://docs.godotengine.org/en/stable/classes/class_configfile.html` (`save_encrypted`, `load_encrypted`), `https://docs.godotengine.org/en/stable/classes/class_os.html` (`get_environment`); `https://docs.godotengine.org/en/stable/engine_details/development/compiling/compiling_with_script_encryption_key.html` (PCK encryption; the `contributing/...` path is a 404 on `stable`); `https://docs.godotengine.org/en/stable/tutorials/networking/high_level_multiplayer.html` (*Secure multiplayer design*)
+- Security — where security-discipline lands (2026-09-19): gdlint's rule list `https://github.com/Scony/godot-gdscript-toolkit/wiki/3.-Linter` and `https://raw.githubusercontent.com/Scony/godot-gdscript-toolkit/master/gdtoolkit/linter/__init__.py` (`DEFAULT_CONFIG`); `https://docs.godotengine.org/en/stable/classes/class_projectsettings.html` (the `debug/gdscript/warnings/*` keys, `unsafe_cast`; the `network/*` keys — no plain-HTTP switch); `https://docs.godotengine.org/en/stable/classes/class_tlsoptions.html` (`client`, `client_unsafe`), `https://docs.godotengine.org/en/stable/classes/class_httpclient.html` (`connect_to_host`); `https://docs.godotengine.org/en/stable/tutorials/export/exporting_pcks.html` (*Security concerns*, `load_resource_pack`); `https://docs.godotengine.org/en/stable/classes/class_editorexportplatformandroid.html` (`permissions/*`, `keystore/release_*` env vars, `user_data_backup/allow`); `https://docs.godotengine.org/en/stable/tutorials/scripting/c_sharp/c_sharp_basics.html` (.NET SDK, `.csproj`); `https://docs.godotengine.org/en/stable/tutorials/export/exporting_projects.html` (`export_presets.cfg`, `.godot/export_credentials.cfg`, PCK versus ZIP); `https://raw.githubusercontent.com/godotengine/godot/master/editor/version_control/editor_vcs_interface.cpp` (the default `.gitignore`); `https://docs.godotengine.org/en/stable/classes/index.html` (no keychain class), `https://docs.godotengine.org/en/stable/classes/class_crypto.html`, `https://docs.godotengine.org/en/stable/classes/class_configfile.html` (`save_encrypted`, `load_encrypted`), `https://docs.godotengine.org/en/stable/classes/class_os.html` (`get_environment`); `https://docs.godotengine.org/en/stable/engine_details/development/compiling/compiling_with_script_encryption_key.html` (PCK encryption; the `contributing/...` path is a 404 on `stable`); `https://docs.godotengine.org/en/stable/tutorials/networking/high_level_multiplayer.html` (*Secure multiplayer design*)
 - Lint — where code-discipline lands (2026-09-13): `https://raw.githubusercontent.com/Scony/godot-gdscript-toolkit/master/gdtoolkit/linter/__init__.py` (`max-nested-blocks`/`max-statements` commented out), `https://pypi.org/pypi/gdtoolkit/json`, `https://docs.godotengine.org/en/stable/classes/class_projectsettings.html` (`debug/gdscript/warnings/*`), `https://docs.godotengine.org/en/stable/classes/class_@gdscript.html` (`assert`); C# as in `stack-unity`
 - Download / current version: `https://godotengine.org/download/linux/`
 - Exporting for Android: `https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_android.html`;
