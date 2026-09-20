@@ -45,20 +45,33 @@ question `$ARGUMENTS` already answered.
      never met" applies: the research comes first.
    - If the user changes scope after scaffolding ("we should add iOS"), that is the
      Add-to-Existing Flow, not this table.
-4. **Starting point**: "Would you like a minimal example, a basic scaffold with common features,
+4. **Exposure**: "Will anyone you didn't invite be able to reach this?" — with the proposed
+   answer already in the question, so it is a confirmation, not a blank: web ticked → "You
+   ticked web, so I'll assume yes — right?"; desktop or mobile only → "Nothing you ticked
+   accepts connections, so I'll assume no — right?". The answer is which of
+   `security-discipline`'s two tiers the scaffold builds to: *Every project*, or *Reachable by
+   strangers*. It is not recorded anywhere — what step 6 scaffolds is the record, and from then
+   on the code says which tier it is (a route handler is a route handler).
+5. **Starting point**: "Would you like a minimal example, a basic scaffold with common features,
    or something specific — describe your use case."
 
-Once all four are answered:
+Once all five are answered:
 
-5. **Scaffold**: create the project directory (if it doesn't already exist), initialize the
+6. **Scaffold**: create the project directory (if it doesn't already exist), initialize the
    language's standard tooling (e.g. `npm init`, `cargo init`, a Maven/Gradle project layout,
    `python -m venv` + `pyproject.toml`, whatever is standard for the confirmed language), and
    write starter files reflecting the confirmed stack and starting point.
-6. **Verify**: run the stack's standard build/test command (e.g. `mvn compile`, `npm run build`,
+   Also write the stack skill's `## Lint — where code-discipline lands` config and its
+   `## Security — where security-discipline lands` static-analysis config — the same file — and
+   the `.gitignore` entries the Security section's `### Secrets` names. If the answer to step 4
+   was yes, scaffold what that section's `### Reachable by strangers` lists for this stack: the
+   auth layer, the public/private split, error handling that returns no internals, transport.
+   `/orc-code` names no framework itself; the stack skill does.
+7. **Verify**: run the stack's standard build/test command (e.g. `mvn compile`, `npm run build`,
    `cargo build`, `python -m py_compile` or the project's own test command) and confirm it exits
    cleanly. If it fails, fix the issue before continuing — do not report this flow as complete
    until the verification command actually passes.
-7. **Report**: tell the user what was created, the exact command to run it, and any relevant next
+8. **Report**: tell the user what was created, the exact command to run it, and any relevant next
    steps.
 
 ## Add-to-Existing Flow
@@ -117,9 +130,11 @@ step's output is the next step's input.
    `## Lint — where code-discipline lands` names the config file and its contents. If the
    project already has that file, use it as it is — a project's own settings win, and this mode
    does not edit them. If not, write that section's config verbatim, tell the user the project
-   has just adopted `code-discipline`, and commit the config on its own. **The same for the
+   has just adopted `code-discipline`, and commit the config on its own. The same for the
+   `## Security — where security-discipline lands` static-analysis config, in the same file —
+   one commit says the project adopted both. **The same for the
    mutation config** `orc-test`'s `languages/<lang>.md` names (`[tool.mutmut]` for Python):
-   without it `analyze` reports "TCE not measurable", step 2 has no TCE and step 3.3 has no
+   without it `analyze` reports "TCE not measurable", step 2 has no TCE and step 3.4 has no
    survivors to work from. Its own commit, like the lint config.
 2. **Baseline, in numbers.** The linter over the whole tree (the stack section's command —
    `ruff check .`, `oxlint .`, `./gradlew detekt`, and so on) and `/orc-test analyze` on the
@@ -146,7 +161,15 @@ step's output is the next step's input.
       move — the block into a named helper, verbatim, its free variables as parameters — and
       the net is the linter's undefined-name rules plus an import of the module; the commit
       says so. Do those files last, and never rewrite logic in them under this mode.
-   3. **`/orc-test generate`** for what the baseline `analyze` listed — surviving mutants,
+   3. **The security scan, through `modernize-harden`.** Run the Plugin-Discovery Procedure
+      below for `code-modernization`. Found: run `/modernize-harden` on the project — it scans
+      for OWASP, CWE, dependency and secrets findings and produces a reviewable patch; review
+      each hunk against `security-discipline`'s rules and apply what holds, under the same
+      "suite green after every file" rule. Not found: say plainly
+      "`code-modernization` isn't currently installed", offer the install line the procedure
+      gives, and — if the user declines — read `security-discipline` against the code by
+      hand, one rule at a time, the way step 3.2 reads `code-discipline`.
+   4. **`/orc-test generate`** for what the baseline `analyze` listed — surviving mutants,
       uncovered code, test-lint findings — under `generate`'s own rules: deletions are proposed
       as a list, never done unasked.
 4. **before → after, every number**, in the shape `generate` reports: findings by rule,
@@ -331,5 +354,5 @@ Do not invent additional defaults beyond what's listed here — if a scope isn't
 ask directly in the New-Project Flow's step 3 instead of guessing. A row's **Knowledge** column
 names the background skill that holds the stack's current toolchain, project layout, store
 rules, and the facets every stack skill answers — presence, UI, storage (v18 spec §3). When a
-row has one, its scaffold step follows that file rather than this one's generic step 5. A row
+row has one, its scaffold step follows that file rather than this one's generic step 6. A row
 marked *stub* is not a default to propose; it is a name to research.

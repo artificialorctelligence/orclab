@@ -19,7 +19,9 @@ a subagent's task — whatever the language. The rules are in the order the work
 - The project's framework and runner are known. `skills/orc-test/languages/<lang>.md` says which
   for each language `/orc-test` supports; a project's own config wins over that file.
 - The scenarios that matter are listed *before* any test exists: empty and null inputs, a large
-  input, the async path, the error path, the boundary the code's own `if` names.
+  input, the async path, the error path, the boundary the code's own `if` names. At every
+  trust boundary, the hostile case — an unauthenticated request, malformed input — is on the
+  list, and the test proves it is refused (`security-discipline`).
 
 ## 2. TDD — one law, not two
 
