@@ -54,7 +54,10 @@ def audit_findings(stdout, returncode):
     # package when it comes from more than one source (found in the real captured fixture); the
     # ✗ N count is a count of distinct vulnerabilities, not of records.
     try:
-        data = json.loads(stdout)
+        # runner.run merges stderr, and pip-audit prints its one-line summary there before the
+        # JSON ("No known vulnerabilities found" / "Found N known vulnerabilities in M packages",
+        # seen live 2026-09-19); read from the first `{`, the way csharp.py does.
+        data, _ = json.JSONDecoder().raw_decode(stdout, stdout.index("{"))
         deps = data.get("dependencies", []) if isinstance(data, dict) else data
         out, seen = [], set()
         for dep in deps:
@@ -67,7 +70,7 @@ def audit_findings(stdout, returncode):
                 fix = ", ".join(v.get("fix_versions", [])) or "none published"
                 out.append(f"{dep['name']} {dep['version']}: {ids} — fix {fix}")
         return out
-    except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
+    except (json.JSONDecodeError, KeyError, TypeError, AttributeError, ValueError):
         return _UNREADABLE
 
 

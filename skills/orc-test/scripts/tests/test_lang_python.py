@@ -287,6 +287,22 @@ def test_audit_clean_and_unreadable():
     assert py.audit_findings("Traceback (most recent call last)", 2) == ["audit output not understood — see above"]
 
 
+def test_audit_findings_skips_pip_audits_stderr_summary():
+    # runner.run merges stderr into stdout, and pip-audit always prints a one-line summary on
+    # stderr before the JSON — both captured live 2026-09-19 with pip-audit 2.10.1: "No known
+    # vulnerabilities found" on the v22check scaffold, "Found 36 known vulnerabilities in 3
+    # packages" on a pyproject pinning requests==2.19.0 (a cachecontrol WARNING line came ahead
+    # of it on a cold cache). Read as pure JSON, every real run was "not understood", a red gate.
+    clean = 'No known vulnerabilities found\n{"dependencies": [{"name": "fastapi", "version": "0.141.1", "vulns": []}], "fixes": []}\n'
+    assert py.audit_findings(clean, 0) == []
+    vuln = ('Found 1 known vulnerability in 1 package\n{"dependencies": [{"name": "x", "version": "1", "vulns": ['
+            '{"id": "CVE-1", "fix_versions": ["2"], "aliases": []}]}], "fixes": []}\n')
+    assert py.audit_findings(vuln, 1) == ["x 1: CVE-1 — fix 2"]
+    # No JSON at all — pip-audit's own error line, as on a pyproject.toml with no [project] table.
+    assert py.audit_findings("ERROR:pip_audit._cli:pyproject file pyproject.toml does not contain `project` section\n", 1) == [
+        "audit output not understood — see above"]
+
+
 def test_audit_findings_never_raises_on_valid_but_wrong_shaped_json():
     # Valid JSON, but not the shape pip-audit documents: must land on the sentinel, not crash
     # cmd_audit with a KeyError/TypeError/AttributeError.
