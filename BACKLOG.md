@@ -3578,7 +3578,9 @@ user site the suites already use. Second run: ``ERROR:pip_audit._cli:pyproject f
 does not contain `project` section`` then `Python: audit output not understood — see above`, exit
 1. Orclab's root `pyproject.toml` is tool configuration only and declares no dependencies, so
 pip-audit refuses it, and with the merge `/orc-git push` on Orclab is red until that is settled —
-#54, not fixed here because both fixes are design calls.
+#54, not fixed in Task 11 because both fixes were design calls (the v22 review chose one the same
+day; #54 is resolved, and the line on Orclab is now `Python     audit not available — nothing
+declared: pyproject.toml has no [project] table`, exit 0).
 
 *`ruff check --select S .` on Orclab:* `Found 1487 errors.` — 1352 of them `S101` (`assert`, i.e.
 the test suites), 54 `S603`, 48 `S607`, 21 `S404`, 4 `S314`, 4 `S405`, 3 `S310`, 1 `S602`. Under
@@ -3588,7 +3590,13 @@ live at `skills/*/scripts/tests/` and `hooks/scripts/tests/`; with `**/tests/**`
 errors.` (54 `S603`, 48 `S607`, 4 `S314`, 3 `S310`, 1 `S602`; no `S101` outside tests). Orclab's
 own adoption is a quality-mode pass, not done here.
 
-*The scaffold.* `/orc-code` was followed from this branch's `skills/orc-code/SKILL.md` (the
+*The scaffold.* Verdict first: everything `stack-web`'s `### Reachable by strangers` says the
+exposed tier scaffolds was there — auth, the public/private split, bounded input, the
+internals-free error handler, the rate limit — plus the security lint config and the secrets
+layout; the one absent piece, transport, is the one the section itself defers to the reverse
+proxy's config on the first project; and the one red line the audit printed was a parser bug in
+`/orc-test`, fixed the same day, not the scaffold's. The evidence: `/orc-code` was followed from
+this branch's `skills/orc-code/SKILL.md` (the
 installed plugin was v0.21.0) with the answers new project, `v22check`, app, web, exposure "yes",
 minimal example, into a scratch directory, per `stack-web`. Node 20.20.2 on this machine satisfies
 Vite 8 (≥ 20.19) but not Vitest 5 (≥ 22.12); network was up. Against `stack-web`'s Security
@@ -3667,8 +3675,9 @@ direflail wants it written from a real deployment, not before one. Starts when v
 ## #51: /orc-test audit on a multi-module Gradle build reads only the root project's dependencies until dependencyCheckAggregate is wired
 
 Found writing v22's `/orc-test audit` for Kotlin and Java (#48, plan Tasks 2 and 5):
-`./gradlew dependencyCheckAnalyze` audits the project it is applied to, and `cli.py` reads the
-root project's `build/reports/dependency-check-report.json`, so on a multi-module build the
+`./gradlew dependencyCheckAnalyze` audits the project it is applied to, and `java.py`'s
+`_report_cmd` (which `kotlin.py` reuses) reads the root project's
+`build/reports/dependency-check-report.json`, so on a multi-module build the
 audit sees only the root's own dependencies — and the root of a Kotlin Multiplatform project or
 a root-plus-`app/` Android project declares none, so every one of them audits nothing and
 reports it as clean. `skills/orc-test/languages/kotlin.md`'s `## Audit` records the gap in its
@@ -3709,7 +3718,7 @@ builds on a stack ... Orclab has never met", the first multiplayer game writes t
 research before its server is built; until then `skills/stack-godot/SKILL.md` and
 `skills/stack-unity/SKILL.md` point here.
 
-## #54: /orc-test audit is red on Orclab itself: pip-audit refuses a pyproject.toml with no [project] table, so /orc-git push on Orclab stops
+## #54: /orc-test audit is red on Orclab itself: pip-audit refuses a pyproject.toml with no [project] table, so /orc-git push on Orclab stops (RESOLVED 2026-09-19)
 
 Found running v22's live verification (#48, plan Task 11 Step 1) on 2026-09-19: `python3
 skills/orc-test/scripts/run.py audit` on Orclab itself prints ``ERROR:pip_audit._cli:pyproject
@@ -3739,3 +3748,22 @@ the JS/TS half reads `package-lock.json` and is unaffected, and a project whose 
 has a `[project]` table (`stack-web`'s and `stack-python-desktop`'s layout tables both describe
 `pyproject.toml` as holding the name, the `version` `/orc-version` writes and `dependencies`,
 which is that table) audits correctly, shown live the same day on the v22check scaffold.
+
+**Resolved for real, not just tracked** — fix (b), decided by the v22 review the same day and
+cheaper than the paragraph above claims: `cli.py` already printed `audit not available — <reason>`
+for a language with no free tool, and `orc-git/SKILL.md` already said that line *"is carried into
+the report and the push continues"*, so there was no fifth line shape and no gate prose to write.
+What was added (commit `1c66836`): an optional language-module member `audit_nothing(root)`,
+which `_audit_line` consults *before* `audit_unavailable` — so a tool-only repository without
+pip-audit is never told to install a tool that will then refuse it — and whose reason prints on
+that existing line with the gate left green. Python's returns `nothing declared: pyproject.toml
+has no [project] table` when the file is absent or has no `project` key, else `None`; `[project]`
+only, because `audit_cmd`'s `.` reads only that table (`requirements.txt` would be a different
+`audit_cmd`, not this). Pinned by `test_audit_nothing_is_a_pyproject_without_a_project_table`
+(missing file, tool-only, `[project]`) and
+`test_nothing_declared_is_not_available_and_never_asks_for_the_tool` (the fake's
+`audit_unavailable` raises if consulted). Live on this worktree, `python3
+skills/orc-test/scripts/run.py --cwd . audit`: `detected: Python` then `Python     audit not
+available — nothing declared: pyproject.toml has no [project] table`, exit 0 — where the same
+command had printed `Python: audit output not understood — see above`, exit 1. Fix (a) was not
+taken: Orclab's version stays in `.claude-plugin/plugin.json` alone.
