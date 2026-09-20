@@ -2779,6 +2779,11 @@ fires for a private project too. The one pending action with a real trigger — 
 and `flatpak` and writing `ego`/`spices` once Orcshot's #198 and #205 resolve — is split out as
 **#37**, so this heading no longer hides it.
 
+**Update 2026-09-20.** v18 §6 parked Docker — *"probably going to remain open. No row, no
+facet."* v23 unparked it as an opt-in development environment, not a shipping unit: spec
+`2026-09-20-orclab-v23-containers-design.md`, BACKLOG #58. Every stack skill now carries a fifth
+facet, `## Containers`; shipping *as* a container stays parked and is #60.
+
 ## #34: Mutation-testing orc-todo's suite writes test data into the real BACKLOG.md, VERIFICATION.md and .git/orclab — a cwd→None mutant falls back to the process cwd (RESOLVED 2026-09-13)
 
 Found 2026-09-12 by the first real `/orc-test analyze skills/orc-todo/scripts` (v17, Task 19). Until this is fixed, **running mutation testing on orc-todo's suite overwrites the real repo's BACKLOG.md, VERIFICATION.md and `.git/orclab/` state.** It did: after the run the main checkout's BACKLOG.md was a 33-line test fixture (`## #23: t` / `b`), the worktree's VERIFICATION.md had nine "Scenario 62–70: on the branch" stubs appended, `.git/orclab/lock` held `{not json`, `counters.json` said 23 and `lanes.json` held the test lane "B". All restored the same session (main's BACKLOG.md from its commit, byte-identical; `lock clear`; `lane delete B`); the worktree's VERIFICATION.md was still carrying the stubs when Task 19 finished — `git checkout -- VERIFICATION.md # orclab:discard-entries` removes them.
@@ -3672,6 +3677,14 @@ shared account; orcshot.org is set to 8.5; Linux Mint 22.3's apt has 8.3. Shared
 publishing (DreamHost as the confirmed-live example) is a separate task, not PHP-specific, and
 direflail wants it written from a real deployment, not before one. Starts when v22 ships.
 
+**Update 2026-09-20 — v24, after v23 (containers).** The "how do we run PHP 8.5 locally"
+question this entry's brainstorm opened became v23 first, by direflail's decision (#58): a
+container as an opt-in development environment for any stack, not just PHP. This entry is now
+v24 and starts when v23 ships; its live check runs in the container `stack-php`'s Containers
+section will define — the toolchain and Composer's audit inside the image, nothing installed on
+the machine — with the section proposing "yes" to `/orc-code`'s container question, PHP being
+the toolchain unusual on a dev machine that §1 of the v23 spec had in mind.
+
 ## #51: /orc-test audit on a multi-module Gradle build reads only the root project's dependencies until dependencyCheckAggregate is wired
 
 Found writing v22's `/orc-test audit` for Kotlin and Java (#48, plan Tasks 2 and 5):
@@ -3854,3 +3867,247 @@ depending on Yarn version; `pnpm-lock.yaml` → `pnpm audit --json`) and pick th
 its findings-shape parser accordingly, the same way `_runner` already picks vitest vs. jest from
 `package.json`; then correct `javascript.md`'s remedy line to match whichever manager the
 lockfile names instead of unconditionally naming `npm install`.
+
+## #58: Containers as an opt-in development environment — v23 (RESOLVED 2026-09-20)
+
+The request, direflail 2026-09-20, in the brainstorm that had started as "how do we run PHP
+locally": *"this shouldn't be just for php, we need to figure out how containerization fits best
+into orclab and provide it as an option when building a project."* PHP became v24 (#50) and this
+became v23: a container as an opt-in *development environment* — the toolchain and every
+`/orc-test` tool live in it so nothing has to be installed on the machine — asked once at
+scaffold, never the default, and never what ships. Spec:
+`docs/superpowers/specs/2026-09-20-orclab-v23-containers-design.md`.
+
+**Licensing, confirmed live 2026-09-20** (docs.docker.com/subscription/desktop-license): Docker
+*Desktop* is free only for personal use, education, non-commercial open source, and businesses
+under 250 employees *and* $10M revenue; Docker *Engine* is separate — *"The licensing and
+distribution terms for Docker and Moby open-source projects, such as Docker Engine, aren't
+changing."* On Linux, Engine installs without Desktop (docs.docker.com/engine/install/ubuntu,
+which says Mint is *"not officially supported (though it may work)"*); Mint 22.3's apt has
+`docker.io` 29.1.3 and `podman` 4.9.3, both Apache-2.0.
+
+**The design, one paragraph per spec section.** *§1, the opt-in:* `/orc-code`'s New-Project
+Flow gained a fifth question after Exposure — *"Run this project's toolchain in a container, so
+nothing has to be installed on this machine?"* — proposed "no" unless the stack's `## Containers`
+section says to propose "yes", skipped with a reason for a stack that cannot (iOS). "Yes" writes
+two committed files at the root: a `Dockerfile` from the stack skill (toolchain plus every
+`/orc-test` tool for that language) and a `compose.yaml` with one service named `orclab` that
+mounts the project at its own host path and sets it as the working directory, so every path in
+every report is valid on both sides. The committed `compose.yaml` with an `orclab` service *is*
+the record (nothing under git-ignored `.orclab/` could be); `.orclab/test.yaml` overrides per
+checkout with `container: false` and `runner: docker|podman`. Verify runs the build/test command
+through the container. *§2, `/orc-test` through it:* one change in the one chokepoint,
+`runner.run`, which becomes `<engine> compose run --rm -T --workdir <dir> orclab <cmd>` from the
+project root after one `<engine> compose build orclab`; detection lives beside the config
+(`container.detect`); `detect`'s first line says `(in container)`; `missing()` asks inside
+(`probe.which`, `probe.python_module`); git and `/orc-test` itself stay on the host
+(`runner.run_on_host`); no engine on PATH prints `container runner not found — install podman or
+docker — skipped`, a failed build prints its output and `container build failed — see above`,
+exit 1 — never the host as a fallback. `lint_on_write` gets the same prefix
+(`container_prefix`). *§3, stacks and engine:* all nine `stack-*` skills carry `## Containers`
+(yes with a Dockerfile, or cannot with the reason — iOS and every stack's iOS half); the engine
+is settled once in `skills/orc-test/SKILL.md`'s `## Containers`. *§4:* tests red-first for every
+piece, `docs/commands/orc-code.md` and `orc-test.md` in the same commits, and this live check.
+*§5:* this entry, #59, #60, #50 and #33 updated — and #61, #62, #63 from the review and the check.
+
+**The engine: Podman, Docker Engine the alternative; with both installed Podman is used.** The
+one-sentence reason from `skills/orc-test/SKILL.md`: *"Podman runs as your own user with nothing
+to join — a file it writes into the project 'is actually owned by your user on the host' — while
+Docker Engine's daemon runs as root, and the `docker` group that lets you use it without `sudo`
+'grants root-level privileges to the user'."* direflail installed `podman` 4.9.3 and
+`podman-compose` 1.0.6 from Mint's apt on 2026-09-20; `podman info` says rootless, overlay;
+`/etc/subuid` and `/etc/subgid` already held a range for the user.
+
+**The live check, 2026-09-20, on this machine.** The scaffold `v23check` — `stack-web`, answers
+new / app / web / exposure no / container **yes** / minimal example — was built by following this
+branch's `skills/orc-code/SKILL.md` by hand (the installed plugin was v0.22.0). The host's Node is
+20.20.2, below Vite's 22.12 floor, which is exactly the case `stack-web`'s section says to answer
+"yes" for; the Vite half was therefore scaffolded *through* the container. The two files, as
+written — `Dockerfile` verbatim from `stack-web`'s section:
+
+```dockerfile
+FROM node:24-trixie AS nodejs
+FROM python:3.14
+COPY --from=nodejs /usr/local/bin/node /usr/local/bin/node
+COPY --from=nodejs /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
+RUN pip install --no-cache-dir "fastapi[standard]" sqlmodel pytest pytest-cov mutmut pip-audit ruff
+```
+
+and `compose.yaml` verbatim from `skills/orc-test/SKILL.md`:
+
+```yaml
+services:
+  orclab:
+    build: .
+    volumes:
+      - .:${PWD}
+    working_dir: ${PWD}
+```
+
+`podman compose build orclab`: **23.95 s wall**, first time, with the two base images pulled;
+`podman images`: `localhost/v23check_orclab latest 1.46 GB` (`python:3.14` 1.14 GB,
+`node:24-trixie` 1.25 GB). Inside: Node v24.21.0, npm 11.19.0, Python 3.14.7, pytest 9.1.1,
+mutmut 3.8.0, ruff 0.16.8, pip-audit 2.10.1, `id` = root — and every file the container wrote
+into the tree (`web/` from `npm create vite@latest web -- --template react-ts`, `node_modules`,
+`mutants/`) came out owned by `direflail`, the rootless claim seen for real. The section's
+Dockerfile needed nothing it did not say. Verify through the container: `npm run build` → `✓
+built in 97ms`; `python3 -m pytest -q` → `3 passed`.
+
+`/orc-test`, `python3 skills/orc-test/scripts/run.py --cwd <scratch>/v23check <sub>`, every
+report line verbatim:
+
+- `detect` → `detected: Python (in container), JS/TS (web/) (in container)` /
+  `$ podman compose build orclab` / `$ podman compose run --rm -T --workdir <scratch>/v23check
+  orclab python3 -c 'import pytest'` (and `pytest_cov`, `sh -c 'command -v npx'`) /
+  `  Python: test command python3 -m pytest -q --ignore-glob=*mutants/*` / `  JS/TS: test
+  command npx vitest run`, exit 0.
+- `run` → `Python     ✓ 3 passed (1.1s)` / `JS/TS      ✓ 1 passed 1 passed (0.9s)`, exit 0.
+- `coverage` → `Python     coverage 100.0% (8/8 lines) ✓` / `JS/TS      coverage 100.0% (1/1
+  lines) ✓`, exit 0.
+- `analyze`, first run → `Python     coverage 100.0% (8/8 lines) ✓` / `           TCE not
+  measurable — mutation tool produced no mutants — check its configuration    lint: 0 findings`.
+  Not the container: mutmut ignores decorated functions by design (`file_mutation.py`, naming
+  `@app.post("/foo")`), so the FastAPI route was never mutated, and the one plain function
+  returned a bare f-string, which mutmut has nothing to mutate — verified with 3.7.0 in a
+  throwaway container, same result, and with a plain `def f(a): return a + 1`, 6 mutants.
+  `languages/python.md` gained the caveat. With the logic moved into the plain function,
+  `analyze` → `Python     coverage 100.0% (9/9 lines) ✓` / `           TCE 100.0% ✓    lint: 0
+  findings` (10 mutants, all killed), exit 0. JS/TS the same run: `           TCE not measurable
+  — mutation tool produced no mutants — check its configuration    lint: not run — eslint not
+  configured with @vitest/eslint-plugin or eslint-plugin-jest` — Stryker 10.0.0 rejected
+  `/orc-test`'s own flag, `error: unknown option '--jsonReporter.fileName=…'`; that is **#63**,
+  not this.
+- `audit` → `Python     audit ✓ 0 vulnerable` / `JS/TS      audit ✗ 2 vulnerable` / `    qs 2.2.5
+  - 6.15.3: GHSA-q8mj-m7cp-5q26, GHSA-x5fp-wj9c-mxmx, GHSA-4mjr-xmp4-gh2g — fix npm audit fix` /
+  `    typed-rest-client 2.3.1 - 3.1.0: via qs — fix npm audit fix`, exit 1 — real advisories in
+  Stryker's own dependency tree, reported through the container exactly as they would be on a
+  host.
+
+The three negatives. `container: false` in `.orclab/test.yaml`: `detect` → `detected: Python,
+JS/TS (web/)`; `run` → `$ python3 -m pytest -q '--ignore-glob=*mutants/*'` … `ModuleNotFoundError:
+No module named 'fastapi'` / `Python     ✗ 1 error 1 error (0.3s)` / `JS/TS      ✓ 1 passed 1
+passed (0.5s)`, exit 1 — the override holds, and the host run fails because FastAPI is not on
+this machine, which is what the container was for. `runner: docker` (docker is not installed
+here): `detect` and `run` → `detected: Python (in container), JS/TS (web/) (in container)` /
+`Python: container runner not found — install podman or docker — skipped` / `JS/TS: container
+runner not found — install podman or docker — skipped` / `nothing to run`, exit 0. `FROM
+no-such-image:0`: `run` → `$ podman compose build orclab` / `container build failed — see above`
+/ `podman build -f ./Dockerfile -t v23check_orclab .` / `STEP 1/1: FROM no-such-image:0` /
+`Error: creating build container: short-name "no-such-image:0" did not resolve to an alias and
+no unqualified-search registries are defined in "/etc/containers/registries.conf"` / `exit code:
+125`, exit 1 — **after a fix this check found**, below.
+
+`lint_on_write`, `echo '{"tool_name":"Write","tool_input":{"file_path":"<scratch>/v23check/app/
+deep.py"}}' | python3 hooks/scripts/lint_on_write.py` on a four-deep loop: stderr `orclab
+lint_on_write: `ruff check` on <scratch>/v23check/app/deep.py exited 1 - code-discipline's
+checkable rules, from the project's own config. Set ORCLAB_LINT_ON_WRITE_OFF=1 to disable.` /
+`too-many-nested-blocks: Too many nested blocks (4 > 2)` … `Found 1 error.`, then the engine's
+own lines `podman run --name=v23check_orclab_tmp43165 --rm -i … -w <scratch>/v23check
+v23check_orclab ruff check --no-fix <scratch>/v23check/app/deep.py` and `Error: executing
+/usr/bin/podman-compose run --rm -T --workdir <scratch>/v23check orclab ruff check --no-fix
+<scratch>/v23check/app/deep.py: exit status 1`, exit 2. The scratch project, its image, the two
+base images and the `v23check_default` network were deleted afterwards; `podman images` is empty.
+
+**What the plan got wrong, and what fixed it.** Research and review, before this check: the plan
+had the image build going through `runner.run` — i.e. through the `compose run` wrap — where it
+must go through `run_on_host` (the engine is a host command); `${PWD}` in `compose.yaml` is read
+from the *environment* of the process calling the engine, and `cwd=` does not rewrite the
+inherited `PWD`, so `run.py` sets it explicitly; the tool-presence checks that had to move inside
+were more than `missing()` — `audit_unavailable`, `mutation_unavailable` and the hook's on-PATH
+check all asked the host; and gdUnit4 needed `--headless --ignoreHeadlessMode` to run at all
+without a display. **This check found two more.** (1) `podman-compose` 1.0.6 — Mint's apt, the
+version the install line names — **exits 0 when `podman build` fails**: `compose_build` discards
+`build_one`'s result and only logs `exit code: 125` (1.6.0 returns the status; read in both
+sources). The broken-Dockerfile negative "passed" the first time and ran the tests in the *stale*
+image from the earlier build — the silent outcome §2 forbids, one layer under the guard. What
+should have caught it, `cli._resolve`'s `cp.returncode != 0`, was widened rather than doubled:
+`container.build_failed` also reads that logged line; one test with a fake engine that prints it
+and exits 0; a fifth fact in `skills/orc-test/SKILL.md`'s engine bullet. (2) Four tests in
+`test_cli.py` put a fake `docker` on PATH and were written on a machine with no engine; with
+podman installed, `RUNNERS`' preference picked the real one and all four went red. The fixture
+now pins `runner: docker`. `languages/python.md`'s `Last real run` carries the in-container
+`analyze` line.
+
+**Resolved**: v23 is shipped and was exercised on this machine through a real rootless engine
+end to end — scaffold, build, all five `/orc-test` subcommands, the override, the two refusals,
+and the hook — with every line above produced by the code as committed.
+
+## #59: A devcontainer.json beside the Dockerfile, for editors that attach to the container
+
+Deferred from v23 (#58) by direflail — *"A, leave B as an /orc-todo"* — and named in spec
+`2026-09-20-orclab-v23-containers-design.md` §"Out of scope, by name": the devcontainer standard
+(`.devcontainer/devcontainer.json`) describes a container environment for editors (VS Code,
+Codespaces) and can point at the very `Dockerfile` v23 writes through its `build.dockerfile`
+property, so adding it is one small file per project beside the existing two, not a second
+mechanism. Written when someone wants their editor attached to the container; until then the
+`compose.yaml` and `Dockerfile` are the whole record and nothing reads a devcontainer file.
+
+## #60: Deploying a project as a container: a production image as an orc-package ingredient
+
+direflail, 2026-09-20, while v23 (#58) was being designed: *"we probably will need to deploy a
+container eventually, but that can be an /orc-todo as well."* v23's container is a development
+environment and deliberately not production-shaped — it carries pytest, mutmut, Stryker and the
+rest, and what it produces is ordinary project files that ship however the stack's `##
+Deployment` section or `orc-package` ingredient says. Deploying *as* a container is a different
+artefact: a production image with the runtime and the built code and no test tools, produced by
+a new `orc-package` ingredient in the nine-section shape, and it is the stack's `## Deployment`
+section that decides whether a stack ships that way at all (today none does — `stack-web`'s
+still says shipping a container is parked). Written when the first project that deploys as a
+container arrives, from that deployment, not before.
+
+## #61: gdscript.py reads GODOT_BIN on the host and forwards --godot; inside a container the host must export the image's path
+
+Found by Task 7's review of v23 (#58), 2026-09-20, and deferred from it. `gdscript.py`'s
+`missing()` reads `GODOT_BIN` on the host on purpose (its own comment: *"GODOT_BIN is a host
+environment variable"*) and `mutation_cmd` forwards the value to gdmutant as `--godot <path>`;
+`compose run` passes no host variable into the container, so for a containerised Godot project
+the host must `export GODOT_BIN=/usr/local/bin/godot` — the *image's* path, where the command
+actually runs, not any Godot the host may have. `skills/stack-godot/SKILL.md`'s Containers
+section documents exactly that mirror (*"`GODOT_BIN` is set in the image, and the host mirrors
+it"*), so it works, but it is a value the developer has to know to set to a path that is not on
+their machine, and a wrong one is reported as `GODOT_BIN` missing rather than as the mismatch it
+is. The cleaner fix is the shape v23 gave every other tool check: a probe-style check where the
+commands run — `probe.which("godot")` or reading `$GODOT_BIN` *inside* via `sh -c` through the
+chokepoint — and passing `--godot` from what the container reports, so the host variable is only
+consulted on a host run. Scope: GDScript projects that opted into a container; a host run is
+unchanged. Not done in v23 because no Godot project has been built through a container yet, and
+the host-mirror line in the stack skill covers the first one.
+
+## #62: languages/python.md pins mutmut 3.7.0; PyPI has 3.8.0 (2026-09-12)
+
+`skills/orc-test/languages/python.md`'s Mutation section still opens with *"mutmut 3.7.0 (PyPI,
+2026-07-31)"*, while PyPI has had 3.8.0 since 2026-09-12 — noticed while writing
+`stack-web`'s Containers section, and confirmed for real on 2026-09-20 when v23's (#58) live check
+built its image from the unpinned `pip install … mutmut` line and got 3.8.0, which ran the
+scaffold's suite to `TCE 100.0% ✓` with the same `[tool.mutmut]` keys and the same `mutants/`
+cache shape `run.py` reads. A currency line, not a defect: the version stated is one release
+behind what a fresh install gets, and the module's claims have now been seen to hold on the
+newer one; the fix is the version and date in that line, under `currency-discipline`.
+
+## #63: orc-test analyze: Stryker 10.0.0 rejects --jsonReporter.fileName, so no JS/TS project gets a TCE
+
+Found by v23's live check (#58), 2026-09-20 — the first time `/orc-test`'s JavaScript mutation
+step has met a real StrykerJS: `languages/javascript.md`'s previous "last real run" (2026-09-19,
+the v22check scaffold) stopped at `No test files found`, so `mutation_cmd` had never actually
+reached Stryker. On the v23check scaffold (`stack-web`, `web/` with `vitest` 5.0.1,
+`@stryker-mutator/core` 10.0.0 and `@stryker-mutator/vitest-runner` 10.0.0 installed by the
+project), `run.py analyze` ran `npx stryker run --incremental --reporters json,progress
+--jsonReporter.fileName=<root>/.orclab/test/javascript/mutation.json` and Stryker answered
+`error: unknown option '--jsonReporter.fileName=…'`, exit 1; the report line was `JS/TS
+TCE not measurable — mutation tool produced no mutants — check its configuration`, which
+misnames the cause — the tool never started. `npx stryker run --help` on 10.0.0 lists
+`--reporters`, `--incremental`, `--incrementalFile` and the `--dashboard.*` options, and no
+`--jsonReporter.*` one; `jsonReporter.fileName` exists in Stryker's config file, not as a CLI
+flag (or not in this major — the research is whoever fixes this). The flag is
+`skills/orc-test/scripts/orc_test/langs/javascript.py:102`, and `javascript.md`'s Mutation
+section states the same command as fact. Consequence: no JS/TS project gets a TCE from
+`/orc-test` today, containerised or not — the same failure on a host — and the
+`--incremental` reporting also never ran, so the caveat about `reports/stryker-incremental.json`
+is unverified. Fix shape: write the reporter's file name the way Stryker 10 accepts it (a
+`--configFile` Orclab generates, or read Stryker's default `reports/mutation/mutation.json`
+under the project instead of `<out>` — `stryker.py`'s reader already takes the newest `*.json`
+with a `files` key under the directory it is given), run it live on a scaffold with a real test,
+and record the run in `javascript.md`. Not fixed in v23 because it is the JS module's own
+contract with Stryker, not the container layer, and the live check's job was to record it.
