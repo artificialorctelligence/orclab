@@ -228,6 +228,47 @@ def test_a_linter_that_hangs_is_cut_off_and_the_write_goes_through(tmp_path, run
     assert run(f, bin_dir=bin_dir).returncode == 0
 
 
+# --- v23: a containerised project lints through compose run -----------------------------------
+
+COMPOSE = "services:\n  orclab:\n    build: .\n"
+
+
+def test_containerised_project_lints_through_compose_run(tmp_path, run):
+    src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
+    (tmp_path / "compose.yaml").write_text(COMPOSE)
+    f = src / "a.py"
+    f.write_text("x = 1\n")
+    bin_dir = tmp_path / "dockerbin"
+    bin_dir.mkdir()
+    docker = bin_dir / "docker"
+    docker.write_text('#!/bin/sh\necho "argv: $*"\nexit 1\n')
+    docker.chmod(docker.stat().st_mode | stat.S_IEXEC)
+    r = run(f, bin_dir=bin_dir)
+    assert r.returncode == 2
+    assert f"compose run --rm -T --workdir {tmp_path} orclab ruff check --no-fix" in r.stderr
+
+
+def test_container_false_in_test_yaml_lints_on_the_host(tmp_path, run):
+    src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
+    (tmp_path / "compose.yaml").write_text(COMPOSE)
+    (tmp_path / ".orclab").mkdir()
+    (tmp_path / ".orclab" / "test.yaml").write_text("container: false\n")
+    f = src / "a.py"
+    f.write_text("x = 1\n")
+    bin_dir = fake_tool(tmp_path / "bin", "ruff", 1, "src/a.py:1:1: E999 fake finding")
+    r = run(f, bin_dir=bin_dir)
+    assert r.returncode == 2 and "compose run" not in r.stderr
+
+
+def test_containerised_project_with_no_engine_says_nothing(tmp_path, run):
+    src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")
+    (tmp_path / "compose.yaml").write_text(COMPOSE)
+    f = src / "a.py"
+    f.write_text("x = 1\n")
+    r = run(f, bin_dir=fake_tool(tmp_path / "bin", "ruff", 1, "finding"))   # ruff on the host, no docker
+    assert r.returncode == 0    # fail open - the hook never runs a containerised project's linter on the host
+
+
 def test_as_a_process_findings_are_exit_2_on_stderr(tmp_path):
     """The contract Claude Code sees; the one test here that runs the script for real."""
     src = project(tmp_path, "pyproject.toml", "[tool.ruff]\n")

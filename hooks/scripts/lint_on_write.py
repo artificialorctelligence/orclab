@@ -20,14 +20,22 @@ a PostToolUse hook's output reaches Claude (the docs: "exit 2 instead so Claude 
 even though the tool already ran"). A clean file, an unlinted language, or any failure of this
 script itself exits 0 and says nothing: a hook that wedges every write is worse than a missed
 warning.
+
+v23: a containerised project (compose.yaml with an `orclab` service at the git root, per
+skills/orc-test/scripts/orc_test/container.py) lints through `compose run` instead of the host -
+same config-file gate, same tool, run one layer over. No engine on PATH means no lint, never a
+silent fall-through to the host.
 """
 
 import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
+
+from orclab_shared import invoking_root
 
 OFF = "ORCLAB_LINT_ON_WRITE_OFF"
 TIMEOUT = 30
@@ -50,6 +58,32 @@ LINTERS = {
 # ESLint projects (Expo) instead of oxlint ones: same rules, different config file and binary
 ESLINT = ("eslint.config.js", "eslint", ["eslint"])
 NODE_BIN = "node_modules/.bin"
+
+# v23: a containerised project (compose.yaml with an `orclab` service at the git root) lints
+# through the container. A deliberate copy of skills/orc-test/scripts/orc_test/container.py's
+# detection, by the rule in orclab_shared.py's docstring; no PyYAML here, a regex is enough for
+# the one shape Orclab itself writes.
+SERVICE_RE = re.compile(r"^services:\s*$(?:\n(?!\S).*)*?^  orclab:\s*$", re.MULTILINE)
+RUNNERS = ("docker", "podman")
+
+
+def container_prefix(root):
+    """[] on the host; the compose-run prefix when `root` (the git root) is containerised and
+    this checkout has not opted out; None when it is containerised but no engine is on PATH -
+    then lint nothing, never fall back to the host."""
+    compose = pathlib.Path(root) / "compose.yaml"
+    if not compose.is_file() or not SERVICE_RE.search(compose.read_text(errors="replace")):
+        return []
+    override = pathlib.Path(root) / ".orclab" / "test.yaml"
+    text = override.read_text(errors="replace") if override.is_file() else ""
+    if re.search(r"^container:\s*false\s*$", text, re.MULTILINE):
+        return []
+    m = re.search(r"^runner:\s*(\w+)\s*$", text, re.MULTILINE)
+    names = (m.group(1),) if m else RUNNERS
+    engine = next((n for n in names if shutil.which(n)), None)
+    if engine is None:
+        return None
+    return [engine, "compose", "run", "--rm", "-T", "--workdir", str(root), "orclab"]
 
 
 def _config_dir(start, name, holds=lambda p: True):
@@ -88,9 +122,16 @@ def command_for(path):
     local = root / NODE_BIN / tool
     if local.exists():
         argv = [str(local)] + argv[1:]
-    elif shutil.which(tool) is None:
+
+    git_root = invoking_root(root)
+    prefix = container_prefix(git_root) if git_root else []
+    if prefix is None:
         return None
-    return root, argv + [str(pathlib.Path(path).resolve())]
+    if not prefix and not local.exists() and shutil.which(tool) is None:
+        return None
+
+    cwd = pathlib.Path(git_root) if prefix else root
+    return cwd, prefix + argv + [str(pathlib.Path(path).resolve())]
 
 
 def main():
