@@ -19,3 +19,9 @@ isSemVerMajor}` when the fix is an upgrade of a different top-level package). He
 (six advisories, `fixAvailable` a dict naming lodash 4.18.1) and minimist (two advisories) —
 both direct, so no `via` strings; that case is covered inline in test_lang_javascript.py.
 `metadata.vulnerabilities.total` is 2, which matches the two lines the parser produces.
+
+The capture above is stdout only. `orc_test.runner.run` merges stderr into stdout, and a real
+npm can print a warning line on stderr ahead of the JSON (e.g. an `.npmrc` with
+`shrinkwrap=false` → "npm warn config shrinkwrap Use the --package-lock setting instead.",
+found live 2026-09-19) — `audit_findings` reads from the first `{` for exactly this reason;
+see test_audit_findings_skips_stderr_prefix in test_lang_javascript.py.

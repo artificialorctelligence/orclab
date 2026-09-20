@@ -113,6 +113,15 @@ def test_audit_clean_and_unreadable():
     assert js.audit_findings("42", 1) == _UNREADABLE
 
 
+def test_audit_findings_skips_stderr_prefix():
+    # runner.run merges stderr into stdout, and an .npmrc with shrinkwrap=false makes npm print
+    # a warning line on stderr ahead of the JSON (found live 2026-09-19) — read from the first
+    # `{`, the way python.py and csharp.py do, instead of crashing json.loads on the prefix.
+    prefixed = ("npm warn config shrinkwrap Use the --package-lock setting instead.\n"
+                + (_FIX / "npm_audit.json").read_text())
+    assert js.audit_findings(prefixed, 1) == js.audit_findings((_FIX / "npm_audit.json").read_text(), 1)
+
+
 def test_audit_unavailable_names_npm(monkeypatch):
     monkeypatch.setattr(js.shutil, "which", lambda tool: None)
     assert "npm" in js.audit_unavailable("/x")

@@ -15,3 +15,8 @@ each with `package`, `kind` (direct/dev/transitive), `isDiscontinued`, `replaced
 not in the JSON — only the boolean — which is why the parser's line points at `dart pub get`
 for the URL. Only http is flagged; the two transitive entries have `current: null`, which the
 parser has to tolerate.
+
+The capture above is stdout only. `orc_test.runner.run` merges stderr into stdout, so any prose
+a real `pub outdated` writes there would land ahead of this JSON — `audit_findings` reads from
+the first `{` for exactly that reason; see test_audit_findings_skips_stderr_prefix in
+test_lang_dart.py.

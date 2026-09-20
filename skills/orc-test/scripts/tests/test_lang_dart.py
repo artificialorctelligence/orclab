@@ -96,6 +96,13 @@ def test_audit_findings_from_captured_json():
     assert lines == ["http 0.13.0: security advisory (dart pub get prints the URL) — fix not reported by pub (latest 1.6.0)"]
 
 
+def test_audit_findings_skips_stderr_prefix():
+    # runner.run merges stderr into stdout; a one-line prefix ahead of the JSON must not crash
+    # json.loads — read from the first `{`, the way python.py and csharp.py do.
+    prefixed = "Resolving dependencies...\n" + (FIX / "pub_outdated.json").read_text()
+    assert dart.audit_findings(prefixed, 0) == dart.audit_findings((FIX / "pub_outdated.json").read_text(), 0)
+
+
 def test_audit_clean_and_unreadable():
     assert dart.audit_findings('{"packages": []}', 0) == []
     assert dart.audit_findings('{"packages": [{"package": "a", "isCurrentAffectedByAdvisory": true, "current": null, "latest": null}]}', 0) == [

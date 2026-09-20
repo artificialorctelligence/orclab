@@ -49,20 +49,23 @@ def audit_cmd(root):
     return [_tool(root), "pub", "outdated", "--json"]
 
 
+def _line(p):
+    current = (p.get("current") or {}).get("version", "?")
+    latest = (p.get("latest") or {}).get("version") or "unknown"
+    return (f"{p['package']} {current}: security advisory (dart pub get prints the URL)"
+            f" — fix not reported by pub (latest {latest})")
+
+
 def audit_findings(stdout, returncode):
     # pub exits 0 either way, so the flag decides. The JSON carries no advisory id and no fixed
     # version — `dart pub get` prints the GHSA URL — so the line keeps the shared `— fix` token
     # and offers the latest version in brackets.
     try:
-        out = []
-        for p in json.loads(stdout)["packages"]:
-            if p["isCurrentAffectedByAdvisory"]:
-                current = (p.get("current") or {}).get("version", "?")
-                latest = (p.get("latest") or {}).get("version") or "unknown"
-                out.append(f"{p['package']} {current}: security advisory (dart pub get prints the URL)"
-                           f" — fix not reported by pub (latest {latest})")
-        return out
-    except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
+        # runner.run merges stderr into stdout; read from the first `{` in case anything precedes
+        # the JSON, the way python.py and csharp.py do.
+        data, _ = json.JSONDecoder().raw_decode(stdout, stdout.index("{"))
+        return [_line(p) for p in data["packages"] if p["isCurrentAffectedByAdvisory"]]
+    except (json.JSONDecodeError, KeyError, TypeError, AttributeError, ValueError):
         return _UNREADABLE
 
 

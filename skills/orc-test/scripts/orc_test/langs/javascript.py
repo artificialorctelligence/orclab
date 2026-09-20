@@ -32,24 +32,30 @@ def audit_cmd(root):
     return ["npm", "audit", "--json"]
 
 
+def _fix(v):
+    fix = v.get("fixAvailable")
+    if isinstance(fix, dict):
+        return f"{fix['name']} {fix['version']}"
+    return "npm audit fix" if fix else "none published"
+
+
 def audit_findings(stdout, returncode):
     # npm keys `vulnerabilities` by package and gives the vulnerable `range`, not the installed
     # version (languages/javascript.md). A `via` entry is an advisory dict, or a bare package name
     # when the vulnerability is inherited from a dependency; both are named. Exit code is not
     # consulted: npm's is tunable by --audit-level, the output is not.
     try:
-        vulns = json.loads(stdout)["vulnerabilities"]
+        # runner.run merges stderr, and an .npmrc can make npm print a warning line there ahead
+        # of the JSON (e.g. "npm warn config shrinkwrap ...", seen live 2026-09-19) — read from
+        # the first `{`, the way python.py and csharp.py do.
+        data, _ = json.JSONDecoder().raw_decode(stdout, stdout.index("{"))
+        vulns = data["vulnerabilities"]
         out = []
         for name, v in vulns.items():
             ids = [x["url"].rpartition("/")[2] if isinstance(x, dict) else f"via {x}" for x in v["via"]]
-            fix = v.get("fixAvailable")
-            if isinstance(fix, dict):
-                fix = f"{fix['name']} {fix['version']}"
-            else:
-                fix = "npm audit fix" if fix else "none published"
-            out.append(f"{name} {v['range']}: {', '.join(dict.fromkeys(ids))} — fix {fix}")
+            out.append(f"{name} {v['range']}: {', '.join(dict.fromkeys(ids))} — fix {_fix(v)}")
         return out
-    except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
+    except (json.JSONDecodeError, KeyError, TypeError, AttributeError, ValueError):
         return _UNREADABLE
 
 
