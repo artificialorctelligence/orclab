@@ -3,7 +3,8 @@ from orc_test import config
 
 
 def test_defaults_without_file(tmp_path):
-    assert config.load(tmp_path) == {"coverage": 80, "tce": 70, "languages": {}}
+    assert config.load(tmp_path) == {
+        "coverage": 80, "tce": 70, "languages": {}, "container": True, "runner": None}
 
 
 def test_load_returns_independent_languages_dict_each_call(tmp_path):
@@ -40,3 +41,19 @@ def test_file_overrides_thresholds_and_commands(tmp_path):
     cfg = config.load(tmp_path)
     assert cfg["coverage"] == 90 and cfg["tce"] == 70
     assert cfg["languages"]["python"]["test"] == "make check"
+
+
+def test_container_keys_default_and_read(tmp_path):
+    cfg = config.load(tmp_path)
+    assert cfg["container"] is True and cfg["runner"] is None
+    (tmp_path / ".orclab").mkdir()
+    (tmp_path / ".orclab" / "test.yaml").write_text("container: false\nrunner: podman\n")
+    cfg = config.load(tmp_path)
+    assert cfg["container"] is False and cfg["runner"] == "podman"
+
+
+def test_runner_must_be_a_known_engine(tmp_path):
+    (tmp_path / ".orclab").mkdir()
+    (tmp_path / ".orclab" / "test.yaml").write_text("runner: rkt\n")
+    with pytest.raises(config.BadConfig, match="runner"):
+        config.load(tmp_path)
