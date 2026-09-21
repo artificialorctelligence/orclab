@@ -2,6 +2,42 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.25.0] - 2026-09-20
+
+### Added
+- `/orc-package shared-hosting`: the ingredient for a host that serves PHP and nothing else,
+  written from the first real DreamHost deployment — panel steps in the order they have to
+  happen (document root before the first upload), `vendor/` built `--no-dev` in the container
+  and rsynced up, the `channels.yaml` leaf with a confirm command, the `RELEASING.md` steps,
+  and the two cron facts. Closes #64.
+- `/orc-test run` now prints a real test count for Kotlin and Java (`12 passed 1 failed`),
+  read from the JUnit XML Gradle and Maven write, where before the line said only `passed`.
+
+### Changed
+- `/orc-code`: a new part of an existing project — a server behind an app — is the
+  New-Project Flow into a subdirectory of the same repository, never a second repo. The first
+  PHP session reached for one.
+- `stack-php`, corrected by that first project: the host-PHP dev loop is a trap and the
+  `ports:` line is the proposal; Infection stops on any stderr byte, so `error_log` in the CLI
+  needs the `phpunit.xml` fix; OpenAPI attributes cost ten MSI points and get an
+  `infection.json5` regex; `addErrorMiddleware`'s third argument is `false` for a public API;
+  `JSON_PRESERVE_ZERO_FRACTION`; the Deployment section points at the shared-hosting
+  ingredient; Layout says `server/` lives inside the app's repo.
+
+### Fixed
+- `/orc-test` finds a containerised sub-project's `compose.yaml` beside the language's own
+  marker, not only at the repository root. orcweather's `server/` was detected and then
+  skipped as "missing composer"; now each language runs in its own container. (#66)
+- `/orc-test run` reported a language with zero tests as `✓ passed` when its runner exits 0
+  with nothing to run — Gradle on a `NO-SOURCE` test task, which is what orcweather's
+  untested Kotlin car module produced. "Did anything run" is now the language module's own
+  call (`test_summary`), with pytest's signals as the default; for Gradle and Maven it is
+  the JUnit XML under the project's `build/test-results/` and `target/surefire-reports/`,
+  which also ignores the pub-cache plugin modules a Flutter `android/` build tests. An empty
+  suite is `0 tests ✗`, and `/orc-git merge` refuses it. Verified on Gradle 9.3.1 that a test
+  task losing its sources removes its old results, so a deleted suite cannot pass on stale
+  XML. (#67; #68 opened for the plugin-module default.)
+
 ## [0.24.0] - 2026-09-20
 
 ### Added
