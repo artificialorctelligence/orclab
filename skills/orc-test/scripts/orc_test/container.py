@@ -1,5 +1,5 @@
-"""A project that runs its toolchain in a container (v23). The record is compose.yaml at the
-project root with a service named `orclab` — committed, so a clone keeps the opt-in; nothing
+"""A project that runs its toolchain in a container (v23). The record is compose.yaml beside the
+language's marker, or at the project root, with a service named `orclab` — committed, so a clone keeps the opt-in; nothing
 under .orclab/ can serve, that directory is git-ignored. Inside, the project is mounted at its
 own host path, so every path in every report is valid on both sides and nothing is translated."""
 
@@ -20,14 +20,19 @@ class Container:
     runner: str | None          # None: the engine is not on PATH — the caller says so, never runs on the host
 
 
-def detect(root, cfg):
-    """The project's Container, or None when it is not containerised or this checkout opted out."""
-    root = pathlib.Path(root)
-    if cfg.get("container") is False or not _has_service(root / "compose.yaml"):
+def detect(d, cfg, root=None):
+    """The Container for the language whose marker sits in `d`, or None when it is not
+    containerised or this checkout opted out. The compose.yaml beside the marker wins; the
+    repository root's is the fallback — a sub-project with its own container (orcweather's
+    `server/`, BACKLOG #66) and a root container shared by every part are both one file."""
+    if cfg.get("container") is False:
+        return None
+    where = next((pathlib.Path(x) for x in (d, root) if x is not None and _has_service(pathlib.Path(x) / "compose.yaml")), None)
+    if where is None:
         return None
     wanted = cfg.get("runner")
     names = (wanted,) if wanted else RUNNERS
-    return Container(root, next((n for n in names if shutil.which(n)), None))
+    return Container(where, next((n for n in names if shutil.which(n)), None))
 
 
 def _has_service(path):

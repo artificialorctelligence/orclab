@@ -3776,6 +3776,22 @@ adds a client against this PHP API — to either find the contract from `stack-p
 and close the entry saying a sentence was the record, or stumble on something that becomes the
 entry's material.
 
+**Update 2026-09-20 — the first project reported back.** orcweather's `docs/orclab-php-findings.md`
+is the report the v24 handoff asked for. Every version the skill named came out of the image
+exactly, and none of the three Dockerfile fixes had to be rediscovered — the "run every tool
+live before writing" method held. What the skill had wrong or missing, each now corrected in
+`skills/stack-php/SKILL.md`: `pdo_sqlite` is on the host (was "not checked"); the host-PHP dev
+loop is a trap (that machine's PHP had no `curl`) and the `ports:` line is now the proposal;
+Infection's "tests must be in a passing state" has a second cause — any stderr byte, which
+`error_log()` produces in the CLI — fixed in `phpunit.xml`; OpenAPI attributes are ten points of
+MSI under `--with-uncovered`, excluded by regex in `infection.json5`; `addErrorMiddleware`'s third
+argument logs a stack trace per 404 and is now `false` for a public API; `JSON_PRESERVE_ZERO_FRACTION`
+for GeoJSON; the `-o` form of `openapi` confirmed. Two findings were not the skill's: `/orc-test`
+cannot run a containerised sub-project (#66, new), and `/orc-version` does not bump
+`composer.json` (#6, already listed). One was `/orc-code`'s — the session reached for a second
+repository for `server/` and needed reminding that one repository holds every part; the Route
+step now says so.
+
 ## #51: /orc-test audit on a multi-module Gradle build reads only the root project's dependencies until dependencyCheckAggregate is wired
 
 Found writing v22's `/orc-test audit` for Kotlin and Java (#48, plan Tasks 2 and 5):
@@ -4203,7 +4219,7 @@ with a `files` key under the directory it is given), run it live on a scaffold w
 and record the run in `javascript.md`. Not fixed in v23 because it is the JS module's own
 contract with Stryker, not the container layer, and the live check's job was to record it.
 
-## #64: Shared-hosting publishing (DreamHost the confirmed-live example) — written from the first real deployment, not before one
+## #64: Shared-hosting publishing (DreamHost the confirmed-live example) — written from the first real deployment, not before one (RESOLVED 2026-09-20)
 
 Opened by the v24 spec (`docs/superpowers/specs/2026-09-20-orclab-v24-php-design.md`, §7).
 #50 has said since 2026-09-19 that shared-hosting publishing "is a separate task, not
@@ -4228,6 +4244,21 @@ build.
 first project ... ships to a channel Orclab has never met" — written from the recorded lines, each
 stamped with the date the first project ran it. Not a PHP thing: a static React build lands on the
 same host the same way.
+
+**Resolved for real, not just tracked (2026-09-20).** The first project deployed the same day
+the entry was opened: orcweather's API to DreamHost, recorded in its `server/RELEASING.md`
+(eight steps plus a teardown, every one run) and `docs/orclab-php-findings.md` (the five answers
+in the handoff's order). The ingredient is
+`skills/orc-package/ingredients/shared-hosting/ingredient.md`, nine sections, every line
+stamped 2026-09-20 or marked as not run. What the deployment settled, against what this entry
+guessed: Composer is not installed on the host and never needs to be — `vendor/` is built
+`--no-dev` in the dev container and rsynced (7.9 MB, 1.6 s); the document root is a per-domain
+panel field (`<domain>/public`) set *before* the first upload, so Slim's `.htaccess`-in-the-web-
+root recipe is unnecessary there; `display_errors = Off`, `log_errors = On` was already the
+host's default; HTTPS was already on; the first deploy took ~2 minutes. `stack-php`'s
+Deployment section now says this instead of "not yet written". Not covered, and said so in
+both places: a `stack-web` front end served from the same `public/`, and a host that is not
+DreamHost — the shape holds, the panel paths will not.
 
 ## #65: Cross-project dependencies — orcweather's app stacks will call the v24 PHP API; what, if anything, Orclab records about one project depending on another
 
@@ -4266,3 +4297,54 @@ is being released. Its own small spec then. Could be v25, could be never.
 
 **Not this:** anything that versions or locks the two repos together mechanically. Two repos with
 a contract file between them is how this is normally done; Orclab should not invent a coupling.
+
+## #66: /orc-test finds a language's marker two directories down but looks for its compose.yaml only at the repository root — a containerised sub-project is detected and then skipped (RESOLVED 2026-09-20)
+
+Found by the first PHP project (orcweather, 2026-09-20; its `docs/orclab-php-findings.md`), whose
+API is `server/` inside the Flutter app's repository — the layout `stack-php`'s Layout section
+now names as the right one, and the one `stack-web` uses for `web/`. From the repo root, `run.py
+detect` printed `PHP (server/)` — the marker two directories down, exactly as `skills/orc-test/SKILL.md`
+"How it finds the languages" documents — and then `PHP: missing composer … or run inside the
+stack-php container — skipped`.
+
+**Why.** `skills/orc-test/scripts/orc_test/cli.py:53` calls `container.detect(root, cfg)` once,
+with the repository root, and `container.py:26` reads `root / "compose.yaml"`. The marker walk
+(`detect.py`) is per directory; the container lookup is not. So a `compose.yaml` beside
+`server/composer.json` is never opened, `/orc-test` concludes the project is not containerised,
+looks for `composer` on the host, and skips PHP. The consequence for that repo: `/orc-test` covers
+Dart and Kotlin and the PHP tools are run by hand with the `podman compose run …` prefix from
+`server/`, which is precisely the by-hand path the command exists to replace.
+
+**A second observation from the same session, recorded so the fixer knows it exists:**
+`run.py --cwd server detect` still detected Kotlin, Dart and PHP from the whole repository and
+skipped PHP the same way — `--cwd` did not scope detection to `server/`. Whether that is intended
+(detection from the git root regardless of `--cwd`) or a second defect is for whoever picks this
+up to decide; it is not separately tracked.
+
+**Shape of the fix, not done here.** Look for `compose.yaml` in the marker's directory first and
+fall back to the root — `container.detect` takes the directory, not the root, and `runner.use()`
+becomes per language rather than one global `_ACTIVE` (`runner.py`'s module-level container is
+the thing that assumes one container per repo). `compose.yaml`'s `${PWD}` mount then has to be
+set to the marker directory for that language's runs, which is what `runner.run_on_host` already
+does for the root. The alternative — writing "one containerised project per repository" into
+`skills/orc-test/SKILL.md` — is the smaller change and the wrong one: it would forbid the layout
+the stacks recommend.
+
+**What it does not affect.** A containerised project whose `compose.yaml` is at the repository
+root (every fixture and every project before orcweather) is unchanged; a sub-project that is not
+containerised runs on the host as before.
+
+**Resolved for real, not just tracked (2026-09-20, same day).** `container.detect(d, cfg, root)`
+now looks for `compose.yaml` beside the language's marker first and at the repository root
+second; `cli._resolve` resolves one container per language, builds each distinct `compose.yaml`
+once, and `_each(usable)` makes that language's container active before each loop body, so every
+`run()` and every probe goes through the right one — `runner`'s single active container stays,
+set per language instead of once. Proven two ways: `tests/test_cli.py::
+test_containerised_sub_project_is_run_in_its_own_container` reproduces orcweather's shape (Python
+at the root on the host, `server/composer.json` with its own `compose.yaml`) and failed before
+the change with the exact "missing composer" line; and `run.py detect` on the real orcweather
+repo printed `detected: Kotlin (android/), Dart, Swift (ios/), PHP (server/) (in container)`,
+probed `composer` through `podman compose run … --workdir …/server`, and listed `PHP: test
+command vendor/bin/phpunit`. 239 tests pass. The `--cwd server` observation: intended —
+`detect.project_root` is `git rev-parse --show-toplevel`, so the project is always the
+repository, and `--cwd` says where you are, not what to scope to; not a second defect.

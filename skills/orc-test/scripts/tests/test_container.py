@@ -105,3 +105,16 @@ def test_run_on_host_is_never_wrapped(tmp_path, capsys):
     runner.use(container.Container(root=tmp_path, runner="docker"))
     cp = runner.run_on_host(["echo", "host"], cwd=tmp_path)
     assert cp.stdout == "host\n" and capsys.readouterr().out == "$ echo host\n"
+
+
+def test_detect_prefers_the_compose_beside_the_marker_and_falls_back_to_the_root(tmp_path):
+    """BACKLOG #66: `root` is the fallback, not the only place looked."""
+    service = "services:\n  orclab:\n    build: .\n"
+    (tmp_path / "server").mkdir()
+    cfg = {"container": True, "runner": "docker"}
+    assert container.detect(tmp_path / "server", cfg, tmp_path) is None
+    (tmp_path / "compose.yaml").write_text(service)
+    assert container.detect(tmp_path / "server", cfg, tmp_path).root == tmp_path
+    (tmp_path / "server" / "compose.yaml").write_text(service)
+    assert container.detect(tmp_path / "server", cfg, tmp_path).root == tmp_path / "server"
+    assert container.detect(tmp_path / "server", {"container": False}, tmp_path) is None

@@ -40,6 +40,10 @@ what you have). The report's first line says so: `detected: Python (in container
 that for just this checkout, put either of these in `.orclab/test.yaml`: `container: false` to
 run on this machine instead, or `runner: docker` (or `podman`) to pick the engine.
 
+A part of the project that lives in its own folder with its own container — a PHP server inside
+a phone app's repository, say — runs inside that container, while the parts without one run on
+this machine. The first line names which is which.
+
 ## What it will ask you
 
 Nothing, for `run`, `coverage`, `analyze`, and `detect` — each one runs the moment you type it. A

@@ -174,3 +174,23 @@ def test_dirty_asks_the_host_git_even_when_a_container_is_active(tmp_path, capsy
     assert cli._dirty(repo, set()) == set()
     out = capsys.readouterr().out
     assert out.startswith("$ git status --porcelain") and "$ docker" not in out
+
+
+def test_containerised_sub_project_is_run_in_its_own_container(tmp_path, capsys, monkeypatch):
+    """BACKLOG #66 (orcweather, 2026-09-20): compose.yaml beside server/composer.json, none at the
+    root. The marker was found two directories down and the container was not — PHP was skipped
+    as "missing composer" while Python ran on the host. Each language gets the container beside
+    its own marker, falling back to the root's; the host is used only where neither exists."""
+    repo = make_repo(tmp_path)
+    (repo / "server").mkdir()
+    (repo / "server" / "composer.json").write_text("{}\n")
+    (repo / "server" / "compose.yaml").write_text("services:\n  orclab:\n    build: .\n")
+    _fake_docker(repo, monkeypatch, "#!/bin/sh\necho \"argv: $*\"\nexit 0\n")
+    code, out = run(["detect"], repo, capsys)
+    assert code == 0
+    assert "detected: Python, PHP (server/) (in container)" in out
+    assert "missing composer" not in out
+    assert "$ docker compose build orclab" in out
+    assert f"--workdir {repo / 'server'} orclab sh -c 'command -v composer'" in out
+    assert "import pytest" not in out          # Python's probe stayed on the host (importlib, no command printed)
+    assert "PHP: test command vendor/bin/phpunit" in out

@@ -28,7 +28,10 @@ to pick, explaining each option in a sentence, rather than guessing.
 ## What it will ask you
 
 First, if it isn't already obvious from what you typed: are you starting something new, or
-working on an existing project?
+working on an existing project? A new *part* of a project you already have — a server behind an
+existing app, a front end for an existing API — counts as starting something new, and it goes in
+a folder inside the project you already have, not in a second repository; Orclab keeps every part
+of a project in one place and finds each part's tests by itself.
 
 **Starting something new**, one question at a time, skipping any your description already
 answered:

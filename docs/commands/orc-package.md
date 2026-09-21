@@ -27,10 +27,11 @@ sounded related.
 | `/orc-package flatpak` | Sets up Flathub |
 | `/orc-package play` | Sets up Google Play |
 | `/orc-package app-store` | Sets up the Apple App Store |
+| `/orc-package shared-hosting` | Sets up a plain shared web host — an account with SSH and a control panel, DreamHost the one it was written from |
 | `/orc-package <other channel name>` | If no ready-made instructions exist for that name, offers to interview you and write new ones |
 
-Of those five ready-made channels, only the Launchpad PPA one has actually been carried through a
-real release so far. The Snap Store one has had its account registration and login done for real,
+Of those six ready-made channels, two have actually been carried through a real release: the
+Launchpad PPA, and shared hosting (a PHP API uploaded to DreamHost on 2026-09-20). The Snap Store one has had its account registration and login done for real,
 and the store's own review tool run locally against a real build, but no real upload yet. The
 Flathub one has had its automated checks and a sandbox test run for real, but no real account
 registration or submission at all yet. The Google Play and Apple App Store ones are written from

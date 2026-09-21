@@ -72,6 +72,13 @@ A stack's own Containers section may add to this file (a named volume for a buil
 environment variable); the three lines above stay as they are, and the `orclab` service name
 is what `/orc-test` and `lint_on_write` recognise.
 
+**One container per language, not per repository.** The `compose.yaml` is looked for beside
+each language's marker first and at the repository root second, so a sub-project with its own
+container (`server/compose.yaml` beside `server/composer.json`, the layout `stack-php`
+recommends) runs inside it while a Dart app at the root runs on the host — `detected: Dart, PHP
+(server/) (in container)`. Each distinct `compose.yaml` is built once. On the first PHP project
+(2026-09-20) only the root was checked and PHP was skipped as "missing composer"; BACKLOG #66.
+
 Every command runs as `<engine> compose run --rm -T --workdir <dir> orclab <cmd>`, after one
 `<engine> compose build orclab`; the first line of the report says
 `detected: Python (in container)`. `${PWD}` is filled in from the environment of the process

@@ -40,8 +40,9 @@ def _target_under(m, d, root, path):
 
 
 def _resolve(args):
-    """(project root, config, [(module, dir, target)]). `dir` is where the language's marker
-    sits — every tool runs from there — while reports and `.orclab/test/` stay at the root."""
+    """(project root, config, [(module, dir, target, container)]). `dir` is where the language's
+    marker sits — every tool runs from there — while reports and `.orclab/test/` stay at the root;
+    `container` is that language's own (None: the host), and `_each` makes it active per loop."""
     root = detect.project_root(args.cwd)
     cfg = config.load(root)
     mods = [m for m in langs.ALL if not args.lang or m.KEY == args.lang]
@@ -50,33 +51,44 @@ def _resolve(args):
     if args.path:
         p = pathlib.Path(args.path)
         path = p.resolve().relative_to(root) if p.is_absolute() else p
-    c = container.detect(root, cfg)
-    runner.use(c)
-    suffix = " (in container)" if c else ""
-    print("detected: " + (", ".join(_name(m, d, root) + suffix for m, d in found) or "no supported language"))
-    if c and c.runner is None:
-        for m, _d in found:
-            print(f"{m.LABEL}: container runner not found — install podman or docker — skipped")
-        return root, cfg, []
-    if c and found:
-        cp = runner.run_on_host(container.build_cmd(c), cwd=root)   # the engine itself is a host command
-        if container.build_failed(cp):
-            print(cp.stdout[-3000:])
-            raise ContainerUnavailable
+    # One container per language, not per repository (BACKLOG #66): the compose.yaml beside the
+    # marker, else the root's, else the host. Built once per distinct compose.yaml.
+    per_lang = [(m, d, container.detect(d, cfg, root)) for m, d in found]
+    print("detected: " + (", ".join(_name(m, d, root) + (" (in container)" if c else "") for m, d, c in per_lang)
+                         or "no supported language"))
+    built = set()
     usable = []
-    for m, d in found:
+    for m, d, c in per_lang:
+        runner.use(c)
+        if c and c.runner is None:
+            print(f"{m.LABEL}: container runner not found — install podman or docker — skipped")
+            continue
+        if c and c.root not in built:
+            cp = runner.run_on_host(container.build_cmd(c), cwd=c.root)   # the engine itself is a host command
+            if container.build_failed(cp):
+                print(cp.stdout[-3000:])
+                raise ContainerUnavailable
+            built.add(c.root)
         gone = m.missing(d)
         for tool in gone:
             print(f"{m.LABEL}: missing {tool} — {m.TOOLS[tool]} — skipped")
         if gone:
             continue
         target = _target_under(m, d, root, path)
-        usable.append((m, d, target))
+        usable.append((m, d, target, c))
     return root, cfg, usable
 
 
 def _name(mod, d, root):
     return mod.LABEL if d == root else f"{mod.LABEL} ({d.relative_to(root)}/)"
+
+
+def _each(usable):
+    """Yield (module, dir, target) with that language's container made active first — every
+    `run()` inside the loop body then goes through the right compose.yaml, or the host."""
+    for m, d, target, c in usable:
+        runner.use(c)
+        yield m, d, target
 
 
 def _out(root, mod, empty=True):
@@ -109,7 +121,7 @@ def _run_tests(mod, d, target, cfg):
 
 def cmd_detect(args):
     _root, cfg, usable = _resolve(args)
-    for m, d, target in usable:
+    for m, d, target in _each(usable):
         print(f"  {m.LABEL}: test command {' '.join(_test_cmd(d, m, target, cfg))}")
     return 0
 
@@ -118,7 +130,7 @@ def cmd_run(args):
     _root, cfg, usable = _resolve(args)
     failed = False
     lines = []
-    for m, d, target in usable:
+    for m, d, target in _each(usable):
         ok, line = _run_tests(m, d, target, cfg)
         failed |= not ok
         lines.append(line)
@@ -156,7 +168,7 @@ def _coverage_block(mod, cov, threshold, out):
 def cmd_coverage(args):
     root, cfg, usable = _resolve(args)
     failed, blocks = False, []
-    for m, d, target in usable:
+    for m, d, target in _each(usable):
         cov = _coverage(m, d, target, _out(root, m))
         if cov is None:
             failed = True
@@ -196,7 +208,7 @@ def _audit_line(mod, d):
 def cmd_audit(args):
     _root, _cfg, usable = _resolve(args)
     failed, blocks = False, []
-    for m, d, _target in usable:
+    for m, d, _target in _each(usable):
         block, bad = _audit_line(m, d)
         failed |= bad
         blocks.append(block)
@@ -293,7 +305,7 @@ def cmd_analyze(args):
     result = {"when": int(time.time()), "target": args.path, "languages": {}}
     failed_gates, blocks = set(), []
     root, cfg, usable = _resolve(args)
-    for m, d, target in usable:
+    for m, d, target in _each(usable):
         ok, _ = _run_tests(m, d, target, cfg)
         if not ok:
             print(f"{m.LABEL}: tests failed; nothing measured")

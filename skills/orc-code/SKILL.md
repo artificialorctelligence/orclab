@@ -20,6 +20,15 @@ right flow below — do this before anything else.
    work, ask exactly one question: "Starting something new, or working on an existing project?"
    - "New" → **New-Project Flow**
    - "Existing" → **Add-to-Existing Flow**
+   - **A new part of an existing project** — a server for an app that already exists, a
+     front end for an API, a second stack beside the first — is **New-Project Flow, scaffolded
+     into a subdirectory of the existing repository**, not a new repository. Orclab's layout
+     has always been one repository holding every part: `stack-web` puts `web/` beside its
+     Python API, `stack-php` puts `server/` inside the app's repo, and `/orc-test` finds every
+     language's marker up to two directories down and runs each from its own directory. Say
+     that in one sentence when you route this way, so the user knows a second repo is not
+     coming. (The first PHP project's session reached for a new repo and needed reminding,
+     2026-09-20.)
 
 Never guess this from the filesystem (an empty directory, presence of a git history, manifest
 files, etc.) — always resolve it from what was typed or by asking directly.
@@ -64,7 +73,10 @@ question `$ARGUMENTS` already answered.
 
 Once all six are answered:
 
-7. **Scaffold**: create the project directory (if it doesn't already exist), initialize the
+7. **Scaffold**: create the project directory (if it doesn't already exist) — for a new part
+   of an existing project, that is a subdirectory of its repository named for the part
+   (`server/`, `web/`, `app/`), no deeper than two levels so `/orc-test` finds it, and no
+   `git init` — initialize the
    language's standard tooling (e.g. `npm init`, `cargo init`, a Maven/Gradle project layout,
    `python -m venv` + `pyproject.toml`, whatever is standard for the confirmed language), and
    write starter files reflecting the confirmed stack and starting point.
