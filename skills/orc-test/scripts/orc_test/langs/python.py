@@ -11,6 +11,7 @@ import ast
 import json
 import os
 import pathlib
+import re
 import shutil
 
 import tomllib
@@ -191,6 +192,11 @@ def _drop_cache_if_tests_changed(cwd):
     # mutmut-stats.json's tests_by_mangled_function_name if a full rerun ever hurts
     if any(p.stat().st_mtime > cached for p in tests):
         shutil.rmtree(mutants)
+
+
+# mutmut's live counter — `⠋ 312/625  🎉 280 🫥 0  ⏰ 1 …`, one \r-rewritten line (its print_stats)
+# — carries no ETA; the runner appends one from the rate it sees (BACKLOG #74)
+MUTATION_PROGRESS = re.compile(r"^\S+ (?P<done>\d+)/(?P<total>\d+) ")
 
 
 def mutation_cmd(root, target, out):

@@ -71,7 +71,9 @@ source_paths = ["orc_todo/"]
 pytest_add_cli_args_test_selection = ["tests/"]
 also_copy = ["tests/"]
 ```
-`python3 -m mutmut run`, then `run.py` reads mutmut's own cache — `mutants/<file>.meta`, one
+`python3 -m mutmut run` — streamed, so its counter (`⠋ 312/625  🎉 280 … 🙁 31`, one
+`\r`-rewritten line) shows live; mutmut has no ETA, so `runner.py` appends `~2m 40s` from the
+rate since the first reading (`MUTATION_PROGRESS`; BACKLOG #74) — then `run.py` reads mutmut's own cache — `mutants/<file>.meta`, one
 JSON per source file with every mutant's exit code — which is all `mutmut results` prints
 (`--all true` needed there; mutmut 3.7 otherwise lists only the *non-killed* ones, reading as a
 0% score) and what `mutmut show <key>` walks to find a key's file. Exit codes 1/3 are `killed`,

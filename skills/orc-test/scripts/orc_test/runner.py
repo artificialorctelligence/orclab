@@ -2,6 +2,7 @@
 for a containerised project (v23), the one place the `compose run` prefix is added."""
 
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -67,8 +68,9 @@ def run_on_host(cmd, cwd, env=None, input=None, stream=False, progress=None):
                 chunks.append(chunk)
                 text = chunk.decode(errors="replace")
                 sys.stdout.write(text)
-                # the tool's latest rewrite of its counter line is what follows the last \r
-                if progress and (m := progress.match(text.rsplit("\r", 1)[-1])):
+                # the tool's latest counter is its last line: after the last \r (mutmut rewrites
+                # one line) or \n (Infection prints one per fifty mutants)
+                if progress and (m := progress.match(re.split(r"[\r\n]", text.rstrip("\r\n"))[-1])):
                     done, total, now = int(m["done"]), int(m["total"]), time.monotonic()
                     first = first or (done, now)
                     eta = _eta(done, total, *first, now)

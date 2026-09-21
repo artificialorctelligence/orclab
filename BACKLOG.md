@@ -4590,3 +4590,32 @@ mutmut diff helper does, and stays captured). Infection's `--no-progress` is dro
 orcweather's PHP re-run showing Infection's `IIII............MM.U   ( 50 / 407)` lines live. In a
 non-TTY transcript the `\r` frames arrive as text rather than a moving bar; in a terminal they
 render as the tool intends.
+
+## #74: /orc-test analyze streams the mutation tools' progress, but mutmut and Infection count without an ETA — the runner now appends one from the rate it observes (RESOLVED 2026-09-21)
+
+Found 2026-09-20, the same question that produced #73: direflail asked for "how much of the
+mutation tests are done (and/or an ETA)". #73 let each tool's own progress through. That is
+enough for Dart (`mutation_test` prints `Total [##    ] 34% ~2m 40s`) and Stryker (its bar
+carries `remaining: ~1m`), and no help for the two stacks Orclab itself runs most: mutmut prints
+`⠋ 312/625  🎉 280 🫥 0  ⏰ 1 …` (its `print_stats`, one `\r`-rewritten line, no time at all —
+the per-mutant durations it keeps go to ordering and timeouts, never to a sum), and Infection
+prints `IIII......MM.U   ( 50 / 407)` once per fifty mutants. Orclab's own analyze is ~8900
+mutmut mutants; the counter says where it is and nothing about when it ends.
+
+Scope: the mutation step of `analyze`, Python and PHP. Languages whose tool prints its own ETA
+pass through untouched; a language with no `MUTATION_PROGRESS` gets the tool's line and nothing
+more.
+
+**Resolved (2026-09-21).** `runner.run(..., progress=<regex>)`: for each streamed chunk the
+last line (after the last `\r` or `\n`) is matched against the language's `MUTATION_PROGRESS`
+(`done`/`total` groups — `langs/python.py`, `langs/php.py`), and `_eta()` appends `~2m 40s`
+to the terminal — never to `cp.stdout`, which the parsers read. The rate is measured from the
+*first* counter reading, not from the run's start, because an incremental mutmut run opens on
+the cached count. Known ceiling, marked `ponytail:` in `_eta`: mutmut runs its estimated-fastest
+mutants first, so the early figure reads low and climbs. Proven live on a fresh copy of
+`hooks/scripts` (625 mutants, `mutants/` wiped): `⠋ 24/625 … ~7s` from the second reading on,
+the run ending in mutmut's own `31.45 mutations/second` with the capture unchanged;
+`tests/test_runner.py::test_run_stream_appends_eta_when_progress_regex_reads_done_of_total` and
+`::test_mutation_progress_regexes_read_each_tool_s_real_line` (Infection's line is #73's, as
+seen on orcweather — no Infection here to re-run). Through Claude's Bash tool the line still
+arrives when the run ends; in a terminal it is live.

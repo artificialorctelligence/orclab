@@ -50,7 +50,11 @@ Nothing, for `run`, `coverage`, `analyze`, and `detect` — each one runs the mo
 first `analyze` on a real project takes a while, since planting and testing each defect one at a
 time is slow (later runs are faster, since the tool re-checks only what changed since last time,
 where it's able to); it tells you how many files it's about to work through before it starts, but
-it doesn't stop to ask, because typing the command is already your go-ahead.
+it doesn't stop to ask, because typing the command is already your go-ahead. While it works, the
+mutation tool's own progress line shows in the terminal — how many defects have been tried out
+of how many, and roughly how long the rest will take (`~2m 40s`); where the tool only counts,
+`/orc-test` adds the estimate from the rate it sees. That line is live in a terminal; through
+Claude's Bash tool it arrives as text when the run ends.
 
 For `generate`:
 - Before deleting any test, it shows you the full list of what it wants to remove and why, and

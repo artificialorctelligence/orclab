@@ -48,3 +48,11 @@ def test_run_stream_appends_eta_when_progress_regex_reads_done_of_total(capsys, 
     assert runner._eta(done=1, total=4, done0=1, t0=0.0, now=5.0) == ""      # no rate yet
     assert runner._eta(done=3, total=4, done0=1, t0=0.0, now=10.0) == "~5s"  # 2 in 10s, 1 left
     assert runner._eta(done=3, total=203, done0=1, t0=0.0, now=2.0) == "~3m 20s"
+
+
+def test_mutation_progress_regexes_read_each_tool_s_real_line():
+    from orc_test.langs import php, python
+    m = python.MUTATION_PROGRESS.match("⠋ 312/625  🎉 280 🫥 0  ⏰ 1  🤔 0  🙁 31  🔇 0  🧙 0")
+    assert (m["done"], m["total"]) == ("312", "625")
+    m = php.MUTATION_PROGRESS.match("IIII............MM.U   ( 50 / 407)")
+    assert (m["done"], m["total"]) == ("50", "407")

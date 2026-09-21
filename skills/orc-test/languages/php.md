@@ -35,8 +35,9 @@ absolute path the rest of `/orc-test` already works with — no translation need
 `with PCOV` means no report will be written, and `coverage_parse` then returns `Coverage(0, 0)`.
 
 ## Mutation (TCE)
-Infection 0.35.4: `vendor/bin/infection --no-interaction --no-progress --threads=max
---with-uncovered [--filter=<target>]`. Config is `infection.json5` at the project root (or
+Infection 0.35.4: `vendor/bin/infection --no-interaction --threads=max
+--with-uncovered [--filter=<target>]`, streamed; its `( 50 / 407)` line per fifty mutants shows
+live and `runner.py` appends `~2m 40s` from the observed rate (`MUTATION_PROGRESS`; BACKLOG #74). Config is `infection.json5` at the project root (or
 wherever the marker directory is); `mutation_unavailable` requires `infection/infection` in
 `composer.json`'s `require-dev` and an `infection.json5`/`infection.json` present — Infection
 writes the former on its own first interactive run. Since `mutation_cmd` passes no logger flag

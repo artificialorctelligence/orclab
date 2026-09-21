@@ -87,6 +87,11 @@ def mutation_unavailable(root, target=None):
     return None
 
 
+# Infection's live line, one per fifty mutants — `IIII......MM.U   ( 50 / 407)` (BACKLOG #73) —
+# carries no ETA; the runner appends one from the rate it sees (BACKLOG #74)
+MUTATION_PROGRESS = re.compile(r".*\( *(?P<done>\d+) / (?P<total>\d+)\)")
+
+
 def mutation_cmd(root, target, out):
     # No --logger-json (Infection has none); the full log's path is infection.json5's own
     # logs.json key, read back by mutation_parse. --with-uncovered: since Infection 0.31 the
