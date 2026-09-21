@@ -223,14 +223,35 @@ def test_mutation_runs_where_the_nearest_tool_mutmut_config_is(tmp_path):
     (sub / "pkg").mkdir(parents=True)
     (sub / "pyproject.toml").write_text("[tool.mutmut]\nsource_paths = ['pkg/']\n")
     (tmp_path / "pyproject.toml").write_text("[tool.pytest.ini_options]\n")
-    assert py.mutation_cwd(tmp_path, "skills/x/scripts/pkg") == sub
-    assert py.mutation_cwd(tmp_path, "skills/x") == tmp_path
-    assert py.mutation_cwd(tmp_path, None) == tmp_path
+    assert py.mutation_cwds(tmp_path, "skills/x/scripts/pkg") == [sub]
+    assert py.mutation_cwds(tmp_path, "skills/x") == [sub]
+    assert py.mutation_cwds(tmp_path, None) == [sub]
+
+
+def test_mutation_runs_every_config_below_when_the_root_has_none(tmp_path, monkeypatch):
+    """A repo whose packages each carry their own [tool.mutmut] and whose root has none (Orclab's
+    six) got `TCE not measurable` from the root — and /orc-git release carried that through as
+    a tool-missing case (2026-09-20, v0.25.0 released with no TCE)."""
+    monkeypatch.setattr(probe, "python_module", lambda name: True)
+    (tmp_path / "pyproject.toml").write_text("[tool.pytest.ini_options]\n")
+    for name in ("b", "a"):
+        d = tmp_path / "skills" / name / "scripts"
+        d.mkdir(parents=True)
+        (d / "pyproject.toml").write_text("[tool.mutmut]\nsource_paths = ['pkg/']\n")
+    stale = tmp_path / "skills" / "a" / "scripts" / "mutants"
+    stale.mkdir()
+    (stale / "pyproject.toml").write_text("[tool.mutmut]\n")       # mutmut's own copy, not a config
+    assert py.mutation_cwds(tmp_path, None) == [tmp_path / "skills" / "a" / "scripts",
+                                                tmp_path / "skills" / "b" / "scripts"]
+    assert py.mutation_unavailable(tmp_path) is None
+    assert py.mutation_cwds(tmp_path, "skills/b") == [tmp_path / "skills" / "b" / "scripts"]
+    assert py.mutation_cwds(tmp_path, "docs") == []
+    assert py.mutation_unavailable(tmp_path, "docs").startswith("no [tool.mutmut] found")
 
 
 def test_mutation_cwd_ignores_a_commented_out_tool_mutmut_line(tmp_path):
     (tmp_path / "pyproject.toml").write_text("# [tool.mutmut]\n[tool.pytest.ini_options]\n")
-    assert py.mutation_cwd(tmp_path, None) == tmp_path
+    assert py.mutation_cwds(tmp_path, None) == []
 
 
 def test_mutation_cwd_never_searches_above_root(tmp_path):
@@ -239,7 +260,7 @@ def test_mutation_cwd_never_searches_above_root(tmp_path):
     outside = tmp_path / "outside"
     outside.mkdir()
     (outside / "pyproject.toml").write_text("[tool.mutmut]\nsource_paths = ['x/']\n")
-    assert py.mutation_cwd(root, "../outside") == root
+    assert py.mutation_cwds(root, "../outside") == []
 
 
 def test_mutation_cmd_drops_cached_verdicts_when_a_test_is_newer_than_them(tmp_path):

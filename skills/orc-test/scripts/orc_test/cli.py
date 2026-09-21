@@ -10,6 +10,7 @@ import sys
 import time
 
 from . import config, container, detect, langs, runner
+from .model import Mutation
 from .runner import run
 
 
@@ -21,7 +22,7 @@ _PYTEST_SUMMARY = re.compile(r"(\d+) passed|(\d+) failed|(\d+) error")
 # What every mutation tool may legitimately touch, whatever the language. A language module adds
 # its own leftovers via an optional top-level `SANDBOX: set[str]` (path prefixes), alongside the
 # other optional module members: `CAVEATS_FOR(root)`, `coverage_unavailable(root)`,
-# `mutation_cwd(root, target)`, `audit_nothing(root)` (a reason the project declares nothing to
+# `mutation_cwds(root, target)`, `audit_nothing(root)` (a reason the project declares nothing to
 # audit, e.g. a tool-only pyproject.toml — "not available", never red, checked before the tool
 # is; BACKLOG #54). Anything a tracked file gains outside the union of the two is the
 # suite writing to the real tree under a planted defect (test-discipline rule 4; BACKLOG #34).
@@ -247,25 +248,29 @@ def _mutation(mod, root, d, target, out):
         print(f"{mod.LABEL}: mutating {_source_count(d, mod, None)} files"
               " — a first run on the whole project takes a while; later runs are incremental"
               " where the tool supports it")
-    where = getattr(mod, "mutation_cwd", lambda r, t: r)(d, target)   # a sub-project's own config
+    # a sub-project's own config, or each of them when the root has none — one score for the language
+    wheres = getattr(mod, "mutation_cwds", lambda r, t: [r])(d, target)
     sandbox = _SANDBOX | getattr(mod, "SANDBOX", set())   # the language's own legitimate scratch paths
-    before = _dirty(root, sandbox)
-    cp = run(mod.mutation_cmd(where, target, out), cwd=where)
-    changed = sorted(_dirty(root, sandbox) - before)
-    if changed:
-        print(f"mutation run changed tracked files outside its sandbox: {' '.join(changed)} — the "
-              "suite writes to the real tree under a planted defect (test-discipline rule 4; BACKLOG #34)")
-        return {"unavailable": "mutation run modified the working tree — see above"}
-    if cp.returncode not in (0, 1, 2):        # tools exit non-zero on survivors; a crash is higher
-        print(cp.stdout[-3000:])
-        return {"unavailable": f"mutation tool exited {cp.returncode}"}
-    mut = mod.mutation_parse(where, out)
-    if not mut.total:
-        print(cp.stdout[-3000:])
-        return {"unavailable": "mutation tool produced no mutants — check its configuration"}
-    sub = pathlib.Path(where).relative_to(root)
-    return {"score": mut.score, "killed": mut.killed, "total": mut.total,
-            "survivors": [[str(sub / s.file), s.line, s.description] for s in mut.survivors]}
+    killed, total, survivors = 0, 0, []
+    for where in wheres:
+        before = _dirty(root, sandbox)
+        cp = run(mod.mutation_cmd(where, target, out), cwd=where)
+        changed = sorted(_dirty(root, sandbox) - before)
+        if changed:
+            print(f"mutation run changed tracked files outside its sandbox: {' '.join(changed)} — the "
+                  "suite writes to the real tree under a planted defect (test-discipline rule 4; BACKLOG #34)")
+            return {"unavailable": "mutation run modified the working tree — see above"}
+        if cp.returncode not in (0, 1, 2):        # tools exit non-zero on survivors; a crash is higher
+            print(cp.stdout[-3000:])
+            return {"unavailable": f"mutation tool exited {cp.returncode}"}
+        mut = mod.mutation_parse(where, out)
+        sub = pathlib.Path(where).relative_to(root)
+        if not mut.total:
+            print(cp.stdout[-3000:])
+            return {"unavailable": f"mutation tool produced no mutants in {sub} — check its configuration"}
+        killed, total = killed + mut.killed, total + mut.total
+        survivors += [[str(sub / s.file), s.line, s.description] for s in mut.survivors]
+    return {"score": Mutation(killed, total).score, "killed": killed, "total": total, "survivors": survivors}
 
 
 def _tce_line(tce, threshold):

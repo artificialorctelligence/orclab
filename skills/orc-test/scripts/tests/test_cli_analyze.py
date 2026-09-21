@@ -163,7 +163,25 @@ def test_analyze_rebases_survivors_from_a_sub_project_to_the_root(tmp_path, caps
     repo = make_repo(tmp_path)
     m = fake(Mutation(9, 10, [Survivor("pkg/a.py", 2, "x <= 1")]))
     (repo / "skills" / "x" / "scripts").mkdir(parents=True)
-    m.mutation_cwd = lambda root, target: pathlib.Path(root) / "skills" / "x" / "scripts"
+    m.mutation_cwds = lambda root, target: [pathlib.Path(root) / "skills" / "x" / "scripts"]
     monkeypatch.setattr(langs, "ALL", [m])
     _code, out = run(["analyze"], repo, capsys)
     assert "skills/x/scripts/pkg/a.py:2  x <= 1" in out
+
+
+def test_analyze_sums_tce_over_every_sub_project_config(tmp_path, capsys, monkeypatch):
+    """Six packages with their own [tool.mutmut] and a root with none is one TCE line, not
+    `not measurable` (v0.25.0 was released on that line, 2026-09-20)."""
+    repo = make_repo(tmp_path)
+    subs = [repo / "skills" / n / "scripts" for n in ("a", "b")]
+    for d in subs:
+        d.mkdir(parents=True)
+    m = fake()
+    m.mutation_cwds = lambda root, target: subs
+    m.mutation_parse = lambda root, out: (Mutation(9, 10, [Survivor("pkg/a.py", 2, "x <= 1")])
+                                          if root == subs[0] else Mutation(5, 10))
+    monkeypatch.setattr(langs, "ALL", [m])
+    _code, out = run(["analyze"], repo, capsys)
+    assert "TCE 70.0% ✓" in out and "skills/a/scripts/pkg/a.py:2  x <= 1" in out
+    result = json.loads((repo / ".orclab" / "test" / "analyze.json").read_text())
+    assert result["languages"]["fake"]["tce"]["killed"] == 14

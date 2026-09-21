@@ -98,8 +98,12 @@ A hit is only recorded when the tests import the code under that same name — s
 must be importable by its top-level name from the directory mutmut runs in. A package that lives
 at `skills/x/scripts/pkg/` therefore gets its own `pyproject.toml` in `skills/x/scripts/`, and
 `run.py` runs mutmut from the nearest `pyproject.toml` with a `[tool.mutmut]` section at or
-above the path given (`mutation_cwd` in `langs/python.py`). A path argument narrows only by
-choosing which config runs; within one config it always mutates the whole `source_paths`.
+above the path given — or, when there is none there, from every one below it, summing the
+verdicts into one TCE for the language (`mutation_cwds` in `langs/python.py`). That second
+case is Orclab's own shape: six packages with their own config and a root with none, which from
+the root used to print `TCE not measurable`, and v0.25.0 was released on that line (2026-09-20).
+A path argument narrows only by choosing which configs run; within one config it always mutates
+the whole `source_paths`.
 
 ## Test lint
 No tool. ruff's `PT` rules (flake8-pytest-style) report nothing for an assertion-free test or a

@@ -4433,3 +4433,39 @@ language's directory name them (`android/app/` → `:app`), and AGP's real task 
 because #67 is about what "passed" means and this is about what runs; and because `:app:test`
 versus `:app:testDebugUnitTest` (one variant or three compiles) is a choice that wants a second
 project to look at.
+
+## #69: /orc-test analyze from a root with no [tool.mutmut] said "not measurable" although six packages below it each had one — v0.25.0 was released with no TCE (RESOLVED 2026-09-20)
+
+Found 2026-09-20 by direflail asking, after `/orc-git release` for v0.25.0, "orclab has no
+mutation testing?". It has six: `hooks/scripts`, `orc-package`, `orc-publish`, `orc-release`,
+`orc-test` and `orc-todo` each carry a `pyproject.toml` with `[tool.mutmut]`, and #35 and #42
+were measured through them. But `analyze` from the repository root printed `TCE not measurable
+— no [tool.mutmut] found in any pyproject.toml at or above /home/direflail/projects/orclab` and
+exited 0, because `langs/python.py`'s `_mutmut_config` only ever walked *up* from the target,
+and the root's `pyproject.toml` deliberately has no `[tool.mutmut]` (mutmut has to run from
+inside each package's directory to import the code under the name it mutates —
+`languages/python.md`). `/orc-git release`'s rule — *"exit 0 but no language got a ✓ → continue
+and carry it into the report"* — was written for a project with no mutation tool and treated
+this the same way, so the release went out on coverage alone. Claude read the line, reported
+it, and did not stop to ask why a repository with six configs said "no config" — the
+before-explaining pass would have caught it; the release step was followed as a checklist.
+
+**What should have covered it.** `mutation_unavailable`'s own message named the gap ("at or
+above") and every earlier Orclab TCE run had been done with a path (`analyze skills/orc-todo/
+scripts`, #35), so the root form had never been exercised as a gate until `release` started
+running it (v21). Searched: `python.md`, `SKILL.md`, `docs/commands/orc-test.md`, `BACKLOG.md`
+— nothing recorded that the root form could not see the sub-projects.
+
+**Resolved (same day).** `mutation_cwd(root, target)` is now `mutation_cwds`, a list: the
+nearest config at or above the target as before, or, when there is none, every `pyproject.toml`
+with `[tool.mutmut]` below it (`mutants/` and the other `SKIP_DIRS` excluded, since mutmut
+copies a pyproject into its cache). `cli._mutation` runs the tool in each, sums killed and
+total into one score for the language, and rebases each run's survivors to the root as before;
+a run producing no mutants names its directory. `mutation_unavailable` fires only when neither
+form finds a config. Proven: `tests/test_lang_python.py::
+test_mutation_runs_every_config_below_when_the_root_has_none` and `tests/test_cli_analyze.py::
+test_analyze_sums_tce_over_every_sub_project_config` failed before the change; `analyze` from
+Orclab's root now prints `TCE 80.5% ✓` (7032/8737, survivors listed per skill) — the gate
+v0.25.0 should have been held to, and would have passed. 243 tests pass. `release`'s
+"not measurable → continue" rule is unchanged: it is right for a project with no tool, and the
+misconfigured-project case it mishandled no longer produces that line.

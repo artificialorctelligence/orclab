@@ -27,8 +27,9 @@ MARKERS = ["pyproject.toml", "setup.py", "setup.cfg"]
 TOOLS = {"pytest": "pip install pytest", "pytest_cov": "pip install pytest-cov"}
 CAVEATS = [
     "mutmut writes its cache and a copy of the tests to mutants/; add it to .gitignore.",
-    ("mutmut runs from the nearest pyproject.toml with [tool.mutmut] at or above the path and"
-    " mutates that file's source_paths; a path narrows only by picking which config runs."),
+    ("mutmut runs from the nearest pyproject.toml with [tool.mutmut] at or above the path — or,"
+    " when there is none, from every one below it — and mutates each file's source_paths; a path"
+    " narrows only by picking which configs run."),
 ]
 SANDBOX = {"mutants", ".coverage", "__pycache__", ".pytest_cache"}   # mutmut/pytest-cov's own scratch
 
@@ -139,35 +140,38 @@ def coverage_parse(root, out):
 def mutation_unavailable(root, target=None):
     if not probe.python_module("mutmut"):
         return "mutmut not installed — pip install mutmut"
-    if _mutmut_config(root, target) is None:
+    if not mutation_cwds(root, target):
         where = pathlib.Path(root) / (target or ".")
-        return (f"no [tool.mutmut] found in any pyproject.toml at or above {where} — add [tool.mutmut]"
-                " with source_paths = [...]; see languages/python.md")
+        return (f"no [tool.mutmut] found in any pyproject.toml at or above {where}, nor in any below"
+                " it — add [tool.mutmut] with source_paths = [...]; see languages/python.md")
     return None
 
 
-def _mutmut_config(root, target):
-    """The nearest dir from `target` up to `root` whose pyproject.toml has a [tool.mutmut]
-    section, or None. A `target` whose ".." walks above `root` never searches above it."""
+def _has_mutmut(pyproject):
+    text = pyproject.read_text() if pyproject.is_file() else ""
+    return bool(text) and tomllib.loads(text).get("tool", {}).get("mutmut") is not None
+
+
+def mutation_cwds(root, target):
+    """Where mutmut runs: the nearest dir from `target` up to `root` whose pyproject.toml has a
+    [tool.mutmut] section — or, when there is none, every such dir below `target` (a repo whose
+    packages each carry their own config and whose root has none, like Orclab's six; from the
+    root that used to be "not measurable", and v0.25.0 was released on that line). mutmut names
+    mutants from the file path relative to its cwd and must import the code by that same name,
+    so a package under skills/x/scripts/ runs from there. A `target` whose ".." walks above
+    `root` never searches above it."""
     root = pathlib.Path(root)
     here = root / (target or ".")
     normalized = pathlib.Path(os.path.normpath(here))
     if normalized != root and root not in normalized.parents:
-        return None
+        return []
     for d in [here, *here.parents]:
-        pyproject = d / "pyproject.toml"
-        text = pyproject.read_text() if pyproject.is_file() else ""
-        if text and tomllib.loads(text).get("tool", {}).get("mutmut") is not None:
-            return d
+        if _has_mutmut(d / "pyproject.toml"):
+            return [d]
         if d == root:
             break
-    return None
-
-
-def mutation_cwd(root, target):
-    """Where mutmut runs. mutmut names mutants from the file path relative to its cwd and must
-    import the code by that same name, so a package under skills/x/scripts/ runs from there."""
-    return _mutmut_config(root, target) or pathlib.Path(root)
+    return sorted(p.parent for p in here.rglob("pyproject.toml")
+                  if not set(p.relative_to(root).parts) & SKIP_DIRS and _has_mutmut(p))
 
 
 def _drop_cache_if_tests_changed(cwd):
@@ -190,7 +194,7 @@ def _drop_cache_if_tests_changed(cwd):
 
 
 def mutation_cmd(root, target, out):
-    # mutmut takes its paths from pyproject.toml (see CAVEATS); `root` here is mutation_cwd().
+    # mutmut takes its paths from pyproject.toml (see CAVEATS); `root` here is one of mutation_cwds().
     _drop_cache_if_tests_changed(root)
     return ["python3", "-m", "mutmut", "run"]
 
