@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.25.1] - 2026-09-20
+
+### Fixed
+- `/orc-test analyze` from a repository root with no `[tool.mutmut]` said `TCE not measurable`
+  even when the packages below it each carried one — Orclab's own shape, six configs and a
+  bare root — and `/orc-git release` carried that through as a tool-missing case, so v0.25.0
+  went out with no mutation score. mutmut now runs from the nearest config at or above the
+  path as before, or, when there is none, from every config below it, and the verdicts are
+  summed into one TCE for the language. From Orclab's root that is `TCE 80.5% ✓`
+  (7032/8737), the gate v0.25.0 would have passed had it faced it. (#69)
+
 ## [0.25.0] - 2026-09-20
 
 ### Added
