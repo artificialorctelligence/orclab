@@ -99,6 +99,14 @@ capture is JSON, the same pattern `python.py`/`javascript.py` already use for th
 stray stderr lines.
 
 ## Caveats
+- **First real project (orcweather `server/`, 2026-09-20)** found two misreads, both fixed that
+  day: its `infection.json5` carries a `//` comment at the *end* of a line, which the whole-line-only
+  stripper could not read, so `run.py` fell back to `<out>/infection.json`, found nothing, and said
+  "produced no mutants" beside a 407-mutant log (BACKLOG #72; end-of-line comments and trailing
+  commas are now read, block comments still degrade); and its container mounts only `server/`, so
+  `--coverage-clover <root>/.orclab/test/php/clover.xml` was written inside the container and lost —
+  phpunit said "done" and `run.py` said "no coverage report found" (BACKLOG #70; reports now land
+  beside the marker).
 - **`vendor/bin/phpunit`, `infection` and `phpstan` are the project's own `require-dev`
   packages**, installed by `composer install` — the one thing the project runs itself, once, and
   again whenever `composer.json` changes.

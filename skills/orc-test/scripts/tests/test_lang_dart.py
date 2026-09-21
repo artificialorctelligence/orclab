@@ -36,6 +36,17 @@ def test_mutation_junit_parse():
     assert ">= " in m.survivors[0].description or "replaced" in m.survivors[0].description
 
 
+def test_mutation_junit_parse_real_shape():
+    # Six cases cut from orcweather's real report (fixture README): survivors carry file, line and
+    # the mutated code in the <failure> text, not in name=; one statement spans two lines.
+    m = dart._parse_junit(FIX / "mutation_test_junit_real.xml")
+    assert (m.killed, m.total) == (4, 6)
+    assert (m.survivors[0].file, m.survivors[0].line) == ("lib/debug_alerts.dart", 16)
+    assert m.survivors[0].description == "eq: final lat = parts.length != 2 ? double.tryParse(parts[0]) : null;"
+    assert (m.survivors[1].file, m.survivors[1].line) == ("lib/main.dart", 194)
+    assert m.survivors[1].description.startswith("removeVoidCall1: if (permission == LocationPermission.denied")
+
+
 def test_mutation_parse_no_report(tmp_path):
     assert dart.mutation_parse(tmp_path, tmp_path / "out") == Mutation(0, 0)
 

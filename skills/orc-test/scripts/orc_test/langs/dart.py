@@ -24,6 +24,10 @@ CAVEATS = [("mutation_test is young (pub.dev 1.8.0, 2026-02); its report is read
 SANDBOX = {"coverage", ".dart_tool"}   # package:coverage/mutation_test/pub output
 
 _CASE = re.compile(r"^(?P<file>[^:]+):(?P<line>\d+):\d+ (?P<what>.*)$")
+# mutation_test 1.8.1's real <failure> text: "File: lib/x.dart\nLine: 16\nOriginal line: ...\nMutation: ..."
+# — name= is "Line16_builtin.op.eq_0" and classname= the file, so the text is where the mutation is.
+# Original line and Mutation both span several lines when the mutated statement does.
+_FAILURE = re.compile(r"File: (?P<file>\S+)\s+Line: (?P<line>\d+)\s+Original line:.*?\n\s*Mutation:(?P<what>.*)", re.S)
 
 AUDIT_TOOL = ("dart pub outdated", TOOLS["dart"])
 _UNREADABLE = ["audit output not understood — see above"]
@@ -117,7 +121,13 @@ def _parse_junit(path):
             killed += 1
             continue
         m = _CASE.match(case.get("name", ""))
-        if m:
+        real = _FAILURE.search(case.find("failure").text or "")
+        if real:    # the shape mutation_test 1.8.1 actually writes (orcweather, 2026-09-20; BACKLOG #71)
+            # "Line194_builtin.function.removeVoidCall1_0" → "removeVoidCall1"; a deleted statement
+            # leaves the mutated code looking unchanged, so the mutator name says what happened
+            mutator = case.get("name", "").split("_", 1)[-1].rsplit("_", 1)[0].rsplit(".", 1)[-1]
+            survivors.append(Survivor(real["file"], int(real["line"]), f"{mutator}: {' '.join(real['what'].split())}"))
+        elif m:     # the shape the hand-built fixture assumed
             survivors.append(Survivor(m["file"], int(m["line"]), m["what"]))
         else:
             survivors.append(Survivor(case.get("classname", "?"), 0, case.get("name", "")))

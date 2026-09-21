@@ -20,3 +20,31 @@ def test_run_missing_binary_does_not_raise(tmp_path):
 def test_run_feeds_input_to_stdin(tmp_path):
     cp = run([sys.executable, "-c", "import sys; print(sys.stdin.read().upper())"], cwd=tmp_path, input="hi")
     assert cp.stdout.strip() == "HI"
+
+
+def test_run_stream_echoes_output_as_it_arrives_and_still_captures_it(capsys, tmp_path):
+    # The mutation step streams so the tool's own progress bar (\r-rewritten, no newline for
+    # minutes) reaches the terminal; the captured stdout is unchanged for the parsers (BACKLOG #73).
+    cp = run([sys.executable, "-c",
+              "import sys; sys.stdout.write('File [##  ] 40%\\r'); sys.stdout.flush(); print('done'); raise SystemExit(255)"],
+             cwd=tmp_path, stream=True)
+    assert cp.returncode == 255
+    assert cp.stdout == "File [##  ] 40%\rdone\n"
+    out = capsys.readouterr().out
+    assert out.startswith("$ ") and out.endswith("File [##  ] 40%\rdone\n")
+
+
+def test_run_stream_appends_eta_when_progress_regex_reads_done_of_total(capsys, tmp_path):
+    # mutmut prints `N/total …` but never an ETA; the runner appends one from the rate it observes
+    import re
+    from orc_test import runner
+    progress = re.compile(r"^\S+ (?P<done>\d+)/(?P<total>\d+) ")
+    cp = run([sys.executable, "-c",
+              "import sys,time; sys.stdout.write('\\r⠋ 1/4 x'); sys.stdout.flush(); time.sleep(0.3);"
+              " sys.stdout.write('\\r⠙ 3/4 x'); sys.stdout.flush(); print()"],
+             cwd=tmp_path, stream=True, progress=progress)
+    assert cp.stdout == "\r⠋ 1/4 x\r⠙ 3/4 x\n"          # the capture stays the tool's own text
+    assert re.search(r"3/4 x ~\d+s", capsys.readouterr().out)
+    assert runner._eta(done=1, total=4, done0=1, t0=0.0, now=5.0) == ""      # no rate yet
+    assert runner._eta(done=3, total=4, done0=1, t0=0.0, now=10.0) == "~5s"  # 2 in 10s, 1 left
+    assert runner._eta(done=3, total=203, done0=1, t0=0.0, now=2.0) == "~3m 20s"

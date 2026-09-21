@@ -20,9 +20,9 @@ says so and stops.
 | Subcommand | Question it answers | Writes |
 |---|---|---|
 | `run` (or nothing) | Does the code work? | nothing |
-| `coverage` | How much of it do the tests exercise? (gate 80%) | `.orclab/test/<lang>/` |
+| `coverage` | How much of it do the tests exercise? (gate 80%) | `<marker dir>/.orclab/test/<lang>/` |
 | `audit` | Do the dependencies carry a known vulnerability? (gate: any finding) | nothing |
-| `analyze` | Would the tests notice a defect? (coverage + TCE at 70% + lint) | `.orclab/test/<lang>/`, `.orclab/test/analyze.json` |
+| `analyze` | Would the tests notice a defect? (coverage + TCE at 70% + lint) | `<marker dir>/.orclab/test/<lang>/`, `.orclab/test/analyze.json` |
 | `generate` | Fix what `analyze` found | tests, uncommitted — see below |
 | `detect` | Which languages, and which test command each | nothing |
 
@@ -76,7 +76,11 @@ is what `/orc-test` and `lint_on_write` recognise.
 each language's marker first and at the repository root second, so a sub-project with its own
 container (`server/compose.yaml` beside `server/composer.json`, the layout `stack-php`
 recommends) runs inside it while a Dart app at the root runs on the host — `detected: Dart, PHP
-(server/) (in container)`. Each distinct `compose.yaml` is built once. On the first PHP project
+(server/) (in container)`. Each distinct `compose.yaml` is built once. A sub-project's
+container mounts only its own directory, so each language's reports (`.orclab/test/<lang>/`) are
+written beside its marker — `server/.orclab/test/php/` — where the container can reach them; a
+report path at the repository root was written inside the container and lost with it (orcweather,
+2026-09-20; BACKLOG #70). `analyze.json` alone stays at the root. On the first PHP project
 (2026-09-20) only the root was checked and PHP was skipped as "missing composer"; BACKLOG #66.
 
 Every command runs as `<engine> compose run --rm -T --workdir <dir> orclab <cmd>`, after one
@@ -216,7 +220,9 @@ That list is the most valuable thing this command produces.
 
 **Before a whole-project run it says how many files it is about to mutate**, once per language,
 and that a first run takes a while (later runs are incremental where the tool supports it). It
-does not ask — you typed the command. Give it a path to narrow it — how far a path narrows the
+does not ask — you typed the command. The tool's own progress line streams to the terminal as it
+runs (done/total and an ETA; for mutmut, which only counts, the ETA is `/orc-test`'s own from the
+observed rate — BACKLOG #74). Through the Bash tool that line lands when the run ends. Give it a path to narrow it — how far a path narrows the
 mutation step is per language; `languages/<lang>.md` says. `--no-mutation` skips the
 slow step and the report says `TCE skipped` rather than showing a number that is not one.
 

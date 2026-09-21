@@ -4469,3 +4469,124 @@ Orclab's root now prints `TCE 80.5% ✓` (7032/8737, survivors listed per skill)
 v0.25.0 should have been held to, and would have passed. 243 tests pass. `release`'s
 "not measurable → continue" rule is unchanged: it is right for a project with no tool, and the
 misconfigured-project case it mishandled no longer produces that line.
+
+## #70: /orc-test wrote every report to <root>/.orclab/test/<lang>/, a path a sub-project's container cannot see — orcweather's PHP coverage was "not measurable" while phpunit said "done" (RESOLVED 2026-09-20)
+
+Found 2026-09-20 on the first `/orc-test analyze` of orcweather after #66 — the first project
+with a containerised sub-project (`server/compose.yaml` beside `server/composer.json`, the
+layout `stack-php` recommends). The report said `PHP        coverage not measurable — no coverage
+report found — see languages/php.md`, and `.orclab/test/php/` at the root was empty. Run by hand
+from `server/`, `podman compose run ... vendor/bin/phpunit --coverage-clover
+/home/direflail/projects/orcweather/.orclab/test/php/clover.xml` printed `Generating code
+coverage report in Clover XML format ... done` — and left nothing on the host. The sub-project's
+compose file mounts only its own directory (`.:${PWD}`, `${PWD}` = `server/`), so the root-level
+report path exists *inside the container only*; phpunit wrote it there and `--rm` threw it away.
+`cli._resolve`'s docstring stated the rule that broke: "every tool runs from [the marker dir]
+while reports and `.orclab/test/` stay at the root" — true on the host, and for a root-level
+container that mounts the whole repo, false for the one-container-per-language layout #66
+introduced the same day. Infection was not affected only because its log path is relative to its
+own cwd (`infection.json5`'s `logs.json`), which is how the run produced a 3.8 MB
+`server/.orclab/test/php/infection.json` beside an empty root dir.
+
+Scope: every language whose marker sits below the root *and* runs in its own container. A
+sub-project on the host, or one whose container is the root's (mounting the whole repo), was
+never affected. `analyze.json` is written by `run.py` on the host and was never at risk.
+
+**Resolved (same day).** `_out(d, mod)`: each language's `.orclab/test/<lang>/` is now beside its
+marker — `server/.orclab/test/php/` — the one host path its container is guaranteed to reach, and
+where Infection already wrote; `analyze.json` alone stays at the root. Proven by
+`tests/test_cli_analyze.py::test_analyze_reports_land_beside_a_sub_project_marker` (red before
+the change) and by orcweather: `PHP        coverage 84.2% (144/171 lines) ✓`, `clover.xml`, `html/`
+and `infection.json` all in `server/.orclab/test/php/`. `SKILL.md`'s Containers section and its
+"Writes" column say where reports land now. A sub-project needs its own `.gitignore` line for
+`.orclab/` (orcweather's `server/.gitignore` already had one).
+
+## #71: /orc-test analyze read mutation_test's exit code 255 as a crash and said "TCE not measurable" beside a complete 662-mutant report; its survivors would have printed with line 0 (RESOLVED 2026-09-20)
+
+Found 2026-09-20 on the first real Dart mutation run (`languages/dart.md` had carried "Last real
+run: none yet" since 2026-09-11) — orcweather, mutation_test 1.8.1, 23 files, about three minutes.
+`run.py` printed `TCE not measurable — mutation tool exited 255` while
+`.orclab/test/dart/mutation-test.junit.xml` (156 KB, 662 `<testcase>`s, 255 `<failure>`s — TCE
+61.5%) sat finished beside it. `bin/mutation_test.dart:169`: `if (!foundAll) { exit(-1); }` —
+any surviving mutant is -1, which is 255 on Linux. `cli._mutation` accepted only exit codes 0, 1
+and 2 as "survivors" and called anything higher a crash, an assumption made from the tools that
+had been run for real (mutmut, Stryker, PIT). Reading the report next: `_parse_junit`'s
+`_CASE` regex expected the survivor's file, line and change in the testcase `name`
+(`lib/clamp.dart:5:10 > replaced with >=`) — the shape the hand-built fixture
+`mutation_test_junit.xml` assumed, whose README said "verify on first real run". The real report
+has `name="Line16_builtin.op.eq_0" classname="lib/debug_alerts.dart"` and puts the mutation in
+the `<failure>` element's text (`File: … / Line: … / Original line: … / Mutation: …`, several
+lines when the statement spans them). The fallback branch would have printed all 255 survivors as
+`lib/main.dart:0  Line128_builtin.op.eq_0` — the score right, the list `generate` works from
+useless.
+
+Scope: Dart only for the parser; the exit-code rule was shared by every language, and any other
+tool with a non-0/1/2 survivor exit would have hit it the same way.
+
+**Resolved (same day).** `cli._mutation` reads the report first and lets the exit code speak only
+when there is no report (the report dir is emptied before each run — #70 — so a report there is
+this run's). `_parse_junit` reads the `<failure>` text with `_FAILURE` (dotall, for multi-line
+statements), keeps the old `_CASE` branch as a fallback, and prefixes the mutator name from
+`name=` (`removeVoidCall1: if (…) {`) because a deleted statement leaves the mutated code
+looking unchanged. New fixture `mutation_test_junit_real.xml`, six cases cut from orcweather's
+report, with a README saying so. Proven: `test_analyze_reads_the_report_when_the_tool_exits_high`,
+`test_analyze_no_report_and_a_high_exit_code_names_the_exit_code` and
+`test_mutation_junit_parse_real_shape` (the first and third red before the change); orcweather
+re-run: `TCE 61.5% ✗ (min 70)` with 255 survivors as `lib/debug_alerts.dart:16  eq: final lat =
+parts.length != 2 ? …`. `dart.md` has its first "Last real run" line.
+
+## #72: /orc-test read infection.json5 with a whole-line-comment-only JSON5 stripper; orcweather's end-of-line // comment made analyze say "produced no mutants" beside a 407-mutant log (RESOLVED 2026-09-20)
+
+Found 2026-09-20, same orcweather run as #70. `PHP ... TCE not measurable — mutation tool produced
+no mutants in server — check its configuration`, while Infection's own output above it ended
+`407 mutations were generated ... MSI: 80%` and named the log it wrote. `server/infection.json5`
+line 3 ends `"excludes": ["Fetch.php"] }, // Fetch is the network edge; ...` — a comment at the
+end of a line, which JSON5 allows and Infection reads. `langs/php.py`'s `_JSON5_COMMENT` was
+`^\s*//.*$` — whole-line comments only, the case `test_mutation_parse_tolerates_json5_comments`
+covered. `json.loads` failed, `_infection_log_path` fell back to `<out>/infection.json` (at the
+root then — #70), found nothing, `Mutation(0, 0)`. `mutation_unavailable` had the same parse
+failure and, by design, returned None ("degrades") rather than refusing — so the run happened,
+and the log it produced was looked for in the wrong place. `php.md:54` documented the degrade for
+trailing commas; it did not say a trailing comment was the same case, and nothing said the
+degraded path silently produces "no mutants" instead of "could not read your config".
+
+Scope: PHP only; only a project whose `infection.json5` carries JSON5 syntax beyond whole-line
+`//` comments. Infection's own run is unaffected; only Orclab's reading of where the log went.
+
+**Resolved (same day).** Two regex passes, each with a group-1 alternative that matches a string
+literal and keeps it so `"http://x//y"` and a comma inside a string survive: `_JSON5_COMMENT`
+strips `//` to end of line anywhere, then `_JSON5_COMMA` strips a comma before `}`/`]` — two
+passes because a comma before a comment before `}` is only trailing once the comment is gone.
+Block comments still degrade. Proven: `test_mutation_parse_reads_trailing_comments_and_commas`
+(orcweather's line, a comma inside the comment, a `//` inside a string, a trailing comma; red
+before); the old fallback test now uses a `/* block */` comment for the case that still cannot be
+read. orcweather re-run: `TCE 71.0% ✓` (289/407 — `run.py` counts the 46 mutants the project
+told Infection to ignore as alive, where Infection's MSI excludes them and says 80%; not tracked
+separately because the OpenAPI-attribute mutants it ignores are the project's own call and the
+gate passed either way — worth a look if a project's gate ever turns on that difference).
+
+## #73: /orc-test analyze showed nothing for the minutes the mutation tool ran — its output was captured and printed only on failure, though every tool prints a progress bar and mutation_test an ETA (RESOLVED 2026-09-20)
+
+Found 2026-09-20 during orcweather's first Dart mutation run: direflail asked whether there was
+"a means of determining how much of these tests are done (and/or an ETA)". There was — on the
+tool's side. `runner.run` used `subprocess.run(..., stdout=PIPE)`, so the terminal showed
+`$ dart run mutation_test -f junit -o …` and then nothing for three minutes; the captured output
+was printed only when the step failed (`cp.stdout[-3000:]`). mutation_test writes a per-file
+line and a `\r`-rewritten bar with an ETA computed from elapsed/progress
+(`app_progress_bar.dart:_createText`: `File [###   ] Total [##    ] 34% ~2m 40s`) even when stdout
+is not a TTY; Infection prints a `( 50 / 407)` count per fifty mutants but `mutation_cmd` passed
+`--no-progress`, a flag chosen for a captured run. A three-minute Dart run is the short case —
+Orclab's own Python TCE (#69, 8737 mutants) runs for much longer with the same silence.
+
+Scope: the mutation step of `analyze` only. `run` and `coverage` finish in seconds and stay
+captured; `audit` too.
+
+**Resolved (same day).** `runner.run(..., stream=True)`: `Popen`, `os.read` of 4096-byte chunks —
+bytes, not lines, because a progress bar is one `\r`-rewritten line for minutes — echoed to
+stdout as they arrive and joined into `cp.stdout` unchanged for the parsers. `cli._mutation` is
+its only caller; `input` is refused under `stream` (the mutation commands never feed stdin — the
+mutmut diff helper does, and stays captured). Infection's `--no-progress` is dropped. Proven:
+`tests/test_runner.py::test_run_stream_echoes_output_as_it_arrives_and_still_captures_it`, and
+orcweather's PHP re-run showing Infection's `IIII............MM.U   ( 50 / 407)` lines live. In a
+non-TTY transcript the `\r` frames arrive as text rather than a moving bar; in a terminal they
+render as the tool intends.

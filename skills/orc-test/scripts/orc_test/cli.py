@@ -42,8 +42,11 @@ def _target_under(m, d, root, path):
 
 def _resolve(args):
     """(project root, config, [(module, dir, target, container)]). `dir` is where the language's
-    marker sits — every tool runs from there — while reports and `.orclab/test/` stay at the root;
-    `container` is that language's own (None: the host), and `_each` makes it active per loop."""
+    marker sits — every tool runs from there and its `.orclab/test/<lang>/` reports land there too
+    (a sub-project's container mounts only its own directory, so a report path at the root is
+    written inside the container and lost with it; BACKLOG #70) — while `analyze.json` stays at
+    the root; `container` is that language's own (None: the host), and `_each` makes it active
+    per loop."""
     root = detect.project_root(args.cwd)
     cfg = config.load(root)
     mods = [m for m in langs.ALL if not args.lang or m.KEY == args.lang]
@@ -92,8 +95,9 @@ def _each(usable):
         yield m, d, target
 
 
-def _out(root, mod, empty=True):
-    out = pathlib.Path(root) / ".orclab" / "test" / mod.KEY
+def _out(d, mod, empty=True):
+    """This language's report dir, beside its marker (see `_resolve`), emptied unless told not to."""
+    out = pathlib.Path(d) / ".orclab" / "test" / mod.KEY
     if empty:
         shutil.rmtree(out, ignore_errors=True)
         out.mkdir(parents=True)
@@ -178,7 +182,7 @@ def cmd_coverage(args):
     root, cfg, usable = _resolve(args)
     failed, blocks = False, []
     for m, d, target in _each(usable):
-        cov = _coverage(m, d, target, _out(root, m))
+        cov = _coverage(m, d, target, _out(d, m))
         if cov is None:
             failed = True
             continue
@@ -186,7 +190,7 @@ def cmd_coverage(args):
             blocks.append(f"{m.LABEL:<10} coverage not measurable — {cov['unavailable']}")
             continue
         failed |= cov.percent < cfg["coverage"]
-        blocks.append(_coverage_block(m, cov, cfg["coverage"], _out(root, m, empty=False)))
+        blocks.append(_coverage_block(m, cov, cfg["coverage"], _out(d, m, empty=False)))
     print("\n" + "\n\n".join(blocks) if blocks else "nothing measured")
     return 1 if failed else 0
 
@@ -254,19 +258,23 @@ def _mutation(mod, root, d, target, out):
     killed, total, survivors = 0, 0, []
     for where in wheres:
         before = _dirty(root, sandbox)
-        cp = run(mod.mutation_cmd(where, target, out), cwd=where)
+        cp = run(mod.mutation_cmd(where, target, out), cwd=where, stream=True,   # the tool's own progress bar,
+                 progress=getattr(mod, "MUTATION_PROGRESS", None))            # plus an ETA where it has none
         changed = sorted(_dirty(root, sandbox) - before)
         if changed:
             print(f"mutation run changed tracked files outside its sandbox: {' '.join(changed)} — the "
                   "suite writes to the real tree under a planted defect (test-discipline rule 4; BACKLOG #34)")
             return {"unavailable": "mutation run modified the working tree — see above"}
-        if cp.returncode not in (0, 1, 2):        # tools exit non-zero on survivors; a crash is higher
-            print(cp.stdout[-3000:])
-            return {"unavailable": f"mutation tool exited {cp.returncode}"}
+        # The report decides, not the exit code: every tool exits non-zero on survivors and each
+        # picks its own number (mutation_test's is -1 → 255; BACKLOG #71). `out` was emptied
+        # before the run, so a report there is this run's. No report: a crash-like
+        # exit code is the message, otherwise the configuration is.
         mut = mod.mutation_parse(where, out)
         sub = pathlib.Path(where).relative_to(root)
         if not mut.total:
             print(cp.stdout[-3000:])
+            if cp.returncode not in (0, 1, 2):
+                return {"unavailable": f"mutation tool exited {cp.returncode}"}
             return {"unavailable": f"mutation tool produced no mutants in {sub} — check its configuration"}
         killed, total = killed + mut.killed, total + mut.total
         survivors += [[str(sub / s.file), s.line, s.description] for s in mut.survivors]
@@ -285,7 +293,7 @@ def _tce_line(tce, threshold):
 def _analyze_one(m, root, d, target, cfg, no_mutation, failed_gates):
     """One language's coverage, TCE and lint: its analyze.json entry and its printed block.
     (None, None) when coverage could not be measured because the tests were red."""
-    out = _out(root, m)
+    out = _out(d, m)
     sub = d.relative_to(root)
     cov = _coverage(m, d, target, out)
     if cov is None:

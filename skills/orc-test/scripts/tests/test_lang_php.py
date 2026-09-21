@@ -69,8 +69,8 @@ def test_mutation_cmd_has_no_logger_json_option_and_uses_with_uncovered(tmp_path
     # is what makes an untested file count against the score instead of vanishing from it.
     out = tmp_path / "out"
     cmd = php.mutation_cmd(tmp_path, None, out)
-    assert cmd == ["vendor/bin/infection", "--no-interaction", "--no-progress",
-                    "--threads=max", "--with-uncovered"]
+    assert cmd == ["vendor/bin/infection", "--no-interaction", "--threads=max", "--with-uncovered"]
+    assert "--no-progress" not in cmd    # the run is streamed; the progress line is wanted (BACKLOG #73)
     assert not any(c.startswith("--logger-json") for c in cmd)
     cmd = php.mutation_cmd(tmp_path, "src/Greeting.php", out)
     assert cmd[-1] == "--filter=src/Greeting.php"
@@ -127,13 +127,28 @@ def test_mutation_parse_tolerates_json5_comments(tmp_path):
 
 
 def test_mutation_parse_falls_back_on_json5_it_cannot_read(tmp_path):
-    # Real JSON5 (trailing commas, block comments) is beyond the //-line-comment fallback;
-    # mutation_parse must degrade to <out>/infection.json, never raise.
+    # Real JSON5 beyond the fallback (a /* block */ comment): mutation_parse must degrade to
+    # <out>/infection.json, never raise.
     out = tmp_path / "out"
     out.mkdir()
     (out / "infection.json").write_bytes((FIX / "infection.json").read_bytes())
-    (tmp_path / "infection.json5").write_text('{\n  "logs": {"json": "out/infection.json",},\n}')
+    (tmp_path / "infection.json5").write_text('{\n  /* the log */ "logs": {"json": "out/infection.json"}\n}')
     mut = php.mutation_parse(tmp_path, out)
+    assert mut.total == 10
+
+
+def test_mutation_parse_reads_trailing_comments_and_commas(tmp_path):
+    # orcweather's server/infection.json5 (2026-09-20): a // comment at the END of a line, not on
+    # its own. The whole-line-only stripper failed, fell back to <out>/infection.json, found
+    # nothing, and analyze said "produced no mutants" beside a 407-mutant log (BACKLOG #72).
+    # The comment text carries a comma, and the string a `//`, so the stripper must respect quotes.
+    log = tmp_path / "elsewhere" / "infection.json"
+    log.parent.mkdir()
+    log.write_bytes((FIX / "infection.json").read_bytes())
+    (tmp_path / "infection.json5").write_text(
+        '{\n    "source": { "directories": ["src"], "excludes": ["Fetch.php"] }, // Fetch is the network edge, live-tested\n'
+        '    "logs": { "json": "elsewhere/infection.json", "html": "http://x//y", },\n}')
+    mut = php.mutation_parse(tmp_path, tmp_path / "out")
     assert mut.total == 10
 
 

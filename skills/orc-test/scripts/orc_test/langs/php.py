@@ -29,7 +29,11 @@ SANDBOX = {".phpunit.cache", "vendor"}   # PHPUnit's own cache and composer's in
 
 AUDIT_TOOL = ("composer", "https://getcomposer.org/download/")
 _UNREADABLE = ["audit output not understood — see above"]
-_JSON5_COMMENT = re.compile(r"^\s*//.*$", re.MULTILINE)
+# JSON5 → JSON, in two passes so a comma before a comment before `}` is still trailing: a `//`
+# comment to end of line (whole-line or trailing — orcweather's file had a trailing one, BACKLOG
+# #72), then a trailing comma before `}`/`]`. Group 1 keeps string literals untouched in both.
+_JSON5_COMMENT = re.compile(r'("(?:\\.|[^"\\])*")|//[^\n]*')
+_JSON5_COMMA = re.compile(r'("(?:\\.|[^"\\])*")|,(?=\s*[}\]])')
 
 
 def _dev_deps(root):
@@ -88,7 +92,9 @@ def mutation_cmd(root, target, out):
     # logs.json key, read back by mutation_parse. --with-uncovered: since Infection 0.31 the
     # default mutates covered code only, which would score an untested file as 100%; with the
     # flag an uncovered mutant counts as alive, matching how Stryker/PIT are read here.
-    cmd = ["vendor/bin/infection", "--no-interaction", "--no-progress", "--threads=max", "--with-uncovered"]
+    # no --no-progress: the run is streamed (runner.run stream=True), and Infection's `.M.S..`
+    # line is the only sign of life during a long run
+    cmd = ["vendor/bin/infection", "--no-interaction", "--threads=max", "--with-uncovered"]
     if target:
         cmd.append(f"--filter={target}")
     return cmd
@@ -98,7 +104,8 @@ def _json5_load(text):
     try:
         return json.loads(text)
     except ValueError:
-        return json.loads(_JSON5_COMMENT.sub("", text))
+        keep_strings = lambda m: m.group(1) or ""
+        return json.loads(_JSON5_COMMA.sub(keep_strings, _JSON5_COMMENT.sub(keep_strings, text)))
 
 
 def _infection_log_path(root, out):

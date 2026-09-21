@@ -1,7 +1,11 @@
 # Dart
 
-Researched on: 2026-09-11 (versions read from pub.dev that day). Last real run: none yet — the first
-project with this language corrects it.
+Researched on: 2026-09-11 (versions read from pub.dev that day). Last real run: 2026-09-20, on
+orcweather (Flutter, mutation_test 1.8.1): `coverage 88.0% (661/751 lines) ✓`, then 662 mutants
+in ~3 minutes, `TCE 61.5%`. Two things the research had wrong, both fixed that day: mutation_test
+does `exit(-1)` (255 on Linux) whenever any mutant survived, which `run.py` had read as a crash;
+and the survivor's file, line and mutated code are in the `<failure>` element's text, not the
+testcase `name` (BACKLOG #71; fixture `mutation_test_junit_real.xml`).
 
 ## Detect
 `pubspec.yaml` at the root or up to two directories down. Its own `dependencies:` block decides
@@ -30,9 +34,12 @@ threshold flag — there is no project-side gate to delegate to; `run.py` is the
 mutation_test 1.8.0 (pub.dev, 2026-02): `dart pub add --dev mutation_test`, then `dart run
 mutation_test -f junit -o <out>`. It defaults to running `dart test` over `lib/` with no further
 config. Its own gate is an XML config value, unused here. `run.py` takes the newest `*.xml` found
-under `<out>` and reads it as junit: each mutant is a `<testcase>`, a `<failure>` child marks a
-survivor, and the survivor's file/line/description are parsed from the testcase's `name`
-attribute (`lib/clamp.dart:5:10 > replaced with >=`). Alternative, not used: dart_mutant
+under `<out>` and reads it as junit: each mutant is a `<testcase>` (`name="Line16_builtin.op.eq_0"
+classname="lib/x.dart"`), a `<failure>` child marks a survivor, and the survivor's file, line and
+mutated code come from that element's text (`File: … / Line: … / Original line: … / Mutation: …`,
+several lines when the statement spans them); the report is `<mutator>: <mutated code>`. It exits
+255 when anything survived — the report is what `run.py` reads, the exit code only matters when
+there is no report. Alternative, not used: dart_mutant
 (github.com/Nimblesite/dart_mutant, MIT, Rust, Stryker JSON) — `run.py`'s existing `stryker.py`
 reader would read its report unchanged, no new parser needed.
 

@@ -1,0 +1,8 @@
+mutation_test_junit_real.xml — six <testcase>s cut from a real report.
+
+Captured 2026-09-20 from `dart run mutation_test -f junit` (mutation_test 1.8.1) on orcweather
+(662 mutants, 255 survived). The real shape differs from the hand-built mutation_test_junit.xml:
+name= is "Line<N>_<mutator>_<k>", classname= is the file, and the survivor's file, line, original
+and mutated code are in the <failure> element's text ("File: … / Line: … / Original line: … /
+Mutation: …"), spanning several lines when the statement does. mutation_test exits -1 (255) when
+any mutant survived. BACKLOG #71.

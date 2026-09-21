@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<testsuites>
+  <testsuite id="8" name="builtin.op.eq" package="builtin.op.eq" tests="6" failures="2" errors="0">
+    <properties>
+      <property name="test_runner" value="mutation_test" />
+      <property name="version" value="mutation-test version: 1.8.1" />
+    </properties>
+    <testcase name="Line68_builtin.op.eq_0" classname="lib/librewxr.dart" time="4.712" />
+    <testcase name="Line14_builtin.op.eq_0" classname="lib/road_risk.dart" time="3.938" />
+    <testcase name="Line16_builtin.op.eq_0" classname="lib/idot.dart" time="4.978" />
+    <testcase name="Line52_builtin.op.eq_0" classname="lib/settings.dart" time="5.335" />
+    <testcase name="Line16_builtin.op.eq_0" classname="lib/debug_alerts.dart" time="5.1370000000000005">
+      <failure type="undetected" message="All tests passed despite changing the code!">
+File: lib/debug_alerts.dart
+Line: 16
+Original line:   final lat = parts.length == 2 ? double.tryParse(parts[0]) : null;
+Mutation:   final lat = parts.length != 2 ? double.tryParse(parts[0]) : null;
+</failure>
+    </testcase>
+    <testcase name="Line194_builtin.function.removeVoidCall1_0" classname="lib/main.dart" time="5.017">
+      <failure type="undetected" message="All tests passed despite changing the code!">
+File: lib/main.dart
+Line: 194
+Original line:       if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        setState(() =&gt; _error = 'Location permission denied');
+Mutation:       if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        
+</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

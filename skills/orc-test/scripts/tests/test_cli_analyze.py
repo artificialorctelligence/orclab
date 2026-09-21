@@ -185,3 +185,46 @@ def test_analyze_sums_tce_over_every_sub_project_config(tmp_path, capsys, monkey
     assert "TCE 70.0% ✓" in out and "skills/a/scripts/pkg/a.py:2  x <= 1" in out
     result = json.loads((repo / ".orclab" / "test" / "analyze.json").read_text())
     assert result["languages"]["fake"]["tce"]["killed"] == 14
+
+
+def test_analyze_reads_the_report_when_the_tool_exits_high(tmp_path, capsys, monkeypatch):
+    # mutation_test 1.8.1 does `exit(-1)` (255) whenever a mutant survived, after writing a complete
+    # junit report; orcweather's first Dart run was called "exited 255" beside a 662-mutant report
+    # (BACKLOG #71). The report decides; the exit code speaks only when there is no report.
+    m = fake(Mutation(407, 662, []))
+    m.mutation_cmd = lambda root, t, out: ["bash", "-c", "exit 255"]
+    monkeypatch.setattr(langs, "ALL", [m])
+    _code, out = run(["analyze"], make_repo(tmp_path), capsys)
+    assert "TCE 61.5%" in out
+    assert "exited 255" not in out
+
+
+def test_analyze_no_report_and_a_high_exit_code_names_the_exit_code(tmp_path, capsys, monkeypatch):
+    m = fake(Mutation(0, 0, []))
+    m.mutation_cmd = lambda root, t, out: ["bash", "-c", "echo segfault-ish; exit 139"]
+    monkeypatch.setattr(langs, "ALL", [m])
+    _code, out = run(["analyze"], make_repo(tmp_path), capsys)
+    assert "TCE not measurable — mutation tool exited 139" in out
+    assert "segfault-ish" in out
+
+
+def test_analyze_reports_land_beside_a_sub_project_marker(tmp_path, capsys, monkeypatch):
+    # A sub-project's container mounts only its own directory (`.:${PWD}` in server/compose.yaml),
+    # so a report path at the repository root is written inside the container and lost with it —
+    # orcweather's PHP coverage "not measurable" while phpunit said "done" (BACKLOG #70). The
+    # report dir is beside the marker; analyze.json stays at the root.
+    repo = make_repo(tmp_path)
+    (repo / "pyproject.toml").unlink()
+    (repo / "tests" / "test_ok.py").unlink()
+    sub = repo / "server"
+    (sub / "tests").mkdir(parents=True)
+    (sub / "pyproject.toml").write_text("[tool.pytest.ini_options]\n")
+    (sub / "tests" / "test_ok.py").write_text("def test_ok():\n    assert 1\n")
+    seen = {}
+    m = fake(Mutation(9, 10, []))
+    m.coverage_cmd = lambda root, t, out: seen.setdefault("out", pathlib.Path(out)) and ["true"]
+    monkeypatch.setattr(langs, "ALL", [m])
+    run(["analyze"], repo, capsys)
+    assert seen["out"] == sub / ".orclab" / "test" / "fake"
+    assert (repo / ".orclab" / "test" / "analyze.json").exists()
+    assert not (repo / ".orclab" / "test" / "fake").exists()
