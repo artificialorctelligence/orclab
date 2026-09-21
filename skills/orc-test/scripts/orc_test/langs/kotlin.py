@@ -12,6 +12,7 @@ from .java import (  # noqa: F401 — audit_findings is this module's too
     _gradle_audit_cmd,
     _gradle_audit_unavailable,
     audit_findings,
+    test_summary,
 )
 
 KEY = "kotlin"

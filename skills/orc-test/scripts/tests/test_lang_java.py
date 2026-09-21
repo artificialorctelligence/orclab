@@ -1,8 +1,9 @@
 import pathlib
+import subprocess
 from types import SimpleNamespace
 
 from orc_test import probe
-from orc_test.langs import java
+from orc_test.langs import java, kotlin
 
 
 def test_source_ext():
@@ -151,3 +152,25 @@ def test_audit_clean_and_unreadable():
     assert java.audit_findings("cat: target/x: No such file", 1) == _UNREADABLE
     assert java.audit_findings('{"dependencies": [{"vulnerabilities": [{}]}]}', 0) == _UNREADABLE
     assert java.audit_findings("42", 0) == _UNREADABLE
+
+
+_XML = '<testsuite name="ATest" tests="{t}" skipped="0" failures="{f}" errors="{e}"></testsuite>'
+
+
+def test_summary_counts_junit_xml_under_the_project_only(tmp_path):
+    """BACKLOG #67: a Flutter android/ `gradlew test` also runs pub-cache plugins' tests, whose XML
+    lands outside the project; only build/test-results (Gradle) and target/surefire-reports
+    (Maven) under the project root count, and none at all is "nothing ran"."""
+    cp = subprocess.CompletedProcess([], 0, "", "")
+    assert java.test_summary(tmp_path, cp) == (False, "")
+    g = tmp_path / "app" / "build" / "test-results" / "testDebugUnitTest"
+    g.mkdir(parents=True)
+    (g / "TEST-ATest.xml").write_text(_XML.format(t=3, f=0, e=0))
+    (g / "binary").mkdir()
+    (g / "binary" / "output.bin").write_text("not xml")
+    assert java.test_summary(tmp_path, cp) == (True, "3 passed")
+    s = tmp_path / "target" / "surefire-reports"
+    s.mkdir(parents=True)
+    (s / "TEST-BTest.xml").write_text(_XML.format(t=4, f=1, e=1))
+    assert java.test_summary(tmp_path, cp) == (True, "5 passed 2 failed")
+    assert kotlin.test_summary is java.test_summary

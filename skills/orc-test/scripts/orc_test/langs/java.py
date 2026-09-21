@@ -2,6 +2,7 @@
 
 import json
 import pathlib
+import xml.etree.ElementTree as ET
 
 from .. import jacoco, pitest, probe
 from ..model import Coverage, Finding, Mutation
@@ -118,6 +119,27 @@ def test_cmd(root, target):
         f = _pkg_filter(target) if target else None
         return ["mvn", "-q", "test"] + ([f"-Dtest={f}"] if f else [])
     return _gradle_cmd(root) + ["test"]
+
+
+def test_summary(root, cp):
+    """(ran, counts) from the JUnit XML Gradle (build/test-results) and Surefire (target/surefire-
+    reports) write inside each module of the project. Gradle exits 0 on a NO-SOURCE test task, so
+    the exit code cannot say whether anything ran (BACKLOG #67); and a Flutter android/ `gradlew
+    test` also runs every pub-cache plugin's tests, whose XML lands outside the project, so the
+    files under `root` are the project's own and nothing else. Gradle removes the results of a test
+    task that lost its sources (confirmed live, Gradle 9.3.1), so a stale pass cannot linger.
+    # ponytail: Maven does not clean target/ on `mvn test`; a suite deleted without `mvn clean` still
+    # counts its old reports. Add an mtime check keyed on the run's start if that ever bites.
+    """
+    root = pathlib.Path(root)
+    tests = failed = 0
+    for p in list(root.glob("**/build/test-results/**/*.xml")) + list(root.glob("**/target/surefire-reports/*.xml")):
+        suite = ET.parse(p).getroot()
+        tests += int(suite.get("tests", 0))
+        failed += int(suite.get("failures", 0)) + int(suite.get("errors", 0))
+    if not tests:
+        return False, ""
+    return True, f"{tests - failed} passed" + (f" {failed} failed" if failed else "")
 
 
 def coverage_cmd(root, target, out):

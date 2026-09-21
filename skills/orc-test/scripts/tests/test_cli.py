@@ -194,3 +194,17 @@ def test_containerised_sub_project_is_run_in_its_own_container(tmp_path, capsys,
     assert f"--workdir {repo / 'server'} orclab sh -c 'command -v composer'" in out
     assert "import pytest" not in out          # Python's probe stayed on the host (importlib, no command printed)
     assert "PHP: test command vendor/bin/phpunit" in out
+
+
+def test_language_that_says_nothing_ran_is_zero_tests_even_on_exit_zero(tmp_path, capsys, monkeypatch):
+    """BACKLOG #67: Gradle exits 0 on a NO-SOURCE test task; the language module's own summary
+    decides "ran", not pytest's exit-5 / 'no tests ran' signals."""
+    repo = make_repo(tmp_path)
+    m = fake()
+    m.test_summary = lambda root, cp: (False, "")
+    monkeypatch.setattr(cli.langs, "ALL", [m])
+    code, out = run(["run"], repo, capsys)
+    assert code == 1 and "0 tests" in out and "✗" in out
+    m.test_summary = lambda root, cp: (True, "12 passed")
+    code, out = run(["run"], repo, capsys)
+    assert code == 0 and "✓ 12 passed" in out

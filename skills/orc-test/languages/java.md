@@ -12,6 +12,13 @@ bare `gradle`.
 Maven: `mvn -q test`, or `mvn -q test -Dtest=<pkg>.*` when the target narrows to a package under
 `src/main/java/<pkg>`. Gradle: `./gradlew test` (or `gradle test`). JUnit 5 either way.
 
+**What zero tests looks like.** Gradle exits 0 on a `NO-SOURCE` test task and Surefire prints
+`No tests to run.` and exits 0 (BACKLOG #67), so `run` counts the JUnit XML under
+`build/test-results/` (Gradle) and `target/surefire-reports/` (Maven) instead of trusting the
+exit code: none is `0 tests ✗`. The Maven half is by Surefire's documented report layout, not a
+live run — and `mvn test` does not clean `target/`, so a suite deleted without `mvn clean` still
+counts its old reports; that is the one known gap.
+
 ## Coverage
 JaCoCo 0.8.15 (GitHub releases — **Maven Central's search API reported 0.8.13 that day; stale,
 check GitHub**). Maven needs no pom change: `mvn -q org.jacoco:jacoco-maven-plugin:prepare-agent

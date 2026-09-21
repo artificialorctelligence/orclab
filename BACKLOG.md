@@ -4349,7 +4349,7 @@ command vendor/bin/phpunit`. 239 tests pass. The `--cwd server` observation: int
 `detect.project_root` is `git rev-parse --show-toplevel`, so the project is always the
 repository, and `--cwd` says where you are, not what to scope to; not a second defect.
 
-## #67: /orc-test run reports Kotlin ✓ passed when Gradle's test task is NO-SOURCE — a language with zero tests passes instead of failing
+## #67: /orc-test run reports Kotlin ✓ passed when Gradle's test task is NO-SOURCE — a language with zero tests passes instead of failing (RESOLVED 2026-09-20)
 
 Found 2026-09-20 running `/orc-test` (no subcommand, i.e. `run`) from orcweather's root. The
 report was:
@@ -4390,3 +4390,46 @@ Dart or PHP, both of which printed real counts.
 
 Companion in orcweather: its own BACKLOG records that the car module has no tests — that is
 the project's debt, this entry is the tool's.
+
+**Resolved (2026-09-20, same day).** `cli._run_tests` no longer decides "did anything run" with
+pytest's signals for every language: a language module may carry `test_summary(root, cp) ->
+(ran, counts)`, and `_pytest_summary` is the default for the ones that do not. `java.test_summary`
+— shared into `kotlin` the way `audit_findings` already is — reads the JUnit XML under the
+project's `build/test-results/` (Gradle) and `target/surefire-reports/` (Maven): none is `0 tests
+✗`, otherwise the line carries the count (`12 passed 1 failed`), which Kotlin never had. Reading
+the results files rather than the task lines does two things at once: it ignores the pub-cache
+plugin modules a Flutter `android/` build also tests (their XML is outside the project — #68),
+and it survives `UP-TO-DATE` runs that print nothing. Verified before relying on it: on Gradle
+9.3.1 (orcweather's wrapper) a scratch project with one JUnit test wrote
+`build/test-results/test/TEST-ATest.xml`; deleting the test and re-running removed the whole
+`test-results` directory, so a deleted suite cannot pass on stale XML. The Maven glob is from
+Surefire's documented layout, no `mvn` on this host. Proven two ways: `tests/test_cli.py::
+test_language_that_says_nothing_ran_is_zero_tests_even_on_exit_zero` and `tests/test_lang_java.py::
+test_summary_counts_junit_xml_under_the_project_only` both failed before the change (the first
+printed `✓ passed`, the second `AttributeError`); and `run.py --cwd ~/projects/orcweather --lang
+kotlin run` now prints `Kotlin ✗ 0 tests (1.5s)` and exits 1. 241 tests pass. `languages/kotlin.md`
+and `java.md` now say what zero tests looks like for their runners. The other runners the entry
+presumed open (Swift, Godot, Jest/Stryker, Dart, PHP, C#) are unchanged and unverified here —
+each needs its own live "zero tests" run before its module gets a `test_summary`; that is
+per-language work as each one meets a project with no tests, not one entry.
+
+## #68: /orc-test's default Kotlin test command in a Flutter `android/` runs every pub-cache plugin's unit tests, not just the app's
+
+Found 2026-09-20 reproducing #67. `kotlin.test_cmd` is `./gradlew test`; Flutter's generated
+`android/settings.gradle.kts` includes every plugin project from `~/.pub-cache`, so that command
+compiles and runs the plugins' own JUnit suites — on orcweather, `:geolocator_android`,
+`:jni`, `:jni_flutter`, `:package_info_plus`, `:sensors_plus` and `:shared_preferences_android`
+all got `testDebugUnitTest` tasks, and `shared_preferences_android` ran 12 tests and failed one
+(`BUILD FAILED`, exit 1). That failure is not orcweather's and would print `Kotlin ✗ failed` on
+a project whose own tests are green. orcweather already sidesteps it in `.orclab/test.yaml`
+(`test: ./gradlew :app:testDebugUnitTest`, with a comment saying why) — the workaround is
+recorded in `languages/kotlin.md` under "Flutter's `android/` is a special case", but nothing in
+Orclab does it by default. `coverage_cmd` (`test koverXmlReport`) has the same shape.
+
+Not just Flutter: any Gradle build that includes projects from outside the repository has it.
+Which module is "the project's" is the question — the `build.gradle(.kts)` files under the
+language's directory name them (`android/app/` → `:app`), and AGP's real task is
+`test<Variant>UnitTest`, not the `test` lifecycle task that runs every variant. Not done in #67
+because #67 is about what "passed" means and this is about what runs; and because `:app:test`
+versus `:app:testDebugUnitTest` (one variant or three compiles) is a choice that wants a second
+project to look at.

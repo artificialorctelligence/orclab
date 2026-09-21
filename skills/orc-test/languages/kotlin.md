@@ -13,6 +13,20 @@ drops Java from the result for that project so the two never both run.
 ## Run
 `./gradlew test` (or `gradle test` without the wrapper). JUnit 5.
 
+**What zero tests looks like.** Gradle exits 0 on a test task with no sources — `> Task
+:app:testDebugUnitTest NO-SOURCE`, then `BUILD SUCCESSFUL` — so the exit code cannot say whether
+anything ran (BACKLOG #67). `run` reads the JUnit XML the test tasks write under each module's
+`build/test-results/` instead: no XML anywhere under the project is `0 tests ✗`; otherwise the
+line carries the real count. Gradle removes a test task's results when its sources go away
+(confirmed live, Gradle 9.3.1), so a deleted suite cannot pass on last week's XML.
+
+**Flutter's `android/` is a special case.** Its `settings.gradle.kts` includes every plugin from
+`~/.pub-cache`, so a bare `gradlew test` runs those plugins' unit tests too (orcweather:
+`shared_preferences_android` ran 12 and failed one that is not orcweather's). Their XML lands
+in the pub cache, outside the project, so `run` never counts them — but their failure still
+fails the build. Declare the app module's task in `.orclab/test.yaml` (`test: ./gradlew
+:app:testDebugUnitTest`) until BACKLOG #68 makes that the default.
+
 ## Coverage
 Kover 0.9.9 (`org.jetbrains.kotlinx.kover` Gradle plugin): `./gradlew test koverXmlReport` →
 `build/reports/kover/report.xml`, written in JaCoCo's own XML shape, so `jacoco.parse` reads it

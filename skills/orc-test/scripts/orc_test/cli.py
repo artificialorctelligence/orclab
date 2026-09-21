@@ -103,19 +103,27 @@ def _test_cmd(d, mod, target, cfg):
     return detect.declared_test_cmd(d, mod.KEY, cfg) or mod.test_cmd(d, target)
 
 
+def _pytest_summary(root, cp):
+    """(ran, counts) read from the runner's output, pytest's way — the default for a language module
+    without its own `test_summary(root, cp)`. A runner that exits 0 with nothing to run (Gradle on a
+    NO-SOURCE test task, BACKLOG #67) needs its own, or an empty suite passes."""
+    counts = " ".join(m.group(0) for m in _PYTEST_SUMMARY.finditer(cp.stdout))
+    return bool(counts) or not ("no tests ran" in cp.stdout or cp.returncode == 5), counts
+
+
 def _run_tests(mod, d, target, cfg):
     """(ok, one-line summary). Prints the tool's output tail when it failed or gave no counts."""
     t0 = time.monotonic()
     cp = run(_test_cmd(d, mod, target, cfg), cwd=d)
     secs = time.monotonic() - t0
     ok = cp.returncode == 0
-    counts = " ".join(m.group(0) for m in _PYTEST_SUMMARY.finditer(cp.stdout))
+    ran, counts = getattr(mod, "test_summary", _pytest_summary)(d, cp)
     if not ok or not counts:
         print(cp.stdout[-3000:])
-    if not counts:
-        empty = "no tests ran" in cp.stdout or cp.returncode == 5
-        counts = "0 tests" if empty else ("passed" if ok else "failed")
-        ok = ok and not empty
+    if not ran:
+        ok, counts = False, "0 tests"
+    elif not counts:
+        counts = "passed" if ok else "failed"
     return ok, f"{mod.LABEL:<10} {'✓' if ok else '✗'} {counts} ({secs:.1f}s)"
 
 
