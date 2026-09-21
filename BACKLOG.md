@@ -4348,3 +4348,45 @@ probed `composer` through `podman compose run … --workdir …/server`, and lis
 command vendor/bin/phpunit`. 239 tests pass. The `--cwd server` observation: intended —
 `detect.project_root` is `git rev-parse --show-toplevel`, so the project is always the
 repository, and `--cwd` says where you are, not what to scope to; not a second defect.
+
+## #67: /orc-test run reports Kotlin ✓ passed when Gradle's test task is NO-SOURCE — a language with zero tests passes instead of failing
+
+Found 2026-09-20 running `/orc-test` (no subcommand, i.e. `run`) from orcweather's root. The
+report was:
+
+```
+detected: Kotlin (android/), Dart, Swift (ios/), PHP (server/) (in container)
+Kotlin     ✓ passed (5.4s)
+Dart       ✓ passed (4.8s)
+PHP        ✓ passed (0.6s)
+```
+
+But the Gradle output above the Kotlin line ended `> Task :app:testDebugUnitTest NO-SOURCE` —
+`android/app/src/test/` does not exist; the car module (six `.kt` files under
+`android/app/src/main/kotlin/…/car/`) has no unit tests at all. Gradle exits 0 on a NO-SOURCE
+task, so the build "succeeded" and `cli._run_tests` printed ✓.
+
+The skill's own rule (`SKILL.md`, "When something goes wrong"): *"A language detected with no
+tests → `0 tests ✗`, nothing measured — an empty suite is a failure, not a pass."* The code
+implements that rule only for pytest: `_run_tests` sets `empty` from `"no tests ran" in
+cp.stdout or cp.returncode == 5`, both pytest signals. Gradle's signal is the `NO-SOURCE`
+outcome on the test task (and, when a test source set exists but is empty, a run with no
+`tests completed` line); neither is looked for, so ✓ with no count is what a Kotlin project
+with no tests gets. The same hole is presumably open for every other runner whose empty-suite
+signal is not pytest's — Swift's `xcodebuild test` with no test target, Godot with no
+`test/` directory, Stryker/Jest with no matching files — each language's `## Run` section
+should say what its "zero tests" looks like and `_run_tests` (or a per-module hook) should
+read it.
+
+Consequence: the gate this command exists for is silently open for that language. `/orc-git
+merge` runs `run` before and after landing a branch and would have waved the Kotlin car module
+through with nothing tested. The owner's rule, stated the same day: **if a language is in a
+project, it needs testing — full stop.** Detection already gets this right (Kotlin *was*
+detected); the failure is only in what "passed" means afterwards.
+
+Does not affect: `coverage` or `analyze` for Kotlin — untried on this project, and JaCoCo with
+no test task would presumably fail loudly on its own; that is not verified. Does not affect
+Dart or PHP, both of which printed real counts.
+
+Companion in orcweather: its own BACKLOG records that the car module has no tests — that is
+the project's debt, this entry is the tool's.
