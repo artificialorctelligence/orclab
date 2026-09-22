@@ -15,6 +15,7 @@ for this on its own: it only runs because you typed it yourself, or because a pr
 
 | You type | What it does |
 |---|---|
+| `/orc-publish` | Lists everything the project can publish to, numbered, and asks which — then continues as below for what you picked |
 | `/orc-publish <selection>` | Shows you the exact plan — the **dry run** — for what would be published where, then, once you say yes to that plan, actually publishes it |
 | `/orc-publish <selection> --dry-run` | Shows the same plan on its own and stops there; nothing is published |
 | `/orc-publish <selection> --metrics` | Reads back each channel's own published download/install numbers; publishes nothing |
@@ -29,7 +30,9 @@ paths — a **tree file** — with each specific destination at the end of one p
 a project with a Linux PPA channel arranged the way the skill's own examples are (a leaf named
 after the Ubuntu series it publishes to, like `noble`) might select just that one leaf with
 `linux.ppa.noble` — the exact shape depends on how your project's own `channels.yaml` is laid out.
-Leaving `<selection>` out acts on everything the tree file has actionable.
+Leaving `<selection>` out lists every leaf the tree file has actionable, numbered, and asks which to
+publish — numbers, paths, or `all`. Nothing is selected until you answer; `all` is something you
+type, never the default.
 
 ## What it will ask you
 

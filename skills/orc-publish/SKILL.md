@@ -62,6 +62,16 @@ warning, since the real run proceeds in all three of those cases too. So a wrapp
 `--dry-run && <publish>` stops exactly where a person reading the plan would. When it is
 non-zero, say so: the plan is already known broken, and there is nothing to confirm yet.
 
+## Step 2a: With no selection tokens, the list is a menu, not a plan
+
+If Step 1 found no selection tokens, the user has not chosen anything yet — `run.py` resolved
+every leaf only so there is something to choose from. Do not ask "publish all of these?". Show
+the leaves from the dry run numbered, and ask which to publish: numbers, dotted paths, or `all`.
+Then re-run Step 2 with the chosen dotted paths as the selection tokens, so the plan the user
+confirms — and the exit-code verdict — is for exactly those leaves. Only `all`, typed by the
+user, selects everything; it is never the default and never inferred from silence or a bare
+"yes".
+
 ## Step 3: Get an explicit go-ahead for that specific list
 
 Ask the user to confirm the list from Step 2. A vague "sounds good" earlier in the conversation,
