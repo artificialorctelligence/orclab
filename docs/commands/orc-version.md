@@ -54,10 +54,17 @@ the command.
   is added to the top, above everything already there.
 - **The project's version files** — it looks for whichever of these already exist in the project
   and updates only those; you don't choose which ones: `.claude-plugin/plugin.json`,
-  `.claude-plugin/marketplace.json`, `pyproject.toml`, `debian/changelog`, or a
+  `.claude-plugin/marketplace.json`, `pyproject.toml`, `pubspec.yaml`, `debian/changelog`, or a
   `*.metainfo.xml`/`*.appdata.xml` file at the project's root. A project with none of these still
   gets the changelog entry and the tag, just no version file edit — it says so plainly rather than
   creating a file you don't already use.
+- **A Flutter project's build number, bumped for you.** `pubspec.yaml` holds two numbers on one
+  line — `version: 1.0.0+6`. The left half is the version you asked for; the `+6` is the build
+  number, and the App Store and Google Play both refuse an upload carrying one they have already
+  seen. So this command always increases it, even when the version itself doesn't change: a build
+  that came back rejected is re-uploaded under the same version and still needs a number the store
+  has never seen. Nothing else in the file is touched — comments, dependencies and a pinned
+  package's own `version:` all stay exactly as they were.
 - **A commit** — `Bump version to X.Y.Z`, containing the changelog and whichever version files
   exist and were changed. Skipped entirely if you added `--no-commit`.
 - **A local tag** — `vX.Y.Z`. Skipped if you added `--no-commit`. Either way, nothing this command

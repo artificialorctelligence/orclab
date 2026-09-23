@@ -329,3 +329,119 @@ def test_verify_consistency_includes_the_metainfo(tmp_path):
     write_version(str(tmp_path), "pyproject.toml", "0.3.0")
     ok, versions = verify_consistency(str(tmp_path))
     assert ok is False and versions["org.orcshot.Orcshot.metainfo.xml"] == "0.2.0"
+
+
+# --- pubspec.yaml -----------------------------------------------------------
+#
+# Flutter's two numbers on one line. Shaped after orcweather's real pubspec, including a nested
+# `version:` under dependencies — the same hazard _write_pyproject guards against, and the reason
+# the pattern anchors to column 0.
+
+PUBSPEC = """
+    name: orcweather
+    description: "A new Flutter project."
+    publish_to: 'none'
+
+    # In iOS, build-name is used as CFBundleShortVersionString.
+    version: 1.0.0+6
+
+    environment:
+      sdk: ^3.9.2
+
+    dependencies:
+      flutter:
+        sdk: flutter
+      flutter_map: ^8.3.2
+      some_pinned_package:
+        hosted: https://example.test
+        version: 2.1.0
+
+    flutter:
+      uses-material-design: true
+    """
+
+
+def test_detect_finds_pubspec(tmp_path):
+    write(tmp_path, "pubspec.yaml", PUBSPEC)
+    assert detect(str(tmp_path)) == ["pubspec.yaml"]
+
+
+def test_detect_ignores_a_pubspec_with_no_version_line(tmp_path):
+    # A package pubspec need not carry one; write_version would raise on it, so detect skips it
+    # rather than letting version-set pick a file it cannot write.
+    write(tmp_path, "pubspec.yaml", "name: some_lib\ndependencies:\n  meta: ^1.0.0\n")
+    assert detect(str(tmp_path)) == []
+
+
+def test_read_pubspec_returns_the_version_without_the_build_number(tmp_path):
+    # The build number is pubspec-local and must not leak into cross-file consistency.
+    write(tmp_path, "pubspec.yaml", PUBSPEC)
+    assert read_version(str(tmp_path), "pubspec.yaml") == "1.0.0"
+
+
+def test_write_pubspec_increments_the_build_number(tmp_path):
+    write(tmp_path, "pubspec.yaml", PUBSPEC)
+    write_version(str(tmp_path), "pubspec.yaml", "1.1.0")
+    assert re.search(r"^version: 1\.1\.0\+7$", (tmp_path / "pubspec.yaml").read_text(), re.M)
+
+
+def test_write_pubspec_increments_even_when_the_version_is_unchanged(tmp_path):
+    # The real case this exists for: a rejected upload is re-uploaded under the same version and
+    # still needs a build number the store has never seen.
+    write(tmp_path, "pubspec.yaml", PUBSPEC)
+    write_version(str(tmp_path), "pubspec.yaml", "1.0.0")
+    assert re.search(r"^version: 1\.0\.0\+7$", (tmp_path / "pubspec.yaml").read_text(), re.M)
+
+
+def test_write_pubspec_preserves_everything_else(tmp_path):
+    p = write(tmp_path, "pubspec.yaml", PUBSPEC)
+    before = p.read_text()
+    write_version(str(tmp_path), "pubspec.yaml", "1.1.0")
+    after = p.read_text()
+    assert "# In iOS, build-name is used as CFBundleShortVersionString." in after
+    assert "flutter_map: ^8.3.2" in after
+    assert "uses-material-design: true" in after
+    assert len(after.splitlines()) == len(before.splitlines())
+
+
+def test_write_pubspec_does_not_touch_a_dependency_version_field(tmp_path):
+    write(tmp_path, "pubspec.yaml", PUBSPEC)
+    write_version(str(tmp_path), "pubspec.yaml", "1.1.0")
+    assert "    version: 2.1.0" in (tmp_path / "pubspec.yaml").read_text()
+
+
+def test_write_pubspec_honours_an_explicit_build_number(tmp_path):
+    write(tmp_path, "pubspec.yaml", PUBSPEC)
+    write_version(str(tmp_path), "pubspec.yaml", "1.1.0", build=42)
+    assert re.search(r"^version: 1\.1\.0\+42$", (tmp_path / "pubspec.yaml").read_text(), re.M)
+
+
+def test_write_pubspec_refuses_an_explicit_build_that_does_not_increase(tmp_path):
+    # stack-flutter's promise: "must refuse a bump that leaves +N unchanged" — the store refuses
+    # the upload, and finding out from Apple or Google is the expensive way to find out.
+    write(tmp_path, "pubspec.yaml", PUBSPEC)
+    with pytest.raises(ValueError, match="build number"):
+        write_version(str(tmp_path), "pubspec.yaml", "1.1.0", build=6)
+    assert "version: 1.0.0+6" in (tmp_path / "pubspec.yaml").read_text()
+
+
+def test_write_pubspec_with_no_build_number_starts_at_one(tmp_path):
+    write(tmp_path, "pubspec.yaml", "name: app\nversion: 1.0.0\n")
+    write_version(str(tmp_path), "pubspec.yaml", "1.0.1")
+    assert "version: 1.0.1+1" in (tmp_path / "pubspec.yaml").read_text()
+
+
+def test_pubspec_version_may_be_quoted_and_carry_a_trailing_comment(tmp_path):
+    write(tmp_path, "pubspec.yaml", 'name: app\nversion: "1.0.0+6"  # two numbers\n')
+    assert read_version(str(tmp_path), "pubspec.yaml") == "1.0.0"
+    write_version(str(tmp_path), "pubspec.yaml", "1.0.1")
+    text = (tmp_path / "pubspec.yaml").read_text()
+    assert '"1.0.1+7"' in text and "# two numbers" in text
+
+
+def test_verify_consistency_compares_pubspec_on_its_version_not_its_build(tmp_path):
+    write(tmp_path, "pubspec.yaml", PUBSPEC)
+    write(tmp_path, ".claude-plugin/plugin.json", '{"name": "x", "version": "1.0.0"}')
+    ok, versions = verify_consistency(str(tmp_path))
+    assert ok is True
+    assert versions["pubspec.yaml"] == "1.0.0"

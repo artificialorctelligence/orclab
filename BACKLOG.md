@@ -448,7 +448,7 @@ name; it gets its own when something needs it.
 against one. Not before — the procedure needs one real run to be corrected by, the same as
 every other component here.
 
-## #6: Per-language manifest version detection/sync for /orc-version — deferred, same reasoning as #4 (PARTIALLY ADDRESSED 2026-09-07 — still open for the formats it names) (UPDATED 2026-09-13 — re-scoped from pom/package.json/Cargo to the version files of Orclab's own stacks; two-number model needed) (UPDATED 2026-09-13 — AppStream metainfo handler shipped for Orcshot 0.4.0; the plan is three steps, this was the first) (UPDATED 2026-09-22 — step 2's trigger moved: orcweather, not Orctool, is the first Flutter project heading for a store)
+## #6: Per-language manifest version detection/sync for /orc-version — deferred, same reasoning as #4 (PARTIALLY ADDRESSED 2026-09-07 — still open for the formats it names) (UPDATED 2026-09-13 — re-scoped from pom/package.json/Cargo to the version files of Orclab's own stacks; two-number model needed) (UPDATED 2026-09-13 — AppStream metainfo handler shipped for Orcshot 0.4.0; the plan is three steps, this was the first) (UPDATED 2026-09-22 — step 2's trigger moved: orcweather, not Orctool, is the first Flutter project heading for a store) (UPDATED 2026-09-22 — step 2 shipped: pubspec.yaml handled, build number always increments; still open for steps 3's formats)
 
 Raised by direflail (2026-09-05) while designing `/orc-version` (see
 `docs/superpowers/specs/2026-09-05-orclab-v3-orc-version-orc-help-design.md`): when Orclab is
@@ -587,6 +587,44 @@ described above, still one format at a time. Only the triggering project and its
 Orctool's own store slice remains a real future trigger for the same handler; whichever of the
 two gets there first proves it, and the second one costs nothing extra. Nothing here touches
 step 1 (shipped) or step 3, and the `composer.json` note below step 3 is unaffected.
+
+**Step 2 shipped 2026-09-22 — `pubspec.yaml`, with the two-number model.** `PUBSPEC` joins
+`KNOWN_FORMATS`; `read_version` returns only the human half of `version: 1.0.0+6`, so the build
+number stays out of cross-file consistency and a Flutter project still compares cleanly against a
+`plugin.json` beside it. `write_version` **derives the build number and always increases it** —
+`build=` may be passed explicitly and is refused if it does not increase, which is the refusal
+`stack-flutter`'s Play and App Store rows promised.
+
+**Why always-increment rather than only-on-change**, since the entry's earlier wording ("refuse a
+bump that leaves `+N` unchanged") suggested a check rather than a derivation: setting the same
+version twice is not a mistake to refuse, it is the real re-upload-after-rejection case, and it
+still needs a number the store has never seen. Deriving it makes the promised property true by
+construction instead of by error message. `_roll_back_versions` calls `write_version` with no
+`build=`, so an aborted release leaves the build number advanced — deliberate, and the safe
+direction: a number that may already have been uploaded is never handed out twice.
+
+Twelve tests in `tests/test_versionfiles.py` (suite 32 → 44, whole scripts suite 130 green;
+`hooks/scripts` 189 green). Proven against orcweather's real `pubspec.yaml` on a copy, not a
+fixture: `version-set 1.0.1` took `1.0.0+6` to `1.0.1+7`, a second `version-set 1.0.1` took it to
+`+8`, `version-verify` agreed, and a `diff` of everything but the version line was empty —
+including the nested `version: 2.1.0` under a pinned dependency, which is why the pattern anchors
+to column 0. Removing the `+ 1` from the derivation fails four of the twelve, so the tests bite.
+
+**Docs corrected in the same commit**, per `CLAUDE.md`'s rule that a skill misdescribing a shipped
+command is fixed before the command is: `stack-flutter` said `/orc-version` "does not edit this
+file yet" and that the handler "when written ... must refuse a bump that leaves `+N` unchanged" —
+both now describe what ships. Five other stack skills (`stack-godot`, `stack-unity`,
+`stack-react-native`, `stack-android-native`, `stack-ios-native`) enumerate the handled formats in
+a sentence about their *own* still-unhandled file; the enumeration gained `pubspec.yaml` and the
+rest of each sentence stays true. `docs/commands/orc-version.md` gained the format and a paragraph
+on the build number in a user's terms.
+
+**What stays open:** step 3 — every other stack's file, one at a time, when a project on it ships
+— and the first-touch "suggest a starting version from what's already there" half, still unbuilt.
+`verify_consistency` still has nothing to cross-check a build number *against*, because
+`pubspec.yaml` is the only format here that carries one; the day a second does (Android's
+`versionCode` in `build.gradle.kts`, iOS's `CURRENT_PROJECT_VERSION`) is the day that check earns
+its code, and not before.
 
 
 ## #7: Distribution-channel download/install metrics — carried over from Orcshot #186, direflail wants Orclab to own this eventually (PARTIALLY ADDRESSED 2026-09-10 — Launchpad and Flathub confirmed, Snap blocked until a snap exists)

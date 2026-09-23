@@ -2,8 +2,9 @@
 
 Deliberately per-format, not a generic "detect any manifest" abstraction: each format carries
 real syntax whose sloppy write breaks a real build. Formats are added when a real project needs
-one. Supported today: pyproject.toml, .claude-plugin/plugin.json, .claude-plugin/marketplace.json,
-debian/changelog and an AppStream metainfo file (see the two sections below).
+one. Supported today: pyproject.toml, pubspec.yaml, .claude-plugin/plugin.json,
+.claude-plugin/marketplace.json, debian/changelog and an AppStream metainfo file (see the
+sections below).
 
 This module is the single owner of version-setting - /orc-release uses it directly, and
 /orc-version delegates to it rather than carrying a second implementation.
@@ -21,23 +22,27 @@ PYPROJECT = "pyproject.toml"
 PLUGIN_JSON = ".claude-plugin/plugin.json"
 MARKETPLACE_JSON = ".claude-plugin/marketplace.json"
 DEBIAN_CHANGELOG = "debian/changelog"
+PUBSPEC = "pubspec.yaml"
 
 METAINFO_SUFFIXES = (".metainfo.xml", ".appdata.xml")   # AppStream: <id>.metainfo.xml, older .appdata.xml
 
-KNOWN_FORMATS = [PYPROJECT, PLUGIN_JSON, MARKETPLACE_JSON, DEBIAN_CHANGELOG]
+KNOWN_FORMATS = [PYPROJECT, PUBSPEC, PLUGIN_JSON, MARKETPLACE_JSON, DEBIAN_CHANGELOG]
 
 
 def detect(root):
     """Repo-relative paths of every known version-holding file that actually exists.
 
     pyproject.toml only counts if it has a [project] table — one that's only e.g.
-    [tool.pytest.ini_options] holds no version, and write_version would raise on it.
+    [tool.pytest.ini_options] holds no version, and write_version would raise on it. Same reason
+    for a pubspec.yaml with no top-level version line, which a plain Dart package need not have.
     """
     found = []
     for rel in KNOWN_FORMATS:
         if not os.path.exists(os.path.join(root, rel)):
             continue
         if rel == PYPROJECT and "project" not in tomllib.loads(_read_text(root, rel)):
+            continue
+        if rel == PUBSPEC and not _PUBSPEC_VERSION.search(_read_text(root, rel)):
             continue
         found.append(rel)
     # ponytail: root only, where Orcshot keeps its metainfo; walk data/ too when a project puts it there
@@ -65,6 +70,9 @@ def read_version(root, relpath):
     if relpath == MARKETPLACE_JSON:
         plugins = json.loads(_read_text(root, relpath)).get("plugins", [])
         return plugins[0].get("version") if plugins else None
+    if relpath == PUBSPEC:
+        m = _PUBSPEC_VERSION.search(_read_text(root, relpath))
+        return m.group("version") if m else None
     if relpath == DEBIAN_CHANGELOG:
         return _changelog_current_version(_read_text(root, relpath))
     if relpath.endswith(METAINFO_SUFFIXES):
@@ -86,6 +94,8 @@ def write_version(root, relpath, version, **kwargs):
         for plugin in data.get("plugins", []):
             plugin["version"] = version
         return _write_text(root, relpath, json.dumps(data, indent=2) + "\n")
+    if relpath == PUBSPEC:
+        return _write_pubspec(root, relpath, version, **kwargs)
     if relpath == DEBIAN_CHANGELOG:
         return _write_changelog(root, relpath, version, **kwargs)
     if relpath.endswith(METAINFO_SUFFIXES):
@@ -234,3 +244,47 @@ def _write_metainfo(root, relpath, version, body=None, **_ignored):
     else:
         entry = f'{indent}<release version="{version}" date="{date}"/>\n'
     _write_text(root, relpath, text[: opened.end()] + entry + text[opened.end():])
+
+
+# --- pubspec.yaml -----------------------------------------------------------
+#
+# Flutter keeps two numbers on one line: `version: 1.0.0+6`. The left half is the human version
+# (Android's versionName, iOS's CFBundleShortVersionString) and participates in cross-file
+# consistency like every other format here; `+6` is the build number (versionCode,
+# CFBundleVersion) and is pubspec-local, which is why read_version returns only the left half.
+#
+# Both stores refuse an upload whose build number they have already seen — and they refuse it at
+# upload, after the cloud-Mac minutes have been spent, which is the expensive place to find out.
+# So the build number is derived by default and always increases: setting the same version twice
+# is the real re-upload-after-rejection case and must still produce a number the store has never
+# seen. An explicit build= is honoured but refused if it does not increase, which is the refusal
+# stack-flutter's App Store and Play rows promise.
+#
+# Anchored to column 0: a nested `version:` under a pinned dependency is a real thing to hit, the
+# same hazard _write_pyproject's targeted regex guards against. Edited as text for the same
+# reason as every other format here — a YAML round-trip would reformat the file and drop its
+# comments on the way out.
+
+_PUBSPEC_VERSION = re.compile(
+    r"""^(?P<prefix>version:[ \t]*)(?P<q>["']?)(?P<version>[^\s"'\#+]+)"""
+    r"""(?:\+(?P<build>\d+))?(?P=q)(?P<trailing>[ \t]*(?:\#.*)?)$""",
+    re.MULTILINE,
+)
+
+
+def _write_pubspec(root, relpath, version, build=None, **_ignored):
+    text = _read_text(root, relpath)
+    m = _PUBSPEC_VERSION.search(text)
+    if not m:
+        raise ValueError(f"{relpath} has no top-level version line")
+    current = int(m.group("build") or 0)
+    if build is None:
+        build = current + 1
+    elif int(build) <= current:
+        raise ValueError(
+            f"{relpath}: build number {build} does not increase on {current} — both stores "
+            f"refuse an upload that reuses one"
+        )
+    line = (f"{m.group('prefix')}{m.group('q')}{version}+{int(build)}"
+            f"{m.group('q')}{m.group('trailing')}")
+    _write_text(root, relpath, text[: m.start()] + line + text[m.end():])
