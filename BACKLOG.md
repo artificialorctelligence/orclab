@@ -4925,3 +4925,20 @@ General → Sharing → Remote Login **off**, Screen Sharing **off**. Nothing el
 second attempt would otherwise have to rebuild: the `mac-build` alias in `~/.ssh/config`, the
 `~/.ssh/mac_build` keypair, and the `sarahs-laptop.lan` host-key line in `known_hosts`. If this is
 never revisited, those three are the local litter to clear.
+
+**Local side cleared too, same night — superseding the paragraph above.** direflail asked for the
+three local remnants gone as well, so the `mac-build` stanza was cut from `~/.ssh/config` (the
+`orcweather-api` stanza asserted intact before the write), the `~/.ssh/mac_build` keypair deleted,
+and the `sarahs-laptop.lan` line dropped from `known_hosts` with `ssh-keygen -R` — plus the
+`known_hosts.old` that command leaves behind, which is itself litter worth naming. A `grep -ril`
+over `~/.ssh` for the host, the IP and the key name returns nothing. The keypair that should never
+have been generated no longer exists.
+
+**One reusable gotcha, worth more than the cleanup itself:** on this machine the SSH agent is
+**gnome-keyring** (`SSH_AUTH_SOCK=/run/user/1000/keyring/ssh`), and `ssh-add -d` against it
+printed *"Identity removed"* while `ssh-add -l` still listed the same fingerprint
+(`SHA256:+Fxg/5dI…`) afterwards. The key only left the agent once the file on disk was deleted.
+So **`ssh-add -d` cannot be trusted as a teardown step under gnome-keyring** — it reports success
+and does nothing durable. Any teardown that claims to have unloaded a key must verify with
+`ssh-add -l` and compare fingerprints rather than trusting the exit code, which is the same
+"verify by effect, not by the tool's own say-so" habit `secret-hygiene` already argues for.
