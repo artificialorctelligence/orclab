@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "orclab": {
+      "source": {
+        "source": "directory",
+        "path": "."
+      }
+    }
+  },
+  "enabledPlugins": {
+    "orclab@orclab": true
+  }
+}
