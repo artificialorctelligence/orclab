@@ -448,7 +448,7 @@ name; it gets its own when something needs it.
 against one. Not before — the procedure needs one real run to be corrected by, the same as
 every other component here.
 
-## #6: Per-language manifest version detection/sync for /orc-version — deferred, same reasoning as #4 (PARTIALLY ADDRESSED 2026-09-07 — still open for the formats it names) (UPDATED 2026-09-13 — re-scoped from pom/package.json/Cargo to the version files of Orclab's own stacks; two-number model needed) (UPDATED 2026-09-13 — AppStream metainfo handler shipped for Orcshot 0.4.0; the plan is three steps, this was the first)
+## #6: Per-language manifest version detection/sync for /orc-version — deferred, same reasoning as #4 (PARTIALLY ADDRESSED 2026-09-07 — still open for the formats it names) (UPDATED 2026-09-13 — re-scoped from pom/package.json/Cargo to the version files of Orclab's own stacks; two-number model needed) (UPDATED 2026-09-13 — AppStream metainfo handler shipped for Orcshot 0.4.0; the plan is three steps, this was the first) (UPDATED 2026-09-22 — step 2's trigger moved: orcweather, not Orctool, is the first Flutter project heading for a store)
 
 Raised by direflail (2026-09-05) while designing `/orc-version` (see
 `docs/superpowers/specs/2026-09-05-orclab-v3-orc-version-orc-help-design.md`): when Orclab is
@@ -555,6 +555,38 @@ project root as the version file and says, like the seven stack sentences above,
 `/orc-version` does not edit it yet — `KNOWN_FORMATS` is unchanged. One number, not two: no store
 build code, so it is the `pyproject.toml` shape, the easy kind. Same rule as the rest: added when
 a real PHP project reaches a release.
+
+**Update 2026-09-22 — step 2 names the wrong project; the trigger has moved to orcweather.**
+Found while direflail was setting up Apple Developer Program enrollment, in a session about
+getting iOS development working at all. Step 2 above says the `pubspec.yaml` handler arrives
+"when Orctool reaches its store slice," and names Orctool as "the first project on any of the
+seven stacks ... no code yet." Both halves are now stale, checked directly rather than assumed:
+
+- **Orctool has code.** `git log` in `~/projects/orctool` shows shipped slices and two merged
+  PRs — a compass off the fused rotation-vector sensor, instruments with Show/Log/More switches,
+  per-instrument `.xlsx` export. It is at `version: 1.0.0+1`. The "no code yet" parenthetical
+  dates from the 2026-09-13 brainstorm and has simply been overtaken.
+- **Orcweather, not Orctool, is going to a store first.** direflail decided on 2026-09-22 that
+  orcweather is the first app to reach an iPhone, and began Apple Developer Program enrollment
+  (Individual, $99/year) for it that day. Orcweather is Flutter, at `version: 1.0.0+6`, with
+  `ios/Runner.xcworkspace` scaffolded and bundle id `com.artificialorctelligence.orcweather`.
+
+**Why this is worth correcting rather than leaving to be noticed:** step 2 is the step that
+carries the two-number model change, and the entry currently sends whoever picks it up to a
+project that is not the one about to need it. The concrete consequence is orcweather's: App
+Store Connect refuses an upload that reuses a build number, so the `+N` in `version: 1.0.0+N`
+has to increment on **every** upload — including rejected builds and every TestFlight round —
+and `KNOWN_FORMATS` is still `[PYPROJECT, PLUGIN_JSON, MARKETPLACE_JSON, DEBIAN_CHANGELOG]`
+(re-read 2026-09-22), so `/orc-version` cannot touch `pubspec.yaml` at all. Until the handler
+lands, that number is edited by hand, and the failure mode for getting it wrong is a refused
+upload rather than anything local and visible.
+
+**Scope boundary — what this update does not change.** The handler's design is untouched: still
+`pubspec.yaml`'s single `version: x.y.z+N` line, still carrying the two-number model change
+described above, still one format at a time. Only the triggering project and its timing move.
+Orctool's own store slice remains a real future trigger for the same handler; whichever of the
+two gets there first proves it, and the second one costs nothing extra. Nothing here touches
+step 1 (shipped) or step 3, and the `composer.json` note below step 3 is unaffected.
 
 
 ## #7: Distribution-channel download/install metrics — carried over from Orcshot #186, direflail wants Orclab to own this eventually (PARTIALLY ADDRESSED 2026-09-10 — Launchpad and Flathub confirmed, Snap blocked until a snap exists)
