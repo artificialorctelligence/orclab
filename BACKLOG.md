@@ -4968,3 +4968,10 @@ proved the teardown has a ceiling an agent cannot cross (the two Sharing toggles
 A second round adds Xcode itself — tens of gigabytes on someone else's laptop — which is a
 materially larger thing to remove than a 101-byte `authorized_keys`. Worth agreeing *before*
 installing it who removes it and when.
+
+**Closed out 2026-09-22, end of evening.** Both Sharing toggles are **off** — direflail confirmed
+it, so the "still outstanding at the machine" list two paragraphs up is discharged and nothing of
+tonight's work remains on the owner's laptop or on direflail's. And the Xcode-removal question the
+previous paragraph said to settle *before* installing is **settled with the owner**, so round two
+starts without that hanging over it. Nothing here is open; the entry now describes a procedure and
+its findings, not a task in flight.
