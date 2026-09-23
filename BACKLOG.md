@@ -4725,7 +4725,7 @@ Cost this time was low only by luck: the Android Auto work is still good for the
 the iOS phone app needs none of it. A project that had designed its *core* interaction around the
 car screen would have lost much more.
 
-## #76: A Mac on the LAN is a third build-machine shape Orclab has no word for — and direflail wants an /orc- command for driving one from Linux (UPDATED 2026-09-22 — the Mac is real, it is borrowed, and teardown is a condition of using it) (UPDATED 2026-09-22 — SSH works; the Mac is on macOS 13.0 and cannot build for the App Store)
+## #76: A Mac on the LAN is a third build-machine shape Orclab has no word for — and direflail wants an /orc- command for driving one from Linux (UPDATED 2026-09-22 — the Mac is real, it is borrowed, and teardown is a condition of using it) (UPDATED 2026-09-22 — SSH works; the Mac is on macOS 13.0 and cannot build for the App Store) (UPDATED 2026-09-22 — access torn down the same night; the two Sharing toggles need a human)
 
 Raised by direflail 2026-09-22, in the session that set up Apple Developer enrollment: *"since
 i'm on a linux machine, it might be good to be able to virtual desktop / ssh into the mac i have
@@ -4896,3 +4896,32 @@ the one authorized key.
 developer tools pops the *"install command line developer tools"* GUI dialog on the owner's
 screen. A probe should use `xcode-select -p` (which fails quietly) or `ls /Applications/Xcode.app`
 instead.
+
+**Teardown, same night — and the half that cannot be automated.** direflail asked for everything
+removed from the owner's machine. `~/.ssh/authorized_keys` was deleted and `~/.ssh` itself
+removed with `rmdir` (not `rm -rf`: it refuses a directory holding anything unexpected, which is
+the guard worth having when the directory is on someone else's computer). `stat` confirmed the
+directory had been **created that evening at 21:34:44** by `ssh-copy-id` itself, so nothing
+pre-existing was destroyed — worth checking before deleting, because had the owner already had
+keys of her own there, the earlier `grep`-based trim would have taken them out. Revocation was
+then *proved* rather than assumed: a fresh connection returns
+`Permission denied (publickey,password,keyboard-interactive)`. Nothing was ever installed — the
+GUI dialog the `xcodebuild` probe triggered was dismissed without downloading, confirmed by the
+absence of both `/Library/Developer/CommandLineTools` and `/Applications/Xcode.app`.
+
+**What an agent cannot take back, and the design consequence.** `sudo -n true` returns *"a
+password is required"*, so Remote Login and Screen Sharing **cannot be turned off over SSH** —
+the same asymmetry that made turning them on an in-person job. Worse, turning off Remote Login is
+the one action that severs the connection performing it. So the teardown any future command ships
+has a hard ceiling: it can remove keys, files and build directories, and must then *tell a person*
+which GUI toggles remain and where. Any design that promises full automated teardown is promising
+something the platform does not allow, and a checklist that silently stops at the toggles leaves
+the owner's machine reachable by anyone on that LAN indefinitely.
+
+**Still outstanding at the machine, for the owner or direflail in person:** System Settings →
+General → Sharing → Remote Login **off**, Screen Sharing **off**. Nothing else.
+
+**Left on direflail's own machine deliberately**, since it costs the owner nothing and is what a
+second attempt would otherwise have to rebuild: the `mac-build` alias in `~/.ssh/config`, the
+`~/.ssh/mac_build` keypair, and the `sarahs-laptop.lan` host-key line in `known_hosts`. If this is
+never revisited, those three are the local litter to clear.
