@@ -4689,3 +4689,161 @@ the run ending in mutmut's own `31.45 mutations/second` with the capture unchang
 `::test_mutation_progress_regexes_read_each_tool_s_real_line` (Infection's line is #73's, as
 seen on orcweather — no Infection here to re-run). Through Claude's Bash tool the line still
 arrives when the run ends; in a terminal it is live.
+
+## #75: The platform-ceiling skills are read when a platform is in play, not when the work is scoped — orcweather designed a car app for a surface Apple never allows
+
+Found 2026-09-22, in orcweather. The app grew an Android Auto car surface — a Flutter engine
+drawing a map into the host's surface, a Kotlin car module, a conditions card, a spoken summary,
+zoom and pan over a channel. When iOS came up (the user's son has an iPhone with CarPlay in his
+own car), the answer turned out to be: none of the car work can go there. Weather is not a CarPlay
+app category and only navigation apps may draw a map on the car screen. The realistic iOS car
+surface is a widget or Live Activity — a different design, not a port.
+
+**The knowledge was already here and dated before the code.** `skills/car-carplay/SKILL.md` has
+said *"Weather is not a CarPlay app category"* and *"Navigation apps are the only app category
+that have access to this window"* since 2026-09-14, checked against Apple's own PDF. The car work
+in orcweather was scoped and built after that. Nothing failed; the skill simply is not read at the
+moment it would change a decision. Its own description says Claude reads it "when CarPlay is in
+play" — and CarPlay was not in play that day, because the project was thinking about Android. By
+the time CarPlay is in play, the shape of the thing has been built for another platform.
+
+The user's conclusion, worth quoting because it names the fix precisely: *"always check what you
+can get away with on every platform before you start coding."*
+
+**What would actually change.** The background skills that carry *ceilings* — `car-carplay`
+(weather cannot draw a map), `car-android-auto` (which categories and templates exist),
+`map-openstreetmap` (attribution must stay visible, no bulk downloading), `source-*` (what a feed
+does and does not serve) — are consulted per-platform and reactively. Scoping a feature that will
+live on more than one platform should read the ceiling for *every* target platform first, and
+record which ones were checked, so "this cannot exist on iOS" is known while the design is still
+cheap. Where that belongs is the open question: `/orc-code`'s planning step is the obvious home
+(it already asks the security-tier question), and an alternative is a short "platform ceilings"
+section that each `car-*`/`stack-*` skill answers uniformly so a scoping pass can read them all
+at once. Not decided here.
+
+Cost this time was low only by luck: the Android Auto work is still good for the Android half, and
+the iOS phone app needs none of it. A project that had designed its *core* interaction around the
+car screen would have lost much more.
+
+## #76: A Mac on the LAN is a third build-machine shape Orclab has no word for — and direflail wants an /orc- command for driving one from Linux (UPDATED 2026-09-22 — the Mac is real, it is borrowed, and teardown is a condition of using it)
+
+Raised by direflail 2026-09-22, in the session that set up Apple Developer enrollment: *"since
+i'm on a linux machine, it might be good to be able to virtual desktop / ssh into the mac i have
+access to so i don't have to have it right in front of me while you make calls to it"*, then
+*"take notes on how hooking a local-network mac works, i think i want to add an /orc- command for
+making this easier to develop ios/mac stuff."* This entry is those notes. Nothing was built.
+
+**The gap, stated exactly.** `skills/orc-package/ingredients/app-store/ingredient.md` section 6
+offers precisely two leaf shapes, and says so in its own words: **"Local shape — a Mac is this
+machine"** and **"Cloud shape — no Mac here; a CI service builds, signs and uploads."** A Mac on
+the same LAN is neither. The artifact really is produced on a machine the user controls, so the
+cloud shape's whole premise ("no `.ipa` is ever on this machine", no `prepare:`, no `artifact:`,
+no `preflight:`) is wrong; but it is not on *this* filesystem, so the local shape's `prepare:`,
+`artifact:` and `preflight: [no-vcs, no-tool-state]` are wrong too — every one of them names a
+path this machine would have to hold. `skills/stack-ios-native/SKILL.md`'s "Building without a
+Mac" has the same blind spot from the other side: it names Codemagic, Xcode Cloud, GitHub Actions
+and EAS — four *rented* Macs — and says "a Mac at hand or a cloud Mac" without ever covering a Mac
+that is neither in front of you nor rented.
+
+**Searched before concluding nothing covers it** (`CLAUDE.md`, "name what should already have
+covered it"): every shipped `SKILL.md`, every `orc-package` ingredient, `hooks/scripts/*.py` and
+`skills/*/scripts/**.py`. `grep -rln "ssh |Remote Login|Screen Sharing|remote build"` over the
+skills and ingredients matches four files — `security-discipline`, `stack-godot`, `stack-unity`
+and `orc-package/ingredients/shared-hosting`. The same grep for `ssh` over every bundled script
+matches nothing outside `mutants/`. So no component sets up or drives a remote host today.
+
+**But one of those four is a real precedent, and the command should wrap it rather than invent a
+second mechanism.** `shared-hosting` — the ingredient behind `orcshot.org`, and the reason
+`~/.ssh/config` already holds an `orcweather-api` alias — has solved this exact shape:
+- The connection is an **`~/.ssh/config` alias**, substituted into the recipe as `__SSH__`. Not a
+  host, user and key threaded separately; one name the user owns.
+- Its liveness check is `ssh -o BatchMode=yes __SSH__ true` exiting 0 — "the key is loaded and
+  accepted", with no password prompt possible.
+- `rsync` moves the tree; the remote runs its own toolchain; **"`rsync` always runs on this
+  machine."**
+- **"Orclab never generates or copies a key on the user's behalf."**
+
+That last line is a live convention and was broken in this very session — a `~/.ssh/mac_build`
+keypair was generated before the precedent was found. Harmless (nothing trusts it until the user
+runs `ssh-copy-id`) and reported to direflail at the time, but it is exactly the kind of thing the
+new command must not do, and it is recorded here because the next person will feel the same pull.
+
+**Mechanism notes, verified live on 2026-09-22 rather than remembered:**
+- **Discovery works and should be the command's first step.** `avahi-browse -at` on this machine
+  returned 32 services on the LAN (a Nest Hub, a Roku, a garage-door opener, two TVs), so mDNS is
+  healthy here and `avahi-utils` is already installed. No Apple device appeared — direflail
+  confirmed the Mac was powered off, which is the correct negative result, not a broken scan. An
+  awake Mac advertises `_device-info._tcp` and usually `_companion-link._tcp`; Remote Login adds
+  `_ssh._tcp` and Screen Sharing adds `_rfb._tcp`, so the browse doubles as a check of whether
+  the two services are actually enabled. `avahi-resolve` is present, so `<name>.local` resolves
+  without anyone learning an IP.
+- **Turning it on is one pane.** System Settings → General → Sharing holds both Remote Login
+  (SSH) and Screen Sharing (VNC), confirmed against Apple's current mac-help page. Remote Login's
+  info panel offers "All users" vs "Only these users", and an "Allow full disk access for remote
+  users" toggle that a build does not need. The pane **displays the exact `ssh username@hostname`
+  string**, which is the one thing worth reading off the machine by hand.
+- **The GUI half needs a client this machine lacks.** Apple's own Screen Sharing app is Mac-only,
+  so Linux connects as a plain VNC viewer; `remmina` + `remmina-plugin-vnc` are in Mint 22.3's
+  repos (1.4.43) and neither is installed. Whether current macOS still exposes the "VNC viewers
+  may control screen with password" option, and where it sits, was **not** verified — check it on
+  the machine before writing it into anything.
+- **SSH is the half that matters.** `flutter build ipa`, `xcodebuild archive`/`-exportArchive`
+  and `altool --upload-app` are all headless. The GUI is wanted only for the first Xcode Cloud
+  workflow setup, occasional signing dialogs, and Product → Generate Privacy Report — so a
+  command that does SSH well and leaves VNC to a documented one-liner is the right split.
+
+**Why a LAN Mac changes a decision already made in this session, which is what gives this entry
+its stakes.** `stack-ios-native` says of Xcode Cloud: *"To get started, configure a workflow in
+Xcode — the first setup happens inside Xcode, so it needs a Mac once; with one at hand, even
+borrowed, prefer it over Codemagic for this stack."* direflail having a Mac on the LAN satisfies
+that "once", which moves the default for orcweather's iOS builds from Codemagic (500 free
+minutes, then $0.095/min) to Xcode Cloud (25 compute hours included in the $99 membership) — or
+to the LAN Mac directly, at no per-minute cost at all. So this is not only ergonomics; it changes
+which build service the App Store ingredient should be instantiated against, and that decision is
+currently written down the other way.
+
+**Not decided here, deliberately:** the command's name and whether it is even a new command
+rather than a widened `orc-package` ingredient plus a paragraph in `stack-ios-native` — the
+latter is the smaller change and `CLAUDE.md` says to prefer widening a trigger over adding a
+mechanism beside it. Also undecided: whether the third leaf shape is genuinely a third shape or
+just the local shape with `prepare:`/`action:` prefixed by `ssh __SSH__`, which would make the
+ingredient change a few lines rather than a new section. Whoever picks this up should answer that
+before writing any code, because the two answers differ by an order of magnitude in size.
+
+**Blocked on nothing but hardware.** The Mac was off when this was written; the first real step
+is `avahi-browse -at` with it awake, then the Sharing pane, then `ssh-copy-id`. None of it can be
+designed further from guesses — the first live connection will correct half of the above.
+
+**Update, same day — the machine is real, and it is not direflail's.** With the Mac powered on,
+`avahi-browse -art` found it immediately: **`Sarahs-Laptop.local`, 192.168.40.145**, advertising
+`_companion-link._tcp`, AirPlay and AirTunes — and **neither `_ssh._tcp` nor `_rfb._tcp`**, so
+Remote Login and Screen Sharing are both still off at their factory default. That negative is
+worth keeping: the browse is a working check of whether the two services are enabled, so a
+command can tell "Mac asleep", "Mac awake, sharing off" and "ready" apart without touching the
+machine, and without a port scan of hardware that belongs to someone else.
+
+**It is a borrowed laptop, and the owner set a condition.** direflail asked and got permission,
+*"provided i clean up after myself when all done"*. That turns teardown from good manners into a
+requirement of the design, and it lands on three things this entry previously treated as
+one-way: the authorized key in Sarah's `~/.ssh/authorized_keys`, the two Sharing toggles, and
+whatever toolchain a build needs (Xcode is tens of gigabytes). **Whatever gets built here ships
+its teardown in the same change as its setup** — not as a documented afterthought, because the
+person who has to run it will be finishing a project and least inclined to go looking. The
+`shared-hosting` precedent this entry leans on has no teardown half at all, since a hosting
+account is meant to stay; that is the one place the precedent does not carry over, and it is the
+half most likely to be skipped by someone copying its shape.
+
+**Two further constraints that follow from "borrowed laptop" rather than "build machine":**
+- **It is intermittently present.** It leaves the LAN, sleeps, and changes address. Anything that
+  assumes the Mac answers is wrong; `ssh -o BatchMode=yes -o ConnectTimeout=5 __SSH__ true` and a
+  plain "not reachable right now, here is what to turn on" are the normal path, not the error
+  path.
+- **Its footprint should be the narrowest that builds.** Prefer what is already on a stock macOS
+  or removable in one command; prefer a build directory under the user's own home that a single
+  `rm -rf` clears. Full-disk-access for remote users is not needed and was deliberately left off.
+
+**Where this leaves the immediate work:** blocked on one in-person visit to the Mac — System
+Settings → General → Sharing, Remote Login on, "Only these users", and read off the
+`ssh username@hostname` line it displays. Nothing else can proceed remotely, because there is no
+remote path to enabling remote access. A re-run of the browse confirms it from this side the
+moment it is done.

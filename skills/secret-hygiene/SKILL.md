@@ -1,6 +1,6 @@
 ---
 name: secret-hygiene
-description: Use before running or pasting anything that could surface a credential - debugging auth, reading config/env/log files, dumping environment variables, inspecting keyrings or token stores, or sharing command output. Keeps secrets out of the transcript, and gives the recovery procedure when one is exposed anyway.
+description: Use before running anything that could surface a credential OR bring a new one into existence - debugging auth, reading config/env/log files, dumping environment variables, inspecting keyrings or token stores, sharing command output, or generating a key, token or certificate. Keeps secrets out of the transcript, and gives the recovery procedure when one is exposed anyway.
 ---
 
 # Secret Hygiene
@@ -56,6 +56,25 @@ proves a credential works. The credential itself proves nothing extra and costs 
 ```bash
 sed -E 's/((token|secret|password|passwd|api[_-]?key|authorization)[[:space:]]*[:=][[:space:]]*).*/\1<redacted>/I' path/to/config
 ```
+
+**Never bring a credential into existence on the user's behalf.** Generating an SSH keypair,
+minting an API token, creating a certificate, enrolling a device — each is the user's own act, and
+the trigger is the *situation*: you are about to run a command whose result is a new credential.
+It does not matter that nothing trusts it yet, that it has no passphrase, that it is "just local",
+or that the user asked for the larger task it serves. Tell them the exact command and let them run
+it; `ssh-keygen`, `gh auth token`, `openssl req` and their kin are theirs to type.
+
+Why it is a rule and not a courtesy: a key you generated sits on disk looking exactly like one the
+user chose, and they never picked its type, its location, its passphrase, or whether to reuse an
+existing one instead. The next session cannot tell the difference, and neither can they.
+
+`orc-package`'s `shared-hosting` ingredient has said this since it was written — *"Orclab never
+generates or copies a key on the user's behalf"* — but said it about one hosting account, so it
+fired for nobody else. **Broken 2026-09-22**, in a session setting up SSH to a Mac on the LAN: a
+`~/.ssh/mac_build` keypair was generated unprompted, and the convention was only found afterwards,
+while searching for something else. Nothing was compromised; the point is that the rule existed
+and was invisible, which is why it now lives here, phrased by the situation rather than by the
+errand. (BACKLOG #76 records the surrounding work.)
 
 **Never put a secret anywhere it gets copied onward:** not in a URL or query string, not in a
 commit message, not in a `BACKLOG.md` entry, an issue, a PR body, a published artifact, or a
