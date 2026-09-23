@@ -4725,7 +4725,7 @@ Cost this time was low only by luck: the Android Auto work is still good for the
 the iOS phone app needs none of it. A project that had designed its *core* interaction around the
 car screen would have lost much more.
 
-## #76: A Mac on the LAN is a third build-machine shape Orclab has no word for — and direflail wants an /orc- command for driving one from Linux (UPDATED 2026-09-22 — the Mac is real, it is borrowed, and teardown is a condition of using it) (UPDATED 2026-09-22 — SSH works; the Mac is on macOS 13.0 and cannot build for the App Store) (UPDATED 2026-09-22 — access torn down the same night; the two Sharing toggles need a human)
+## #76: A Mac on the LAN is a third build-machine shape Orclab has no word for — and direflail wants an /orc- command for driving one from Linux (UPDATED 2026-09-22 — the Mac is real, it is borrowed, and teardown is a condition of using it) (UPDATED 2026-09-22 — SSH works; the Mac is on macOS 13.0 and cannot build for the App Store) (UPDATED 2026-09-22 — access torn down the same night; the two Sharing toggles need a human) (UPDATED 2026-09-22 — the owner is upgrading macOS; retry planned 2026-09-23)
 
 Raised by direflail 2026-09-22, in the session that set up Apple Developer enrollment: *"since
 i'm on a linux machine, it might be good to be able to virtual desktop / ssh into the mac i have
@@ -4942,3 +4942,29 @@ So **`ssh-add -d` cannot be trusted as a teardown step under gnome-keyring** —
 and does nothing durable. Any teardown that claims to have unloaded a key must verify with
 `ssh-add -l` and compare fingerprints rather than trusting the exit code, which is the same
 "verify by effect, not by the tool's own say-so" habit `secret-hygiene` already argues for.
+
+**Next step, agreed 2026-09-22 evening:** Sarah is upgrading the Mac, and direflail will try again
+on **2026-09-23**. That changes the conclusion two paragraphs up rather than merely deferring it —
+**if the upgrade lands on macOS 26.6 or later, Xcode 26 becomes installable and Xcode Cloud comes
+back on the table**, reversing tonight's reversal and restoring `stack-ios-native`'s original
+advice (25 compute hours/month included in the $99 membership, against Codemagic's 500 free
+minutes then $0.095/min). If it lands anywhere below 26.6 — an upgrade to 14 or 15 is still an
+upgrade — Xcode 26 will not install and Codemagic stands. **So the first thing to check tomorrow
+is `sw_vers -productVersion` against Xcode 26's macOS 26.6 requirement, before any other work**,
+and the answer decides the build service. direflail's Codemagic decision is therefore not
+outstanding so much as not yet answerable.
+
+**Tomorrow starts from nothing, deliberately.** Both sides were torn down tonight, so the sequence
+is: the owner turns Remote Login back on (an OS upgrade may reset it regardless, so it needs
+checking rather than assuming), then `ssh-keygen` a fresh key — **by direflail, not by Claude**,
+per the rule `secret-hygiene` gained today — then `ssh-copy-id -i <pubkey> <alias>` **with `-i`**,
+then the `~/.ssh/config` stanza in the `shared-hosting` shape. Every one of those steps is written
+out above with its verification, so the rebuild is minutes, not a re-derivation. The probe order
+that avoids the GUI dialog is `xcode-select -p`, then `sw_vers`, then `ls /Applications/Xcode.app`
+— never `xcodebuild -version` first.
+
+**And the cleanup clock restarts with it.** The owner's condition was cleanup when done, and tonight
+proved the teardown has a ceiling an agent cannot cross (the two Sharing toggles need a person).
+A second round adds Xcode itself — tens of gigabytes on someone else's laptop — which is a
+materially larger thing to remove than a 101-byte `authorized_keys`. Worth agreeing *before*
+installing it who removes it and when.
