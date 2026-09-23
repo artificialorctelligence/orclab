@@ -4725,7 +4725,7 @@ Cost this time was low only by luck: the Android Auto work is still good for the
 the iOS phone app needs none of it. A project that had designed its *core* interaction around the
 car screen would have lost much more.
 
-## #76: A Mac on the LAN is a third build-machine shape Orclab has no word for — and direflail wants an /orc- command for driving one from Linux (UPDATED 2026-09-22 — the Mac is real, it is borrowed, and teardown is a condition of using it)
+## #76: A Mac on the LAN is a third build-machine shape Orclab has no word for — and direflail wants an /orc- command for driving one from Linux (UPDATED 2026-09-22 — the Mac is real, it is borrowed, and teardown is a condition of using it) (UPDATED 2026-09-22 — SSH works; the Mac is on macOS 13.0 and cannot build for the App Store)
 
 Raised by direflail 2026-09-22, in the session that set up Apple Developer enrollment: *"since
 i'm on a linux machine, it might be good to be able to virtual desktop / ssh into the mac i have
@@ -4847,3 +4847,52 @@ Settings → General → Sharing, Remote Login on, "Only these users", and read 
 `ssh username@hostname` line it displays. Nothing else can proceed remotely, because there is no
 remote path to enabling remote access. A re-run of the browse confirms it from this side the
 moment it is done.
+
+**Update, same day — connected, and the machine cannot do the job.** Remote Login went on and
+`_ssh._tcp` appeared in the browse exactly as predicted, so the mDNS readiness check is confirmed
+working in all three of its states. `~/.ssh/config` gained a `mac-build` alias in the
+`shared-hosting` shape (HostName, User, IdentityFile, `IdentitiesOnly yes`) plus `ConnectTimeout`
+and `ServerAlive*`, because a borrowed laptop sleeps. Key auth verified against
+`sarahdukes@sarahs-laptop.lan` (192.168.40.145), OpenSSH_9.0.
+
+**The blocker, and it is the whole point of the exercise:** the Mac runs **macOS 13.0** (build
+22A380 — the original Ventura, never updated) on an **M1 Pro** with 730 GB free and **no Xcode
+installed at all**. Apple's own SDK-and-system-requirements table, read live 2026-09-22: Xcode 26
+needs **macOS Tahoe 26.6**, Xcode 16 needs macOS 14.5, Xcode 15 needs macOS 13.5. The App Store
+has required Xcode 26 / iOS 26 SDK since 2026-04-28. So this machine is thirteen versions short of
+an App Store build, and 0.5 short of even the newest Ventura-era Xcode.
+
+**This reverses a decision made earlier in the same session, which is why it is written down.**
+`stack-ios-native` says of Xcode Cloud: *"the first setup happens inside Xcode, so it needs a Mac
+once; with one at hand, even borrowed, prefer it over Codemagic for this stack."* A Mac that
+cannot run a current Xcode does not satisfy that "once", so Xcode Cloud is unreachable and
+**Codemagic returns as the default** for orcweather's iOS builds. The rule in the skill is not
+wrong; the rule's premise is "a Mac at hand" and nobody had written down that the premise means
+*a Mac that can run the current Xcode*. That is the correction worth carrying: **"has a Mac" is
+not the question — "has a Mac on a macOS the required Xcode runs on" is.** Any future `/orc-`
+command that probes for a build machine should report the macOS version against the current Xcode
+requirement, not merely that a Mac answered.
+
+**A middle option was considered and rejected on honest grounds.** A `13.0 → 13.5` point update is
+a small, same-major-version ask that would unlock Xcode 15.2, which might be enough to build and
+run on a physical iPhone for testing while store builds went to the cloud. Flutter's own iOS setup
+docs say only *"install and set up the latest version of Xcode"* and publish no minimum version
+number, so whether current Flutter tolerates Xcode 15.2 is **unverified** — and the only way to
+find out is to install ~30 GB of Xcode on a borrowed laptop to see. Imposing on the owner in order
+to discover whether the imposition even helps is the wrong trade; recorded so it is not
+re-proposed as a fresh idea.
+
+**Cleanup performed already, per the owner's condition.** `ssh-copy-id` without `-i` ignores
+`~/.ssh/config` and copies whatever the agent holds — here three keys, including the
+`orcweather-api` production host key and the orcshot dev-VM key, none of which belong on a
+borrowed laptop. `authorized_keys` was trimmed to the single `orclab-linux-to-mac` key behind a
+guard that refuses to write an empty or wrong file (locking yourself out is the one unrecoverable
+mistake in this procedure), fresh-connection login was re-verified afterwards, and the backup was
+removed. **`ssh-copy-id -i <pubkey> <alias>` is the only correct form here** and any command built
+on this should hardcode it. Outstanding on the Mac: Remote Login and Screen Sharing still on, and
+the one authorized key.
+
+**One side effect worth knowing:** running `xcodebuild -version` over SSH on a Mac with no
+developer tools pops the *"install command line developer tools"* GUI dialog on the owner's
+screen. A probe should use `xcode-select -p` (which fails quietly) or `ls /Applications/Xcode.app`
+instead.
