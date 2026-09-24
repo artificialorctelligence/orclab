@@ -35,6 +35,9 @@ anything, anywhere.
 
 ## What it will never do without asking
 
+- It looks in every place a plugin can actually live, including the one a Claude Code on the web
+  session loads from. It used to look in only two of the three, which meant that in a cloud
+  session it reported Orclab as not installed while running out of Orclab.
 - It never reports a version it isn't sure of. If Orclab isn't installed as a plugin anywhere on
   this machine and you're in a project other than Orclab's own, it says so plainly and stops
   instead of guessing.

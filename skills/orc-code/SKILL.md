@@ -328,24 +328,48 @@ subtree.
 
 Given a plugin name to find (e.g. `feature-dev`, `code-modernization`):
 
-1. Search for every `.claude-plugin/plugin.json` file under both of these roots:
+1. Search for every `.claude-plugin/plugin.json` file under all three of these roots:
    - `~/.claude/plugins/marketplaces/`
    - `~/.claude/plugins/cache/`
+   - `~/.claude/skills/` — a *skills-directory* plugin. In Claude Code on the web this is the
+     only root a session loads plugins from, and the two above are always empty; searching them
+     alone there finds nothing, every time (measured 2026-09-24).
 2. For each one found, read it and check its `"name"` field.
 3. The first one whose `"name"` matches the target plugin exactly is the match — its containing
    directory (the directory holding that `.claude-plugin/` folder) is the plugin's root. Use that
    root to locate the plugin's `commands/*.md` files.
-4. **Found is not installed.** A match whose root is under `~/.claude/plugins/marketplaces/` is
-   a marketplace *copy*; the plugin is installed only if its name appears in
-   `~/.claude/plugins/installed_plugins.json` (a `<plugin>@<marketplace>` key). Read that file.
-   A copy with no entry is *available, not installed* — its command files can be read, but the
-   agents they spawn are not registered, so treat it as not installed.
+4. **Found is not installed — and which root decided it.** The test differs by where the match
+   was found, and applying the wrong root's test is how a plugin that is loaded and working gets
+   reported as absent:
+   - **Under `~/.claude/plugins/marketplaces/`** — a marketplace *copy*; the plugin is installed
+     only if its name appears in `~/.claude/plugins/installed_plugins.json` (a
+     `<plugin>@<marketplace>` key). Read that file. A copy with no entry is
+     *available, not installed* — its command files can be read, but the agents they spawn are
+     not registered, so treat it as not installed.
+   - **Under `~/.claude/plugins/cache/`** — installed.
+   - **Under `~/.claude/skills/`** — **loaded**, and the question of installation does not
+     arise. Nothing installed it, so its name will never appear in `installed_plugins.json`, and
+     that absence carries no information. Never read the missing entry as "not installed" for a
+     match found here. `claude plugin list` reports such a plugin as `<name>@skills-dir`.
 5. If no match is found, or the match is available but not installed, stop and tell the user
-   plainly, with the command: `claude plugin install code-modernization@claude-plugins-official`
-   (or the plugin's own name and marketplace). On 2026-09-13 (Desktop) the installing session
-   picked the plugin up itself — its agents and skills were announced with no restart — so
-   check for them first; if they are not visible, a fresh session is the fallback
-   (`CLAUDE.md`, marketplace gotcha 4, which recorded the older behaviour on 2026-09-06).
+   plainly — and say the right thing for where this session is actually running, which is not a
+   guess. Check it: `[ -n "$CLAUDE_CODE_REMOTE" ] && echo cloud`.
+
+   **On the user's own machine** (nothing echoed) — give the command:
+   `claude plugin install code-modernization@claude-plugins-official` (or the plugin's own name
+   and marketplace). On 2026-09-13 (Desktop) the installing session picked the plugin up itself —
+   its agents and skills were announced with no restart — so check for them first; if they are
+   not visible, a fresh session is the fallback (`CLAUDE.md`, marketplace gotcha 4, which
+   recorded the older behaviour on 2026-09-06).
+
+   **In a cloud session** (`cloud` echoed) — do **not** give that command. It reports success and
+   changes nothing there: it writes under `~/.claude/plugins/`, which a cloud session never reads
+   (measured 2026-09-24 across four fresh sessions). Telling a developer to run it sends them
+   somewhere with no exit. Say instead that a cloud container starts empty and keeps nothing, so
+   the plugin's directory has to be under `~/.claude/skills/` *before the session starts* — which
+   in practice means a SessionStart hook checked into the project they are working on. A public
+   plugin needs no credentials to fetch: a plain `git clone` of it succeeded from a cloud session
+   that had no access to its repository at all (measured 2026-09-24).
 
 Real install layouts you may encounter (all three have been directly observed): a versioned cache
 path (`.../cache/<marketplace>/<plugin-name>/<version>/`), a nested marketplace path

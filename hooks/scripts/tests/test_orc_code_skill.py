@@ -122,3 +122,32 @@ def test_scaffold_and_verify_run_through_the_container():
     verify = flow[flow.index("**Verify**"):flow.index("**Report**")]
     assert "Dockerfile" in scaffold and "compose.yaml" in scaffold
     assert "compose run" in verify or "through the container" in verify
+
+
+def test_discovery_searches_the_skills_root_a_cloud_session_loads_from():
+    """A cloud session loads plugins only from ~/.claude/skills/. Searching the two
+    plugins/ roots alone finds nothing there, every time — measured 2026-09-24."""
+    d = TEXT[TEXT.index("## Plugin-Discovery Procedure"):TEXT.index("## Defaults Table")]
+    # Scope to step 1's root list: the roots are named again in step 4, so asserting
+    # against the whole procedure passes even with step 1 unfixed.
+    roots = d[d.index("1. Search for every"):d.index("2. For each one found")]
+    for root in ["~/.claude/plugins/marketplaces/", "~/.claude/plugins/cache/",
+                 "~/.claude/skills/"]:
+        assert root in roots, root
+
+
+def test_discovery_never_calls_a_skills_dir_match_not_installed():
+    """Nothing installs a skills-directory plugin, so it never appears in
+    installed_plugins.json. Reading that absence as 'not installed' is what made
+    /orc-help report Orclab as absent while running out of it."""
+    d = TEXT[TEXT.index("## Plugin-Discovery Procedure"):TEXT.index("## Defaults Table")]
+    for phrase in ["which root decided it", "skills-dir", "carries no information"]:
+        assert phrase in d, phrase
+
+
+def test_discovery_gives_different_advice_in_a_cloud_session():
+    """`claude plugin install` reports success and changes nothing in the cloud, so the
+    not-found branch must check CLAUDE_CODE_REMOTE before naming a remedy."""
+    d = TEXT[TEXT.index("## Plugin-Discovery Procedure"):TEXT.index("## Defaults Table")]
+    for phrase in ["CLAUDE_CODE_REMOTE", "before the session starts", "SessionStart hook"]:
+        assert phrase in d, phrase
