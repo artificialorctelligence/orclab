@@ -13,6 +13,14 @@ landed. **One thing it cannot do, and no command can:** make the session you're 
 switch to the new version. A reinstall only takes effect in a session you start afterward — it
 tells you that plainly, every time it finishes.
 
+**In a cloud session it does something different, because there is nothing to reinstall.** A
+session in Claude Code on the web runs the plugin straight out of the folder you're looking at,
+without installing anything, so there is no installed copy to replace. What it checks instead is
+the thing that actually decides what your next session runs: a new cloud session is a fresh copy
+of your repository *as it exists on GitHub*. So work you've saved but not committed, or committed
+but not pushed, simply won't be there. It tells you which of those is true of your project right
+now, and the remedy is to commit and push and start a new session — not to reinstall anything.
+
 ## What you type
 
 | You type | What it does |
