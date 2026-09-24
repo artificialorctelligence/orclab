@@ -2,6 +2,55 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.26.0] - 2026-09-24
+
+### Added
+- Orclab works in Claude Code on the web. A cloud session starts in a fresh container that
+  keeps nothing from before, so installing never reaches it — the commands report success and
+  change nothing. The repository now carries its own skills into a cloud session instead:
+  committed symlinks under `.claude/skills/` load them with no install, and a SessionStart hook
+  links the checkout into the container's skills directory so the plugin's hooks load too. Both
+  are needed, and the difference was measured — with the symlinks alone, a command the
+  `secret-hygiene` guard should have blocked ran unimpeded.
+- The README's Installing section covers both environments, and says what Orclab can and cannot
+  do in a container: most commands are unaffected, while `/orc-publish`, `/orc-release` and
+  `/orc-package` cannot work there at all, because they need the signing keys and store logins a
+  cloud session is designed to keep outside the sandbox.
+- `/orc-reload` gained a Step 0 that checks which environment it is running in. In a cloud
+  session there is nothing to reinstall, and the question that matters is a different one: the
+  next session is a fresh clone of the remote, so it runs what was *pushed* — not what was
+  saved, and not even what was committed. It now names uncommitted changes and counts unpushed
+  commits, and gives commit-and-push as the remedy.
+- `/orc-version` edits `pubspec.yaml`. Flutter keeps both numbers on one line — `version: 1.0.0+6`
+  — and both stores refuse an upload carrying a build number they have already seen, so the build
+  number now always climbs. Until now that number was edited by hand, and the failure arrived from
+  Apple or Google after the cloud-Mac minutes were spent. (#6)
+- `/orc-test analyze` appends an ETA to mutmut's and Infection's progress counters — the tools
+  count, the runner times. (#74)
+
+### Changed
+- `/orc-publish` with no selection shows the dry run's leaves as a numbered menu and asks which,
+  instead of resolving every leaf and asking yes/no to the whole list. The old gate held, but the
+  only way to say "some of these" was to already know the dotted paths — which is what a bare
+  invocation means you don't. `all` is typed, never the default.
+- `secret-hygiene` fires before a credential is *created*, not only before one could be surfaced.
+  The rule existed, inside one ingredient, about one hosting account — so it fired for nobody
+  else, and an SSH keypair was generated unprompted before the convention was found. (#76)
+- Plugin discovery searches all three roots a plugin can live in, and applies each root's own
+  test rather than the marketplace root's to all of them. A skills-directory plugin is loaded and
+  never appears in `installed_plugins.json`; reading that absence as "not installed" is what made
+  `/orc-help` deny itself.
+
+### Fixed
+- `/orc-help` reported Orclab as not installed while running out of Orclab in a cloud session. It
+  restated the discovery roots inline instead of deferring to `/orc-code`'s procedure, and the two
+  copies had drifted; Step 2 now reads the one procedure.
+- `/orc-code` told a developer in a cloud session to run `claude plugin install`, which reports
+  success and changes nothing there — it writes under `~/.claude/plugins/`, which a cloud session
+  never reads. It now checks the environment and says what a cloud session actually needs.
+- `/orc-test analyze` on orcweather: reports land beside the marker, the report outranks the exit
+  code, JSON5 is read properly, and the mutation step streams. (#70–#73)
+
 ## [0.25.1] - 2026-09-20
 
 ### Fixed
