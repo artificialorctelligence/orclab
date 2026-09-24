@@ -8,6 +8,8 @@ development.
 
 ## Installing
 
+### On your own computer
+
 Clone this repository, then register that checkout as a local plugin marketplace —
 `~/projects/orclab` below is just an example path, use wherever you cloned it:
 
@@ -15,6 +17,41 @@ Clone this repository, then register that checkout as a local plugin marketplace
     /plugin install orclab@orclab
 
 A new install shows up in a fresh session, not the one you ran the install from.
+
+### In a cloud session
+
+Claude Code can also run in the cloud, from your browser or phone, instead of on your machine.
+Installing does not work there, and it fails quietly: the commands above report success and
+change nothing, because a cloud session starts in a fresh container that keeps nothing from
+before and never reads the folder an install writes to. Anthropic's own documentation says the
+same of a plugin a repository turns on in its `.claude/settings.json` — a cloud session does not
+install it.
+
+So something has to put the plugin in place as the session starts. Two ways, and they carry
+different things:
+
+**Enable Orclab for your claude.ai account.** This is the route Anthropic documents, and the only
+one that works in every repository rather than one you have prepared. A plugin enabled for your
+account is downloaded into each cloud session before it starts, with its skills, hooks and
+everything else. Adding it is done in your claude.ai settings rather than from Claude Code.
+
+**Or carry it in a repository you control**, which is what this repository does for its own cloud
+sessions — see `.claude/skills/` and `.claude/hooks/session-start.sh` here. The committed
+symlinks under `.claude/skills/` are part of the clone, so a cloud session loads the skills with
+no install at all. The startup hook additionally links the checkout into the container's own
+skills directory, which is what loads Orclab as a real plugin and brings its hooks — the
+`secret-hygiene` guard and the rest — which a skills directory alone does not. Both were measured in
+real cloud sessions on 2026-09-24, including the part that does not work: with the symlinks
+alone, a command `secret-hygiene` should have blocked ran unimpeded.
+
+### What Orclab can and cannot do in the cloud
+
+A cloud container is Linux, with no screen, no phone attached and no Mac. Most of Orclab is
+unaffected — `/orc-test`, `/orc-git`, `/orc-todo` and `/orc-version` work normally, and
+`/orc-code` works for anything that builds and runs headless. What cannot work there is anything
+needing a device, a display or your own credentials: an iOS build, a desktop app you can actually
+look at, and `/orc-publish`, `/orc-release` and `/orc-package`, which need the signing keys and
+store logins that a cloud session is designed to keep out.
 
 ## Commands
 
@@ -49,8 +86,9 @@ Inside Claude, `/orc-help <name>` shows any of these pages.
 ## What Claude reads on its own
 
 A plugin is installed for your user, so everything below is present in every Claude Code session
-on this machine once Orclab is installed, not only in one project — but each one only comes into
-play when its own trigger fits what you're actually doing: a stack skill when that stack is in
+on this machine once Orclab is installed, not only in one project (in a cloud session, in every
+session that gets Orclab by one of the two routes above) — but each one only comes into play when
+its own trigger fits what you're actually doing: a stack skill when that stack is in
 play, `secret-hygiene` when a command could surface a credential. For example, when
 `secret-hygiene` fires, it keeps secrets out of what gets shown or pasted, and gives the recovery
 procedure if one gets exposed anyway. Uninstalling (`/plugin uninstall orclab@orclab`) removes

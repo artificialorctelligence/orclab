@@ -14,10 +14,14 @@ Orclab's installed plugin files happen to live — those can be different places
 
 ## Step 2: Find Orclab's own installed files and report its version
 
-Run the same discovery approach `/orc-code` uses for finding other plugins, applied to find
-Orclab itself: search for every `.claude-plugin/plugin.json` file under
-`~/.claude/plugins/marketplaces/` and `~/.claude/plugins/cache/`, and find the one whose `"name"`
-field is exactly `orclab`. Its containing directory is Orclab's own installed root.
+Follow `/orc-code`'s **Plugin-Discovery Procedure** — read it from
+`skills/orc-code/SKILL.md` in Orclab's own source and apply it here, looking for a plugin whose
+`"name"` is exactly `orclab`. Its containing directory is Orclab's own root.
+
+Read that procedure rather than working from the roots named here before: this step used to list
+two of them inline, and missed the one every Claude Code on the web session actually loads from,
+so `/orc-help` reported Orclab as not installed while running out of it. One list, in one place,
+is the fix.
 
 - **If a match is found**: read that file's `"version"` field and report it as Orclab's running
   version.

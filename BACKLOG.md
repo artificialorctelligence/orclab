@@ -4975,3 +4975,121 @@ tonight's work remains on the owner's laptop or on direflail's. And the Xcode-re
 previous paragraph said to settle *before* installing is **settled with the owner**, so round two
 starts without that hanging over it. Nothing here is open; the entry now describes a procedure and
 its findings, not a task in flight.
+
+## #77: Would /orc-test and /orc-code be better run as parallel cloud sessions?
+
+Both commands are serial by nature and slow for the same reason: they wait on
+work that does not depend on each other. `/orc-test` runs every suite in a
+project across its languages, then coverage, then mutation testing - a
+multi-language project runs them one stack at a time, and mutation testing in
+particular is long. `/orc-code`'s refactor flow runs a full measurement pass
+before it changes anything, and its plan execution is a sequence of tasks many
+of which touch different files.
+
+A cloud session is a plausible unit of parallelism for that, and the economics
+turn out to favour it in a way worth recording. Anthropic's own documentation
+(read 2026-09-24, https://code.claude.com/docs/en/claude-code-on-the-web):
+"cloud sessions share rate limits with all other Claude and Claude Code usage
+within your account. Running multiple tasks in parallel consumes more rate
+limits proportionately. There is no separate compute charge for the cloud VM."
+So N parallel sessions cost the same rate limit as N serial ones and finish in
+roughly the time of the slowest, with the VM thrown in. Each gets 4 vCPUs,
+16 GB RAM and 30 GB of disk of its own, so they do not contend.
+
+What is genuinely unknown, and why this is an entry rather than a change:
+
+- Whether the split is worth the join. Each session is a fresh clone that
+  pushes a branch; collecting several branches of test repairs back into one
+  coherent change may cost more than the wall-clock saved.
+- Whether a stack's toolchain even installs in a cloud container. Measured
+  2026-09-24 against the default Trusted network policy: Python, Node, Java,
+  Gradle, Rust, PHP, Ruby, Go, Docker, Postgres and Redis are pre-installed;
+  Flutter is fetchable; the Android SDK is not, because dl.google.com is not
+  on the default allowlist. A parallel run that silently skips the stack it
+  could not build would be worse than a slow serial one.
+- Whether it should be automatic at all, or a thing the user asks for. Fanning
+  out sessions on someone's account without being asked spends their rate
+  limit at several times the expected rate.
+
+The pieces to prototype against already exist and were used today: sessions
+are created with the claude-code-remote MCP server's create_session, and their
+results collected by having each push a branch, since a parent session cannot
+read a child's transcript.
+
+## #78: /orc-version treats an empty local tag list as 'never tagged' — in a cloud session that is always true, and it is never right (RESOLVED 2026-09-24)
+
+Found 2026-09-24 while bumping to 0.26.0 from a cloud session. `git tag --list
+'v*'` returned nothing, so `/orc-version` Step 0 fell to its third case, "no
+current version yet", and its changelog range rule ("from the repository's
+first commit to HEAD if no tag exists yet") would have drafted Orclab's entire
+history as one entry.
+
+The project is not untagged. `git ls-remote --tags origin` shows fourteen tags,
+v0.8.0 through v0.25.1. They are simply not in this checkout: a cloud session's
+clone carries `+refs/heads/*:refs/remotes/origin/*` and is shallow, so it
+fetches branches and no tags at all. The same is true of any `--depth` or
+`--no-tags` clone, a fresh CI checkout, or a second machine - the cloud is just
+where it is guaranteed.
+
+Two commands read that empty list as fact:
+
+- `/orc-version` Step 0 case 4 says "the most recent `v*` git tag is always
+  authoritative" and exists precisely to catch a `plugin.json` that has drifted
+  from the real released version. Where no tags are fetched, that check cannot
+  fire and the command silently trusts the manifest - the one input the rule was
+  written not to trust. Step 1's proposal and the changelog draft both read the
+  same empty range.
+- `/orc-git release [tag]` defaults to "newest local tag". In such a checkout
+  there is none, so the default cannot resolve.
+
+This is not #9 or #13 recurring, and should not be merged into them. Those were
+about tags never being *created*, because plan authors bypassed `/orc-version`;
+#13 closed by making the mechanism own the tagging, and it worked - fourteen
+tags exist. This is the opposite shape: the tags exist and the reader cannot
+see them. Same symptom, different cause, and #13's fix is not at fault.
+
+The bump this was found during came out right despite the gap: the range used
+was the commit that last touched `CHANGELOG.md` (`a6e06da`), and `v0.25.1` on
+the remote points at exactly that commit. That was reasoning from the changelog
+rather than from the tag, and it agreed by construction - but nothing in the
+skill tells anyone to do that, so the next person in a fresh checkout gets the
+whole-history draft.
+
+Fix direction, not decided: Step 0 could fetch tags before reading them
+(`git fetch --tags --quiet`, which is cheap and safe even in a shallow clone),
+or read `git ls-remote --tags origin` when the local list is empty and a remote
+exists, or distinguish "no tags anywhere" from "no tags here" and say which. The
+distinction matters for the message as much as the logic: "this project has
+never been tagged" is a very different thing to tell someone than "this checkout
+has no tags, the newest on the remote is v0.25.1".
+
+**Resolved**: both readers now fetch before they conclude, and both say which case
+they are in.
+
+`/orc-version` Step 0 opens by running `git fetch --tags --quiet` and, if the local
+list is still empty and the project has a remote, reading
+`git ls-remote --tags origin` before deciding anything. A tag found only on the
+remote is named and used; the command reports the project as untagged only when
+nothing is on the remote either. Step 0 case 4 now says outright that this is the
+rule the missing tags silently disable — with no tag to compare against there is
+nothing to disagree with, so the command trusts the manifest, which is the one input
+that rule exists to distrust.
+
+The changelog range rule no longer falls from "no tag" straight to the repository's
+first commit. It uses the tag Step 0 established, including a remote-only one; where
+a project genuinely has no tags anywhere it prefers the commit that last touched
+`CHANGELOG.md`, which is where the previous entry stopped, and reaches the first
+commit only when there is no changelog either. That is the reasoning that made the
+0.26.0 entry come out right by hand, now written down instead of improvised.
+
+`/orc-git release` fetches tags before resolving its default, and its "tag not found"
+branch tells the two cases apart, because they need opposite responses: a tag already
+on the remote means the push this subcommand exists to do is done and only the GitHub
+Release may be missing, while nothing anywhere means the user wants `/orc-version`
+first.
+
+**How it is known**: three tests in `hooks/scripts/tests/test_docs.py`, each confirmed
+to fail against a mutated skill — the fetch removed from Step 0, and `/orc-git`'s two
+cases collapsed into one. 201 tests pass. The behaviour itself is prose in a skill and
+so is not mechanically provable; what the tests hold is that the instructions still say
+these things.

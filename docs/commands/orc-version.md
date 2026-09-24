@@ -9,6 +9,11 @@ happened since the last version looks like a small fix, a new feature, or a brea
 carries that names it and its version (`.claude-plugin/plugin.json`), if the project has one (most
 projects don't), or otherwise from the most recent version tag in git; if the two disagree, the
 git tag always wins, since a hand-edited manifest shouldn't quietly become the source of truth.
+It fetches the tags before looking, and if your copy of the project still has none it checks
+whether any exist where the project is hosted — because a copy that simply never downloaded the
+tags looks exactly like a project that was never tagged, and they need opposite answers. If tags
+exist somewhere but not here, it tells you the newest one by name instead of calling the project
+untagged.
 A version number has three parts — major.minor.point (point is also sometimes called "patch") —
 where a major change means something that used to work no longer does, minor means something was
 added, and point means only fixes or cleanup. From the current version, `/orc-version` works out

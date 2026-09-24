@@ -265,12 +265,24 @@ and reversible.
 1. **Ensure GitHub auth**, exactly as `repo` does: `gh auth status`; run `gh auth login` first if
    it reports not logged in.
 2. **Determine the target tag:** the tag named after `release ` (e.g. `/orc-git release v1.2.0`),
-   or the most recent local tag if none was given:
+   or the most recent local tag if none was given. Fetch tags first — a checkout that never
+   fetched them looks identical to a project that was never tagged, and a cloud session's clone
+   never fetches them (#78):
    ```bash
+   git fetch --tags --quiet 2>/dev/null || true
    git tag --list 'v*' --sort=-v:refname | head -1
    ```
 3. **Confirm the tag exists locally:** `git tag --list '<tag>'`. If it doesn't, report this plainly
-   and stop — do not guess what tag was meant.
+   and stop — do not guess what tag was meant. Say *which* case it is rather than just "not
+   found", because they need opposite responses:
+   ```bash
+   git ls-remote --tags origin 2>/dev/null | sed 's|.*refs/tags/||' | sort -V | tail -1
+   ```
+   - **The tag is on the remote already** — then it has been pushed, and this subcommand's job
+     (pushing it) is done; what may still be missing is the GitHub Release. Say so, and do not
+     present it as a missing tag.
+   - **No tag here and none on the remote** — nothing has been tagged yet. The user probably
+     wants `/orc-version` first; say that rather than leaving them at a dead end.
 4. **Run the project's test suites with coverage and mutation testing, before anything is
    pushed** — with `/orc-test`:
    ```bash

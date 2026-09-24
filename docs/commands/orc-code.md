@@ -125,7 +125,10 @@ and whether to run another round), plus:
 - It never calls a new project finished until its build or test command has actually passed.
 - If `feature-dev` isn't installed, it says so plainly and stops rather than trying to add the
   feature itself; if it is installed, it tells you plainly that it's handing the work to that
-  plugin's own process, rather than quietly doing so.
+  plugin's own process, rather than quietly doing so. In a Claude Code on the web session it will
+  never hand you an install command to fix that: installing a plugin there reports success and
+  changes nothing, because a cloud container starts empty and keeps nothing between sessions. It
+  says that instead, and what a cloud session actually needs.
 - It never guesses whether an ambiguous refactor request means a cleanup or a move to something
   different — it asks.
 - In quality mode, it never starts making changes while the project's own tests are already
