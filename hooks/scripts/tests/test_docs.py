@@ -2,6 +2,7 @@
 """The user-facing pages under docs/commands/ (spec: 2026-09-13-orclab-v20-command-docs-design.md).
 Shape and presence only; a page saying what its command does today is a discipline, not a test."""
 
+import json
 import pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
@@ -46,3 +47,31 @@ def test_readme_links_every_page():
     readme = (ROOT / "README.md").read_text()
     for page in PAGES:
         assert f"docs/commands/{page.name}" in readme, page.name
+
+
+def _cloud_hook():
+    return (ROOT / ".claude" / "hooks" / "session-start.sh").read_text()
+
+
+def test_cloud_session_gets_both_the_skills_and_the_plugin_hooks():
+    """A repo's .claude/skills/ carries skills only - measured 2026-09-24, a bare
+    `env` dump ran unblocked in such a session while secret_guard sat on disk. The
+    SessionStart hook loads the checkout as a plugin so hooks/hooks.json registers.
+    Dropping either one silently loses something."""
+    skills = ROOT / ".claude" / "skills"
+    linked = sorted(p.name for p in skills.iterdir())
+    shipped = sorted(p.name for p in (ROOT / "skills").iterdir() if p.is_dir())
+    assert linked == shipped, "every shipped skill needs a .claude/skills/ symlink"
+    for p in skills.iterdir():
+        assert p.is_symlink(), f"{p.name} must be a symlink, not a copy"
+
+    settings = json.loads((ROOT / ".claude" / "settings.json").read_text())
+    cmd = settings["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+    assert cmd.endswith(".claude/hooks/session-start.sh"), cmd
+    assert "ln -sfn" in _cloud_hook() and "$HOME/.claude/skills" in _cloud_hook()
+
+
+def test_cloud_hook_stays_out_of_the_way_on_a_developers_machine():
+    """It exists only because a cloud container starts empty; a local checkout has
+    the plugin installed properly and must not get a second copy."""
+    assert 'CLAUDE_CODE_REMOTE:-}" != "true"' in _cloud_hook()
