@@ -5008,3 +5008,50 @@ The pieces to prototype against already exist and were used today: sessions
 are created with the claude-code-remote MCP server's create_session, and their
 results collected by having each push a branch, since a parent session cannot
 read a child's transcript.
+
+## #78: /orc-version treats an empty local tag list as 'never tagged' — in a cloud session that is always true, and it is never right
+
+Found 2026-09-24 while bumping to 0.26.0 from a cloud session. `git tag --list
+'v*'` returned nothing, so `/orc-version` Step 0 fell to its third case, "no
+current version yet", and its changelog range rule ("from the repository's
+first commit to HEAD if no tag exists yet") would have drafted Orclab's entire
+history as one entry.
+
+The project is not untagged. `git ls-remote --tags origin` shows fourteen tags,
+v0.8.0 through v0.25.1. They are simply not in this checkout: a cloud session's
+clone carries `+refs/heads/*:refs/remotes/origin/*` and is shallow, so it
+fetches branches and no tags at all. The same is true of any `--depth` or
+`--no-tags` clone, a fresh CI checkout, or a second machine - the cloud is just
+where it is guaranteed.
+
+Two commands read that empty list as fact:
+
+- `/orc-version` Step 0 case 4 says "the most recent `v*` git tag is always
+  authoritative" and exists precisely to catch a `plugin.json` that has drifted
+  from the real released version. Where no tags are fetched, that check cannot
+  fire and the command silently trusts the manifest - the one input the rule was
+  written not to trust. Step 1's proposal and the changelog draft both read the
+  same empty range.
+- `/orc-git release [tag]` defaults to "newest local tag". In such a checkout
+  there is none, so the default cannot resolve.
+
+This is not #9 or #13 recurring, and should not be merged into them. Those were
+about tags never being *created*, because plan authors bypassed `/orc-version`;
+#13 closed by making the mechanism own the tagging, and it worked - fourteen
+tags exist. This is the opposite shape: the tags exist and the reader cannot
+see them. Same symptom, different cause, and #13's fix is not at fault.
+
+The bump this was found during came out right despite the gap: the range used
+was the commit that last touched `CHANGELOG.md` (`a6e06da`), and `v0.25.1` on
+the remote points at exactly that commit. That was reasoning from the changelog
+rather than from the tag, and it agreed by construction - but nothing in the
+skill tells anyone to do that, so the next person in a fresh checkout gets the
+whole-history draft.
+
+Fix direction, not decided: Step 0 could fetch tags before reading them
+(`git fetch --tags --quiet`, which is cheap and safe even in a shallow clone),
+or read `git ls-remote --tags origin` when the local list is empty and a remote
+exists, or distinguish "no tags anywhere" from "no tags here" and say which. The
+distinction matters for the message as much as the logic: "this project has
+never been tagged" is a very different thing to tell someone than "this checkout
+has no tags, the newest on the remote is v0.25.1".
