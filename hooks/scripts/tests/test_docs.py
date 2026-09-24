@@ -75,3 +75,19 @@ def test_cloud_hook_stays_out_of_the_way_on_a_developers_machine():
     """It exists only because a cloud container starts empty; a local checkout has
     the plugin installed properly and must not get a second copy."""
     assert 'CLAUDE_CODE_REMOTE:-}" != "true"' in _cloud_hook()
+
+
+def test_orc_reload_checks_for_a_cloud_session_before_the_local_steps():
+    """Steps 1-5 navigate by known_marketplaces.json, installed_plugins.json and a
+    marketplace clone. None of those exists or governs loading in a cloud session, so
+    followed there Step 2 declares a running plugin 'never registered' and stops."""
+    s = (ROOT / "skills" / "orc-reload" / "SKILL.md").read_text()
+    before_step_1 = s[:s.index("## Step 1")]
+    assert "CLAUDE_CODE_REMOTE" in before_step_1, "the cloud check must come first"
+    for phrase in ["Nothing is installed", "@{u}..HEAD", "pushed"]:
+        assert phrase in before_step_1, phrase
+
+
+def test_orc_reload_page_tells_a_cloud_user_the_remedy_is_push_not_reinstall():
+    page = (ROOT / "docs" / "commands" / "orc-reload.md").read_text()
+    assert "cloud session" in page and "commit and push" in page

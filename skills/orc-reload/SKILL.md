@@ -1,7 +1,7 @@
 ---
 name: orc-reload
 description: Use when the user explicitly asks to use orc-reload, or types /orc-reload, to reinstall the Claude Code plugin they are currently developing so a fresh session picks up their latest changes.
-allowed-tools: Read, Bash(claude plugin *), Bash(ls *), Bash(git -C *)
+allowed-tools: Read, Bash(claude plugin *), Bash(ls *), Bash(git -C *), Bash(git status *), Bash(git status), Bash(git log *), Bash(git rev-parse *)
 ---
 
 # orc-reload
@@ -12,7 +12,44 @@ different causes that all present identically, and guessing between them wastes 
 
 **One thing this cannot do, and no command can:** a reinstall never takes effect in a conversation
 that is already running. Skills and commands load when a session starts. You will need a fresh
-session afterward — say so plainly at the end, every time.
+session afterward — say so plainly at the end, every time. Measured again in a cloud session on
+2026-09-24: a marker appended to a loaded skill's body did not appear when that skill was invoked
+seconds later, so the body is held from session start there too, not re-read from disk.
+
+## Step 0: Find out whether there is anything to reinstall
+
+Run `[ -n "$CLAUDE_CODE_REMOTE" ] && echo cloud`. If it prints `cloud`, **stop and use the cloud
+path below instead of Steps 1-5.** Those steps navigate by `known_marketplaces.json`,
+`installed_plugins.json` and a marketplace clone, and in Claude Code on the web none of those
+exists or governs what loaded — measured across seven cloud sessions on 2026-09-23/24. Followed
+there, Step 2 reports that the plugin "has never been registered as a marketplace on this machine"
+and stops, while the plugin is loaded and running.
+
+### The cloud path
+
+Nothing is installed, so nothing can be reinstalled. A cloud session loads the plugin straight from
+the checkout you are sitting in — through `.claude/skills/` in the repo, through a SessionStart
+hook that links the checkout into the container's own skills directory, or through a plugin enabled
+for the user's claude.ai account. Say that plainly rather than reporting a failed reinstall.
+
+Then answer the question they actually have, which is different here. A new cloud session is a
+fresh clone **of the remote**, so what it runs is what has been *pushed* — not what is saved, and
+not even what is committed. Locally, a directory-sourced install picks up an uncommitted working
+tree; in the cloud that same work is invisible to the next session. Check both, and report both:
+
+```
+git status --short
+git log --oneline @{u}..HEAD
+```
+
+- **Uncommitted changes** — name them, and say they will not be in the next session until committed
+  and pushed.
+- **Unpushed commits** — name how many and say the same.
+- **Both clean** — say so, and that the next session will run exactly this commit.
+
+Then tell them the remedy, which is not a reinstall: commit and push, then start a new cloud
+session on this branch. If their changes were already pushed and a session still ran old code, that
+is a real problem worth looking at rather than papering over with a reinstall — say so.
 
 ## Step 1: Confirm this is a plugin project
 
