@@ -91,3 +91,14 @@ def test_orc_reload_checks_for_a_cloud_session_before_the_local_steps():
 def test_orc_reload_page_tells_a_cloud_user_the_remedy_is_push_not_reinstall():
     page = (ROOT / "docs" / "commands" / "orc-reload.md").read_text()
     assert "cloud session" in page and "commit and push" in page
+
+
+def test_readme_does_not_offer_only_the_local_install():
+    """The local steps report success and change nothing in a cloud session - measured
+    2026-09-24. A README offering them alone sends a cloud user somewhere with no exit."""
+    readme = (ROOT / "README.md").read_text()
+    install = readme[readme.index("## Installing"):readme.index("## Commands")]
+    for phrase in ["cloud session", "claude.ai account", ".claude/skills/",
+                   "session-start.sh"]:
+        assert phrase in install, phrase
+    assert install.index("/plugin install orclab@orclab") < install.index("In a cloud session")
