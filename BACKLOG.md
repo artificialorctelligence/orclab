@@ -4968,3 +4968,43 @@ proved the teardown has a ceiling an agent cannot cross (the two Sharing toggles
 A second round adds Xcode itself — tens of gigabytes on someone else's laptop — which is a
 materially larger thing to remove than a 101-byte `authorized_keys`. Worth agreeing *before*
 installing it who removes it and when.
+
+## #77: Would /orc-test and /orc-code be better run as parallel cloud sessions?
+
+Both commands are serial by nature and slow for the same reason: they wait on
+work that does not depend on each other. `/orc-test` runs every suite in a
+project across its languages, then coverage, then mutation testing - a
+multi-language project runs them one stack at a time, and mutation testing in
+particular is long. `/orc-code`'s refactor flow runs a full measurement pass
+before it changes anything, and its plan execution is a sequence of tasks many
+of which touch different files.
+
+A cloud session is a plausible unit of parallelism for that, and the economics
+turn out to favour it in a way worth recording. Anthropic's own documentation
+(read 2026-09-24, https://code.claude.com/docs/en/claude-code-on-the-web):
+"cloud sessions share rate limits with all other Claude and Claude Code usage
+within your account. Running multiple tasks in parallel consumes more rate
+limits proportionately. There is no separate compute charge for the cloud VM."
+So N parallel sessions cost the same rate limit as N serial ones and finish in
+roughly the time of the slowest, with the VM thrown in. Each gets 4 vCPUs,
+16 GB RAM and 30 GB of disk of its own, so they do not contend.
+
+What is genuinely unknown, and why this is an entry rather than a change:
+
+- Whether the split is worth the join. Each session is a fresh clone that
+  pushes a branch; collecting several branches of test repairs back into one
+  coherent change may cost more than the wall-clock saved.
+- Whether a stack's toolchain even installs in a cloud container. Measured
+  2026-09-24 against the default Trusted network policy: Python, Node, Java,
+  Gradle, Rust, PHP, Ruby, Go, Docker, Postgres and Redis are pre-installed;
+  Flutter is fetchable; the Android SDK is not, because dl.google.com is not
+  on the default allowlist. A parallel run that silently skips the stack it
+  could not build would be worse than a slow serial one.
+- Whether it should be automatic at all, or a thing the user asks for. Fanning
+  out sessions on someone's account without being asked spends their rate
+  limit at several times the expected rate.
+
+The pieces to prototype against already exist and were used today: sessions
+are created with the claude-code-remote MCP server's create_session, and their
+results collected by having each push a branch, since a parent session cannot
+read a child's transcript.
