@@ -857,6 +857,64 @@ Same prerequisite as Scenario 59 (the root `pyproject.toml`).
    **Expected:** no `node_modules` directory was created and nothing was installed globally —
    `/orc-test` never installs a tool, it only names the missing one and its install line.
 
+## Scenario 62: Orclab still works on a developer's own machine after the cloud changes
+
+Everything in 0.26.0 and 0.26.1 was measured in Claude Code on the web. Nothing
+was re-checked locally, and two of the changes land in a local session as well:
+the repository now tracks `.claude/settings.json` and 36 symlinks under
+`.claude/skills/`, both of which a local session reads. Run this in a fresh
+local session after pulling `main` and reinstalling per `README.md`, before any
+release.
+
+1. Pull `main` into your local Orclab checkout.
+   **Expected:** the pull succeeds. If it stops with `untracked working tree
+   files would be overwritten by merge: .claude/settings.json`, that is itself
+   the finding — the repo tracks that file as of 0.26.0 and your machine has an
+   untracked one. Move yours aside, note that it happened, and continue.
+
+2. Reinstall per `README.md`, start a **fresh** session in the Orclab checkout,
+   and ask Claude to list every available skill belonging to Orclab, by exact
+   name.
+   **Expected:** each skill appears **once**. If every skill appears twice, once
+   bare (`orc-help`) and once namespaced (`orclab:orc-help`), the repository's
+   `.claude/skills/` symlinks are loading on top of the installed plugin. That
+   costs roughly 4,300 tokens of always-on context in every local session in this
+   repo and buys nothing, because the installed plugin already supplies both the
+   skills and the hooks. This is the main thing the scenario exists to catch: the
+   duplication was measured and accepted for a cloud session, where the symlinks
+   are the documented mechanism, and was never considered for a local one. If it
+   reproduces, the fix is to drop `.claude/skills/` from the repository and keep
+   the SessionStart hook, which carries skills and hooks in the cloud and does
+   nothing locally.
+
+3. Run `/orc-help`.
+   **Expected:** it reports version 0.26.1 and lists the commands. It must not
+   report that Orclab isn't installed — that failure was real in a cloud session
+   before 0.26.0 and the fix must not have broken the local path.
+
+4. Run `/orc-version` with no arguments.
+   **Expected:** it fetches tags, reports the current version from the tag, and
+   proposes a bump with the commits that decided it. It must not say the project
+   has never been tagged.
+
+5. Ask Claude to run `env | grep -i claude`.
+   **Expected:** blocked by `secret_guard` with a message naming secret-hygiene.
+   Confirms the plugin's hooks still register locally through the normal install,
+   independently of anything the cloud work added.
+
+6. Look at `~/.claude/skills/` on your own machine.
+   **Expected:** no `orclab` entry. The SessionStart hook is guarded on
+   `CLAUDE_CODE_REMOTE` and must do nothing outside a cloud container. Anything
+   there means the guard failed and the hook is writing into a developer's home
+   directory.
+
+7. In a **different** project that has a plugin installed normally, start a fresh
+   session and run something that reaches `/orc-code`'s Plugin-Discovery
+   Procedure — for example a refactor that wants `code-modernization`.
+   **Expected:** discovery finds the installed plugin and treats it as installed,
+   as before. The root list was widened, not changed: a plugin under
+   `~/.claude/plugins/` must still be found and judged by that root's own rule.
+
 ## Recording the result
 
 Note the outcome of each scenario (pass/fail, with specifics) either back in this conversation or
