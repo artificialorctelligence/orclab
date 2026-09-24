@@ -5133,3 +5133,27 @@ cloud and local sessions, or an early trial run of the hook from a session whose
 deserve a note in `CLAUDE.md`'s marketplace/install gotchas; the second is a one-off already
 fixed by the current guard. Until then the link itself is safe to delete, and deleting it
 destroys the evidence, so copy `ls -l` output into the answer first.
+
+**The link was deleted 2026-09-24 at direflail's request, and here is the evidence it
+destroyed**, so this entry stays answerable without it:
+
+```
+$ ls -l ~/.claude/skills/orclab
+lrwxrwxrwx 1 direflail direflail 17 Sep 23 19:08 /home/direflail/.claude/skills/orclab -> /home/user/orclab
+
+$ stat -c '%y %n' ~/.claude/skills/orclab
+2026-09-23 19:08:40.221963264 -0500 /home/direflail/.claude/skills/orclab
+
+$ ls -la ~/.claude/skills/
+drwxrwxr-x 1 direflail direflail  12 Sep 23 19:08 .
+lrwxrwxrwx 1 direflail direflail  17 Sep 23 19:08 orclab -> /home/user/orclab
+```
+
+`~/.claude/skills/` is now empty. The three facts that matter are above and unchanged: the link
+was made on 2026-09-23 at 19:08:40 local time, it pointed at a path that has never existed on
+this machine, and it was the only entry in that directory. **The open question is untouched by
+the deletion** — nothing here explains how a container path reached `$HOME`, and if the cause is
+a sync of `~/.claude` from cloud to local, it can simply happen again. Should it reappear, do not
+delete it a second time before checking whether anything else in `~/.claude` also carries a
+`/home/user` path or a timestamp from a cloud session; a second sample is worth more than this
+one, because it can be compared.
