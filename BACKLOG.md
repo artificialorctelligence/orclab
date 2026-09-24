@@ -5009,7 +5009,7 @@ are created with the claude-code-remote MCP server's create_session, and their
 results collected by having each push a branch, since a parent session cannot
 read a child's transcript.
 
-## #78: /orc-version treats an empty local tag list as 'never tagged' — in a cloud session that is always true, and it is never right
+## #78: /orc-version treats an empty local tag list as 'never tagged' — in a cloud session that is always true, and it is never right (RESOLVED 2026-09-24)
 
 Found 2026-09-24 while bumping to 0.26.0 from a cloud session. `git tag --list
 'v*'` returned nothing, so `/orc-version` Step 0 fell to its third case, "no
@@ -5055,3 +5055,34 @@ exists, or distinguish "no tags anywhere" from "no tags here" and say which. The
 distinction matters for the message as much as the logic: "this project has
 never been tagged" is a very different thing to tell someone than "this checkout
 has no tags, the newest on the remote is v0.25.1".
+
+**Resolved**: both readers now fetch before they conclude, and both say which case
+they are in.
+
+`/orc-version` Step 0 opens by running `git fetch --tags --quiet` and, if the local
+list is still empty and the project has a remote, reading
+`git ls-remote --tags origin` before deciding anything. A tag found only on the
+remote is named and used; the command reports the project as untagged only when
+nothing is on the remote either. Step 0 case 4 now says outright that this is the
+rule the missing tags silently disable — with no tag to compare against there is
+nothing to disagree with, so the command trusts the manifest, which is the one input
+that rule exists to distrust.
+
+The changelog range rule no longer falls from "no tag" straight to the repository's
+first commit. It uses the tag Step 0 established, including a remote-only one; where
+a project genuinely has no tags anywhere it prefers the commit that last touched
+`CHANGELOG.md`, which is where the previous entry stopped, and reaches the first
+commit only when there is no changelog either. That is the reasoning that made the
+0.26.0 entry come out right by hand, now written down instead of improvised.
+
+`/orc-git release` fetches tags before resolving its default, and its "tag not found"
+branch tells the two cases apart, because they need opposite responses: a tag already
+on the remote means the push this subcommand exists to do is done and only the GitHub
+Release may be missing, while nothing anywhere means the user wants `/orc-version`
+first.
+
+**How it is known**: three tests in `hooks/scripts/tests/test_docs.py`, each confirmed
+to fail against a mutated skill — the fetch removed from Step 0, and `/orc-git`'s two
+cases collapsed into one. 201 tests pass. The behaviour itself is prose in a skill and
+so is not mechanically provable; what the tests hold is that the instructions still say
+these things.

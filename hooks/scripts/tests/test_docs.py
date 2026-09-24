@@ -102,3 +102,29 @@ def test_readme_does_not_offer_only_the_local_install():
                    "session-start.sh"]:
         assert phrase in install, phrase
     assert install.index("/plugin install orclab@orclab") < install.index("In a cloud session")
+
+
+def test_orc_version_fetches_tags_before_calling_a_project_untagged():
+    """A cloud clone carries branches only, so `git tag --list` is empty while the
+    remote holds fourteen tags (#78). Read as 'never tagged', Step 0's rule that the
+    tag outranks plugin.json cannot fire, and the changelog range becomes the whole
+    history."""
+    s = (ROOT / "skills" / "orc-version" / "SKILL.md").read_text()
+    step0 = s[s.index("## Step 0"):s.index("## Step 1")]
+    assert "git fetch --tags" in step0, "tags must be fetched before being read"
+    assert "git ls-remote --tags" in step0, "an empty local list must be checked against the remote"
+    assert "Do not report the project as untagged" in step0
+
+
+def test_orc_version_changelog_range_does_not_fall_to_the_whole_history():
+    s = (ROOT / "skills" / "orc-version" / "SKILL.md").read_text()
+    assert "git log -1 --format=%H -- CHANGELOG.md" in s
+
+
+def test_orc_git_release_tells_the_two_missing_tag_cases_apart():
+    """'Already pushed' and 'never tagged' both present as a tag that is not local,
+    and they need opposite responses."""
+    s = (ROOT / "skills" / "orc-git" / "SKILL.md").read_text()
+    rel = s[s.index("## release [tag]"):]
+    assert "git fetch --tags" in rel
+    assert "on the remote already" in rel and "none on the remote" in rel

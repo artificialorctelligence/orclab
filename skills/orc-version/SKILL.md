@@ -11,19 +11,46 @@ inside any other project, it's that project.
 
 ## Step 0: Determine the current version
 
+**First, make sure the tags are actually here.** A checkout's tag list being empty does not mean
+the project was never tagged — it usually means this clone never fetched them. A Claude Code on
+the web session clones with `+refs/heads/*:refs/remotes/origin/*` and `--depth`, so it carries
+branches and no tags at all; `--no-tags` clones and some CI checkouts are the same. Orclab's own
+repo read as completely untagged from a cloud session on 2026-09-24 while fourteen tags,
+`v0.8.0` through `v0.25.1`, sat on the remote (#78).
+
+So before reading any tag, fetch them, and if there still are none locally, find out whether that
+is true anywhere:
+
+```bash
+git fetch --tags --quiet 2>/dev/null || true
+git tag --list 'v*' --sort=-v:refname | head -1
+```
+
+If that is empty and the project has a remote, check before concluding anything:
+
+```bash
+git ls-remote --tags origin 2>/dev/null | sed 's|.*refs/tags/||' | sort -V | tail -1
+```
+
+- **A tag on the remote that the fetch did not bring in** — say so plainly, name it, and use it.
+  Do not report the project as untagged.
+- **Nothing on the remote either, or no remote at all** — now the project really has no tags.
+
+Then:
+
 1. If `.claude-plugin/plugin.json` exists in the current project, read its `"version"` field —
    that's the current version.
-2. Otherwise, find the most recent `v*`-prefixed git tag:
-   ```bash
-   git tag --list 'v*' --sort=-v:refname | head -1
-   ```
-   Strip the leading `v` — that's the current version.
+2. Otherwise, use the most recent `v*` tag established above. Strip the leading `v` — that's the
+   current version.
 3. If neither exists, there is no current version yet — treat this as the very first version
    being established.
 4. **If both exist and disagree**: the most recent `v*` git tag is always authoritative — report
    both values plainly and use the tag's version as the current version, not `plugin.json`'s. A
    `plugin.json` that drifted out of sync (a hand-edit, a bad merge) should never silently become
-   the new source of truth for computing the next version.
+   the new source of truth for computing the next version. **This is the rule the missing tags
+   silently disable**: with no tag to compare against, there is nothing to disagree with, and the
+   command trusts the one input this rule exists to distrust. That is why the fetch above comes
+   first and is not optional.
 
 ## Step 1: Parse $ARGUMENTS and route
 
@@ -113,8 +140,13 @@ version** below.
 Once the new version string is determined (from either flow above):
 
 1. **Draft the changelog entry.**
-   - Determine the git range: from the most recent `v*` tag to `HEAD` (`<tag>..HEAD`), or from the
-     repository's first commit to `HEAD` if no tag exists yet.
+   - Determine the git range: from the most recent `v*` tag to `HEAD` (`<tag>..HEAD`), using the
+     tag Step 0 established — including one found only on the remote. If the project genuinely has
+     no tags anywhere, prefer the commit that last touched `CHANGELOG.md`
+     (`git log -1 --format=%H -- CHANGELOG.md`), since that is where the previous entry stopped;
+     fall back to the repository's first commit only when there is no changelog either. Drafting
+     from the first commit in a project that has released before produces an entry covering its
+     entire history, which is how this rule was found wanting (#78).
    - Read the full commit messages in that range (not `--oneline` — the real content is in the
      message bodies):
      ```bash
