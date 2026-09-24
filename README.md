@@ -36,13 +36,17 @@ account is downloaded into each cloud session before it starts, with its skills,
 everything else. Adding it is done in your claude.ai settings rather than from Claude Code.
 
 **Or carry it in a repository you control**, which is what this repository does for its own cloud
-sessions — see `.claude/skills/` and `.claude/hooks/session-start.sh` here. The committed
-symlinks under `.claude/skills/` are part of the clone, so a cloud session loads the skills with
-no install at all. The startup hook additionally links the checkout into the container's own
-skills directory, which is what loads Orclab as a real plugin and brings its hooks — the
-`secret-hygiene` guard and the rest — which a skills directory alone does not. Both were measured in
-real cloud sessions on 2026-09-24, including the part that does not work: with the symlinks
-alone, a command `secret-hygiene` should have blocked ran unimpeded.
+sessions — see `.claude/hooks/session-start.sh` here. It runs before the session starts and links
+the checkout into the container's own skills directory, where Claude Code loads it as a real
+plugin: skills *and* hooks, the `secret-hygiene` guard and the rest. The hook does nothing outside
+a cloud container, so a developer's own machine is untouched by it.
+
+Anthropic's docs name a second route — committing symlinks under the repository's own
+`.claude/skills/`, which are part of the clone. That route is real but carries skills only, with
+no hooks: measured in a cloud session on 2026-09-24, a command the `secret-hygiene` guard should
+have blocked ran unimpeded. Since the hook above already carries the skills, adding it would only
+load every skill a second time — 66 entries for 36 skills, roughly doubling always-on context — so
+this repository does not use it. If you take that route instead of the hook, expect no hooks.
 
 ### What Orclab can and cannot do in the cloud
 

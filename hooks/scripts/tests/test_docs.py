@@ -53,22 +53,27 @@ def _cloud_hook():
     return (ROOT / ".claude" / "hooks" / "session-start.sh").read_text()
 
 
-def test_cloud_session_gets_both_the_skills_and_the_plugin_hooks():
-    """A repo's .claude/skills/ carries skills only - measured 2026-09-24, a bare
-    `env` dump ran unblocked in such a session while secret_guard sat on disk. The
-    SessionStart hook loads the checkout as a plugin so hooks/hooks.json registers.
-    Dropping either one silently loses something."""
-    skills = ROOT / ".claude" / "skills"
-    linked = sorted(p.name for p in skills.iterdir())
-    shipped = sorted(p.name for p in (ROOT / "skills").iterdir() if p.is_dir())
-    assert linked == shipped, "every shipped skill needs a .claude/skills/ symlink"
-    for p in skills.iterdir():
-        assert p.is_symlink(), f"{p.name} must be a symlink, not a copy"
-
+def test_cloud_session_gets_skills_and_hooks_from_the_one_mechanism():
+    """The SessionStart hook links the checkout into the container's own skills
+    directory, where Claude Code loads it as a plugin and hooks/hooks.json registers.
+    Cloud test 7 measured that this lands in time - its namespaced skills were in the
+    session-start list - and that `claude plugin list` reports exactly this one
+    plugin, orclab@skills-dir, pathed at the symlink made here."""
     settings = json.loads((ROOT / ".claude" / "settings.json").read_text())
     cmd = settings["hooks"]["SessionStart"][0]["hooks"][0]["command"]
     assert cmd.endswith(".claude/hooks/session-start.sh"), cmd
     assert "ln -sfn" in _cloud_hook() and "$HOME/.claude/skills" in _cloud_hook()
+
+
+def test_the_repo_does_not_also_ship_a_duplicate_skills_directory():
+    """A committed .claude/skills/ loads the skills a second time, bare-named, on top
+    of whatever already supplies them - 66 list entries for 36 skills in a cloud
+    session, ~4,364 to ~8,700 tokens. It carries skills only, so it cannot replace the
+    hook, and the hook already carries skills, so it adds nothing but the double-load.
+    On a developer's machine it is pure cost: the plugin is installed properly there."""
+    assert not (ROOT / ".claude" / "skills").exists(), (
+        "the hook carries the skills; a committed .claude/skills/ only doubles them"
+    )
 
 
 def test_cloud_hook_stays_out_of_the_way_on_a_developers_machine():

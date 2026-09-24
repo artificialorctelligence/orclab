@@ -5093,3 +5093,43 @@ to fail against a mutated skill — the fetch removed from Step 0, and `/orc-git
 cases collapsed into one. 201 tests pass. The behaviour itself is prose in a skill and
 so is not mechanically provable; what the tests hold is that the instructions still say
 these things.
+
+## #79: A cloud container's symlink reached a developer's home directory, and the hook's guard is not the explanation
+
+Found 2026-09-24 while checking that the cloud work in 0.26.0/0.26.1 still worked on a
+developer's own machine. `~/.claude/skills/orclab` exists on direflail's Linux machine as a
+symlink to `/home/user/orclab`, dated 2026-09-23 19:08. `/home/user` is the path *inside a
+Claude Code on the web container*; it does not exist locally, so the link dangles.
+
+`.claude/hooks/session-start.sh` creates exactly that link — `ln -sfn "$CLAUDE_PROJECT_DIR"
+"$HOME/.claude/skills/orclab"` — but in the container, where `$HOME` is `/home/user`, so it
+writes `/home/user/.claude/skills/orclab`. For the same link to appear under
+`/home/direflail/.claude/`, something carried it across after the fact.
+
+**The hook's guard is not the explanation, and that was tested rather than assumed.** Running
+the hook locally on 2026-09-24 with `CLAUDE_PROJECT_DIR` set exited 0, created nothing, and
+left the existing link's 19:08 timestamp untouched — had the guard failed, the link would have
+been rewritten to `/home/direflail/projects/orclab`. It still points at `/home/user`. So the
+guard works; something outside the hook moved the file.
+
+**Concrete consequence today: none.** The link is dangling and inert. `find ~/.claude/skills/
+-name plugin.json` returns nothing and exits 0 — `find` does not descend a broken symlink — and
+a local session loads only the normally-installed, namespaced plugin, with no bare-named
+duplicates.
+
+**Why it still matters, and it is two things.** First, `/orc-code`'s Plugin-Discovery Procedure
+gained `~/.claude/skills/` as a real search root in 0.26.0, and rules that a match found there
+is *loaded*, with the question of installation not arising. Were this link ever live rather
+than dangling, discovery could find the working tree there and report its version instead of
+the installed plugin's — two different answers to "what version is running," with the wrong one
+looking authoritative. Second, and larger: if `~/.claude` syncs from a cloud container back to
+a developer's machine, then container state generally can land in `$HOME`, and no guard inside
+any hook can prevent that — the guard governs what the hook writes, not what is copied
+afterwards.
+
+**What would close this** is finding out which of the two it was: a sync of `~/.claude` between
+cloud and local sessions, or an early trial run of the hook from a session whose `$HOME` and
+`$CLAUDE_PROJECT_DIR` disagreed. The first is a standing property worth knowing about and would
+deserve a note in `CLAUDE.md`'s marketplace/install gotchas; the second is a one-off already
+fixed by the current guard. Until then the link itself is safe to delete, and deleting it
+destroys the evidence, so copy `ls -l` output into the answer first.

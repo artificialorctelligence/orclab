@@ -859,33 +859,36 @@ Same prerequisite as Scenario 59 (the root `pyproject.toml`).
 
 ## Scenario 62: Orclab still works on a developer's own machine after the cloud changes
 
-Everything in 0.26.0 and 0.26.1 was measured in Claude Code on the web. Nothing
-was re-checked locally, and two of the changes land in a local session as well:
-the repository now tracks `.claude/settings.json` and 36 symlinks under
-`.claude/skills/`, both of which a local session reads. Run this in a fresh
-local session after pulling `main` and reinstalling per `README.md`, before any
-release.
+Everything in 0.26.0 and 0.26.1 was measured in Claude Code on the web. Run this
+in a fresh local session after pulling `main` and reinstalling per `README.md`,
+before any release.
 
-1. Pull `main` into your local Orclab checkout.
-   **Expected:** the pull succeeds. If it stops with `untracked working tree
-   files would be overwritten by merge: .claude/settings.json`, that is itself
-   the finding — the repo tracks that file as of 0.26.0 and your machine has an
-   untracked one. Move yours aside, note that it happened, and continue.
+**Steps 1 and 2 were run on 2026-09-24 and are settled** — recorded here rather
+than deleted, because what they found is the reason the rest still matters. The
+pull was clean (no `.claude/settings.json` on the machine to be overwritten, one
+trivial `BACKLOG.md` conflict where both sides appended). Step 2's duplication
+was confirmed by reading rather than reproduced: cloud test 7 had already
+measured 66 list entries for 36 skills, and the committed symlinks are relative,
+so they resolve and load in any checkout including a local one. The fix that
+step named was applied — `.claude/skills/` is gone and the SessionStart hook,
+which cloud test 7 proved carries skills *and* hooks and lands before the
+session-start list is built, is now the only mechanism. Steps 3-7 are still
+open and want a real fresh session.
 
-2. Reinstall per `README.md`, start a **fresh** session in the Orclab checkout,
-   and ask Claude to list every available skill belonging to Orclab, by exact
-   name.
-   **Expected:** each skill appears **once**. If every skill appears twice, once
-   bare (`orc-help`) and once namespaced (`orclab:orc-help`), the repository's
-   `.claude/skills/` symlinks are loading on top of the installed plugin. That
-   costs roughly 4,300 tokens of always-on context in every local session in this
-   repo and buys nothing, because the installed plugin already supplies both the
-   skills and the hooks. This is the main thing the scenario exists to catch: the
-   duplication was measured and accepted for a cloud session, where the symlinks
-   are the documented mechanism, and was never considered for a local one. If it
-   reproduces, the fix is to drop `.claude/skills/` from the repository and keep
-   the SessionStart hook, which carries skills and hooks in the cloud and does
-   nothing locally.
+1. ~~Pull `main` into your local Orclab checkout.~~ **Done 2026-09-24 — clean.**
+   No `.claude/settings.json` existed locally to collide with, and the only
+   conflict was `BACKLOG.md`, where the local `#76` closeout and the cloud's
+   `#77`/`#78` both appended to the end. Both kept.
+
+2. ~~Check whether every skill appears twice.~~ **Done 2026-09-24 — it would
+   have, and is fixed.** The committed symlinks are relative
+   (`../../skills/orc-help`), so they resolve in any checkout and would have
+   loaded on top of the installed plugin, costing roughly 4,300 tokens of
+   always-on context in every local session in this repo for nothing. Cloud test
+   7 had already measured the same doubling in the cloud (66 entries for 36
+   skills) and proved the SessionStart hook alone carries skills *and* hooks and
+   lands in time. `.claude/skills/` was therefore dropped and the hook kept.
+   A test now fails if that directory comes back.
 
 3. Run `/orc-help`.
    **Expected:** it reports version 0.26.1 and lists the commands. It must not
@@ -914,6 +917,48 @@ release.
    **Expected:** discovery finds the installed plugin and treats it as installed,
    as before. The root list was widened, not changed: a plugin under
    `~/.claude/plugins/` must still be found and judged by that root's own rule.
+
+## Scenario 63: the SessionStart hook alone still carries a cloud session
+
+`.claude/skills/` was removed on 2026-09-24 so that skills stop loading twice.
+The evidence that the hook alone suffices is strong but indirect: cloud test 7
+ran with *both* mechanisms present and showed that the hook's namespaced skills
+were in the session-start list, that `claude plugin list` reported only
+`orclab@skills-dir` pathed at the hook's symlink, and that `lint_on_write`
+resolved through that symlink. The hook-only configuration itself has never been
+run. Run this in a fresh **cloud** session on `main`, before any release.
+
+1. Ask Claude to list every available skill belonging to Orclab, by exact name.
+   **Expected:** 33 skills, each appearing **once**, namespaced (`orclab:orc-help`).
+   Not 66, and no bare-named set. 33 rather than 36 is correct — `orc-package`,
+   `orc-publish` and `orc-release` carry `disable-model-invocation: true`, which
+   withholds their descriptions until they are explicitly invoked.
+   **If nothing Orclab-ish is there at all**, the hook did not land in time
+   without the symlinks beside it, which is the one thing this scenario exists to
+   catch. The fallback is to restore `.claude/skills/` *instead of* the hook,
+   accepting the loss of hooks, and to say so in the README.
+
+2. Run `claude plugin list`.
+   **Expected:** exit 0, one plugin, `orclab@skills-dir`, status loaded, pathed
+   at `~/.claude/skills/orclab`.
+
+3. Ask Claude to run `env | grep -i claude`.
+   **Expected:** blocked by `secret_guard` before it runs, with a message naming
+   secret-hygiene, printing no variable names or values. This is the guardrail
+   the committed symlinks could not carry and the whole reason the hook is the
+   mechanism that was kept.
+
+4. Write a Python file with an unused import to the repository root using the
+   Write tool.
+   **Expected:** `lint_on_write` blocks it and names the unused import, and the
+   message attributes the hook to the `orclab@skills-dir` plugin. A second hook
+   on a different event confirms the whole set registered, not one lucky entry.
+   Write it inside the repo, not `/tmp` — the linter correctly stays silent where
+   no `pyproject.toml` sits between the file and the repo root.
+
+5. Run `/orc-help`.
+   **Expected:** it reports Orclab's version and lists the commands, rather than
+   reporting that Orclab is not installed.
 
 ## Recording the result
 

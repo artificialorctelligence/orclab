@@ -32,11 +32,12 @@ All notable changes to this project are documented here, newest first.
 ### Added
 - Orclab works in Claude Code on the web. A cloud session starts in a fresh container that
   keeps nothing from before, so installing never reaches it — the commands report success and
-  change nothing. The repository now carries its own skills into a cloud session instead:
-  committed symlinks under `.claude/skills/` load them with no install, and a SessionStart hook
-  links the checkout into the container's skills directory so the plugin's hooks load too. Both
-  are needed, and the difference was measured — with the symlinks alone, a command the
-  `secret-hygiene` guard should have blocked ran unimpeded.
+  change nothing. The repository now carries itself into a cloud session instead: a SessionStart
+  hook links the checkout into the container's own skills directory, where Claude Code loads it
+  as a real plugin — skills and hooks both. Anthropic's documented alternative, committing
+  symlinks under the repository's `.claude/skills/`, was measured and rejected: it carries skills
+  only, so a command the `secret-hygiene` guard should have blocked ran unimpeded, and layering it
+  on top of the hook loaded every skill twice — 66 list entries for 36 skills — for nothing.
 - The README's Installing section covers both environments, and says what Orclab can and cannot
   do in a container: most commands are unaffected, while `/orc-publish`, `/orc-release` and
   `/orc-package` cannot work there at all, because they need the signing keys and store logins a

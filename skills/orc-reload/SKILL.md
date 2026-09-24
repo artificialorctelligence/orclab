@@ -28,9 +28,9 @@ and stops, while the plugin is loaded and running.
 ### The cloud path
 
 Nothing is installed, so nothing can be reinstalled. A cloud session loads the plugin straight from
-the checkout you are sitting in — through `.claude/skills/` in the repo, through a SessionStart
-hook that links the checkout into the container's own skills directory, or through a plugin enabled
-for the user's claude.ai account. Say that plainly rather than reporting a failed reinstall.
+the checkout you are sitting in — through a SessionStart hook that links the checkout into the
+container's own skills directory, or through a plugin enabled for the user's claude.ai account.
+Say that plainly rather than reporting a failed reinstall.
 
 Then answer the question they actually have, which is different here. A new cloud session is a
 fresh clone **of the remote**, so what it runs is what has been *pushed* — not what is saved, and
