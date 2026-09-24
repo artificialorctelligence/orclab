@@ -2,6 +2,31 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.26.1] - 2026-09-24
+
+### Fixed
+- `/orc-version` and `/orc-git release` read an empty `git tag --list` as proof that a project
+  had never been tagged. It far more often means this copy of the project never fetched the
+  tags: a Claude Code on the web session clones branches only and shallow, as do `--no-tags`
+  clones and some CI checkouts. Orclab's own repository read as completely untagged from a cloud
+  session while fourteen tags, `v0.8.0` through `v0.25.1`, sat on the remote. Both commands now
+  fetch the tags before reading them, and when a copy still has none they check what exists where
+  the project is hosted before saying anything — naming the newest tag found there rather than
+  calling the project untagged. (#78)
+- The consequence inside `/orc-version` was quieter than the missing tag: its rule that a git tag
+  outranks a hand-edited `plugin.json` exists to catch a manifest that has drifted from the real
+  released version, and with no tag fetched there was nothing to disagree with, so it fell back
+  to trusting the one input that rule exists to distrust. Step 0 now says so where the fetch is,
+  rather than leaving it to be rediscovered. (#78)
+- `/orc-version`'s changelog draft no longer falls from "no tag" straight to the repository's
+  first commit, which in a project that has released before produces one entry covering its
+  entire history. It uses the tag Step 0 established, including one found only on the remote, and
+  where a project genuinely has none it prefers the commit that last touched `CHANGELOG.md`. (#78)
+- `/orc-git release` told apart two situations that both presented as "tag not found" and need
+  opposite responses: a tag already on the remote means the push this subcommand exists to
+  perform is done and only the GitHub Release may be missing, while nothing anywhere means the
+  user wants `/orc-version` first. (#78)
+
 ## [0.26.0] - 2026-09-24
 
 ### Added
