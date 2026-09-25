@@ -925,8 +925,26 @@ The evidence that the hook alone suffices is strong but indirect: cloud test 7
 ran with *both* mechanisms present and showed that the hook's namespaced skills
 were in the session-start list, that `claude plugin list` reported only
 `orclab@skills-dir` pathed at the hook's symlink, and that `lint_on_write`
-resolved through that symlink. The hook-only configuration itself has never been
-run. Run this in a fresh **cloud** session on `main`, before any release.
+resolved through that symlink. Run this in a fresh **cloud** session on `main`,
+before any release.
+
+**Run on 2026-09-25 and passed, all five steps** — the hook-only configuration
+had never been run until then, and this is the run. A cloud session
+(`CLAUDE_CODE_REMOTE` set) on a checkout carrying no `.claude/skills/`, at
+0.26.1, whose `HEAD` was identical to `origin/main`. Step 1: 33 skills, each
+once, all namespaced; the three withheld were `orc-package`, `orc-publish` and
+`orc-release`, which is exactly what their `disable-model-invocation`
+frontmatter predicts. Step 2: exit 0, one plugin, `orclab@skills-dir` 0.26.1,
+loaded, at `~/.claude/skills/orclab`. Step 3: refused before running, naming
+secret-hygiene, printing nothing. Step 4: `F401` named, attributed to
+`orclab@skills-dir`. Step 5: 0.26.1, core context, 11 commands. Nothing needed
+the fallback this scenario exists to trigger — the hook alone does carry a cloud
+session, and `.claude/skills/` can stay gone. The run's one finding was step 4's
+own wording, corrected in the same pass.
+
+The steps are left unstruck, unlike scenario 62's settled ones: those were
+one-time remediation, these are a regression script the next release wants run
+again.
 
 1. Ask Claude to list every available skill belonging to Orclab, by exact name.
    **Expected:** 33 skills, each appearing **once**, namespaced (`orclab:orc-help`).
