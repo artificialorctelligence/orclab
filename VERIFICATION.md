@@ -950,11 +950,15 @@ run. Run this in a fresh **cloud** session on `main`, before any release.
 
 4. Write a Python file with an unused import to the repository root using the
    Write tool.
-   **Expected:** `lint_on_write` blocks it and names the unused import, and the
-   message attributes the hook to the `orclab@skills-dir` plugin. A second hook
-   on a different event confirms the whole set registered, not one lucky entry.
-   Write it inside the repo, not `/tmp` — the linter correctly stays silent where
-   no `pyproject.toml` sits between the file and the repo root.
+   **Expected:** the write succeeds and the file appears on disk — `lint_on_write`
+   is registered on `PostToolUse`, so it runs *after* the write rather than
+   preventing it — and the linter then comes back as a blocking error naming the
+   unused import, with the message attributing the hook to the
+   `orclab@skills-dir` plugin. The file being created is this step passing, not
+   failing; delete it afterwards and confirm `git status` is clean again. A second
+   hook on a different event confirms the whole set registered, not one lucky
+   entry. Write it inside the repo, not `/tmp` — the linter correctly stays silent
+   where no `pyproject.toml` sits between the file and the repo root.
 
 5. Run `/orc-help`.
    **Expected:** it reports Orclab's version and lists the commands, rather than
