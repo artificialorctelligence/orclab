@@ -95,9 +95,44 @@ def test_x11_window_id_is_passed_to_the_capture_tool(tools, tmp_path, monkeypatc
     assert calls[-1][:3] == ["import", "-window", "12345"]
 
 
-def test_gnome_wayland_is_told_to_use_x11_rather_than_left_guessing(tools, tmp_path):
-    with pytest.raises(screenshot.CaptureError, match="GNOME"):
+def test_gnome_wayland_is_told_to_use_x11_rather_than_left_guessing(tools, tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CURRENT_DESKTOP", "GNOME")
+    with pytest.raises(screenshot.CaptureError, match="waits for a human"):
         screenshot.capture_wayland(tmp_path / "o.png", "Anything")
+
+
+def test_spectacle_is_not_used_on_gnome_even_when_it_is_installed(tools, tmp_path, monkeypatch):
+    """A KDE tool on GNOME falls through to the portal and blocks. Fail clearly instead."""
+    present, calls = tools
+    present.add("spectacle")
+    monkeypatch.setenv("XDG_CURRENT_DESKTOP", "ubuntu:GNOME")
+    with pytest.raises(screenshot.CaptureError, match="waits for a human"):
+        screenshot.capture_wayland(tmp_path / "o.png", None)
+    assert calls == [], "spectacle must not be invoked on GNOME"
+
+
+def test_spectacle_is_used_on_kde(tools, tmp_path, monkeypatch):
+    present, calls = tools
+    present.add("spectacle")
+    monkeypatch.setenv("XDG_CURRENT_DESKTOP", "KDE")
+    assert screenshot.capture_wayland(tmp_path / "o.png", None) == "spectacle"
+    assert calls[-1][0] == "spectacle"
+
+
+def test_an_unknown_wayland_desktop_names_both_real_options(tools, tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CURRENT_DESKTOP", "something-nobody-has-heard-of")
+    with pytest.raises(screenshot.CaptureError, match=r"install grim.*install spectacle"):
+        screenshot.capture_wayland(tmp_path / "o.png", None)
+
+
+def test_desktop_prefers_the_standard_variable(monkeypatch):
+    monkeypatch.setenv("XDG_CURRENT_DESKTOP", "KDE")
+    monkeypatch.setenv("DESKTOP_SESSION", "plasmawayland")
+    assert screenshot.desktop() == "kde"
+
+    monkeypatch.delenv("XDG_CURRENT_DESKTOP")
+    monkeypatch.delenv("XDG_SESSION_DESKTOP", raising=False)
+    assert screenshot.desktop() == "plasmawayland"
 
 
 def test_windows_refuses_a_window_instead_of_capturing_the_wrong_thing(tools, tmp_path):

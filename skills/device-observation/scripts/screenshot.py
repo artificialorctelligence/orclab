@@ -124,8 +124,22 @@ def capture_x11(out: Path, title: str | None) -> str:
     raise CaptureError("no X11 capture tool; install ImageMagick, maim or scrot")
 
 
+def desktop() -> str:
+    """The desktop environment, lowercased - 'gnome', 'kde', 'sway', ... or '' if it won't say.
+
+    Wayland is not one thing: whether a window can be captured unattended is decided by the
+    compositor on top of it, not by Wayland. This is the discriminator for that.
+    """
+    for var in ("XDG_CURRENT_DESKTOP", "XDG_SESSION_DESKTOP", "DESKTOP_SESSION"):
+        value = os.environ.get(var, "").strip().lower()
+        if value:
+            return value
+    return ""
+
+
 def capture_wayland(out: Path, title: str | None) -> str:
-    """Wayland: grim on wlroots, Spectacle on KDE. Not run for real."""
+    """Wayland: grim on wlroots, Spectacle on KDE, nothing on GNOME. Not run for real."""
+    where = desktop()
     if have("grim"):
         if title is None:
             run(["grim", str(out)])
@@ -134,12 +148,19 @@ def capture_wayland(out: Path, title: str | None) -> str:
             raise CaptureError("grim needs a compositor query for one window; install swaymsg")
         run(["grim", "-g", sway_geometry(title), str(out)])
         return "grim+swaymsg"
-    if have("spectacle"):
+    # Spectacle on GNOME falls through to the portal and waits for a human to click. A clear
+    # failure beats a capture that silently blocks, so it is only used on its own desktop.
+    if have("spectacle") and "gnome" not in where:
         run(["spectacle", "-b", "-n", "-a" if title else "-f", "-o", str(out)])
         return "spectacle"
+    if "gnome" in where:
+        raise CaptureError(
+            "GNOME on Wayland has no non-interactive window capture - its portal waits for a "
+            "human to click. Run the app under X11, or capture from the device itself"
+        )
     raise CaptureError(
-        "no Wayland capture tool. wlroots compositors: install grim. KDE: install spectacle. "
-        "GNOME has no non-interactive per-window capture - run the app under X11 instead"
+        f"no Wayland capture tool for this desktop ({where or 'unknown'}). "
+        "wlroots compositors (sway, Hyprland): install grim. KDE Plasma: install spectacle"
     )
 
 

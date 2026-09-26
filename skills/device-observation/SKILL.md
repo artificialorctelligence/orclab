@@ -51,11 +51,18 @@ echo "$XDG_SESSION_TYPE"    # x11 or wayland
 - **X11** — `wmctrl -l` for the exact title (a guessed one silently matches nothing), then
   `import -window "$(xdotool search --name 'Title' | head -1)" shot.png`. `maim -i <id>` or `xwd`
   do the same job where ImageMagick is absent. Confirmed live 2026-09-26.
-- **Wayland** — the X11 tools above do not apply, and the answer is per-compositor: `grim` with
-  geometry from `swaymsg` or `hyprctl` on wlroots compositors, `spectacle -a -b -n -o shot.png` on
-  KDE. Under GNOME there is no non-interactive per-window capture at all — the desktop portal
-  wants a human click. Researched 2026-09-26, not verified live: the machine this was written on
-  runs X11.
+- **Wayland is not one answer.** Wayland is the plumbing; what decides whether a window can be
+  captured unattended is the desktop on top of it, read from `XDG_CURRENT_DESKTOP`. On wlroots
+  compositors (sway, Hyprland), `grim` with geometry from `swaymsg` or `hyprctl`. On KDE Plasma,
+  `spectacle -a -b -n -o shot.png`. On **GNOME, there is no non-interactive per-window capture at
+  all** — its portal waits for a human to click, which is the thing this skill exists to avoid.
+  Researched 2026-09-26, not verified live: the machine this was written on runs X11.
+
+  **Do not pick a capture tool by what is installed.** A KDE tool on a GNOME desktop does not
+  fail — it falls through to the portal and blocks, waiting for a click that no one is coming to
+  make, which reads as a hang rather than an error. Branch on the desktop first, then on the
+  tool. `scripts/screenshot.py` does this; it was written the other way round first, and that is
+  the bug direflail's question turned up on 2026-09-26.
 - **An X11 program under Wayland** — the DHU and the Android emulator both are — is reported to
   stay visible to the X11 tools through XWayland. Worth trying before concluding the session type
   rules them out. Not verified.
