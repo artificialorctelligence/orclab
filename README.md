@@ -106,6 +106,10 @@ Discipline:
   language.
 - **currency-discipline** — when choosing a dependency, library version, framework, or technical
   approach, or when research turns up an answer to a technical question.
+- **device-observation** — whenever a real device, emulator or app window is in the loop, so
+  checking something doesn't cost a round trip through you: screenshot the phone and the
+  head-unit window, drive the UI with synthetic input, read `dumpsys` and the crash buffer, and
+  give the app its own log for when the platform's holds seventy seconds.
 - **environment-registry** — when a real, live test environment is accessed or its access details
   are learned, so they don't need re-deriving later.
 - **release-checklist** — when setting up a release process for a new project, or when an
@@ -140,10 +144,6 @@ Sources, maps and car surfaces:
   free federal work-zone registry, or inference from weather data already in hand.
 - **map-openstreetmap** — the OSM tile usage policy, `flutter_map`, a swappable base layer, and
   stacking a raster weather overlay on top.
-- **device-observation** — developing against a real device without using the developer as a
-  camera: screenshot the phone and the head-unit window, drive the UI with synthetic input,
-  read `dumpsys` and the crash buffer, start long-running processes in their terminal instead of
-  dictating commands, and give the app its own log for when the platform's holds seventy seconds.
 - **car-android-auto** — Android Auto / Automotive OS through the Car App Library: the weather
   category, manifest lines, quality rules, and how a Flutter app reaches the car screen.
 - **car-carplay** — Apple CarPlay: which categories exist (weather is not one), that only

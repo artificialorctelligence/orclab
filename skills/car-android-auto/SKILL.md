@@ -106,8 +106,69 @@ the app is foregrounded and creates one otherwise.
 ## Testing without a car
 
 Android Auto's **Desktop Head Unit (DHU)** from the SDK Manager (Extras) drives a phone app
-over ADB; Android Automotive OS has emulator images. Both live under developer.android.com
-`training/cars/testing` — not re-verified in detail on 2026-09-14.
+over ADB; Android Automotive OS has emulator images instead. Both live under
+developer.android.com `training/cars/testing`.
+
+**The whole DHU loop, confirmed live 2026-09-26** — Pixel 9 Pro XL on USB, Android Auto
+17.6.663454, Linux/X11. Claude runs all of it unaided; the one step the phone exposes no intent
+for is driven with synthetic input, per `device-observation`.
+
+1. Phone on the cable, `adb devices` showing it.
+2. **Start the head unit server on the phone.** It is an item in Android Auto's overflow menu,
+   present only once developer mode is on, and there is no intent that starts it directly:
+
+   ```bash
+   adb shell am start -n com.google.android.projection.gearhead/.companion.settings.DefaultSettingsActivity
+   adb exec-out screencap -p > shot.png   # the ⋮ is top right; tap it at that shot's own pixels
+   adb shell input tap 955 221
+   ```
+
+   **Read the menu before tapping — the item is a toggle.** "Start head unit server" means it is
+   off; "Stop head unit server" means it is already running, and tapping kills it. Dismiss with
+   `adb shell input keyevent KEYCODE_BACK` rather than tapping elsewhere.
+3. `adb forward tcp:5277 tcp:5277`
+4. Start the DHU **in the developer's own terminal**, per `device-observation` — it needs their
+   desktop's OpenGL and must outlive the turn:
+
+   ```bash
+   ~/Android/Sdk/extras/google/auto/desktop-head-unit
+   ```
+
+   It runs from any directory: its bundled `libusb` resolves through an `$ORIGIN` rpath. It does
+   not read the bundled `config/*.ini` on its own either — it looks for `~/.android/headunit.ini`
+   and otherwise uses built-in defaults, and `-c <file>` points it at one of the bundled configs
+   for a different car screen size.
+5. **Screenshot the car screen from the phone, not from the desktop.** The projected screen is a
+   virtual display on the phone, so `adb` captures it with nothing installed on the developer's
+   machine — no X11, no Wayland, no screenshot tool:
+
+   ```bash
+   adb shell dumpsys SurfaceFlinger --display-id          # every display, with its name
+   adb shell screencap -d 11529215046874561922 -p > car.png
+   ```
+
+   **Use the long SurfaceFlinger id**, not the small `displayId` that `dumpsys display` prints —
+   `screencap` rejects that one. Both change every session, so read them fresh. Half a dozen
+   virtual displays exist at once and most are blank: the launcher owns the car surface, the facet
+   bar and the dashboard, and the app owns one per car screen it has created. Capture them all and
+   keep the ones that are not black — `identify -format '%[mean]'` sorts them in one pass. The
+   app's own screen, captured alone without the launcher's chrome, is often the more useful
+   picture.
+
+   Screenshotting the DHU *window* instead shows what the developer sees, chrome included, but it
+   depends on their desktop session — `device-observation` has the branch.
+
+**Its startup output looks like a failure and is not.** Pages of ALSA errors (`Invalid card
+'card'`, `Unknown PCM dmix`) are the DHU probing audio devices the machine does not have, and
+`Could not load configuration from '~/.android/headunit.ini'` means only that no ini was found.
+Neither stops the link: the lines that say it worked are `[I]: connected.` and `SSL negotiation
+finished successfully`, so wait for those rather than for a quiet start. **Whether those audio
+probes explain the DHU's intermittent sound is not established** — do not cite them as harmless
+when audio is the question being asked.
+
+**The default car screen is 800×480** — an 800×400 surface with an 80-pixel facet bar under it,
+which is why the phone-side capture comes back in two pieces. Coordinates from a phone screenshot
+mean nothing on it.
 
 ## Where this lands in Flutter's build
 

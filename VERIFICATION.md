@@ -872,8 +872,8 @@ measured 66 list entries for 36 skills, and the committed symlinks are relative,
 so they resolve and load in any checkout including a local one. The fix that
 step named was applied — `.claude/skills/` is gone and the SessionStart hook,
 which cloud test 7 proved carries skills *and* hooks and lands before the
-session-start list is built, is now the only mechanism. Steps 3-7 are still
-open and want a real fresh session.
+session-start list is built, is now the only mechanism. **All of steps 3-7 were run on 2026-09-24 and pass.** Step 6's stated reason
+for its expectation was wrong and is corrected in place; see #79.
 
 1. ~~Pull `main` into your local Orclab checkout.~~ **Done 2026-09-24 — clean.**
    No `.claude/settings.json` existed locally to collide with, and the only
@@ -890,33 +890,60 @@ open and want a real fresh session.
    lands in time. `.claude/skills/` was therefore dropped and the hook kept.
    A test now fails if that directory comes back.
 
-3. Run `/orc-help`.
-   **Expected:** it reports version 0.26.1 and lists the commands. It must not
-   report that Orclab isn't installed — that failure was real in a cloud session
-   before 0.26.0 and the fix must not have broken the local path.
+3. ~~Run `/orc-help`.~~ **Done 2026-09-24 — pass.** Core context (the working
+   directory's own `plugin.json` names `orclab`), discovery matched
+   `~/.claude/plugins/cache/orclab/orclab/0.26.1`, and it reported 0.26.1 and
+   listed all eleven `/orc-*` commands. It did not report Orclab as uninstalled.
+   `installed_plugins.json` records that install at commit `0f43657`, one
+   BACKLOG-only commit behind `main`.
 
-4. Run `/orc-version` with no arguments.
-   **Expected:** it fetches tags, reports the current version from the tag, and
-   proposes a bump with the commits that decided it. It must not say the project
-   has never been tagged.
+4. ~~Run `/orc-version` with no arguments.~~ **Done 2026-09-24 — pass, and it
+   found something.** `git fetch --tags` brought in 25 tags, newest `v0.25.1`,
+   matching the remote; nothing claimed the project was untagged. Step 0's
+   disagreement rule then fired correctly: `plugin.json` says 0.26.1 but the
+   newest tag is `v0.25.1`, so the tag is authoritative and 31 commits sit in
+   the range. **The 0.26.0 and 0.26.1 bumps were committed without ever being
+   tagged** — both were made from cloud sessions that could not see the tags,
+   which is #78's own bug landing on Orclab itself. The changelog entries for
+   both exist. Before releasing 0.26.x, tag those two commits (or retag) rather
+   than letting a bare `/orc-version` propose 0.26.0 over a manifest that
+   already reads 0.26.1. No bump was applied by this check.
 
-5. Ask Claude to run `env | grep -i claude`.
-   **Expected:** blocked by `secret_guard` with a message naming secret-hygiene.
-   Confirms the plugin's hooks still register locally through the normal install,
-   independently of anything the cloud work added.
+5. ~~Ask Claude to run `env | grep -i claude`.~~ **Done 2026-09-24 — pass.**
+   `secret_guard` blocked it before it ran, named secret-hygiene, and printed no
+   variable names or values. The plugin's hooks register locally through the
+   normal install, unaffected by the cloud work.
 
-6. Look at `~/.claude/skills/` on your own machine.
-   **Expected:** no `orclab` entry. The SessionStart hook is guarded on
-   `CLAUDE_CODE_REMOTE` and must do nothing outside a cloud container. Anything
-   there means the guard failed and the hook is writing into a developer's home
-   directory.
+6. ~~Look at `~/.claude/skills/` on your own machine.~~ **Done 2026-09-24 — no
+   `orclab` entry now, but this step's stated reason is wrong.** The directory
+   exists and is empty. It was *not* empty earlier the same day: a dangling
+   `orclab -> /home/user/orclab` symlink was there, which is #79, and #79 ruled
+   the guard out by direct test — running the hook locally created nothing and
+   left the existing link untouched. So an entry here does **not** mean the
+   guard failed; something outside the hook can put one there. Read this step as
+   "an entry here needs explaining", not "an entry here means the guard failed".
 
-7. In a **different** project that has a plugin installed normally, start a fresh
-   session and run something that reaches `/orc-code`'s Plugin-Discovery
-   Procedure — for example a refactor that wants `code-modernization`.
-   **Expected:** discovery finds the installed plugin and treats it as installed,
-   as before. The root list was widened, not changed: a plugin under
-   `~/.claude/plugins/` must still be found and judged by that root's own rule.
+7. ~~In a **different** project that has a plugin installed normally, start a
+   fresh session and run something that reaches `/orc-code`'s Plugin-Discovery
+   Procedure.~~ **Done 2026-09-24 — pass.** Run from a fresh session in Orcshot
+   via `/orc-code refactor`, Migration mode. Discovery matched
+   `~/.claude/plugins/marketplaces/claude-plugins-official/plugins/code-modernization/`
+   first, correctly held that a marketplace copy is only *available* on its own,
+   checked `installed_plugins.json`, found `code-modernization@claude-plugins-official`
+   there, and judged it installed — citing the cache directory name `unknown`
+   rather than a version, as the procedure says to for that plugin. Corroborated
+   independently: its agents and `modernize-*` skills were live in that session.
+   The widened root list did not change the verdict for a plugin under
+   `~/.claude/plugins/`.
+
+   **Noted, not filed.** That session initially skipped Migration mode's step 1
+   (the discovery call) and jumped to step 2's target gate, where it stopped —
+   the test prompt asked to port Orcshot's gnome-shell tray code to Kotlin, which
+   no Defaults Table row supports, so the request was dead regardless. Discovery
+   ran correctly the moment it was asked for. Worth remembering that a skipped
+   step 1 in a *real* migration is precisely the silent degradation that step
+   exists to prevent; one data point on an incoherent prompt is not evidence of a
+   pattern.
 
 ## Scenario 63: the SessionStart hook alone still carries a cloud session
 

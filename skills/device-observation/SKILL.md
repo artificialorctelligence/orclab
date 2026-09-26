@@ -33,17 +33,37 @@ found in the background of a screenshot taken for something else entirely.
 
 ### Screenshot a desktop window (an emulator, a head unit, a desktop app)
 
-On X11 — check first, because the commands differ per session type:
+**First ask whether the desktop is involved at all.** Anything the device itself renders, the
+device can usually capture, and that path works the same on every machine: `adb shell screencap`
+reaches an emulator and even a car screen the phone is projecting into a head unit
+(`car-android-auto` has that case), and `xcrun simctl io booted screenshot` reaches the simulator.
+Reach for desktop capture only for a window that is genuinely the desktop's own — it is the part
+of this skill that varies most between machines, and the part most likely to be missing entirely.
+
+When it really is a desktop window, find the session type first, because nothing below is
+portable:
 
 ```bash
-echo "$XDG_SESSION_TYPE"                                    # x11 or wayland
-wmctrl -l                                                   # window titles
-import -window "$(xdotool search --name 'Window Title' | head -1)" shot.png
+echo "$XDG_SESSION_TYPE"    # x11 or wayland
 ```
 
-On Wayland, `import` and `xdotool` do not work; `grim` (wlroots) or the desktop's own portal is
-needed, and it may not be scriptable at all. Establish which one this machine is once, and record
-it with `environment-registry`.
+- **X11** — `wmctrl -l` for the exact title (a guessed one silently matches nothing), then
+  `import -window "$(xdotool search --name 'Title' | head -1)" shot.png`. `maim -i <id>` or `xwd`
+  do the same job where ImageMagick is absent. Confirmed live 2026-09-26.
+- **Wayland** — the X11 tools above do not apply, and the answer is per-compositor: `grim` with
+  geometry from `swaymsg` or `hyprctl` on wlroots compositors, `spectacle -a -b -n -o shot.png` on
+  KDE. Under GNOME there is no non-interactive per-window capture at all — the desktop portal
+  wants a human click. Researched 2026-09-26, not verified live: the machine this was written on
+  runs X11.
+- **An X11 program under Wayland** — the DHU and the Android emulator both are — is reported to
+  stay visible to the X11 tools through XWayland. Worth trying before concluding the session type
+  rules them out. Not verified.
+
+**Do not assume any of these are installed.** `wmctrl`, `xdotool`, ImageMagick and `grim` are all
+optional packages, absent by default on several distributions. Probe with `command -v` and use
+what is there. If nothing is, that is a fair thing to ask the developer for — one install, once,
+recorded with `environment-registry` — which is very different from asking them to be the camera
+every time.
 
 ### Drive the device
 
@@ -72,6 +92,9 @@ adb shell dumpsys location | grep -A3 "last location"
 adb shell dumpsys package <pkg> | grep -A2 PERMISSION
 ```
 
+`adb shell` reads standard input, so inside a `while read` loop it swallows the remaining lines
+and the loop runs once. Add `< /dev/null` to the `adb` call whenever looping over ids.
+
 `dumpsys` is chronically under-used and settles questions logs cannot: whether a permission is
 actually granted, whether the app is really requesting location, whether a position fix exists at
 all. One session spent an hour on a "no GPS" bug that `dumpsys location` answered in one line — a
@@ -85,6 +108,11 @@ Claude's sandboxed one: it needs their desktop's OpenGL and their signed-in tool
 the turn, and they must be able to stop it. Where the harness offers a terminal tool, use it, and
 then make the panel visible — opening a tab does not necessarily reveal it.
 
+A harness terminal tool may refuse a working directory outside the project. Run the thing by its
+absolute path, or put a `cd` in the command line — but check whether it actually needs a
+particular directory before telling anyone that it does. A bundled binary usually finds its own
+libraries through an `$ORIGIN` rpath and runs from anywhere; `readelf -d` settles it in one line.
+
 Do not hand the developer a long command to paste. If Claude can run it, Claude runs it.
 
 ## What the platform will not give you, and what to build instead
@@ -97,8 +125,14 @@ So when a project is used away from the desk, the app should write its own log:
 
 - To a location readable without root — on Android, `getExternalFilesDir`, which `adb pull` reaches
   even for a store-installed release build, where `run-as` does not work at all.
-- **Flushed every line.** A buffered sink dies with the process and takes exactly the lines that
-  would have explained the crash.
+- **Written synchronously, never buffered.** A buffered sink dies with the process and takes
+  exactly the lines that would have explained the crash — but "flush after every write" is the
+  wrong cure and an expensive one to learn: Dart's `IOSink` makes it an error to write while a
+  flush is in flight, so the next line threw, the catch disabled the log, and after the change
+  *nothing* was recorded but the first marker. Verified broken and then fixed on 2026-09-26. Use
+  the platform's plain synchronous append (`File.writeAsStringSync(mode: append)`); the bytes are
+  with the operating system before the call returns, which is what actually survives a crash, and
+  at a few lines a minute reopening the file costs nothing.
 - With the platform's uncaught-error hooks routed into it, not only what someone thought to print.
 - Marking every cold start, so a launch with no clean shutdown before it *is* the crash report.
 
