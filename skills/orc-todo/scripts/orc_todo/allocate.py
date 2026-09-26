@@ -13,12 +13,22 @@ entry.
 """
 
 from . import state
-from .resources import RESOURCES, insert, render, scan_max
+from .resources import RESOURCES, has_foreign_numbered_headings, insert, render, scan_max
 
 
 class ResourceMissing(Exception):
     """The project has no such file. Never create one - a project without a BACKLOG.md has
     not opted into having one."""
+
+
+class UnknownFormat(Exception):
+    """The file has numbered entries, but not in the heading format this resource knows.
+
+    Refusing is the whole point. Allocating anyway would hand back a number the file already
+    uses, write it under a heading shape nothing else in the file has, and - for the backlog,
+    which has no anchor - append it past the resolved entries. Three wrong things at once, all
+    silent, against a file whose premise is that numbers are permanent and never reused.
+    """
 
 
 def canonical_file(resource, cwd=None):
@@ -55,6 +65,16 @@ def next_number(resource, cwd=None):
     paths = {canonical_file(resource, cwd), target}
     stored = state.read_counters(cwd).get(resource.key, 0)
     scanned = max(scan_max(p.read_text(), resource) for p in paths if p.exists())
+    if scanned == 0:
+        for p in sorted(paths):
+            if p.exists() and has_foreign_numbered_headings(p.read_text()):
+                raise UnknownFormat(
+                    f"{p} numbers its entries in a heading format the allocator does not know. "
+                    f"It writes and reads {resource.heading.format(n='N', title='<title>')!r}. "
+                    f"Refusing rather than allocating #1 on a file that already has entries - "
+                    f"see backlog-discipline's fallback, which is the route for a file the "
+                    f"allocator cannot number."
+                )
     return max(stored, scanned) + 1
 
 

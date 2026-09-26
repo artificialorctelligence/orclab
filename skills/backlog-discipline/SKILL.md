@@ -54,9 +54,22 @@ here**. The allocator's counter only ever moves forward, so a deleted maximum en
 cause a number to be reissued through it; the failure mode that exception existed for is closed
 here. It reappears below, because the fallback has no counter.
 
+**The allocator only reads one heading shape: `## #N:`.** A project whose backlog numbers its
+entries some other way — `### N.` is the one seen in the wild — is refused rather than numbered,
+because both of the allocator's sources fail the same way on it and the number it would hand out
+is `1` on a file that already has a `1`. That refusal is not a breakage; it is the route to the
+fallback below, and it names itself when it fires. Found 2026-09-26 in orckeys, which uses
+`### N.` under `## Open` / `## Resolved` — permanent, never-reused numbers exactly as this skill
+asks for, just written differently. **Match this file's `## #N:` heading format when you set a
+backlog up**, and if an existing project already uses another one, either renumber it into this
+shape or accept that it lives on the fallback path permanently.
+
 **If `/orc-todo` genuinely isn't available** — the project isn't a git repository, Orclab isn't
-installed, or the allocator script itself is missing — fall back to scanning the file for every
-`## #N:` heading and taking the highest `N` seen; the new entry is `N + 1`. Say so plainly when you
+installed, the allocator script itself is missing, or it refused the file's heading format
+above — fall back to scanning the file for every numbered entry heading **in whatever format
+that file actually uses** and taking the highest `N` seen; the new entry is `N + 1`, written in
+that same format. (Scanning for `## #N:` specifically is what the allocator already did and is
+why it refused; repeating it by hand would find nothing and hand out `1` again.) Say so plainly when you
 do it, so whoever reads the entry later knows why it didn't go through the allocator. A consuming
 project without Orclab still needs this skill to work.
 

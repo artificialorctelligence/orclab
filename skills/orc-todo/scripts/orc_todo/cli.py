@@ -11,7 +11,7 @@ import sys
 
 from . import lanes as lanemod
 from . import state
-from .allocate import ResourceMissing, allocate
+from .allocate import ResourceMissing, UnknownFormat, allocate
 from .resources import RESOURCES, _headings
 
 RESOLVED = re.compile(r"\(RESOLVED\b")
@@ -206,7 +206,7 @@ def main(argv=None):
     except state.NotAGitRepo as e:
         print(f"error: {e} - /orc-todo needs a git repository", file=sys.stderr)
         return 1
-    except (ResourceMissing, lanemod.UnspeccedItem, lanemod.LaneMissing,
+    except (ResourceMissing, UnknownFormat, lanemod.UnspeccedItem, lanemod.LaneMissing,
             lanemod.LaneExists, lanemod.LaneStateCorrupt) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1

@@ -1,4 +1,4 @@
-from orc_todo.resources import RESOURCES, insert, render, scan_max
+from orc_todo.resources import RESOURCES, has_foreign_numbered_headings, insert, render, scan_max
 
 BACKLOG = RESOURCES["backlog"]
 VERIFICATION = RESOURCES["verification"]
@@ -87,3 +87,13 @@ def test_insert_goes_before_the_first_anchor_when_the_heading_repeats():
     text = "# V\n\n## Recording the result\n\nfirst\n\n## Recording the result\n\nsecond\n"
     out = insert(text, VERIFICATION, "## Scenario 1: a\n\nsteps\n")
     assert out.startswith("# V\n\n## Scenario 1: a\n\nsteps\n\n## Recording the result\n\nfirst\n")
+
+
+def test_foreign_numbered_headings_spots_another_projects_format():
+    assert has_foreign_numbered_headings("## Open\n\n### 17. a finding\n")
+    assert has_foreign_numbered_headings("## 3) a finding\n")
+
+
+def test_foreign_numbered_headings_ignores_prose_headings_and_fenced_examples():
+    assert not has_foreign_numbered_headings("# Backlog\n\n## Open\n\n## Resolved\n")
+    assert not has_foreign_numbered_headings("prose\n\n```\n### 1. an example\n```\n")

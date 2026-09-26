@@ -194,3 +194,42 @@ def test_allocate_honours_its_own_timeout_and_the_missing_file_message_names_it(
         assert time.monotonic() - t < 3          # the default is 10s; the argument must reach held()
     with pytest.raises(alloc.ResourceMissing, match=r"VERIFICATION\.md"):
         alloc.allocate("verification", "t", "b", cwd=repo)
+
+
+# The orckeys backlog, 2026-09-26: a flat numbered list with permanent numbers, exactly what
+# backlog-discipline asks for, written with "### N." headings instead of "## #N:".
+ORCKEYS = """# Backlog
+
+Flat list, permanent numbers, never reused.
+
+## Open
+
+### 17. The newest open finding
+
+prose
+
+## Resolved
+
+### 1. The oldest one, resolved 2026-09-24
+
+prose
+"""
+
+
+def test_allocate_refuses_a_backlog_whose_headings_it_cannot_read(tmp_path):
+    """Found 2026-09-26 in orckeys. Both of next_number's sources returned 0 for the same
+    reason - no counter, and a file scan that matched no heading - so the redundancy its
+    docstring describes failed in the same direction twice and it allocated #1 onto a file
+    whose "### 1." was already resolved."""
+    repo = make_repo(tmp_path, backlog=ORCKEYS)
+    with pytest.raises(alloc.UnknownFormat) as e:
+        alloc.allocate("backlog", "a new finding", "real prose", cwd=repo)
+    assert "## #N: <title>" in str(e.value), "the message must name the format it does expect"
+    assert (repo / "BACKLOG.md").read_text() == ORCKEYS, "nothing may be written"
+
+
+def test_allocate_still_numbers_the_first_entry_of_an_empty_backlog(tmp_path):
+    """The refusal must not fire on the case scan_max's 0 legitimately means: a real backlog
+    with no entries in it yet, where 1 is the correct number."""
+    repo = make_repo(tmp_path, backlog="# Backlog\n\nheader prose, no entries yet.\n")
+    assert alloc.allocate("backlog", "the first finding", "real prose", cwd=repo) == 1

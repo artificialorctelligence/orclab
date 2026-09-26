@@ -78,6 +78,24 @@ def scan_max(text, resource):
     return max(numbers) if numbers else 0
 
 
+# A numbered entry heading in *some* format: "## #1:", "### 1.", "## 1)". Deliberately loose,
+# and only ever consulted once a resource's own pattern has already found nothing.
+_FOREIGN_NUMBERED = re.compile(r"^#{2,4} #?\d+[.:)]", re.MULTILINE)
+
+
+def has_foreign_numbered_headings(text):
+    """True when the file numbers entries in a heading format this resource does not know.
+
+    Only meaningful once scan_max has returned 0, because 0 is two different answers wearing
+    the same face: "no entries yet", where 1 is the right number, and "entries written in a
+    format number_re does not match", where 1 is a number already in use. A project whose
+    BACKLOG.md uses "### 1." is the second case, and the allocator's two sources cannot catch
+    it between them - a format mismatch zeroes the file scan and a project with no .orclab/
+    has no counter, so next_number's documented redundancy fails in the same direction twice.
+    """
+    return bool(_headings(_FOREIGN_NUMBERED, text))
+
+
 def render(resource, number, title, body):
     """One section in the file's house format."""
     return resource.heading.format(n=number, title=title) + "\n\n" + body.rstrip("\n") + "\n"
