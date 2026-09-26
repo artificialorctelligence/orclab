@@ -5278,3 +5278,26 @@ item 2 above. **#65** asks what Orclab records about one project depending on an
 multi-piece modelling question from the dependency side, and a cross-project dependency is
 plausibly an address in this same tree. Three separate mechanisms bolted onto `/orc-code`'s
 planning step would be the worst outcome; a single answer may serve all three.
+
+## #81: Does the DHU's ALSA noise explain its intermittent audio?
+
+Starting the Desktop Head Unit prints roughly thirty ALSA errors before it connects — `Invalid
+card 'card'`, `Unknown PCM dmix`, failures to open a52, iec958 and usb_stream. The link succeeds
+regardless, and `skills/car-android-auto/SKILL.md` now tells a reader to wait for `[I]:
+connected.` rather than read those as a failed start.
+
+An earlier draft of that paragraph called the noise harmless. direflail corrected it on
+2026-09-26: sound through the DHU works on some runs and not others, which is exactly the
+symptom those lines would produce if they were more than noise. The word was withdrawn and the
+paragraph now says the question is unsettled — but unsettled is not the same as answered.
+
+What is known, measured on the machine this was found on (2026-09-26): the only playback
+hardware is HDMI on the NVidia card, audio goes through PipeWire, ALSA's default PCM is
+`type pulse` via the pipewire bridge, and the DHU is a 2022 binary that speaks ALSA directly.
+Those are the conditions under which the probes fail. What is not known is whether a run with
+working sound produces different output, which is the one observation that would settle it —
+and it needs a run where the sound actually fails, so it cannot be forced.
+
+Resolving this means either replacing the "not established" sentence with a real cause, or
+recording that the two are unrelated so nobody re-opens it. Either way the paragraph in
+`car-android-auto` is what changes.
