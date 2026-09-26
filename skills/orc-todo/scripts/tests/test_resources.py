@@ -97,3 +97,17 @@ def test_foreign_numbered_headings_spots_another_projects_format():
 def test_foreign_numbered_headings_ignores_prose_headings_and_fenced_examples():
     assert not has_foreign_numbered_headings("# Backlog\n\n## Open\n\n## Resolved\n")
     assert not has_foreign_numbered_headings("prose\n\n```\n### 1. an example\n```\n")
+
+
+def test_heading_re_still_counts_an_entry_whose_title_is_empty():
+    """The pattern grew a title group on 2026-09-26 so cli could stop keeping its own copy.
+    Requiring a space after the colon would have dropped `## #22:` from the scan, and a
+    heading the scan cannot see is a number the allocator hands out twice."""
+    assert scan_max("## #22:\n\nprose\n", BACKLOG) == 22
+
+
+def test_heading_re_captures_the_title_for_the_cli():
+    import re
+    from orc_todo.resources import RESOURCES
+    m = re.search(RESOURCES["backlog"].heading_re, "## #7: a real title\n", re.MULTILINE)
+    assert (int(m.group(1)), m.group(2).strip()) == (7, "a real title")

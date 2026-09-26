@@ -13,7 +13,8 @@ entry.
 """
 
 from . import state
-from .resources import RESOURCES, has_foreign_numbered_headings, insert, render, scan_max
+from .resources import (RESOURCES, has_foreign_numbered_headings, insert, render, scan_max,
+                        unknown_format_message)
 
 
 class ResourceMissing(Exception):
@@ -68,13 +69,11 @@ def next_number(resource, cwd=None):
     if scanned == 0:
         for p in sorted(paths):
             if p.exists() and has_foreign_numbered_headings(p.read_text()):
-                raise UnknownFormat(
-                    f"{p} numbers its entries in a heading format the allocator does not know. "
-                    f"It writes and reads {resource.heading.format(n='N', title='<title>')!r}. "
-                    f"Refusing rather than allocating #1 on a file that already has entries - "
-                    f"see backlog-discipline's fallback, which is the route for a file the "
-                    f"allocator cannot number."
-                )
+                raise UnknownFormat(unknown_format_message(
+                    p, resource,
+                    "Refusing rather than allocating #1 on a file that already has entries - "
+                    "see backlog-discipline's fallback, which is the route for a file the "
+                    "allocator cannot number."))
     return max(stored, scanned) + 1
 
 

@@ -57,8 +57,10 @@ here. It reappears below, because the fallback has no counter.
 **The allocator only reads one heading shape: `## #N:`.** A project whose backlog numbers its
 entries some other way — `### N.` is the one seen in the wild — is refused rather than numbered,
 because both of the allocator's sources fail the same way on it and the number it would hand out
-is `1` on a file that already has a `1`. That refusal is not a breakage; it is the route to the
-fallback below, and it names itself when it fires. Found 2026-09-26 in orckeys, which uses
+is `1` on a file that already has a `1`. The read subcommands refuse the same file for the same
+reason — `list` would otherwise report a full backlog as empty, which is the quieter half of the
+same bug. That refusal is not a breakage; it is the route to the fallback below, and it names
+itself when it fires. Found 2026-09-26 in orckeys, which uses
 `### N.` under `## Open` / `## Resolved` — permanent, never-reused numbers exactly as this skill
 asks for, just written differently. **Match this file's `## #N:` heading format when you set a
 backlog up**, and if an existing project already uses another one, either renumber it into this

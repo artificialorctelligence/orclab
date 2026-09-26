@@ -12,11 +12,13 @@ import sys
 from . import lanes as lanemod
 from . import state
 from .allocate import ResourceMissing, UnknownFormat, allocate
-from .resources import RESOURCES, _headings
+from .resources import RESOURCES, _headings, has_foreign_numbered_headings, unknown_format_message
 
 RESOLVED = re.compile(r"\(RESOLVED\b")
 PARTIAL = re.compile(r"\(PARTIALLY ADDRESSED\b")
-_HEADING = re.compile(r"^## #(\d+): (.*)$", re.MULTILINE)
+# The backlog resource owns the heading shape. A second literal here is what let the read
+# commands keep reporting "no open entries" on a file the allocator had already refused.
+_HEADING = re.compile(RESOURCES["backlog"].heading_re, re.MULTILINE)
 _NEXT_SECTION = re.compile(r"^## ", re.MULTILINE)
 
 
@@ -35,10 +37,24 @@ def _sections(text):
 
 
 def _read_backlog(cwd):
+    """The text of the backlog, or a refusal if its entries are in a shape we cannot read.
+
+    The guard is two conditions, not one: no entry matched *and* something that looks like a
+    numbered entry heading is present. Either alone is wrong - a correct backlog trips the
+    foreign-heading detector too (`## #80:` is itself a numbered heading), and an empty backlog
+    has no entries for the honest reason. Both together is the only case where "no open
+    entries" would be a lie.
+    """
     path = _backlog_path(cwd)
     if not path.exists():
         raise ResourceMissing(f"no BACKLOG.md in this project (looked in {path.parent})")
-    return path.read_text()
+    text = path.read_text()
+    if not _sections(text) and has_foreign_numbered_headings(text):
+        raise UnknownFormat(unknown_format_message(
+            path, RESOURCES["backlog"],
+            "Reporting an empty backlog for a file that plainly has entries would be a silent "
+            "wrong answer, so it stops here instead."))
+    return text
 
 
 def cmd_list(args):

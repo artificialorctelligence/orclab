@@ -64,11 +64,12 @@ that spec first, and then comes back and asks which lane the finished item belon
   doesn't have one yet, it says so plainly and creates nothing.
 - It will never accept a blank entry. If the body you give `add` is empty, or only blank lines,
   it refuses outright rather than writing a stub.
-- It will never number an entry in a backlog it can't read. It writes and reads headings of one
-  shape — `## #12: the title`. If your backlog already numbers its entries some other way, say
-  `### 12.`, it stops and tells you so rather than handing out a number, because the number it
-  would have handed out is `1` and your file almost certainly already has a `1`. Number that
-  entry by hand instead: read the file, take the highest number in it, add one.
+- It will never guess at a backlog it can't read. It writes and reads headings of one shape —
+  `## #12: the title`. If your backlog numbers its entries some other way, say `### 12.`, every
+  subcommand stops and tells you so. Adding would otherwise hand out `1`, on a file that almost
+  certainly already has a `1`; listing would otherwise report the file as empty, which is a
+  wrong answer that looks like a right one. Until the file is renumbered into that shape, work
+  on it by hand: read it, take the highest number in it, add one.
 - It will never commit the entry it just wrote. Writing an entry and committing it to git are two
   separate steps — committing is something you do yourself afterward, for example with
   [`/orc-git commit`](orc-git.md).

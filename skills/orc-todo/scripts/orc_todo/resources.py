@@ -20,7 +20,7 @@ class Resource:
     key: str
     filename: str
     heading: str          # format string with {n} and {title}
-    number_re: str        # must anchor at line start; group 1 is the number
+    heading_re: str       # anchored at line start; group 1 the number, group 2 the title
     anchor: str | None    # insert before this line; None or absent means append
     canonical_text: bool  # write the text to the main checkout, or to the invoking one
 
@@ -30,7 +30,7 @@ RESOURCES = {
         key="backlog",
         filename="BACKLOG.md",
         heading="## #{n}: {title}",
-        number_re=r"^## #(\d+):",
+        heading_re=r"^## #(\d+):(.*)$",
         anchor=None,
         canonical_text=True,   # a finding is true the moment it is written
     ),
@@ -38,7 +38,7 @@ RESOURCES = {
         key="verification",
         filename="VERIFICATION.md",
         heading="## Scenario {n}: {title}",
-        number_re=r"^## Scenario (\d+):",
+        heading_re=r"^## Scenario (\d+):(.*)$",
         anchor="## Recording the result",
         canonical_text=False,  # a scenario describes the branch it was written on (BACKLOG #30)
     ),
@@ -74,7 +74,7 @@ def scan_max(text, resource):
     the next one to 100. A gap is supposed to be the record of a deleted entry - a phantom gap
     is that record lying.
     """
-    numbers = [int(m.group(1)) for m in _headings(re.compile(resource.number_re, re.MULTILINE), text)]
+    numbers = [int(m.group(1)) for m in _headings(re.compile(resource.heading_re, re.MULTILINE), text)]
     return max(numbers) if numbers else 0
 
 
@@ -88,12 +88,22 @@ def has_foreign_numbered_headings(text):
 
     Only meaningful once scan_max has returned 0, because 0 is two different answers wearing
     the same face: "no entries yet", where 1 is the right number, and "entries written in a
-    format number_re does not match", where 1 is a number already in use. A project whose
+    format heading_re does not match", where 1 is a number already in use. A project whose
     BACKLOG.md uses "### 1." is the second case, and the allocator's two sources cannot catch
     it between them - a format mismatch zeroes the file scan and a project with no .orclab/
     has no counter, so next_number's documented redundancy fails in the same direction twice.
     """
     return bool(_headings(_FOREIGN_NUMBERED, text))
+
+
+def unknown_format_message(path, resource, consequence):
+    """The one wording for "this file numbers entries some way I do not recognise".
+
+    Shared because the allocator and the read commands detect the same condition and must not
+    drift into describing it differently - the reader is looking at one file, not two bugs.
+    """
+    return (f"{path} numbers its entries in a heading format /orc-todo does not know. It writes "
+            f"and reads {resource.heading.format(n='N', title='<title>')!r}. {consequence}")
 
 
 def render(resource, number, title, body):

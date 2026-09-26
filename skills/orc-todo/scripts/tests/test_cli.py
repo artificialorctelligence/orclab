@@ -285,3 +285,58 @@ def test_remove_keeps_trailing_spaces_and_collapses_only_newlines(tmp_path, caps
         "# Backlog\n\n## #7: an open one\n\nprose   \n\n## #22: last\n\nmore  \n"
     assert run(["remove", "22"], repo, capsys)[0] == 0
     assert (repo / "BACKLOG.md").read_text() == "# Backlog\n\n## #7: an open one\n\nprose   \n"
+
+
+# orckeys' shape: a flat numbered list with permanent numbers, written "### N." instead of
+# "## #N:". Before 2026-09-26 every read command reported this file as empty, exit 0.
+FOREIGN = """# Backlog
+
+Flat list, permanent numbers, never reused.
+
+## Open
+
+### 17. the newest open finding
+
+prose
+
+## Resolved
+
+### 1. the oldest one, resolved
+
+prose
+"""
+
+
+def _foreign_repo(tmp_path):
+    repo = make_repo(tmp_path)
+    (repo / "BACKLOG.md").write_text(FOREIGN)
+    return repo
+
+
+def test_list_refuses_a_backlog_it_cannot_read_rather_than_calling_it_empty(tmp_path, capsys):
+    """The silent half of the 2026-09-26 orckeys bug. `no open entries` on a 17-entry file is a
+    wrong answer that looks like a right one, and it survived the allocator's own fix because
+    the heading shape was hardcoded a second time in this module."""
+    code, out = run(["list"], _foreign_repo(tmp_path), capsys)
+    assert code == 1
+    assert "no open entries" not in out
+    assert "## #N: <title>" in out
+
+
+def test_show_and_remove_refuse_the_same_file_the_same_way(tmp_path, capsys):
+    repo = _foreign_repo(tmp_path)
+    for args in (["show", "17"], ["remove", "17"]):
+        code, out = run(args, repo, capsys)
+        assert code == 1, args
+        assert "no entry #17" not in out, f"{args}: must not claim the entry is absent"
+        assert "heading format" in out, args
+    assert (repo / "BACKLOG.md").read_text() == FOREIGN
+
+
+def test_an_empty_backlog_still_reports_no_open_entries(tmp_path, capsys):
+    """The refusal must not fire on the honest case: a real backlog with nothing in it yet."""
+    repo = make_repo(tmp_path)
+    (repo / "BACKLOG.md").write_text("# Backlog\n\nheader prose, no entries yet.\n")
+    code, out = run(["list"], repo, capsys)
+    assert code == 0
+    assert "no open entries" in out
