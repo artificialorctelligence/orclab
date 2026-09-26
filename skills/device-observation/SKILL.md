@@ -2,6 +2,7 @@
 name: device-observation
 description: Use when a project is developed against a real device the developer has to look at — a phone, a head unit, an emulator, a desktop app window — and every check currently costs a round trip through them. Claude drives and observes the device itself: screenshots, synthetic input, logs that outlive the platform's own, and long-running processes started in the developer's own terminal. Not a command; Claude reads it whenever a human is being used as a pair of eyes.
 user-invocable: false
+allowed-tools: Bash(python3 *)
 ---
 
 # Device observation — stop using the developer as a camera
@@ -64,6 +65,43 @@ optional packages, absent by default on several distributions. Probe with `comma
 what is there. If nothing is, that is a fair thing to ask the developer for — one install, once,
 recorded with `environment-registry` — which is very different from asking them to be the camera
 every time.
+
+### The desktop build of a mobile app
+
+A Flutter, React Native or Compose Multiplatform app usually also runs on the desktop, and
+rebuilding there takes seconds where a phone takes minutes. Most layout, state and logic work is
+faster to check that way, and the screenshot is a desktop window like any other.
+
+What it does **not** check is anything the phone or the car actually decides: real permissions,
+real sensors, the car surface, the projected screen, how a layout behaves at the size and
+brightness of the real thing. Use the desktop build to iterate and the device to confirm, and say
+which one a screenshot came from — a screenshot with no device behind it, presented as if there
+were, is worse than no screenshot.
+
+Its console output is right there in the terminal it was started from, so the app's own log file
+matters less here than on a phone. Start it in the developer's terminal all the same, for the
+reasons below.
+
+### A portable way to capture a window
+
+There is no one command that screenshots a window on every desktop, so this skill ships one that
+picks whatever the machine has:
+
+```bash
+python3 "${CLAUDE_SKILL_DIR}/scripts/screenshot.py" --list
+python3 "${CLAUDE_SKILL_DIR}/scripts/screenshot.py" --window 'Orcweather' shot.png
+python3 "${CLAUDE_SKILL_DIR}/scripts/screenshot.py" shot.png          # the whole screen
+```
+
+Standard library only, no packages to install. It prints the path and the real dimensions of what
+it wrote, because a capture tool that exits 0 over an empty file is the failure worth catching. On
+a desktop with nothing usable it fails with the name of what to install rather than a stack trace,
+and under GNOME on Wayland it says outright that no non-interactive per-window capture exists and
+to run the app under X11 instead.
+
+Confirmed live on Linux/X11 2026-09-26. The macOS, Windows and Wayland branches are written from
+each tool's documented interface and have not been run; `scripts/tests/` covers which branch gets
+chosen on each platform, which is the part that can be wrong on a machine nobody here has.
 
 ### Drive the device
 

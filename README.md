@@ -109,7 +109,8 @@ Discipline:
 - **device-observation** — whenever a real device, emulator or app window is in the loop, so
   checking something doesn't cost a round trip through you: screenshot the phone and the
   head-unit window, drive the UI with synthetic input, read `dumpsys` and the crash buffer, and
-  give the app its own log for when the platform's holds seventy seconds.
+  give the app its own log for when the platform's holds seventy seconds. Ships a standard-library
+  screenshot tool that picks whatever capture mechanism the machine actually has.
 - **environment-registry** — when a real, live test environment is accessed or its access details
   are learned, so they don't need re-deriving later.
 - **release-checklist** — when setting up a release process for a new project, or when an
