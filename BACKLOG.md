@@ -4711,9 +4711,11 @@ moment it would change a decision. Its own description says Claude reads it "whe
 play" — and CarPlay was not in play that day, because the project was thinking about Android. By
 the time CarPlay is in play, the shape of the thing has been built for another platform.
 
-**See also #80** (2026-09-26), the same root from the delivery side: the recipe tree is
-reachable only from inside `/orc-package`. Both propose `/orc-code`'s planning step as the home.
-Read them together — three separate mechanisms bolted on there would be the worst outcome.
+**See also #80** (2026-09-26), the same root from another angle: `/orc-code` and
+`/orc-package` walk one tree — the Defaults Table computes two of a `channels.yaml` path's five
+levels — under two vocabularies that disagree, so neither command can see the other's half. Both
+entries land on `/orc-code`'s planning step as the likely home. Read them together — three
+separate mechanisms bolted on there would be the worst outcome.
 
 The user's conclusion, worth quoting because it names the fix precisely: *"always check what you
 can get away with on every platform before you start coding."*
@@ -5166,67 +5168,113 @@ delete it a second time before checking whether anything else in `~/.claude` als
 `/home/user` path or a timestamp from a cloud session; a second sample is worth more than this
 one, because it can be compared.
 
-## #80: The recipe tree is Orclab's organising model for a multi-piece project, but it is written down once as one command's input parameter
+## #80: `/orc-code` and `/orc-package` work on one tree and disagree on what its levels are called — the model needs codifying
 
-Reported from orckeys 2026-09-25, against 0.26.1, and confirmed here 2026-09-26.
+Reported from orckeys 2026-09-25 against 0.26.1, and rewritten here 2026-09-26 after direflail
+corrected the first diagnosis. The original report and this project's first pass at it both
+reached the same wrong conclusion, independently, which is the best evidence there is that the
+naming misleads rather than merely under-documents.
 
-A session was asked to plan splitting one repository into three deliverables — a macro daemon
-for a PPA, and two lighting contributions sent upstream to OpenRGB. The user suggested
-organising it with "the recipes tree". The session grepped for `recipe`, found it only in
-`/orc-package`, concluded recipes are a packaging concern with nothing to say about organising
-work, argued against the user's suggestion, and separately claimed the two upstream
-contributions "have no recipe, and can't have one". Both wrong; the user corrected them by hand.
+**What happened in orckeys.** A session was asked to plan splitting one repository into three
+deliverables — a macro daemon for a PPA, and two lighting contributions sent upstream to
+OpenRGB. direflail suggested organising it with "the recipes tree". The session grepped for
+`recipe`, found it only in `/orc-package`, concluded recipes are a packaging concern with
+nothing to say about organising work, argued against the suggestion, and separately claimed the
+two upstream contributions "have no recipe, and can't have one". direflail: *"i thought these
+were one and the same up until i hit this bug."*
 
-**The model really is the organising one.** The recipe is not the prose in `/orc-package` — it
-is the shape of `channels.yaml`, whose tree is component/platform/os/channel/series. Level two
-is the *dev stack*, so a leaf already says which piece, built how, for what target, delivered
-where. Confirmed against `~/projects/orcshot/.orclab/publish/channels.yaml`, whose real top
-levels are `desktop:` → `python:` → `linux:` → `ppa:` → `noble:`.
+**They are one and the same.** `/orc-code`'s Defaults Table (`skills/orc-code/SKILL.md:380`) is
+keyed by type plus the platforms ticked, and its answer is the stack. A `channels.yaml` path is
+component/stack/os/channel/series. Orcshot's real file has two components:
 
-**Where it is written down, confirmed here 2026-09-26:**
+```
+desktop:                gnome-shell-extension:
+  python:                 js:
+    linux:                  linux:
+      ppa: snap: flatpak:     ego:
+```
 
-- `skills/orc-package/SKILL.md:51-52` states it once, complete and correct: *"Ask which
-  `channels.yaml` parent path the leaf belongs under — the tree is
-  component/platform/os/channel/series (`desktop.python.linux.ppa`)"*. It is an *input
-  parameter to one command*, reachable only by someone already running that command on a
-  project that already has a recipe.
-- `grep -c recipe skills/orc-code/SKILL.md` → **0**. The command that decides what a project
-  *is* never mentions it, and its New-Project Flow has no component concept.
-- `grep -rn "recipe\|component/platform" docs/commands/` → **no hits**. The pages a user reads
-  do not carry the model at all.
-- So: ask Orclab "how is a multi-piece project organised?" and nothing answers.
+| Level | Orcshot's values | Who decides it |
+|---|---|---|
+| 1 component | `desktop`, `gnome-shell-extension` | `/orc-code` Step 0.2's third bullet — "a new part of an existing project" → a subdirectory. Decided, never named. |
+| 2 stack | `python`, `js` | the Defaults Table's **output** column |
+| 3 os | `linux` | the Defaults Table's **input** — "Scope ticked" |
+| 4 channel | `ppa`, `snap`, `flatpak`, `ego` | `/orc-package` |
+| 5 series | `noble`, `resolute` | `/orc-package` |
 
-**The second error is the one that matters more.** The session reasoned that a contribution to
+So the Defaults Table sits astride levels 2 and 3 of a `channels.yaml` address: platforms in,
+stack out. `/orc-code` owns the front half of the path and `/orc-package` the back half, and
+neither says so.
+
+**The names cross over, which is why nobody can see it.** `/orc-package:51-52` says *"the tree is
+component/platform/os/channel/series (`desktop.python.linux.ppa`)"*. Map that onto its own
+example and it is calling `python` the **platform** and `linux` the **os**. `/orc-code` asks
+*"Which platforms? Tick any of: Linux, Windows, Mac, Android, iOS, web."* The one word both
+commands use — *platform* — means **level 2** in one and **level 3** in the other. A reader who
+takes `/orc-package`'s sentence to `/orc-code` lands on the wrong level and correctly concludes
+there is no correspondence. Calling a language a platform is the root of it. Second trap on top:
+`desktop` is a component at level 1 in Orcshot's file *and* the name of the platform family in
+the Defaults Table — same word, different level, both true for that project.
+
+**The model has no mechanical existence anywhere.** From `skills/orc-publish/scripts/orc_publish/
+tree.py`'s own docstring: *"There is no fixed schema beyond that distinction - depth follows
+whatever a real project actually needs."* A node is a leaf when its keys are a subset of
+`LEAF_KEYS`, a branch otherwise. The words component/platform/os/channel/series appear nowhere
+in `/orc-publish`'s code (its one `"component"` is an unrelated path-segment matcher in the
+preflight rules). Confirmed by search 2026-09-26: the model exists in exactly one parenthetical,
+in one command's input-gathering step, and `grep -rn "recipe\|component/platform" docs/commands/`
+returns nothing — the eleven pages a user reads do not carry it at all. Reading the code does not
+reveal it either, which is why a careful pass concluded the concept was absent rather than
+differently named.
+
+**What it costs today.** `/orc-package` step 1 asks the user to type the parent path, reasoning
+*"the user knows their project's shape better than you do."* True — and they already told
+Orclab: the stack was confirmed at `/orc-code` step 3, the os is what they ticked, the component
+is the subdirectory routing decision. Three of five coordinates, elicited and confirmed in an
+earlier Orclab conversation, discarded, then asked for again. The paths are real addresses, not
+just indentation: `distro.yaml` cites leaves by dotted string (`channel:
+desktop.python.linux.ppa.noble`), so a retyped path with a wrong middle segment points at
+nothing.
+
+**The delivery half is read too narrowly as well.** The orckeys session claimed a contribution to
 someone else's project cannot have a recipe — no version of ours to bump, no artifact of ours to
-upload. That over-fits the model to the examples it read. A channel is not "a store or a
-registry"; it is anywhere code gets delivered, plus whatever that place requires. An upstream
-merge request qualifies, and its leaf is unremarkable — a `prepare:`, an `action:` that pushes a
-fork branch and opens the MR, and `requirements:` holding the project's own rules (rebase not
-merge, C-style loops and casts, one functional area per MR, no AI authorship trailers). Filling
-that in is exactly what lets `/orc-code` do its best work on a piece whose conventions are set
-by someone else. All six shipped ingredients (`app-store`, `flatpak`, `play`, `ppa`,
-`shared-hosting`, `snap`) are stores or hosts, and that uniformity is itself the misleading
-signal that made "upstream merge request" read as out-of-model.
+upload. That over-fits the model to the examples it read. A channel is anywhere code gets
+delivered plus whatever that place requires; an upstream merge request qualifies, with a
+`prepare:`, an `action:` that pushes a fork branch and opens the MR, and `requirements:` holding
+the project's own rules (rebase not merge, C-style loops and casts, one functional area per MR,
+no AI authorship trailers). Filling that in is exactly what lets `/orc-code` do its best work on
+a piece whose conventions are set by someone else. All six shipped ingredients (`app-store`,
+`flatpak`, `play`, `ppa`, `shared-hosting`, `snap`) are stores or hosts, and that uniformity is
+itself the signal that made a merge request read as out-of-model.
 
-**Proposed, not decided:** (1) a background skill carrying the model — the five levels, that
-level two is the dev stack and a project may have several (orcweather is Flutter + PHP in one
-repo), that a channel is any delivery destination and its requirements with at least one
-non-store example shown beside a PPA, that `requirements:`/`issues:` are where a destination's
-own rules live, and that components are pieces of a deliverable rather than devices or features;
-(2) one cross-reference from `/orc-code`, whose New-Project Flow could record the
-component/stack/os it just decided and write the `channels.yaml` parent path at creation time
-instead of leaving it to be reconstructed at `/orc-package` time; (3) an `upstream-merge-request`
-ingredient, to fix the store-shaped impression at its source.
+**What direflail asked for, 2026-09-26:** *"the two commands disagree on names, and they work on
+the same tree. we need to codify this in orclab and make it easier and more useful to interact
+with."* So the work is not "write a skill explaining a model". It is three things, in this order:
 
-**Open question, the real one:** whether this is a new skill or a widening of something that
-exists. Per CLAUDE.md's "name what should already have covered it", the honest answer is that
-nothing covers it — searched every shipped `SKILL.md`, `docs/commands/`, `CLAUDE.md` and this
-file; the only statement of the tree is the `/orc-package` line above. But the *shape* of the
-failure is already tracked twice. **#75** is the same root — knowledge reachable only once you
-are in the relevant command, when the decision needing it is made earlier — for platform
-ceilings rather than delivery, and it names `/orc-code`'s planning step as the obvious home,
-which is also proposal (2) here. **#65** asks what Orclab records about one project depending on
-another, which is the same multi-piece modelling question from the dependency side. Whoever
-takes any of the three should read the other two first; a single answer at `/orc-code`'s
-planning step may serve all of them, and three separate mechanisms there would be the worst
-outcome.
+1. **Settle the vocabulary and use one set of words in both commands.** Level 2 is a *stack*, not
+   a platform — `/orc-code` already calls it that and the data agrees (`python`, `js`). Whatever
+   level 3 is called, `/orc-code` and `/orc-package` must call it the same thing. This is the
+   part that has to happen first; everything else inherits the names.
+2. **Stop discarding the coordinates `/orc-code` already has.** It knows the component, stack and
+   os by the end of its New-Project Flow. Writing the `channels.yaml` parent path at scaffold
+   time removes `/orc-package`'s retype-from-memory step and makes the address exist before
+   anything needs to cite it.
+3. **Make the tree something you can look at and act on.** Today the only way to see a project's
+   shape is to open `channels.yaml`. "Easier and more useful to interact with" means a way to ask
+   Orclab what a project's pieces are, where each one goes, and which coordinates are still
+   blank — the missing-leaf view is as useful as the filled-in one.
+
+Two cautions for whoever takes it. **A component is not a folder:** Orcshot's
+`gnome-shell-extension` has no top-level directory — its source is at
+`src/orcshot/resources/gnome-shell-extensions/<uuid>` and `scripts/pack-extension.sh` builds it.
+It is a thing built and delivered separately, wherever its source lives. **And the depth is not
+fixed** — `tree.py` accepts whatever a project needs, so codifying the five names must not become
+a schema that rejects a real project's tree.
+
+**Related, read before starting.** **#75** is the same root from another angle — knowledge
+reachable only once you are inside the command that holds it, when the decision needing it was
+made earlier — and already names `/orc-code`'s planning step as the likely home, which is also
+item 2 above. **#65** asks what Orclab records about one project depending on another: the same
+multi-piece modelling question from the dependency side, and a cross-project dependency is
+plausibly an address in this same tree. Three separate mechanisms bolted onto `/orc-code`'s
+planning step would be the worst outcome; a single answer may serve all three.
