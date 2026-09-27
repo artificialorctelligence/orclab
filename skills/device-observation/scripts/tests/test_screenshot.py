@@ -7,6 +7,7 @@ a message that names what to install.
 
 from __future__ import annotations
 
+import json
 import struct
 import sys
 from pathlib import Path
@@ -16,6 +17,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import screenshot
+
+WINDOW_RECT = {"x": 10, "y": 20, "width": 800, "height": 480}
 
 
 @pytest.fixture
@@ -169,3 +172,208 @@ def test_run_tolerates_the_exit_codes_it_is_given():
     assert screenshot.run([sys.executable, "-c", "raise SystemExit(1)"], tolerate=(1,)) == ""
     with pytest.raises(screenshot.CaptureError, match="exited 1"):
         screenshot.run([sys.executable, "-c", "raise SystemExit(1)"])
+
+
+# --- listing windows, per desktop ---------------------------------------------------------
+
+
+def test_list_windows_on_x11_takes_the_title_after_wmctrls_three_columns(tools, monkeypatch):
+    present, _ = tools
+    present.add("wmctrl")
+    monkeypatch.setattr(screenshot, "session", lambda: "x11")
+    monkeypatch.setattr(
+        screenshot,
+        "run",
+        lambda cmd, tolerate=(): "0x03400004  0 Matrix Firefox\n0x0300000f  0 Matrix Head Unit\n",
+    )
+    assert screenshot.list_windows() == ["Firefox", "Head Unit"]
+
+
+SWAY_TREE = {
+    "name": "root",
+    "nodes": [
+        {"name": "workspace", "nodes": [{"name": "Orcweather", "pid": 42, "rect": WINDOW_RECT}]},
+        {"name": "scratch", "floating_nodes": [{"name": "Notes", "pid": 43, "rect": WINDOW_RECT}]},
+    ],
+}
+
+
+def test_list_windows_on_sway_walks_tiled_and_floating_windows(tools, monkeypatch):
+    present, _ = tools
+    present.add("swaymsg")
+    monkeypatch.setattr(screenshot, "session", lambda: "wayland")
+    monkeypatch.setattr(screenshot, "run", lambda cmd, tolerate=(): json.dumps(SWAY_TREE))
+    # "workspace" and "root" have no pid, so they are containers rather than windows.
+    assert screenshot.list_windows() == ["Orcweather", "Notes"]
+
+
+def test_list_windows_on_macos_splits_the_osascript_list(tools, monkeypatch):
+    present, _ = tools
+    present.add("osascript")
+    monkeypatch.setattr(screenshot, "session", lambda: "macos")
+    monkeypatch.setattr(screenshot, "run", lambda cmd, tolerate=(): "Finder, Safari , Xcode")
+    assert screenshot.list_windows() == ["Finder", "Safari", "Xcode"]
+
+
+def test_list_windows_is_empty_when_the_desktop_offers_no_way_to_ask(tools, monkeypatch):
+    monkeypatch.setattr(screenshot, "session", lambda: "wayland")
+    assert screenshot.list_windows() == []
+
+
+# --- wayland capture ----------------------------------------------------------------------
+
+
+def test_grim_captures_the_whole_screen_without_a_compositor_query(tools, tmp_path, monkeypatch):
+    present, calls = tools
+    present.add("grim")
+    monkeypatch.setenv("XDG_CURRENT_DESKTOP", "sway")
+    assert screenshot.capture_wayland(tmp_path / "o.png", None) == "grim"
+    assert calls[-1][0] == "grim" and "-g" not in calls[-1]
+
+
+def test_grim_needs_swaymsg_to_find_one_window(tools, tmp_path, monkeypatch):
+    present, _ = tools
+    present.add("grim")
+    monkeypatch.setenv("XDG_CURRENT_DESKTOP", "sway")
+    with pytest.raises(screenshot.CaptureError, match="install swaymsg"):
+        screenshot.capture_wayland(tmp_path / "o.png", "Orcweather")
+
+
+def test_grim_is_given_the_geometry_swaymsg_reports(tools, tmp_path, monkeypatch):
+    present, calls = tools
+    present.update({"grim", "swaymsg"})
+    monkeypatch.setenv("XDG_CURRENT_DESKTOP", "sway")
+    monkeypatch.setattr(
+        screenshot,
+        "run",
+        lambda cmd, tolerate=(): calls.append(cmd) or json.dumps(SWAY_TREE),
+    )
+    assert screenshot.capture_wayland(tmp_path / "o.png", "orcweather") == "grim+swaymsg"
+    assert calls[-1][:3] == ["grim", "-g", "10,20 800x480"]
+
+
+def test_sway_geometry_says_which_title_it_could_not_find(tools, monkeypatch):
+    monkeypatch.setattr(screenshot, "run", lambda cmd, tolerate=(): json.dumps(SWAY_TREE))
+    with pytest.raises(screenshot.CaptureError, match="no window matching 'Nothing'"):
+        screenshot.sway_geometry("Nothing")
+
+
+# --- macOS --------------------------------------------------------------------------------
+
+
+def test_macos_without_screencapture_is_not_a_normal_macos(tools, tmp_path):
+    with pytest.raises(screenshot.CaptureError, match="not a normal macOS"):
+        screenshot.capture_macos(tmp_path / "o.png", None)
+
+
+def test_macos_full_screen_suppresses_the_shutter(tools, tmp_path):
+    present, calls = tools
+    present.add("screencapture")
+    assert screenshot.capture_macos(tmp_path / "o.png", None) == "screencapture"
+    assert "-x" in calls[-1], "a capture nobody is watching should not make a noise"
+
+
+def test_macos_window_capture_crops_to_the_bounds_osascript_reports(tools, tmp_path, monkeypatch):
+    present, calls = tools
+    present.update({"screencapture", "osascript"})
+    monkeypatch.setattr(
+        screenshot, "run", lambda cmd, tolerate=(): calls.append(cmd) or "10, 20, 800, 480"
+    )
+    assert screenshot.capture_macos(tmp_path / "o.png", "Orcweather") == "screencapture -R"
+    assert calls[-1][:4] == ["screencapture", "-x", "-R", "10,20,800,480"]
+
+
+def test_macos_names_the_permission_when_the_bounds_come_back_wrong(tools, tmp_path, monkeypatch):
+    """An app without Accessibility access returns nothing useful, which is not a crash."""
+    present, _ = tools
+    present.update({"screencapture", "osascript"})
+    monkeypatch.setattr(screenshot, "run", lambda cmd, tolerate=(): "")
+    with pytest.raises(screenshot.CaptureError, match="Accessibility"):
+        screenshot.capture_macos(tmp_path / "o.png", "Orcweather")
+
+
+# --- Windows ------------------------------------------------------------------------------
+
+
+def test_windows_uses_powershell_and_falls_back_to_pwsh(tools, tmp_path):
+    present, calls = tools
+    present.add("powershell")
+    assert screenshot.capture_windows(tmp_path / "o.png", None) == "powershell"
+    assert calls[-1][0] == "powershell"
+
+    present.remove("powershell")
+    present.add("pwsh")
+    screenshot.capture_windows(tmp_path / "o.png", None)
+    assert calls[-1][0] == "pwsh"
+
+
+def test_windows_with_no_shell_at_all_says_which_two_it_looked_for(tools, tmp_path):
+    with pytest.raises(screenshot.CaptureError, match="neither powershell nor pwsh"):
+        screenshot.capture_windows(tmp_path / "o.png", None)
+
+
+# --- dispatch and the command line ----------------------------------------------------------
+
+
+@pytest.mark.parametrize("kind", ["x11", "wayland", "macos", "windows"])
+def test_capture_dispatches_to_the_backend_for_this_session(kind, tmp_path, monkeypatch):
+    """BACKENDS binds the functions at import, so the dict is what a test must patch."""
+    monkeypatch.setattr(screenshot, "session", lambda: kind)
+    monkeypatch.setitem(screenshot.BACKENDS, kind, lambda out, title: f"{kind}-was-called")
+    assert screenshot.capture(tmp_path / "o.png", None) == f"{kind}-was-called"
+
+
+def test_main_prints_the_path_and_the_real_size(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(screenshot, "capture", lambda out, title: "import")
+    monkeypatch.setattr(screenshot, "png_size", lambda path: (800, 480))
+    out = tmp_path / "shot.png"
+    assert screenshot.main([str(out)]) == 0
+    printed = capsys.readouterr().out
+    assert "800x480" in printed and "via import" in printed and str(out) in printed
+
+
+def test_main_creates_the_output_directory_rather_than_failing_on_it(tmp_path, monkeypatch):
+    monkeypatch.setattr(screenshot, "capture", lambda out, title: "import")
+    monkeypatch.setattr(screenshot, "png_size", lambda path: (1, 1))
+    nested = tmp_path / "a" / "b" / "shot.png"
+    assert screenshot.main([str(nested)]) == 0
+    assert nested.parent.is_dir()
+
+
+def test_main_passes_the_window_title_through(tmp_path, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        screenshot, "capture", lambda out, title: seen.update(title=title) or "import"
+    )
+    monkeypatch.setattr(screenshot, "png_size", lambda path: (1, 1))
+    screenshot.main(["--window", "Head Unit", str(tmp_path / "o.png")])
+    assert seen["title"] == "Head Unit"
+
+
+def test_main_reports_a_failure_on_stderr_and_exits_nonzero(tmp_path, monkeypatch, capsys):
+    def boom(out, title):
+        raise screenshot.CaptureError("no window matching 'X'; try --list")
+
+    monkeypatch.setattr(screenshot, "capture", boom)
+    assert screenshot.main([str(tmp_path / "o.png")]) == 1
+    captured = capsys.readouterr()
+    assert "screenshot failed: no window matching" in captured.err
+    assert captured.out == "", "a failure must not also print a path"
+
+
+def test_main_list_prints_one_title_per_line(monkeypatch, capsys):
+    monkeypatch.setattr(screenshot, "list_windows", lambda: ["Firefox", "Head Unit"])
+    assert screenshot.main(["--list"]) == 0
+    assert capsys.readouterr().out == "Firefox\nHead Unit\n"
+
+
+def test_main_list_on_a_desktop_that_will_not_say_exits_nonzero(monkeypatch, capsys):
+    monkeypatch.setattr(screenshot, "list_windows", list)
+    monkeypatch.setattr(screenshot, "session", lambda: "wayland")
+    assert screenshot.main(["--list"]) == 1
+    assert "will not list windows" in capsys.readouterr().err
+
+
+def test_run_turns_a_missing_binary_into_a_capture_error():
+    with pytest.raises(screenshot.CaptureError, match="definitely-not-a-real-binary"):
+        screenshot.run(["definitely-not-a-real-binary-xyzzy"])
