@@ -88,3 +88,20 @@ def test_audit_is_the_gradle_half_of_java(tmp_path):
     assert kotlin.audit_unavailable(tmp_path) is None
     assert "gradle dependencyCheckAnalyze" in kotlin.audit_cmd(tmp_path)[2]
     assert "build/reports/dependency-check-report.json" in kotlin.audit_cmd(tmp_path)[2]
+
+
+def test_lint_finds_test_sources_inside_a_module(tmp_path):
+    """BACKLOG #72: an Android app's tests are in `app/src/test`, not `src/test`. Handed a path that
+    does not exist, detekt writes no report and `analyze` said `lint: not run` on a project with 29
+    tests in it (orcweather, 2026-09-27)."""
+    (tmp_path / "app" / "src" / "test" / "kotlin").mkdir(parents=True)
+    (tmp_path / "build" / "generated" / "src" / "test").mkdir(parents=True)   # output, not source
+    assert kotlin._test_dirs(tmp_path, None) == [tmp_path / "app" / "src" / "test"]
+
+
+def test_lint_keeps_the_single_module_layout_and_an_explicit_path(tmp_path):
+    (tmp_path / "src" / "test").mkdir(parents=True)
+    assert kotlin._test_dirs(tmp_path, None) == [tmp_path / "src" / "test"]
+    assert kotlin._test_dirs(tmp_path, "src/test/kotlin/pkg") == [tmp_path / "src/test/kotlin/pkg"]
+    # Nothing there at all: the old path, so the message stays "detekt wrote no report".
+    assert kotlin._test_dirs(tmp_path / "empty", None) == [tmp_path / "empty" / "src/test"]

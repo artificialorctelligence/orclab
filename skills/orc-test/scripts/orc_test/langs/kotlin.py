@@ -99,12 +99,28 @@ def mutation_parse(root, out):
     return pitest.parse(p) if p else Mutation(0, 0)
 
 
+def _test_dirs(root, target):
+    """Every directory holding test sources, for a linter's input.
+
+    `src/test` is the single-module layout. A Gradle project can have any number of modules, and an
+    Android app's tests live in `app/src/test` — pointed at the language root's `src/test` there,
+    detekt is handed a path that does not exist, writes no report, and `analyze` says `lint: not
+    run` on a project whose tests are right there (orcweather, 2026-09-27; BACKLOG #72).
+    """
+    root = pathlib.Path(root)
+    if target:
+        return [root / target]
+    found = [d for d in sorted(root.glob("**/src/test"))
+             if d.is_dir() and not any(part in SKIP_DIRS for part in d.relative_to(root).parts)]
+    return found or [root / "src/test"]
+
+
 def lint(root, target, out):
     if not probe.which("detekt"):
         return "detekt not installed — https://detekt.dev/docs/gettingstarted/cli"
-    tests = pathlib.Path(root) / (target or "src/test")
+    tests = ",".join(str(d) for d in _test_dirs(root, target))
     report = pathlib.Path(out) / "detekt.xml"
-    run(["detekt", "--input", str(tests), "--report", f"xml:{report}"], cwd=root)
+    run(["detekt", "--input", tests, "--report", f"xml:{report}"], cwd=root)
     import xml.etree.ElementTree as ET
     if not report.exists():
         return "detekt wrote no report"

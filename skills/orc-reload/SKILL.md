@@ -73,12 +73,14 @@ The `source.source` field decides what happens next, and the two cases genuinely
 
 ### `"directory"` — the source is the live working tree
 
-Nothing to refresh. The marketplace reads the project directory directly, so whatever is committed
-(or even uncommitted) there right now is what gets installed. Go straight to Step 3.
+Nothing to fetch — the marketplace reads the project directory directly. But **it installs what is
+committed there, not the working tree**: measured 2026-09-27 (BACKLOG #74), an uncommitted fix was
+absent from `~/.claude/plugins/cache/` after an uninstall/install that both reported success, and
+present after the same pair following a commit. So if `git status --porcelain` prints anything, say
+so and commit before Step 3, or the reinstall will look like it worked and change nothing.
 
-Worth telling the user if their working tree is dirty: a directory-sourced install picks up
-uncommitted changes, which is usually what you want while developing, but it means "installed" and
-"pushed" can quietly diverge.
+"Installed" and "pushed" can still diverge — a commit is enough to be installed and not enough to be
+in a cloud session, which is the cloud path above.
 
 ### `"github"` — there is a cached clone, and it does NOT auto-refresh
 

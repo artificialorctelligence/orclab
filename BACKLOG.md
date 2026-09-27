@@ -5469,3 +5469,73 @@ a machine from lacking it.
 Do not resolve this by adding an empty `[project]` table to silence the message. That would make
 the gate print a number while Orclab's one real dependency still went undeclared, which is worse
 than the honest "nothing declared" it prints today.
+
+## #72: Kotlin's test lint looked for `src/test` at the language root, so a module layout got no lint at all (RESOLVED 2026-09-27)
+
+Found 2026-09-27 installing detekt to close orcweather's last open gate. `analyze` printed
+`lint: not run — detekt wrote no report`, and the command it had run was
+`detekt --input <project>/android/src/test`. That directory does not exist: an Android app's tests
+are in `app/src/test`, and orcweather has 29 of them there. Handed a path that is not there, detekt
+writes nothing, and the report says the tool did not run — indistinguishable from not installed.
+
+`kotlin._test_dirs` now finds every `**/src/test` under the language's directory, skipping
+`SKIP_DIRS` so a generated `build/…/src/test` is not linted, and passes them to detekt as one
+comma-separated `--input`. An explicit path still wins, and a project with nothing there still gets
+the old path so the message stays what it was.
+
+**Java's `lint` has the same flaw** — `pathlib.Path(root) / _test_dir(target)`, and a Maven or Gradle
+multi-module project puts its tests in `<module>/src/test` exactly like this one. Not fixed here
+because PMD is not installed on this machine and `--dir` taking more than one path is documentation
+rather than something seen to work; fixing it blind would be a second unverified path in place of a
+verified-wrong one.
+
+## #73: two of `analyze`'s three gates are absent by default on Kotlin, and one of them has no working tool at all
+
+Raised 2026-09-27 by direflail, after orcweather's Kotlin coverage reached 82% and the same report
+read `TCE not measurable` and `lint: not run`. Coverage is the only one of the three gates that a
+project gets without being told to. That is worth fixing in different ways for the two of them.
+
+**Mutation testing (TCE) has no working tool for an Android project.** `languages/kotlin.md` names
+`info.solidsoft.pitest`, and that plugin's own FAQ says it does not support Android: *"Short answer
+is: not directly"*, pointing at Karol Wrótniak's fork. That fork,
+`pl.droidsonroids.gradle.pitest`, last published **0.2.12 in November 2022**. Applied to orcweather
+(Gradle 9.3.1, AGP 9) on 2026-09-27 it fails at configuration time:
+
+```
+> Failed to apply plugin 'pl.droidsonroids.pitest'.
+   > Cannot mutate configuration container for buildscript of project ':app' using create(String).
+```
+
+So for every Android or Flutter project Orclab measures, TCE is not a missing install — there is
+nothing to install. Two things follow. The message should say that rather than naming a plugin that
+cannot work there ("no mutation tool supports Android Gradle projects; the fork is four years
+stale"), which is a change to `kotlin.mutation_unavailable` keyed on the Android plugin being
+applied. And the route worth investigating is Pitest without Gradle at all: pitest core is alive
+(1.30.0, August 2026), and `org.pitest.mutationtest.commandline.MutationCoverageReport` takes
+`--classPath`, `--targetClasses` and `--targetTests` — an Android unit-test variant has compiled
+classes and a test runtime classpath on disk, so the plugin may simply be unnecessary. Unproven.
+
+**Test lint is installable but nothing asks a project to adopt it.** detekt is a CLI, not a project
+dependency, so there is nothing for a project to declare — but `/orc-code`'s quality mode step 1
+writes each stack's `## Lint — where code-discipline lands` config, and neither
+`stack-android-native` nor `stack-flutter` carries a `detekt.yml` or says detekt is what lands
+there for Kotlin. A project therefore lints with whatever detekt's defaults are, which is how
+orcweather's first lint came back with `LongParameterList` on a test fake. Both stack skills should
+carry the config, and it should be written on adoption the way the linter config already is.
+
+Worth knowing for whoever installs it: detekt's latest **stable** is 1.23.8 (February 2025, built
+against Kotlin 2.0.21); 2.0.0 has been in alpha for a year (alpha.6, August 2026). 1.23.8 parsed
+orcweather's Kotlin 2.4.0 sources without complaint, so the front-end version gap did not bite here.
+
+## #74: `/orc-reload` says a directory-sourced install picks up an uncommitted working tree; it does not
+
+Found 2026-09-27: a fix to `kotlin.py` was saved but not committed, `claude plugin uninstall` and
+`install` both reported success, and the installed copy under `~/.claude/plugins/cache/` did not
+contain the new function — the command that ran afterwards was still the old one. Committing first
+and reinstalling put it there. Two earlier reinstalls in the same session appeared to work because
+both followed a commit.
+
+`skills/orc-reload/SKILL.md` says the opposite under `"directory"` — *"whatever is committed (or even
+uncommitted) there right now is what gets installed"* — and warns that "installed" and "pushed" can
+diverge. The real divergence is narrower and the other way round: installed tracks **committed**,
+not the working tree. Corrected in the skill, with the reinstall step now saying to commit first.
