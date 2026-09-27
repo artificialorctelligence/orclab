@@ -66,9 +66,48 @@ def test_migration_mode_adds_stack_tests_worktree_and_gate():
 def test_discovery_tells_available_from_installed():
     d = TEXT[TEXT.index("## Plugin-Discovery Procedure"):TEXT.index("## Defaults Table")]
     for phrase in ["installed_plugins.json", "available, not installed",
-                   "claude plugin install code-modernization@claude-plugins-official",
+                   "claude plugin install ", "@claude-plugins-official",
                    "fresh session"]:
         assert phrase in d, phrase
+
+
+def test_a_cache_directory_is_not_proof_of_installation():
+    """Measured 2026-09-27: uninstall leaves the cached copy, plugin.json and all.
+
+    Reading a stale cache directory as "installed" is worse than reading it as absent -
+    the flow proceeds and dies at the first agent spawn.
+    """
+    d = " ".join(
+        TEXT[TEXT.index("## Plugin-Discovery Procedure"):TEXT.index("## Defaults Table")].split()
+    )
+    assert "not proof either; read that file too" in d
+    assert "leaves the cached copy on disk" in d
+    assert "only authority" in d
+
+
+def test_discovery_offers_to_run_the_install_rather_than_handing_over_a_command():
+    """direflail, 2026-09-27: a missing plugin should not end the flow with homework.
+
+    The three call sites all defer to step 5, so this is pinned once, here.
+    """
+    # Collapsed, so a rewrap of the paragraph cannot fail a rule that is still there.
+    d = " ".join(
+        TEXT[TEXT.index("## Plugin-Discovery Procedure"):TEXT.index("## Defaults Table")].split()
+    )
+    for phrase in ["offer to install it, and run it if they agree",
+                   "Say what the plugin is and who publishes it",
+                   "If they decline, stop",
+                   "carry on with the flow"]:
+        assert phrase in d, phrase
+    assert "$CLAUDE_CODE_REMOTE" in d, "the cloud branch must survive: install does nothing there"
+
+
+def test_every_call_site_routes_to_the_step_5_offer():
+    """No flow may print an install command of its own instead of making the offer."""
+    for flow_start, flow_end in [("## Add-to-Existing Flow", "## Refactor Flow"),
+                                 ("## Refactor Flow", "## Plugin-Discovery Procedure")]:
+        flow = TEXT[TEXT.index(flow_start):TEXT.index(flow_end)]
+        assert "step 5" in flow, flow_start
 
 
 def test_code_discipline_names_the_quality_mode():

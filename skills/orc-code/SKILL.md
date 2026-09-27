@@ -107,11 +107,12 @@ Once all six are answered:
 This flow wraps the `feature-dev` plugin's own real workflow rather than reimplementing it.
 
 1. Run the **Plugin-Discovery Procedure** below, searching for a plugin named `feature-dev`.
-2. **If not found**: tell the user plainly: "This needs the `feature-dev` plugin, which isn't
-   currently installed." Offer to help — use the `SearchPlugins` tool with keywords like
-   `["feature development", "guided implementation"]` if available, or point at the marketplace
-   install flow (`/plugin marketplace add ...` / `/plugin install ...`) if you know where it's
-   published. Stop here; do not attempt this flow without it.
+2. **If not found, or found but not installed**: say plainly that this flow needs the
+   `feature-dev` plugin, which Anthropic publishes in `claude-plugins-official`, and then follow
+   the procedure's **step 5** — offer to install it, and run the install if they agree. Only if
+   they decline does this stop; do not attempt the flow without it. (Where the plugin might come
+   from some other catalog, the `SearchPlugins` tool with keywords like `["feature development",
+   "guided implementation"]` finds it.)
 3. **If found**: Read the `commands/feature-dev.md` file inside the located plugin's directory in
    full, and follow its instructions directly, exactly as if the user had invoked
    `/feature-dev $ARGUMENTS` themselves. Tell the user plainly that you're using feature-dev's own
@@ -194,9 +195,9 @@ step's output is the next step's input.
       for OWASP, CWE, dependency and secrets findings and produces a reviewable patch; review
       each hunk against `security-discipline`'s rules and apply what holds, under the same
       "suite green after every file" rule. Not found: say plainly
-      "`code-modernization` isn't currently installed", offer the install line the procedure
-      gives, and — if the user declines — read `security-discipline` against the code by
-      hand, one rule at a time, the way step 3.2 reads `code-discipline`.
+      "`code-modernization` isn't currently installed", make the procedure's step 5 offer —
+      install it for them if they agree — and if they decline, read `security-discipline`
+      against the code by hand, one rule at a time, the way step 3.2 reads `code-discipline`.
    4. **`/orc-test generate`** for what the baseline `analyze` listed — surviving mutants,
       uncovered code, test-lint findings — under `generate`'s own rules: deletions are proposed
       as a list, never done unasked.
@@ -228,8 +229,8 @@ of it, and adds the three things it does not know about: which stack Orclab woul
 subtree.
 
 1. **Find the plugin** with the Plugin-Discovery Procedure below. If it is *not installed* —
-   including the case where a marketplace clone holds a copy — stop with the install command
-   the procedure gives. Do not follow a marketplace copy's commands: they spawn the plugin's own
+   including the case where a marketplace clone holds a copy — make the procedure's step 5
+   offer and install it for them if they agree; stop only if they decline. Do not follow a marketplace copy's commands: they spawn the plugin's own
    subagents (`test-engineer`, `architecture-critic`, …), which exist only once it is installed,
    and the run would degrade silently at the first spawn. Installed, the agents are reachable as
    `code-modernization:<agent>` through the Agent tool and that is how "spawn the test-engineer
@@ -339,28 +340,57 @@ Given a plugin name to find (e.g. `feature-dev`, `code-modernization`):
    directory (the directory holding that `.claude-plugin/` folder) is the plugin's root. Use that
    root to locate the plugin's `commands/*.md` files.
 4. **Found is not installed — and which root decided it.** The test differs by where the match
-   was found, and applying the wrong root's test is how a plugin that is loaded and working gets
-   reported as absent:
+   was found, and applying the wrong root's test goes wrong in both directions: a plugin that is
+   loaded and working gets reported as absent, or one that was uninstalled gets reported as
+   present. For the two plugin roots the answer is the same file —
+   `~/.claude/plugins/installed_plugins.json`, which is the only authority — and only a
+   skills-directory match is exempt from it:
    - **Under `~/.claude/plugins/marketplaces/`** — a marketplace *copy*; the plugin is installed
      only if its name appears in `~/.claude/plugins/installed_plugins.json` (a
      `<plugin>@<marketplace>` key). Read that file. A copy with no entry is
      *available, not installed* — its command files can be read, but the agents they spawn are
      not registered, so treat it as not installed.
-   - **Under `~/.claude/plugins/cache/`** — installed.
+   - **Under `~/.claude/plugins/cache/`** — **not proof either; read that file too.**
+     `claude plugin uninstall` removes the entry and leaves the cached copy on disk, complete
+     with its `.claude-plugin/plugin.json`. Measured 2026-09-27: a `feature-dev` uninstalled
+     seconds earlier still had
+     `cache/claude-plugins-official/feature-dev/<id>/.claude-plugin/plugin.json` while
+     `installed_plugins.json` held no entry for it. A directory here says the plugin was
+     installed *once*. Taking it as proof is how an uninstalled plugin gets called installed and
+     the run degrades at the first agent spawn — the exact failure this step exists to prevent.
    - **Under `~/.claude/skills/`** — **loaded**, and the question of installation does not
      arise. Nothing installed it, so its name will never appear in `installed_plugins.json`, and
      that absence carries no information. Never read the missing entry as "not installed" for a
      match found here. `claude plugin list` reports such a plugin as `<name>@skills-dir`.
-5. If no match is found, or the match is available but not installed, stop and tell the user
-   plainly — and say the right thing for where this session is actually running, which is not a
-   guess. Check it: `[ -n "$CLAUDE_CODE_REMOTE" ] && echo cloud`.
+5. If no match is found, or the match is available but not installed, say so plainly — and then
+   act on where this session is actually running, which is not a guess. Check it:
+   `[ -n "$CLAUDE_CODE_REMOTE" ] && echo cloud`.
 
-   **On the user's own machine** (nothing echoed) — give the command:
-   `claude plugin install code-modernization@claude-plugins-official` (or the plugin's own name
-   and marketplace). On 2026-09-13 (Desktop) the installing session picked the plugin up itself —
-   its agents and skills were announced with no restart — so check for them first; if they are
-   not visible, a fresh session is the fallback (`CLAUDE.md`, marketplace gotcha 4, which
-   recorded the older behaviour on 2026-09-06).
+   **On the user's own machine** (nothing echoed) — **offer to install it, and run it if they
+   agree.** Handing someone a command to paste is work Claude can do itself, and they asked for
+   the flow, not for a shopping list. Reaching for the install was Claude's idea and not theirs,
+   so it gets named and agreed first, the way `/orc-git` treats push and release:
+
+   ```bash
+   claude plugin install feature-dev@claude-plugins-official
+   ```
+
+   substituting the plugin's own name and marketplace. Four things go with that offer:
+
+   - **Say what the plugin is and who publishes it, before asking.** Installing someone else's
+     code on the user's machine is not a detail to slip past inside a sentence about something
+     else.
+   - **If they decline, stop.** The flow does not run without it; each flow above says what it
+     does instead. Never fall back to reading a marketplace copy's command files — step 4 says
+     why that degrades silently rather than failing.
+   - **After a yes, run it — then check whether this session can actually see the plugin.** Its
+     skills or agents becoming available is the test, not the install command's exit code. On
+     2026-09-13 (Desktop) the installing session picked it up with no restart; on 2026-09-27 a
+     Desktop session installed `feature-dev` this way and its three agents and its skill were
+     announced to that same session immediately. If they do not appear, say so and name a fresh
+     session as the fallback (`CLAUDE.md`, marketplace gotcha 4, which recorded the older
+     behaviour on 2026-09-06). Do not re-run the install.
+   - **Then carry on with the flow**, rather than making the user start it again.
 
    **In a cloud session** (`cloud` echoed) — do **not** give that command. It reports success and
    changes nothing there: it writes under `~/.claude/plugins/`, which a cloud session never reads
