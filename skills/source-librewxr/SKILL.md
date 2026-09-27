@@ -83,12 +83,19 @@ HARMONIE, ICON-EU, AROME, JMA MSM, ECMWF IFS (9 km) globally. Alerts: WMO CAP
 - **Attribution, mandatory**: *"Weather data via LibreWXR (librewxr.net)"* **plus** the
   underlying agencies' credits — *"You are responsible for carrying those attributions through
   to your users."* RRQPE asks for *"Precipitation data from NOAA Enterprise Rain Rate (RRQPE)"*.
-- **Acceptable use**: personal projects, apps and prototypes are explicitly allowed;
-  *"Normal interactive use, including animation playback, is always fine"*; caching and a CDN
-  in front are *"encouraged"*. Forbidden: bulk download / archive mirroring, circumventing
-  rate limits, re-exposing the hosted endpoint as your own API. Commercial use of the *data* is
-  allowed; commercial-scale *traffic* on the public instance is not — email the operator or
-  self-host.
+- **Acceptable use**, quoted rather than paraphrased, because the qualifier matters: *"Build
+  personal projects, apps, sites, and prototypes against it. Cache responses and put a CDN in
+  front of your usage."* *"Normal interactive use, including animation playback, is always
+  fine"*. Forbidden: *"Scrape or bulk-download the full archive or systematically mirror the
+  service. Resell, sublicense, or re-expose the hosted endpoint as your own **commercial**
+  weather API or proxy."* Commercial use of the *data* is allowed; commercial-scale *traffic* on
+  the public instance is not — email the operator or self-host.
+
+  **A caching proxy in front of the public instance, serving your own app, is the allowed case,
+  not the forbidden one** — it is named in both halves of the permission. An earlier paraphrase
+  here dropped "commercial" from the prohibition, and on 2026-09-26 that cost an orcweather
+  session a wrongly-filed compliance finding against a proxy that was doing exactly what the
+  terms encourage. Quote this clause; do not summarise it.
 - **Privacy**: no analytics, no cookies, no fingerprinting; IPs handled transiently in memory
   for rate limiting; served through Cloudflare. → Play Data safety / App Privacy: the app's
   location is sent to LibreWXR only if you use the `lat`/`lon` query forms; tile requests
