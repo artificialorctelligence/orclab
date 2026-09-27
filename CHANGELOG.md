@@ -2,6 +2,56 @@
 
 All notable changes to this project are documented here, newest first.
 
+## [0.27.0] - 2026-09-26
+
+### Added
+- `device-observation`, a background skill for any project developed against a real device the
+  developer has to look at — screenshot the device and the head-unit window, drive the UI with
+  synthetic input, read `dumpsys` and the crash buffer, start long-running processes in their
+  terminal, and give the app its own log for when the platform's holds seventy seconds.
+- `skills/device-observation/scripts/screenshot.py`, a standard-library screenshot tool that
+  picks whichever capture mechanism the machine has, prints the real dimensions of what it wrote,
+  and fails with the name of what to install. Confirmed on Linux/X11; its macOS, Windows and
+  Wayland branches are written from documentation and have not been run.
+- `car-android-auto` gains the whole verified Desktop Head Unit loop: starting the head unit
+  server from the phone, the port forward, launching the DHU, and capturing the car screen from
+  the phone over `adb` rather than from the desktop — which needs no screenshot tool at all.
+- A per-language `coverage:` key beside `test:` in `.orclab/test.yaml`, for a project whose
+  coverage command has to differ from the one guessed from its test command (#68).
+
+### Changed
+- `/orc-code` offers to install a wrapped plugin it needs and runs the install if you agree,
+  instead of ending the flow with a command to paste. It names the plugin and its publisher
+  first, stops if you decline, and checks the session can actually see the plugin afterwards.
+- A cloud session is carried by the SessionStart hook alone. The 36 committed symlinks under
+  `.claude/skills/` are gone: they also loaded in local sessions, on top of the installed plugin,
+  for roughly 4,300 tokens of always-on context and no benefit.
+- `device-observation`'s logging advice is a plain synchronous append, not a flush per line —
+  flushing is what silenced orcweather's drive log after its first marker.
+- `car-android-auto` says to read the head unit's `uiMode` in Kotlin: a car-session engine has no
+  window, so Flutter's `platformBrightness` reports light however the phone is set, and nothing
+  throws.
+- `source-librewxr` quotes the acceptable-use clause instead of paraphrasing it. The paraphrase
+  dropped "commercial" and a session filed a compliance finding against a proxy the terms allow.
+- `test-discipline` says how to actually test a race — a gate the test owns, not a sleep.
+- `backlog-discipline` states the heading format the tooling requires.
+
+### Fixed
+- `/orc-code` no longer reports an uninstalled plugin as installed. `claude plugin uninstall`
+  leaves the cached copy on disk, so a cache directory proved nothing; the flow would start and
+  then die at the first agent spawn, which is the silent failure that check exists to prevent.
+- `/orc-todo`'s read commands refuse a backlog whose heading format they cannot parse, instead of
+  answering "no open entries" on a file full of them.
+- The entry allocator refuses an unreadable backlog instead of issuing #1 on a project whose #1
+  was resolved days earlier.
+- `/orc-test analyze` finds Gradle's test results when Flutter has relocated the module's build
+  directory, instead of reporting a green suite as "tests failed; nothing measured" (#71).
+- `screenshot.py` picks its capture tool by desktop environment rather than by what happens to be
+  installed. Spectacle on GNOME does not fail — it waits for a human to click, which is a hang.
+
+### Removed
+- `.claude/skills/` and its 36 symlinks (see Changed, above).
+
 ## [0.26.1] - 2026-09-24
 
 ### Fixed
