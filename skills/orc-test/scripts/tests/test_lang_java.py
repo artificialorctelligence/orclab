@@ -1,5 +1,7 @@
 import pathlib
+import os
 import subprocess
+import time
 from types import SimpleNamespace
 
 from orc_test import probe
@@ -174,3 +176,31 @@ def test_summary_counts_junit_xml_under_the_project_only(tmp_path):
     (s / "TEST-BTest.xml").write_text(_XML.format(t=4, f=1, e=1))
     assert java.test_summary(tmp_path, cp) == (True, "5 passed 2 failed")
     assert kotlin.test_summary is java.test_summary
+
+
+def test_summary_finds_results_when_the_build_dir_was_moved_out_of_the_module(tmp_path):
+    """Flutter's generated android/build.gradle.kts relocates every module's build directory to
+    <project>/build/<module>, so orcweather's 23 passing tests wrote their XML a directory above the
+    one Kotlin was detected in, and `analyze` reported `0 tests` and refused to measure a green
+    suite (2026-09-26). The repository, not the language's own directory, is the search root."""
+    (tmp_path / ".git").mkdir()
+    android = tmp_path / "android"
+    android.mkdir()
+    moved = tmp_path / "build" / "app" / "test-results" / "testDebugUnitTest"
+    moved.mkdir(parents=True)
+    (moved / "TEST-ATest.xml").write_text(_XML.format(t=23, f=0, e=0))
+    cp = subprocess.CompletedProcess([], 0, "", "")
+    assert java.test_summary(android, cp) == (True, "23 passed")
+
+
+def test_summary_counts_a_suite_gradle_did_not_rerun(tmp_path):
+    """The reason #71 does not filter on mtime: Gradle writes no XML when the test task is
+    UP-TO-DATE, which is the common case on a re-run. A suite that passed and was not rerun still
+    passed, and must not measure as zero."""
+    (tmp_path / ".git").mkdir()
+    d = tmp_path / "build" / "app" / "test-results" / "test"
+    d.mkdir(parents=True)
+    (d / "TEST-ATest.xml").write_text(_XML.format(t=23, f=0, e=0))
+    os.utime(d / "TEST-ATest.xml", (1, 1))   # last week's run; today's said UP-TO-DATE
+    cp = subprocess.CompletedProcess([], 0, "", "")
+    assert java.test_summary(tmp_path, cp) == (True, "23 passed")

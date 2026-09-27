@@ -5367,3 +5367,31 @@ GitHub-sourced one cannot authenticate to a private repo (`CLAUDE.md`, marketpla
 Whether cross-marketplace dependency resolution works from a local-path marketplace is unknown
 and would have to be measured before trusting it — not inferred from the docs, which do not
 address that combination.
+
+## #71: a relocated Gradle build directory made `analyze` report `0 tests` on a green suite (RESOLVED 2026-09-26)
+
+Found 2026-09-26 running `/orc-test generate --lang kotlin` on orcweather: `analyze` printed
+`Kotlin: tests failed; nothing measured` and refused to go on, with `BUILD SUCCESSFUL` and 23
+passing tests in the output directly above it. `coverage` on the same project worked, because
+`coverage` does not call `_run_tests`.
+
+`java.test_summary` globbed `**/build/test-results/**/*.xml` under the language's own directory.
+Flutter's generated `android/build.gradle.kts` relocates every module's build directory to
+`<project>/build/<module>`, so the results were a directory *above* `android/` and — the part that
+would have defeated a wider search of the same pattern — at `build/app/test-results/`, with the
+module's name where `build` had been.
+
+The fix: the search root is the repository (`_search_root` walks up for `.git`), and the pattern is
+`**/test-results/**/*.xml` rather than `**/build/test-results/**/*.xml`.
+
+**Counting only XML this run wrote was tried first, and reverted the same hour** — worth recording,
+because it is the obvious idea and it is wrong. Widening the search to the repository does expose a
+foreign module's old results, and freshness looked like a better proxy for "ours" than the path was.
+But Gradle writes no XML at all when the test task is UP-TO-DATE, which is the common case on a
+re-run: `analyze` went straight back to `0 tests` on the same green suite, one layer down. An mtime
+check cannot tell "nothing ran" from "nothing needed to run".
+
+So what keeps a foreign module out stays what #68 is about: pinning the project's own test task,
+which `languages/kotlin.md` tells a Flutter project to do. Gradle removes the results of a task that
+lost its sources, so our own module's results cannot linger; the `ponytail:` note about Maven not
+cleaning `target/` stays a note, now with the reason an mtime check will not be the answer.

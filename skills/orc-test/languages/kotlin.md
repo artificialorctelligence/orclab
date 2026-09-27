@@ -35,8 +35,11 @@ languages:
     coverage: ./gradlew :app:testDebugUnitTest :app:koverXmlReport
 ```
 
-Flutter also relocates every module's build directory under the project root, so Kover's report
-lands in `<project>/build/app/reports/kover/` where `jacoco.find` does not look. Name the file in
+Flutter also relocates every module's build directory under the project root — note the shape,
+because the module's name goes where `build` was: `<project>/build/app/`, not `android/app/build/`.
+Two things live there. The JUnit XML `test_summary` reads is handled (it searches the repository and
+keeps what this run wrote), but Kover's report lands in `<project>/build/app/reports/kover/` where
+`jacoco.find` does not look. Name the file in
 the build script rather than hoping the two agree:
 `kover { reports { total { xml { xmlFile = file("${rootProject.projectDir}/build/reports/kover/report.xml") } } } }`.
 

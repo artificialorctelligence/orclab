@@ -121,19 +121,41 @@ def test_cmd(root, target):
     return _gradle_cmd(root) + ["test"]
 
 
+def _search_root(root):
+    """Where this project's test results can be: the repository, not the language's own directory.
+
+    Gradle's build directory is not always under the module that owns it. Flutter's generated
+    `android/build.gradle.kts` relocates every module's build dir to `<project>/build/<module>`, so
+    a search under `android/` finds no results at all and a green suite is reported as `0 tests`
+    (orcweather, 2026-09-26: `analyze` refused to measure 23 passing tests). The repository is the
+    outer bound; pinning the project's own test task is what keeps somebody else's results out.
+    """
+    root = pathlib.Path(root).resolve()
+    return next((p for p in [root, *root.parents] if (p / ".git").exists()), root)
+
+
 def test_summary(root, cp):
     """(ran, counts) from the JUnit XML Gradle (build/test-results) and Surefire (target/surefire-
-    reports) write inside each module of the project. Gradle exits 0 on a NO-SOURCE test task, so
-    the exit code cannot say whether anything ran (BACKLOG #67); and a Flutter android/ `gradlew
-    test` also runs every pub-cache plugin's tests, whose XML lands outside the project, so the
-    files under `root` are the project's own and nothing else. Gradle removes the results of a test
-    task that lost its sources (confirmed live, Gradle 9.3.1), so a stale pass cannot linger.
+    reports) write for each module, anywhere under the repository (see `_search_root`).
+
+    Gradle exits 0 on a NO-SOURCE test task, so the exit code cannot say whether anything ran
+    (BACKLOG #67). Gradle removes the results of a test task that lost its sources (confirmed live,
+    Gradle 9.3.1), so our own module's results cannot go stale.
+
+    Only counting XML this run wrote was tried and reverted (#71): Gradle writes nothing at all when
+    the task is UP-TO-DATE, which is the common case on a re-run, so a green suite measured as zero
+    — the same symptom, one layer down. What the repository-wide search does expose is a *foreign*
+    module's old results: a Flutter `android/` holds the relocated build directories of every
+    pub-cache plugin, and those linger if `gradlew test` ever ran them. Pinning the project's own
+    module keeps them out, which `languages/kotlin.md` says to do and #68 will make the default.
     # ponytail: Maven does not clean target/ on `mvn test`; a suite deleted without `mvn clean` still
-    # counts its old reports. Add an mtime check keyed on the run's start if that ever bites.
+    # counts its old reports. An mtime check cannot fix that without breaking Gradle's UP-TO-DATE.
     """
-    root = pathlib.Path(root)
     tests = failed = 0
-    for p in list(root.glob("**/build/test-results/**/*.xml")) + list(root.glob("**/target/surefire-reports/*.xml")):
+    base = _search_root(root)
+    # Not `**/build/test-results/`: when the build directory moves, the module's name goes where
+    # `build` was — Flutter's layout is `<project>/build/app/test-results/`, not `app/build/`.
+    for p in list(base.glob("**/test-results/**/*.xml")) + list(base.glob("**/surefire-reports/*.xml")):
         suite = ET.parse(p).getroot()
         tests += int(suite.get("tests", 0))
         failed += int(suite.get("failures", 0)) + int(suite.get("errors", 0))
