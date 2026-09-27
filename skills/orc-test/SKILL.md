@@ -200,8 +200,15 @@ Procedure step 5 follows for a missing plugin.
 - **Inside a container, do not offer.** The script says to add the tool to the image instead: a
   pip install inside the run container dies with the container.
 
-`PyYAML` is not one of these. Orclab's own code imports it, so a machine without it fails before
-any of this runs; both entry points catch that and print what to install (BACKLOG #84).
+`PyYAML` is the same case reached by a different road, and it is **also an offer**. Orclab's own
+code imports it, so a machine without it does not get a skipped gate — the command dies outright.
+Both entry points catch that specifically and print what to install (BACKLOG #84); treat that
+message exactly like the `missing <tool>` line above, and offer to run it.
+
+The guard is there because the alternative signal is a traceback, and reading the package name
+out of a traceback is a guess: the failing module is `yaml` and the package to install is
+`PyYAML`. Nothing here can be installed for the user without asking — no plugin manifest has a
+field for a Python dependency — and that is a reason to ask, not a reason to stay silent.
 
 ## `run` — does the code work?
 

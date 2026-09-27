@@ -45,3 +45,15 @@ def test_a_missing_tool_is_an_offer_not_homework():
                    "Inside a container, do not offer"]:
         assert phrase in text, phrase
     assert "EXTERNALLY-MANAGED" in text, "say why the plain pip command is not offered"
+
+
+def test_the_pyyaml_guard_is_an_offer_too():
+    """Corrected 2026-09-27: the skill said PyYAML "is not one of these", which was wrong.
+
+    The script never asks in either case - Claude does. A dead import and a skipped gate differ
+    only in how legible the signal is, not in whether an offer is possible.
+    """
+    text = " ".join((ROOT / "skills" / "orc-test" / "SKILL.md").read_text().split())
+    assert "also an offer" in text
+    assert "offer to run it" in text
+    assert "PyYAML is not one of these" not in text
