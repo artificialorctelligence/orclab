@@ -5395,3 +5395,77 @@ So what keeps a foreign module out stays what #68 is about: pinning the project'
 which `languages/kotlin.md` tells a Flutter project to do. Gradle removes the results of a task that
 lost its sources, so our own module's results cannot linger; the `ponytail:` note about Maven not
 cleaning `target/` stays a note, now with the reason an mtime check will not be the answer.
+
+## #83: /orc-git release's own text understates analyze, and its pipe eats the verdict
+
+Releasing 0.27.0 on 2026-09-27 surfaced two problems in `/orc-git release` step 4, both about the
+`analyze` gate rather than about what it measures. The release itself was fine: coverage 94.8%,
+TCE 81.1% (7,396 of 9,122 mutants killed), both well over their thresholds.
+
+**The duration is described wrongly.** Step 4 says analyze "takes minutes on a small project and
+longer on a large one; say so before running it." The run took roughly 32 minutes on Orclab
+itself, exceeded a 10-minute command timeout, and completed in the background. Orclab is not a
+large project by any outside measure — seven suites, ~940 tests — so a reader budgeting "minutes"
+from this sentence is off by an order of magnitude on the very repo the command ships from. The
+text should say tens of minutes are normal once a project has real mutation coverage, and that
+the run belongs in the background from the start rather than being moved there by a timeout.
+
+**The command's own example pipe discards the result.** The session ran analyze through
+`tail -30`, following the shape used elsewhere for readable output. Analyze prints its survivor
+list last, so the last 30 lines were all mutants and lint notes; the coverage and TCE lines the
+gate is actually judged on had scrolled past. Exit 0 still said the gate passed, but the numbers
+had to be recovered afterwards from `.orclab/test/analyze.json`. A gate whose verdict can be
+truncated away while its exit code still reads green invites exactly the "the tool said 0" report
+that `CLAUDE.md`'s evidence rule exists to prevent.
+
+Two candidate fixes, not chosen here: have step 4 tell the caller to read the verdict from
+`analyze.json` rather than from stdout, or have analyze print its summary last, after the
+survivor list, so a tail keeps the part that matters. The second helps every caller and not only
+this command.
+
+Neither is urgent — nothing shipped wrong — but the next person to run a release hits both.
+
+## #84: Orclab's audit gate passes because Orclab under-declares, not because it is clean
+
+`/orc-git push` and `/orc-git release` both end with `Python audit not available — nothing
+declared: pyproject.toml has no [project] table`, every time. Investigated 2026-09-27 after
+direflail asked whether that is a problem auditing Orclab or a problem with Orclab's auditing.
+
+**The audit machinery is fine.** Run against a project that declares dependencies it works
+end to end: `--cwd ~/projects/orcshot audit` invoked `python3 -m pip_audit -f json
+--progress-spinner off .`, parsed the result and reported `Python audit ✓ 0 vulnerable`, exit 0.
+`pip_audit` is installed on this machine, so the tool path is live, and
+`langs/python.py:audit_nothing` is deliberate and correct — pip-audit refuses a pyproject with
+no `[project]` table, so reporting that instead of "install pip-audit" avoids sending a user
+after a tool that would then refuse the project (BACKLOG #54).
+
+**Orclab is the problem, and it is not only cosmetic.** Four shipped modules import PyYAML at
+module top level with no guard and no fallback — `orc_test/config.py:6`,
+`orc_test/container.py:11`, `orc_publish/tree.py:8`, `orc_publish/cli.py:24`. PyYAML is declared
+nowhere machine-readable: no `[project]` table, no requirements file. So "nothing declared" is a
+true statement about the manifest and a false one about the code, and the gate has never had
+anything to check on the repo that ships it.
+
+Consequences, in order of seriousness:
+
+1. **A user without PyYAML gets a traceback.** `/orc-test` reading a `.orclab/test.yaml`, or any
+   `/orc-publish` run, dies with `ModuleNotFoundError: No module named 'yaml'`. Confirmed by
+   importing `orc_test.config` with `yaml` masked. The v7 plan
+   (`docs/superpowers/plans/2026-09-06-orclab-v7-orc-publish.md:1034`) required the opposite —
+   *"If `import yaml` fails, tell the user plainly that `PyYAML` isn't installed"* — and no
+   entry point has such a guard; a repo-wide search for `ImportError`/`ModuleNotFoundError` in
+   shipped code returns only comments.
+2. **`security-discipline` rule 2 is unmet by Orclab itself.** A dependency that is not declared
+   cannot be audited, so the gate reports green-adjacent and means nothing.
+3. **The one plan that mentions it calls PyYAML "already a dependency"**
+   (`2026-09-08-orclab-v12-artifact-preflight.md:9`) — the belief that it was declared has been
+   in the record since v12 and was never true.
+
+Two things to decide, not decided here: whether to add a `[project]` table naming PyYAML (which
+turns the gate on for real and is the only route to auditing it), and whether to keep the bare
+import or add the guard the v7 plan asked for. They are independent — declaring it does not stop
+a machine from lacking it.
+
+Do not resolve this by adding an empty `[project]` table to silence the message. That would make
+the gate print a number while Orclab's one real dependency still went undeclared, which is worse
+than the honest "nothing declared" it prints today.
