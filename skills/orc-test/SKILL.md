@@ -171,8 +171,37 @@ https://packages.ubuntu.com/noble-updates/amd64/docker-compose-v2/filelist ·
 
 ## What it never does
 
-Install a tool — the container engine included — (it names the missing one and its install line,
-and skips that language). Run git. Guess a language it cannot see a marker for.
+Install a tool — the container engine included. The script names the missing one and its install
+command, and skips that language. Run git. Guess a language it cannot see a marker for.
+
+That is the *script's* rule, and it is the right one: a command asked to measure tests should not
+quietly write to someone's Python environment. It is not a reason to hand the user homework.
+
+### When a tool is missing, offer to install it
+
+A run that prints `missing <tool> — <command> — skipped` has found work Claude can do. Offer to
+run that command, and run it if the user agrees — the same rule `/orc-code`'s Plugin-Discovery
+Procedure step 5 follows for a missing plugin.
+
+- **Ask once, for everything missing, saying what each tool is for.** pytest runs the suite,
+  pytest-cov measures coverage, mutmut plants the defects `analyze` counts, pip-audit checks the
+  dependencies against the advisory lists. One question, not one per gate as the run trips over
+  them in turn.
+- **Show the command the script printed, unedited.** It is already right for this machine:
+  `probe.pip_install` reads PEP 668's `EXTERNALLY-MANAGED` marker, so on Debian and Ubuntu it
+  gives `pip install --user --break-system-packages <pkg>`, which works, rather than
+  `pip install <pkg>`, which those systems refuse outright (BACKLOG #84).
+- **Say what `--break-system-packages` does** whenever it appears. It permits writing to the
+  user's own `~/.local` and touches no system package; the name says the opposite.
+- **If they decline, stop asking.** Report the gate as skipped, carry on with the languages that
+  can run, and do not re-offer for the rest of the session.
+- **After a yes, run it and then re-run the gate** — a result measured before the tool existed is
+  not the result they asked for.
+- **Inside a container, do not offer.** The script says to add the tool to the image instead: a
+  pip install inside the run container dies with the container.
+
+`PyYAML` is not one of these. Orclab's own code imports it, so a machine without it fails before
+any of this runs; both entry points catch that and print what to install (BACKLOG #84).
 
 ## `run` — does the code work?
 

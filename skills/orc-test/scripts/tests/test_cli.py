@@ -142,7 +142,12 @@ def test_tool_missing_inside_the_container_is_skipped_never_the_host(tmp_path, c
     (repo / "compose.yaml").write_text("services:\n  orclab:\n    build: .\n")
     _fake_docker(repo, monkeypatch, '#!/bin/sh\ncase "$*" in\n  "compose build"*) exit 0 ;;\n  *) exit 1 ;;\nesac\n')
     code, out = run(["run"], repo, capsys)
-    assert code == 0 and "Python: missing pytest — pip install pytest — skipped" in out
+    # Inside a container the fix is the image, not a pip command: a pip install in the run
+    # container dies with it, so the hint says so rather than naming a command (BACKLOG #84).
+    assert code == 0
+    assert "Python: missing pytest" in out and "skipped" in out
+    assert "container image" in out
+    assert "pip install pytest — skipped" not in out
     assert "$ python3 -m pytest" not in out
 
 

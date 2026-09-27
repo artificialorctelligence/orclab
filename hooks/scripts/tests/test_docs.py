@@ -133,3 +133,37 @@ def test_orc_git_release_tells_the_two_missing_tag_cases_apart():
     rel = s[s.index("## release [tag]"):]
     assert "git fetch --tags" in rel
     assert "on the remote already" in rel and "none on the remote" in rel
+
+
+# --- the PyYAML guard, in both entry points (BACKLOG #84) --------------------------------
+
+_ENTRY_POINTS = ["skills/orc-test/scripts/run.py", "skills/orc-publish/scripts/run.py"]
+
+
+def _guard_message(path):
+    text = (ROOT / path).read_text()
+    assert '_NO_YAML = """' in text, f"{path} has no PyYAML guard message"
+    return text.split('_NO_YAML = """', 1)[1].split('"""', 1)[0]
+
+
+def test_every_entry_point_that_needs_pyyaml_guards_the_import():
+    """A missing PyYAML killed these with a raw traceback; the v7 plan asked for a message."""
+    for path in _ENTRY_POINTS:
+        text = (ROOT / path).read_text()
+        assert "except ModuleNotFoundError" in text, path
+        assert 'missing.name != "yaml"' in text, f"{path} must re-raise anything that is not yaml"
+        assert "sys.exit(_NO_YAML)" in text, path
+
+
+def test_the_two_guard_messages_are_identical():
+    """They live in separate script trees with nothing shared, so only a test keeps them equal."""
+    first, second = (_guard_message(p) for p in _ENTRY_POINTS)
+    assert first == second
+
+
+def test_the_guard_message_gives_a_command_and_the_pep668_escape():
+    message = _guard_message(_ENTRY_POINTS[0])
+    assert "pip install --user PyYAML" in message
+    assert "externally-managed-environment" in message
+    assert "--break-system-packages" in message
+    assert "python3-yaml" in message, "name the distro package too — it is the safer route"

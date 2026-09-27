@@ -9,7 +9,7 @@ import shutil
 import sys
 import time
 
-from . import config, container, detect, langs, runner
+from . import config, container, detect, langs, probe, runner
 from .model import Mutation
 from .runner import run
 
@@ -75,7 +75,7 @@ def _resolve(args):
             built.add(c.root)
         gone = m.missing(d)
         for tool in gone:
-            print(f"{m.LABEL}: missing {tool} — {m.TOOLS[tool]} — skipped")
+            print(f"{m.LABEL}: missing {tool} — {probe.pip_install_hint(m.TOOLS[tool])} — skipped")
         if gone:
             continue
         target = _target_under(m, d, root, path)
@@ -212,7 +212,7 @@ def _audit_line(mod, d):
     why = mod.audit_unavailable(d)
     if why:
         tool, install = mod.AUDIT_TOOL
-        return f"{mod.LABEL}: missing {tool} — {install} — skipped", False
+        return f"{mod.LABEL}: missing {tool} — {probe.pip_install_hint(install)} — skipped", False
     cp = run(mod.audit_cmd(d), cwd=d)
     findings = mod.audit_findings(cp.stdout, cp.returncode)
     if findings == ["audit output not understood — see above"]:

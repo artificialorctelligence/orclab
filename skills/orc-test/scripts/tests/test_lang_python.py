@@ -11,7 +11,10 @@ FIX = pathlib.Path(__file__).parent / "fixtures"
 def test_registered_first_and_mutation_needs_mutmut(tmp_path, monkeypatch):
     assert langs.ALL[0] is py and py.KEY == "python"
     monkeypatch.setattr(probe, "python_module", lambda name: False)
-    assert py.mutation_unavailable(tmp_path) == "mutmut not installed — pip install mutmut"
+    # The command itself is the machine's, not a literal: probe.pip_install renders it for this
+    # interpreter, so pinning the string here would fail on any PEP 668 system (BACKLOG #84).
+    unavailable = py.mutation_unavailable(tmp_path)
+    assert unavailable.startswith("mutmut not installed — ") and "mutmut" in unavailable
     monkeypatch.setattr(probe, "python_module", lambda name: True)
     (tmp_path / "pyproject.toml").write_text("[tool.mutmut]\nsource_paths = ['pkg/']\n")
     assert py.mutation_unavailable(tmp_path) is None

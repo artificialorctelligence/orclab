@@ -140,7 +140,7 @@ def coverage_parse(root, out):
 
 def mutation_unavailable(root, target=None):
     if not probe.python_module("mutmut"):
-        return "mutmut not installed — pip install mutmut"
+        return f"mutmut not installed — {probe.pip_install('mutmut')}"
     if not mutation_cwds(root, target):
         where = pathlib.Path(root) / (target or ".")
         return (f"no [tool.mutmut] found in any pyproject.toml at or above {where}, nor in any below"
