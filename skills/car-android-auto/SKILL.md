@@ -103,6 +103,33 @@ Options, in order of least code:
 Cache the engine (`FlutterEngineCache`) so the car service reuses the running app's engine when
 the app is foregrounded and creates one otherwise.
 
+### A car-session engine knows nothing about the platform — ask the car
+
+An engine started by the `CarAppService` has **no window**, and Flutter's platform values come from
+the view. So `PlatformDispatcher.instance.platformBrightness` returns the default — light — however
+the phone is actually set, and the same suspicion applies to anything else inferred from the
+platform: locale, text scale, window metrics, `MediaQuery`-shaped values generally. Nothing throws;
+the wrong answer is simply returned, which is the worst kind.
+
+Confirmed live 2026-09-26 on orcweather: a corner inset composed in Dart stayed light beside a dark
+car map, with the phone in night mode and the app set to Auto, because Dart had asked Flutter and
+Flutter had no window to ask.
+
+The right source is the head unit, and only Kotlin can read it:
+
+```kotlin
+val night = (carContext.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+    Configuration.UI_MODE_NIGHT_YES
+```
+
+Report it over the channel on `onSurfaceAvailable` and whenever it changes, and let Dart prefer it.
+It is also the *better* answer on its own terms: at dusk what matters is whether the car has gone
+dark, not the phone in somebody's pocket.
+
+The same reasoning applies to the map the SDK draws for you — `setMapColorScheme(followSystem)`
+follows the head unit — so a Dart-composed layer that guesses from the phone will disagree with the
+map underneath it.
+
 ## Testing without a car
 
 Android Auto's **Desktop Head Unit (DHU)** from the SDK Manager (Extras) drives a phone app
