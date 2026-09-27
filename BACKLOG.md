@@ -4500,6 +4500,19 @@ a project whose own tests are green. orcweather already sidesteps it in `.orclab
 recorded in `languages/kotlin.md` under "Flutter's `android/` is a special case", but nothing in
 Orclab does it by default. `coverage_cmd` (`test koverXmlReport`) has the same shape.
 
+**The override half is done 2026-09-26.** `coverage:` now sits beside `test:` under
+`languages.<key>` in `.orclab/test.yaml`, with `{out}` standing in for the report directory (the
+languages that pass a report path on the command line need it), falling back to the language
+module's own command and guessing nothing further — `declared_coverage_cmd` has none of
+`declared_test_cmd`'s Makefile/package.json fallbacks, because a `test:` target says nothing about
+where a coverage report would land. Found by orcweather: its Kotlin test command had to be
+overridden for exactly this reason and its coverage command could not be, so the collision had to
+be settled in `android/build.gradle.kts` (disabling every non-app `Test` task at the root) instead
+of in config. `config.load` now refuses a non-string `test:`/`coverage:` under a language, because
+`coverage: 80` is a threshold at the top level and a command one level down, and running `80` as a
+command would report a red suite rather than the mistake. What remains of this entry is the
+default: making `./gradlew test` pick the project's own module without being told.
+
 Not just Flutter: any Gradle build that includes projects from outside the repository has it.
 Which module is "the project's" is the question — the `build.gradle(.kts)` files under the
 language's directory name them (`android/app/` → `:app`), and AGP's real task is
@@ -5301,3 +5314,18 @@ and it needs a run where the sound actually fails, so it cannot be forced.
 Resolving this means either replacing the "not established" sentence with a real cause, or
 recording that the two are unrelated so nobody re-opens it. Either way the paragraph in
 `car-android-auto` is what changes.
+
+## #70: one orc-test test passes alone and fails in the full suite — order dependence, not a real failure
+
+Found 2026-09-26 while adding #68's coverage override, and present on a clean tree, so it is not
+that change: `tests/test_runner.py::test_run_stream_appends_eta_when_progress_regex_reads_done_of_total`
+passes when `tests/test_runner.py` is run by itself and fails under `pytest tests/` (the assertion
+is on `capsys.readouterr()`). 250 pass either way. Something earlier in the suite leaves state that
+reaches `run`'s streaming path — a module-level cache, a monkeypatch that outlives its test, or
+pytest's capture being held by another fixture. `pytest -p no:randomly` and `--co -q` before it
+would say which.
+
+It matters more than one test: Orclab's own gate is `/orc-test` on itself, so a suite that is red
+only in the order it actually runs in means every push from this repo either fails its own gate or
+teaches whoever is at the keyboard to wave a failure through. Fix the dependency rather than the
+assertion.

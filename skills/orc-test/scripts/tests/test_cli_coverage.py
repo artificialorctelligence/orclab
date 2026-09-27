@@ -83,3 +83,19 @@ def test_coverage_denominator_includes_a_file_nothing_imports_under_an_init_less
     (repo / "src" / "window.py").write_text("def show():\n    return 1\n")   # a GTK window: no test imports it
     _code, out = run(["coverage"], repo, capsys)
     assert "(4/8 lines)" in out and "src/window.py" in out               # BACKLOG #42: was 4/6
+
+
+def test_coverage_command_can_be_overridden(tmp_path, capsys):
+    """A project whose test command had to be overridden (Gradle in a Flutter `android/`, #68) could
+    not override the coverage command that runs the same tests. The report this one writes is a
+    fabrication, which is the point: only the override could have produced it."""
+    repo = make_repo(tmp_path)
+    _src(repo, "def clamp(x, lo, hi):\n    return x\n")
+    (repo / ".orclab").mkdir()
+    (repo / ".orclab" / "test.yaml").write_text(
+        'languages:\n  python:\n'
+        '    coverage: sh -c "printf \'SF:src/calc.py\\nDA:1,1\\nDA:2,0\\nend_of_record\\n\''
+        ' > {out}/coverage.lcov"\n')
+    code, out = run(["coverage"], repo, capsys)
+    assert "50.0% (1/2 lines)" in out
+    assert code == 1

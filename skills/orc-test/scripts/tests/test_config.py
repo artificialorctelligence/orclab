@@ -57,3 +57,13 @@ def test_runner_must_be_a_known_engine(tmp_path):
     (tmp_path / ".orclab" / "test.yaml").write_text("runner: rkt\n")
     with pytest.raises(config.BadConfig, match="runner"):
         config.load(tmp_path)
+
+
+def test_a_per_language_threshold_is_refused_rather_than_run_as_a_command(tmp_path):
+    """`coverage: 80` is a threshold at the top level and a command under a language. Someone will
+    write the number in the wrong place; running `80` and reporting a red suite would not say so."""
+    (tmp_path / ".orclab").mkdir()
+    (tmp_path / ".orclab" / "test.yaml").write_text("languages:\n  kotlin:\n    coverage: 50\n")
+    with pytest.raises(config.BadConfig) as e:
+        config.load(tmp_path)
+    assert "top-level" in str(e.value)

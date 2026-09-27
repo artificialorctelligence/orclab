@@ -24,14 +24,29 @@ line carries the real count. Gradle removes a test task's results when its sourc
 `~/.pub-cache`, so a bare `gradlew test` runs those plugins' unit tests too (orcweather:
 `shared_preferences_android` ran 12 and failed one that is not orcweather's). Their XML lands
 in the pub cache, outside the project, so `run` never counts them — but their failure still
-fails the build. Declare the app module's task in `.orclab/test.yaml` (`test: ./gradlew
-:app:testDebugUnitTest`) until BACKLOG #68 makes that the default.
+fails the build. Declare the app module's task in `.orclab/test.yaml` — both commands, because
+`koverXmlReport` depends on `test` and drags the same plugin suites in with it — until BACKLOG
+#68 makes that the default:
+
+```yaml
+languages:
+  kotlin:
+    test: ./gradlew :app:testDebugUnitTest
+    coverage: ./gradlew :app:testDebugUnitTest :app:koverXmlReport
+```
+
+Flutter also relocates every module's build directory under the project root, so Kover's report
+lands in `<project>/build/app/reports/kover/` where `jacoco.find` does not look. Name the file in
+the build script rather than hoping the two agree:
+`kover { reports { total { xml { xmlFile = file("${rootProject.projectDir}/build/reports/kover/report.xml") } } } }`.
 
 ## Coverage
-Kover 0.9.9 (`org.jetbrains.kotlinx.kover` Gradle plugin): `./gradlew test koverXmlReport` →
+Kover 0.9.9 (`org.jetbrains.kotlinx.kover` Gradle plugin; 0.9.1 and earlier cannot see AGP 9's
+built-in Kotlin and fail at configuration time): `./gradlew test koverXmlReport` →
 `build/reports/kover/report.xml`, written in JaCoCo's own XML shape, so `jacoco.parse` reads it
 unchanged (`jacoco.find` already checks this path). A project-side gate is `kover { reports {
-verify { rule { minBound(80) } } } }` in the build file.
+verify { rule { minBound(80) } } } }` in the build file. Override the whole command with
+`languages.kotlin.coverage` in `.orclab/test.yaml` when the default runs the wrong module.
 
 ## Mutation (TCE)
 Pitest 1.30.0 via the `info.solidsoft.pitest` Gradle plugin — same as Java's Gradle path, same

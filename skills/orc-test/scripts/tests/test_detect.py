@@ -44,6 +44,19 @@ def test_declared_test_cmd_precedence(tmp_path):
     assert detect.declared_test_cmd(tmp_path, "dart", {"languages": {}}) is None
 
 
+def test_declared_coverage_cmd_substitutes_the_report_dir(tmp_path):
+    cfg = {"languages": {"kotlin": {"coverage": "./gradlew :app:koverXmlReport --out {out}"}}}
+    assert detect.declared_coverage_cmd("kotlin", cfg, tmp_path / "rep") == [
+        "./gradlew", ":app:koverXmlReport", "--out", str(tmp_path / "rep")]
+
+
+def test_declared_coverage_cmd_guesses_nothing_when_unset(tmp_path):
+    # Unlike the test command: a Makefile with a `test:` target says nothing about coverage.
+    (tmp_path / "Makefile").write_text("test:\n\tpytest\n")
+    assert detect.declared_coverage_cmd("python", {"languages": {}}, tmp_path) is None
+    assert detect.declared_coverage_cmd("python", {}, tmp_path) is None
+
+
 def test_declared_test_cmd_ignores_malformed_package_json(tmp_path):
     (tmp_path / "package.json").write_text("{not valid json")
     assert detect.declared_test_cmd(tmp_path, "javascript", {"languages": {}}) is None

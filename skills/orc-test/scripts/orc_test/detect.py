@@ -56,6 +56,21 @@ def languages(root, modules):
     return found
 
 
+def declared_coverage_cmd(key, cfg, out):
+    """`languages.<key>.coverage` from .orclab/test.yaml, with `{out}` standing in for the report
+    directory this run was given.
+
+    There is nothing to guess at when it is absent, which is why this has none of the fallbacks
+    `declared_test_cmd` has: a project's `make test` says where its tests are, but nothing about
+    where a coverage report would land. The language module's own command is the only default
+    (#68) — and until this existed, a project whose test command had to be overridden had no way
+    to override the coverage command that runs the same tests."""
+    override = (cfg.get("languages") or {}).get(key, {}).get("coverage")
+    if not override:
+        return None
+    return [a.replace("{out}", str(out)) for a in shlex.split(override)]
+
+
 def declared_test_cmd(root, key, cfg):
     root = pathlib.Path(root)
     override = (cfg.get("languages") or {}).get(key, {}).get("test")

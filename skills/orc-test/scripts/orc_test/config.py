@@ -29,6 +29,15 @@ def load(root):
         except (ValueError, TypeError):
             raise BadConfig(f"{path}: {k!r} must be an integer, got {data[k]!r}")
     cfg["languages"] = dict(data.get("languages") or {})
+    # `coverage: 80` at the top level is a threshold; `coverage:` under a language is a command.
+    # Writing a number there is the obvious mistake, and it would otherwise be run as one.
+    for key, lang in cfg["languages"].items():
+        if not isinstance(lang, dict):
+            raise BadConfig(f"{path}: languages.{key} must be a mapping, got {lang!r}")
+        for k in ("test", "coverage"):
+            if k in lang and not isinstance(lang[k], str):
+                raise BadConfig(f"{path}: languages.{key}.{k} must be a command, got {lang[k]!r}"
+                                f" — thresholds are top-level, not per language")
     cfg["container"] = data.get("container", True) is not False
     runner = data.get("runner")
     if runner is not None and runner not in ("docker", "podman"):

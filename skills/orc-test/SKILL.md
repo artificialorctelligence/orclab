@@ -49,7 +49,14 @@ tce: 70             # mutation score, per language
 languages:
   python:
     test: make check
+  kotlin:
+    coverage: ./gradlew :app:testDebugUnitTest :app:koverXmlReport
 ```
+
+`test:` and `coverage:` are separate because a project can need both overridden and they are not
+the same command; `{out}` in `coverage:` is replaced with this run's report directory, which the
+languages that pass a report path on the command line need. An unset `coverage:` falls back to
+the language module's own command and guesses nothing further.
 
 ## Containers
 

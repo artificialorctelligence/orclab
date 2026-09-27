@@ -136,6 +136,9 @@ def cmd_detect(args):
     _root, cfg, usable = _resolve(args)
     for m, d, target in _each(usable):
         print(f"  {m.LABEL}: test command {' '.join(_test_cmd(d, m, target, cfg))}")
+        cov = detect.declared_coverage_cmd(m.KEY, cfg, _out(d, m, empty=False))
+        if cov:
+            print(f"  {m.LABEL}: coverage command {' '.join(cov)}")
     return 0
 
 
@@ -151,11 +154,15 @@ def cmd_run(args):
     return 1 if failed else 0
 
 
-def _coverage(mod, d, target, out):
+def _coverage_cmd(d, mod, target, out, cfg):
+    return detect.declared_coverage_cmd(mod.KEY, cfg, out) or mod.coverage_cmd(d, target, out)
+
+
+def _coverage(mod, d, target, out, cfg):
     why = getattr(mod, "coverage_unavailable", lambda r: None)(d)
     if why:
         return {"unavailable": why}
-    cp = run(mod.coverage_cmd(d, target, out), cwd=d)
+    cp = run(_coverage_cmd(d, mod, target, out, cfg), cwd=d)
     if cp.returncode != 0:
         print(cp.stdout[-3000:])
         print(f"{mod.LABEL}: tests failed; coverage not measured")
@@ -182,7 +189,7 @@ def cmd_coverage(args):
     root, cfg, usable = _resolve(args)
     failed, blocks = False, []
     for m, d, target in _each(usable):
-        cov = _coverage(m, d, target, _out(d, m))
+        cov = _coverage(m, d, target, _out(d, m), cfg)
         if cov is None:
             failed = True
             continue
@@ -295,7 +302,7 @@ def _analyze_one(m, root, d, target, cfg, no_mutation, failed_gates):
     (None, None) when coverage could not be measured because the tests were red."""
     out = _out(d, m)
     sub = d.relative_to(root)
-    cov = _coverage(m, d, target, out)
+    cov = _coverage(m, d, target, out, cfg)
     if cov is None:
         return None, None
     tce = {"skipped": True} if no_mutation else _mutation(m, root, d, target, out)
