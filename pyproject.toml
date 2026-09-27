@@ -1,3 +1,17 @@
+# Orclab is a Claude Code plugin, not a package anyone pip-installs. This table exists for one
+# reason: `pip_audit .` reads [project].dependencies and nothing else, so without it Orclab's own
+# audit gate had nothing to check and said "nothing declared" on every push (BACKLOG #84). PyYAML
+# is genuinely required — four shipped modules import it at module level.
+#
+# Adding this also makes pyproject.toml a version file: versionfiles.py counts it only when a
+# [project] table is present, so `/orc-version` now writes three files and `version-verify`
+# requires all three to agree.
+[project]
+name = "orclab"
+version = "0.27.0"
+requires-python = ">=3.11"        # tomllib, used by versionfiles.py and langs/python.py
+dependencies = ["PyYAML"]
+
 [tool.pytest.ini_options]
 testpaths = ["skills", "hooks"]
 norecursedirs = ["mutants", "venv", ".orclab"]

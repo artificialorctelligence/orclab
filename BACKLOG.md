@@ -5425,7 +5425,7 @@ this command.
 
 Neither is urgent — nothing shipped wrong — but the next person to run a release hits both.
 
-## #84: Orclab's audit gate passes because Orclab under-declares, not because it is clean
+## #84: Orclab's audit gate passes because Orclab under-declares, not because it is clean (RESOLVED 2026-09-27)
 
 `/orc-git push` and `/orc-git release` both end with `Python audit not available — nothing
 declared: pyproject.toml has no [project] table`, every time. Investigated 2026-09-27 after
@@ -5469,6 +5469,38 @@ a machine from lacking it.
 Do not resolve this by adding an empty `[project]` table to silence the message. That would make
 the gate print a number while Orclab's one real dependency still went undeclared, which is worse
 than the honest "nothing declared" it prints today.
+
+**Resolved for real, not just tracked** (2026-09-27), in three parts, and not by the empty table
+the paragraph above warns against.
+
+*The dependency is declared.* `pyproject.toml` gained a `[project]` table naming `PyYAML` and
+nothing else — the one thing Orclab's shipped code actually imports; pytest, mutmut and pip-audit
+are tools for developing Orclab, not things a consumer needs. That table is the only place that
+could have worked: `audit_cmd` runs `pip_audit .`, which reads `[project].dependencies` and
+nothing else. `requirements.txt` was ruled out by `audit_nothing`'s own comment ("`-r` would be a
+different audit_cmd"), and a plugin manifest has no field for a Python dependency at all.
+Verified before committing to it: a minimal `[project]` table with no `[build-system]` was tested
+in a scratch directory and pip-audit resolved it, so the shape was known to work rather than
+assumed.
+
+*The gate now bites.* `audit` on this repo went from `not available — nothing declared` to
+`Python audit ✓ 0 vulnerable`, having actually resolved PyYAML 6.0.3 against the advisory lists.
+Every push and release from here on checks it.
+
+*The side effect is real and was accepted deliberately.* `versionfiles.py` counts
+`pyproject.toml` as a version file only when a `[project]` table is present, so adding one made
+it a third version file: `/orc-version` now writes it and `version-verify` requires all three to
+agree. Confirmed — `version-verify` reports `pyproject.toml`, `plugin.json` and
+`marketplace.json` all at 0.27.0. This is an improvement, but it arrived as a side effect of
+declaring a dependency, which is not how anyone would expect to acquire it; it is recorded here
+so the next person does not meet it as a surprise.
+
+*Still true, and not closed by this:* Orclab remains a plugin rather than an installable package,
+so the `name` and `version` in that table describe something nobody will ever `pip install`. That
+is conventional and harmless, not a defect. The separate half of this entry — the bare `import
+yaml` with no guard — was closed the same day by 8e9476f and corrected by 620d6dc: both entry
+points now catch the missing module and print what to install, and the skill says to offer to run
+it rather than leaving the user with homework.
 
 ## #87: Kotlin's test lint looked for `src/test` at the language root, so a module layout got no lint at all (RESOLVED 2026-09-27)
 
