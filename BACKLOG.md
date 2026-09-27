@@ -5329,3 +5329,41 @@ It matters more than one test: Orclab's own gate is `/orc-test` on itself, so a 
 only in the order it actually runs in means every push from this repo either fails its own gate or
 teaches whoever is at the keyboard to wave a failure through. Fix the dependency rather than the
 assertion.
+
+## #82: Should Orclab declare feature-dev and code-modernization as plugin dependencies?
+
+`/orc-code` wraps two plugins it does not ship: `feature-dev` (Add-to-Existing) and
+`code-modernization` (Refactor/Migrate). Until 2026-09-27 a missing one ended the flow with an
+install command for the user to paste. It now offers to install and runs it on a yes (commit
+707e1d2), which fixes the immediate complaint — an Orcshot session stopped and direflail
+installed `feature-dev` by hand.
+
+**What was found while fixing it, and deliberately not used.** Claude Code supports real plugin
+dependencies, confirmed against the live docs 2026-09-27
+(`https://code.claude.com/docs/en/plugins/dependencies`): *"A plugin manifest needs only `name`,
+so this is a valid plugin, and installing it installs every dependency."* Re-checked on
+`/reload-plugins`, on auto-update, and on `claude plugin marketplace add`. Declaring both would
+mean one install brings everything, and the offer path above would rarely fire at all.
+
+**Why it was not done.** Both plugins live in `claude-plugins-official`; Orclab's marketplace is
+its own. Cross-marketplace dependencies are refused by default unless the root marketplace lists
+the other in `allowCrossMarketplaceDependenciesOn` — a deliberate protection, and one line to
+opt into. The problem is the failure mode, which differs by where the dependency is declared:
+*"When the dependency is declared in the marketplace entry, the install itself is refused with a
+message… When it's declared in `plugin.json`, the install completes without the dependency and
+your plugin then fails to load."* A `plugin.json` dependency therefore turns any resolution
+failure into a total loss of Orclab — `/orc-git`, `/orc-test`, every discipline skill — because
+one branch of one command wanted a plugin it could not reach. direflail chose the offer path over
+that blast radius on 2026-09-27.
+
+**What would change the answer.** The marketplace-entry form has the better failure mode (a
+refused install that names the problem, with Orclab left untouched) and would still deliver the
+one-install experience. It was not adopted only because the offer path was enough and is
+strictly less risky. Revisit if the offer path proves annoying in practice, or if Orclab ever
+wraps enough third-party plugins that installing them one at a time becomes the complaint.
+
+**Untested either way:** Orclab is installed from a local-path marketplace, because a
+GitHub-sourced one cannot authenticate to a private repo (`CLAUDE.md`, marketplace gotcha 2).
+Whether cross-marketplace dependency resolution works from a local-path marketplace is unknown
+and would have to be measured before trusting it — not inferred from the docs, which do not
+address that combination.
