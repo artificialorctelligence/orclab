@@ -61,6 +61,32 @@ is the worst kind of debt: it is green forever and means nothing. `/orc-test ana
 at scale later (mutation testing plants the defects for you); this rule is the one-defect version
 you run by hand while the code is in front of you.
 
+### Testing a race: gate the fake, do not time it
+
+A concurrency bug has a shape rule 5 exposes brutally — the obvious test passes with the bug
+reinstated. `check a flag → await → set the flag` only breaks when a second caller enters during
+the await, and in a test the two callers almost always run one after the other instead.
+
+Sleeps do not fix this. Neither does adding latency to the fake: that changes *when* things happen,
+not *whether* they overlap.
+
+What works is control. Give the fake a `Completer` (or equivalent) the test owns, so the first
+caller can be **held inside its await** while the second is set off:
+
+```dart
+map.gate = Completer<void>();     // the fake awaits this before finishing
+unawaited(startTheFirstCall());
+await pump();                      // first call is now parked mid-await
+await triggerTheSecondCall();      // straight into the critical section
+map.gate!.complete();
+expect(sideEffects, hasLength(1));
+```
+
+Confirmed on orcweather 2026-09-26, where two radar overlays were being stacked: two
+timing-based attempts passed with the bug deliberately reinstated, and the gated version failed
+immediately. If a race test cannot be made to fail, it is documentation, not a test — say so in the
+comment rather than letting the next person trust it.
+
 ## 6. 80% line coverage on what the change touches
 
 Before saying "done", `/orc-test coverage <path to what you changed>`. Under 80% on a file you
