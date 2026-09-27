@@ -45,7 +45,7 @@ All notable changes to this project are documented here, newest first.
 - The entry allocator refuses an unreadable backlog instead of issuing #1 on a project whose #1
   was resolved days earlier.
 - `/orc-test analyze` finds Gradle's test results when Flutter has relocated the module's build
-  directory, instead of reporting a green suite as "tests failed; nothing measured" (#71).
+  directory, instead of reporting a green suite as "tests failed; nothing measured" (#86).
 - `screenshot.py` picks its capture tool by desktop environment rather than by what happens to be
   installed. Spectacle on GNOME does not fail — it waits for a human to click, which is a hang.
 
