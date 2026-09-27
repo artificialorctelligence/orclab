@@ -91,7 +91,7 @@ def test_audit_is_the_gradle_half_of_java(tmp_path):
 
 
 def test_lint_finds_test_sources_inside_a_module(tmp_path):
-    """BACKLOG #72: an Android app's tests are in `app/src/test`, not `src/test`. Handed a path that
+    """BACKLOG #87: an Android app's tests are in `app/src/test`, not `src/test`. Handed a path that
     does not exist, detekt writes no report and `analyze` said `lint: not run` on a project with 29
     tests in it (orcweather, 2026-09-27)."""
     (tmp_path / "app" / "src" / "test" / "kotlin").mkdir(parents=True)
@@ -105,3 +105,20 @@ def test_lint_keeps_the_single_module_layout_and_an_explicit_path(tmp_path):
     assert kotlin._test_dirs(tmp_path, "src/test/kotlin/pkg") == [tmp_path / "src/test/kotlin/pkg"]
     # Nothing there at all: the old path, so the message stays "detekt wrote no report".
     assert kotlin._test_dirs(tmp_path / "empty", None) == [tmp_path / "empty" / "src/test"]
+
+
+def test_mutation_is_available_when_a_module_declares_pitest(tmp_path):
+    """BACKLOG #88: a Gradle project's root build file names no module's tooling. orcweather declares
+    its pitest task in `app/build.gradle.kts` — the only place it can — and TCE reported "does not
+    apply the pitest plugin" beside a `gradlew :app:pitest` that works."""
+    (tmp_path / "build.gradle.kts").write_text("allprojects { repositories { google() } }\n")
+    assert "pitest" in kotlin.mutation_unavailable(tmp_path)
+    (tmp_path / "app").mkdir()
+    (tmp_path / "app" / "build.gradle.kts").write_text('tasks.register<JavaExec>("pitest") {}\n')
+    assert kotlin.mutation_unavailable(tmp_path) is None
+
+
+def test_a_build_file_under_a_build_directory_does_not_count(tmp_path):
+    (tmp_path / "build" / "generated").mkdir(parents=True)
+    (tmp_path / "build" / "generated" / "build.gradle.kts").write_text('id("pitest")\n')
+    assert "no build.gradle found" in kotlin.mutation_unavailable(tmp_path)

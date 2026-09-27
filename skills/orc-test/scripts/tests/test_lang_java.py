@@ -194,7 +194,7 @@ def test_summary_finds_results_when_the_build_dir_was_moved_out_of_the_module(tm
 
 
 def test_summary_counts_a_suite_gradle_did_not_rerun(tmp_path):
-    """The reason #71 does not filter on mtime: Gradle writes no XML when the test task is
+    """The reason #86 does not filter on mtime: Gradle writes no XML when the test task is
     UP-TO-DATE, which is the common case on a re-run. A suite that passed and was not rerun still
     passed, and must not measure as zero."""
     (tmp_path / ".git").mkdir()

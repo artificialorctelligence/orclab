@@ -52,18 +52,59 @@ verify { rule { minBound(80) } } } }` in the build file. Override the whole comm
 `languages.kotlin.coverage` in `.orclab/test.yaml` when the default runs the wrong module.
 
 ## Mutation (TCE)
-Pitest 1.30.0 via the `info.solidsoft.pitest` Gradle plugin — same as Java's Gradle path, same
-report location (`build/reports/pitest/mutations.xml`), read by the same `pitest.parse`. Plain
-Pitest runs against Kotlin bytecode and reports mutants in compiler-generated code (null checks,
-default-argument dispatchers) that no test could plausibly kill — junk, not real survivors.
+Pitest, and on Android **without a Gradle plugin, because none works** — confirmed live 2026-09-27
+(BACKLOG #88). `info.solidsoft.pitest`'s own FAQ: *"Short answer is: not directly"*, pointing at
+Karol Wrótniak's Android fork; that fork (`pl.droidsonroids.gradle.pitest`) last shipped **0.2.12 in
+November 2022** and on Gradle 9 fails to apply at all — *"Cannot mutate configuration container for
+buildscript of project ':app'"*. Pitest itself is current (1.30.0, August 2026) and works fine; it
+only needs a classpath. A plain `JavaExec` task named `pitest` in the app module is the whole thing,
+and `mutation_unavailable` looks for that word in any of the project's build files:
 
-**Arcmutate's Kotlin plugin** (`com.arcmutate:pitest-kotlin-plugin`, requires pitest ≥ 1.22.0)
-filters those out. It is commercial, but free for open source — verified by an
-`arcmutate-licence.txt` file at the project root, which `cli.py` does not check; instead
-`licence.open_source(root)` reads the project's own `LICENSE`/`LICENCE`/`COPYING` file or its
-`pyproject.toml`/`package.json` `license` field, the same declaration every other gate already
-reads, never a new setting. The original `pitest-kotlin` open-source plugin is unmaintained —
-don't reach for it.
+```kotlin
+val pitestTool: Configuration by configurations.creating
+dependencies {
+    pitestTool("org.pitest:pitest-command-line:1.30.0")
+    pitestTool("org.apache.commons:commons-text:1.15.0")   // pitest's XML writer needs it
+}
+
+afterEvaluate {
+    val unitTest = tasks.named<Test>("testDebugUnitTest")
+    val mainClasses = layout.buildDirectory.dir("tmp/kotlin-classes/debug")
+    tasks.register<JavaExec>("pitest") {
+        dependsOn(unitTest)
+        workingDir = projectDir
+        mainClass.set("org.pitest.mutationtest.commandline.MutationCoverageReport")
+        classpath(pitestTool, mainClasses, provider { unitTest.get().classpath })
+        doFirst {
+            val code = mainClasses.get().asFile.path
+            args("--classPath", (listOf(code) + unitTest.get().classpath.files.map { it.path }).joinToString(":"),
+                 "--mutableCodePaths", code,
+                 "--targetClasses", "<your package>.*", "--targetTests", "<your package>.*",
+                 "--sourceDirs", "src/main/kotlin",
+                 "--reportDir", "${rootProject.projectDir}/build/reports/pitest",
+                 "--outputFormats", "XML", "--threads", "4", "--timeoutConst", "15000")
+        }
+    }
+}
+```
+
+Four things in there each cost a run to find:
+
+- **`workingDir = projectDir`.** Robolectric reads the merged-resources APK by a path relative to the
+  module. Run from the language's directory and it resolves outside the project: every Robolectric
+  test dies with `Failed to open APK ... Error -2147483643` and pitest reports the build unsuitable.
+- **The code under test on `classpath` as well as in `--classPath`.** With only pitest's own jars on
+  the JVM classpath, its pre-scan finds nothing and it exits `No mutations found`, which reads
+  exactly like a wrong filter.
+- **`commons-text`.** `pitest-command-line` does not bring it, and without it the run completes and
+  then dies writing the report: `ClassNotFoundException: org.apache.commons.text.StringEscapeUtils`.
+- **`--timeoutConst 15000`.** Robolectric boots an Android runtime per test class; the default
+  allowance is sized for plain JVM tests and scores most mutants as timeouts.
+- **`--reportDir` named explicitly**, for the same reason Kover's is: Flutter relocates the build
+  directory and `pitest.find` searches `<language dir>/build/reports/pitest`.
+
+Last real run: orcweather, 2026-09-27 — 265 mutations, 130 killed, **49%**, 66 with no coverage,
+48 seconds over 29 test classes on this machine.
 
 ## Test lint
 detekt (no version pinned; run via its CLI). It has no test-specific rule set — an `@Disabled`

@@ -73,14 +73,12 @@ The `source.source` field decides what happens next, and the two cases genuinely
 
 ### `"directory"` — the source is the live working tree
 
-Nothing to fetch — the marketplace reads the project directory directly. But **it installs what is
-committed there, not the working tree**: measured 2026-09-27 (BACKLOG #74), an uncommitted fix was
-absent from `~/.claude/plugins/cache/` after an uninstall/install that both reported success, and
-present after the same pair following a commit. So if `git status --porcelain` prints anything, say
-so and commit before Step 3, or the reinstall will look like it worked and change nothing.
+Nothing to refresh. The marketplace reads the project directory directly, so whatever is committed
+(or even uncommitted) there right now is what gets installed. Go straight to Step 3.
 
-"Installed" and "pushed" can still diverge — a commit is enough to be installed and not enough to be
-in a cloud session, which is the cloud path above.
+Worth telling the user if their working tree is dirty: a directory-sourced install picks up
+uncommitted changes, which is usually what you want while developing, but it means "installed" and
+"pushed" can quietly diverge.
 
 ### `"github"` — there is a cached clone, and it does NOT auto-refresh
 
@@ -135,6 +133,15 @@ Confirm the version from Step 1 is now present. Report the real before-and-after
 expected version isn't there, say the reinstall did not work** and stop — do not report success
 because the commands exited cleanly. Older version directories sticking around alongside the new
 one is normal and not a problem.
+
+**Say the install path, not just the version.** A plugin installs to
+`~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`, so a version bump — including one
+another session committed while this one was working — *moves* it. Anything holding an absolute
+versioned path keeps running the old copy with no error at any point: every Orclab skill invokes its
+own scripts by exactly such a path, and on 2026-09-27 a session spent an hour reading a stale
+`run.py` at the previous version's path and concluded the reinstall had not worked (BACKLOG #89).
+Print the new directory, and if this session has been calling a script under the old one, say that
+the path has changed.
 
 ## Step 5: Tell them about the fresh session
 

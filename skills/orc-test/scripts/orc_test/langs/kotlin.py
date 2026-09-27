@@ -83,11 +83,25 @@ def coverage_parse(root, out):
 
 
 def mutation_unavailable(root, target=None):
-    build_file = _find_build_gradle(root)
-    if build_file is None:
+    """Whether a `pitest` task exists to run — decided by *any* of the project's build files.
+
+    Not just the first one `_find_build_gradle` returns, which in a Gradle project is the root's and
+    names no module's tooling: orcweather's pitest is declared in `app/build.gradle.kts`, the only
+    place it can be, and TCE read "does not apply the pitest plugin" beside a working `gradlew
+    :app:pitest` (2026-09-27; BACKLOG #88).
+
+    "pitest" rather than the plugin id, because on Android there is no plugin to apply — neither
+    `info.solidsoft.pitest` nor the four-year-stale Android fork works on AGP, and a hand-written
+    `JavaExec` task named `pitest` is how a project gets there. `languages/kotlin.md` has the task.
+    """
+    builds = [f for pattern in ("build.gradle*", "*/build.gradle*", "*/*/build.gradle*")
+              for f in sorted(pathlib.Path(root).glob(pattern))
+              if not any(part in SKIP_DIRS for part in f.relative_to(root).parts)]
+    if not builds:
         return "no build.gradle found at or below the project root"
-    build = build_file.read_text()
-    return None if "pitest" in build else "Gradle project does not apply the pitest plugin (info.solidsoft.pitest)"
+    if any("pitest" in f.read_text() for f in builds):
+        return None
+    return "no `pitest` task in any build.gradle — see languages/kotlin.md (no Gradle plugin works on Android)"
 
 
 def mutation_cmd(root, target, out):
@@ -105,7 +119,7 @@ def _test_dirs(root, target):
     `src/test` is the single-module layout. A Gradle project can have any number of modules, and an
     Android app's tests live in `app/src/test` — pointed at the language root's `src/test` there,
     detekt is handed a path that does not exist, writes no report, and `analyze` says `lint: not
-    run` on a project whose tests are right there (orcweather, 2026-09-27; BACKLOG #72).
+    run` on a project whose tests are right there (orcweather, 2026-09-27; BACKLOG #87).
     """
     root = pathlib.Path(root)
     if target:

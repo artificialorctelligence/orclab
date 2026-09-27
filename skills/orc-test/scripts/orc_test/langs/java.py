@@ -142,7 +142,7 @@ def test_summary(root, cp):
     (BACKLOG #67). Gradle removes the results of a test task that lost its sources (confirmed live,
     Gradle 9.3.1), so our own module's results cannot go stale.
 
-    Only counting XML this run wrote was tried and reverted (#71): Gradle writes nothing at all when
+    Only counting XML this run wrote was tried and reverted (#86): Gradle writes nothing at all when
     the task is UP-TO-DATE, which is the common case on a re-run, so a green suite measured as zero
     — the same symptom, one layer down. What the repository-wide search does expose is a *foreign*
     module's old results: a Flutter `android/` holds the relocated build directories of every

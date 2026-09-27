@@ -5315,7 +5315,7 @@ Resolving this means either replacing the "not established" sentence with a real
 recording that the two are unrelated so nobody re-opens it. Either way the paragraph in
 `car-android-auto` is what changes.
 
-## #70: one orc-test test passes alone and fails in the full suite — order dependence, not a real failure
+## #85: one orc-test test passes alone and fails in the full suite — order dependence, not a real failure
 
 Found 2026-09-26 while adding #68's coverage override, and present on a clean tree, so it is not
 that change: `tests/test_runner.py::test_run_stream_appends_eta_when_progress_regex_reads_done_of_total`
@@ -5368,7 +5368,7 @@ Whether cross-marketplace dependency resolution works from a local-path marketpl
 and would have to be measured before trusting it — not inferred from the docs, which do not
 address that combination.
 
-## #71: a relocated Gradle build directory made `analyze` report `0 tests` on a green suite (RESOLVED 2026-09-26)
+## #86: a relocated Gradle build directory made `analyze` report `0 tests` on a green suite (RESOLVED 2026-09-26)
 
 Found 2026-09-26 running `/orc-test generate --lang kotlin` on orcweather: `analyze` printed
 `Kotlin: tests failed; nothing measured` and refused to go on, with `BUILD SUCCESSFUL` and 23
@@ -5470,7 +5470,7 @@ Do not resolve this by adding an empty `[project]` table to silence the message.
 the gate print a number while Orclab's one real dependency still went undeclared, which is worse
 than the honest "nothing declared" it prints today.
 
-## #72: Kotlin's test lint looked for `src/test` at the language root, so a module layout got no lint at all (RESOLVED 2026-09-27)
+## #87: Kotlin's test lint looked for `src/test` at the language root, so a module layout got no lint at all (RESOLVED 2026-09-27)
 
 Found 2026-09-27 installing detekt to close orcweather's last open gate. `analyze` printed
 `lint: not run — detekt wrote no report`, and the command it had run was
@@ -5489,7 +5489,7 @@ because PMD is not installed on this machine and `--dir` taking more than one pa
 rather than something seen to work; fixing it blind would be a second unverified path in place of a
 verified-wrong one.
 
-## #73: two of `analyze`'s three gates are absent by default on Kotlin, and one of them has no working tool at all
+## #88: two of `analyze`'s three gates are absent by default on Kotlin, and one of them has no working tool at all
 
 Raised 2026-09-27 by direflail, after orcweather's Kotlin coverage reached 82% and the same report
 read `TCE not measurable` and `lint: not run`. Coverage is the only one of the three gates that a
@@ -5506,14 +5506,25 @@ is: not directly"*, pointing at Karol Wrótniak's fork. That fork,
    > Cannot mutate configuration container for buildscript of project ':app' using create(String).
 ```
 
-So for every Android or Flutter project Orclab measures, TCE is not a missing install — there is
-nothing to install. Two things follow. The message should say that rather than naming a plugin that
-cannot work there ("no mutation tool supports Android Gradle projects; the fork is four years
-stale"), which is a change to `kotlin.mutation_unavailable` keyed on the Android plugin being
-applied. And the route worth investigating is Pitest without Gradle at all: pitest core is alive
-(1.30.0, August 2026), and `org.pitest.mutationtest.commandline.MutationCoverageReport` takes
-`--classPath`, `--targetClasses` and `--targetTests` — an Android unit-test variant has compiled
-classes and a test runtime classpath on disk, so the plugin may simply be unnecessary. Unproven.
+**The route around it is proven, the same day.** Pitest without any Gradle plugin: a plain
+`JavaExec` task running `org.pitest.mutationtest.commandline.MutationCoverageReport` against the
+unit-test classpath. orcweather now has one, and it reported **265 mutations, 130 killed (49%)** over
+29 test classes including the Robolectric ones, in 48 seconds. `languages/kotlin.md` carries the task
+and the four things that each cost a run to discover — the working directory must be the module or
+Robolectric cannot open the merged-resources APK; the code has to be on the JVM classpath as well as
+in `--classPath` or the pre-scan finds nothing; `commons-text` is missing from
+`pitest-command-line`'s own dependencies; and Robolectric needs `--timeoutConst` raised or most
+mutants score as timeouts.
+
+Two Orclab changes came out of it and are done: `mutation_unavailable` reads *any* of the project's
+build files rather than only the root's (orcweather declares the task in `app/build.gradle.kts`,
+the only place it can, and TCE said "does not apply the pitest plugin" beside a working
+`gradlew :app:pitest`), and its message now points at `languages/kotlin.md` instead of naming a
+plugin that cannot work on Android.
+
+What remains: neither `stack-android-native` nor `stack-flutter` carries this task, so every Android
+project still has to be told. That is the same gap as the detekt one below — both stack skills need
+a section that `/orc-code` writes on adoption.
 
 **Test lint is installable but nothing asks a project to adopt it.** detekt is a CLI, not a project
 dependency, so there is nothing for a project to declare — but `/orc-code`'s quality mode step 1
@@ -5527,15 +5538,32 @@ Worth knowing for whoever installs it: detekt's latest **stable** is 1.23.8 (Feb
 against Kotlin 2.0.21); 2.0.0 has been in alpha for a year (alpha.6, August 2026). 1.23.8 parsed
 orcweather's Kotlin 2.4.0 sources without complaint, so the front-end version gap did not bite here.
 
-## #74: `/orc-reload` says a directory-sourced install picks up an uncommitted working tree; it does not
+## #89: a reinstall looked like it changed nothing, because the version bump moved the install path (RESOLVED 2026-09-27)
 
-Found 2026-09-27: a fix to `kotlin.py` was saved but not committed, `claude plugin uninstall` and
-`install` both reported success, and the installed copy under `~/.claude/plugins/cache/` did not
-contain the new function — the command that ran afterwards was still the old one. Committing first
-and reinstalling put it there. Two earlier reinstalls in the same session appeared to work because
-both followed a commit.
+Found 2026-09-27, and worth recording mostly for how wrong the first diagnosis was. A fix to
+`kotlin.py` was committed, `claude plugin uninstall` and `install` both reported success, and
+`grep _test_dirs ~/.claude/plugins/cache/orclab/orclab/0.26.1/.../kotlin.py` found nothing — the
+command `/orc-test` ran afterwards was still the old one.
 
-`skills/orc-reload/SKILL.md` says the opposite under `"directory"` — *"whatever is committed (or even
-uncommitted) there right now is what gets installed"* — and warns that "installed" and "pushed" can
-diverge. The real divergence is narrower and the other way round: installed tracks **committed**,
-not the working tree. Corrected in the skill, with the reinstall step now saying to commit first.
+The first conclusion was that a directory-sourced install takes the committed tree and not the
+working tree, and `skills/orc-reload/SKILL.md` was edited to say so. That was wrong, and it was
+wrong in the way worth watching for: two reinstalls in the same session had appeared to work, one had
+appeared not to, and "did I commit?" was the difference that happened to correlate.
+
+What actually happened: another session working in this repo committed `Bump version to 0.27.0`
+in between. `claude plugin install` installs to `cache/<marketplace>/<plugin>/<version>/`, so the
+new copy went to `.../0.27.0/`, which had the fix all along — while the session kept invoking
+`.../0.26.1/skills/orc-test/scripts/run.py`, the absolute path it was handed when it started. The
+skill edit is reverted.
+
+**The gap this leaves in `/orc-reload` is real, and is the other one.** Step 4 checks that the new
+version is present in the cache; nothing says that the *path* moved, and a caller holding an
+absolute versioned path — which is exactly how every Orclab skill invokes its own scripts, and how
+this session had been calling `run.py` for hours — silently keeps running the old code with no error
+at any point. Step 5 now says so.
+
+Two further things this ran into, both worth their own attention: another session commits into this
+repository while a session is working in it (this one's commits landed on top of three of theirs),
+and `BACKLOG.md` is the file both append to. And entries #70 to #81 already existed when this
+session filed what it called #70 — it had read only the region around #68 and taken the end of that
+region for the end of the file. Five entries were renumbered to #85 to #89 afterwards.
